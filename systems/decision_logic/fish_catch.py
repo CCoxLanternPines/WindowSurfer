@@ -3,3 +3,10 @@ def should_buy_fish(candle, window_data, tick, cooldowns) -> bool:
     if cooldowns["fish_catch"] <= 0 and tunnel_pos is not None and tunnel_pos < 0.6:
         return True
     return False
+
+
+def should_sell_fish(candle, window_data, note) -> bool:
+    tunnel_pos = window_data.get("tunnel_position")
+    if tunnel_pos is not None and tunnel_pos > 0.9:
+        return True
+    return False
