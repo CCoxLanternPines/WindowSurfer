@@ -18,9 +18,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--window", required=True, help="Candle window, e.g. 1m or 1h"
     )
     parser.add_argument(
+        "-v",
         "--verbose",
-        action="store_true",
-        help="Enable debug output",
+        action="count",
+        default=0,
+        help="Increase verbosity level (use -v or -vv)",
     )
     return parser.parse_args(argv)
 

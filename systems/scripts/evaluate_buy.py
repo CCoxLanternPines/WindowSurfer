@@ -39,7 +39,7 @@ def evaluate_buy_df(
     cooldowns: dict,
     last_triggered: dict,
     sim: bool = False,
-    verbose: bool = False,
+    verbose: int = 0,
     ledger=None  # <- Inject ledger if in RAM mode
 ) -> bool:
     """
@@ -92,7 +92,8 @@ def evaluate_buy_df(
     if should_buy_fish(candle, window_data, tick, cooldowns):
         cooldowns["fish_catch"] = 4
         last_triggered["fish_catch"] = tick
-        tqdm.write(f"[BUY] Fish Catch triggered at tick {tick}")
+        if verbose >= 1:
+            tqdm.write(f"[BUY] Fish Catch triggered at tick {tick}")
         if ledger:
             ledger.add_note(create_note("fish_catch"))
         triggered = True
@@ -101,7 +102,8 @@ def evaluate_buy_df(
     if should_buy_whale(candle, window_data, tick, cooldowns):
         cooldowns["whale_catch"] = 2
         last_triggered["whale_catch"] = tick
-        tqdm.write(f"[BUY] Whale Catch triggered at tick {tick}")
+        if verbose >= 1:
+            tqdm.write(f"[BUY] Whale Catch triggered at tick {tick}")
         if ledger:
             ledger.add_note(create_note("whale_catch"))
         triggered = True
@@ -110,12 +112,13 @@ def evaluate_buy_df(
     if should_buy_knife(candle, window_data, tick, cooldowns):
         cooldowns["knife_catch"] = 1
         last_triggered["knife_catch"] = tick
-        tqdm.write(f"[BUY] Knife Catch triggered at tick {tick}")
+        if verbose >= 1:
+            tqdm.write(f"[BUY] Knife Catch triggered at tick {tick}")
         if ledger:
             ledger.add_note(create_note("knife_catch"))
         triggered = True
 
-    if verbose:
+    if verbose >= 2:
         tunnel_height = tunnel_high - tunnel_low
         tunnel_pct = tunnel_pos * 100
         tqdm.write(

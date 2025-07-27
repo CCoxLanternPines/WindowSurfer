@@ -24,8 +24,8 @@ def esc_listener(should_exit_flag):
                 break
 
 
-def run_live(tag: str, window: str, verbose: bool = False) -> None:
-    if verbose:
+def run_live(tag: str, window: str, verbose: int = 0) -> None:
+    if verbose >= 1:
         tqdm.write(f"[LIVE] Running live mode for {tag} on window {window}")
     should_exit = []
 
@@ -49,13 +49,13 @@ def run_live(tag: str, window: str, verbose: bool = False) -> None:
         ) as pbar:
             for _ in range(remaining_secs):
                 if should_exit:
-                    if verbose:
+                    if verbose >= 1:
                         tqdm.write("\n🚪 ESC detected — exiting live mode.")
                     return
                 time.sleep(1)
                 pbar.update(1)
 
-        if verbose:
+        if verbose >= 1:
             tqdm.write("\n🕐 Top of hour reached! Restarting countdown...\n")
 
         candle = get_candle_data_json(tag, row_offset=0)

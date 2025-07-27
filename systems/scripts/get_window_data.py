@@ -55,8 +55,8 @@ def get_window_data_json(tag: str, window: str, candle_offset: int = 0) -> dict 
     return _extract_window_data(df, window, candle_offset)
 
 
-def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: bool = False) -> dict | None:
-    if verbose:
+def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: int = 0) -> dict | None:
+    if verbose >= 1:
         print(
             f"[get_window_data] tag={tag} window={window} candle_offset={candle_offset}"
         )
@@ -67,12 +67,12 @@ def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: bool
     try:
         df = pd.read_csv(path)
     except FileNotFoundError:
-        if verbose:
+        if verbose >= 1:
             print(f"[ERROR] Data file not found: {path}")
         return None
 
     if df.empty:
-        if verbose:
+        if verbose >= 1:
             print("[WARN] CSV is empty")
         return None
 
@@ -86,7 +86,7 @@ def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: bool
     window_df = df.iloc[start_idx:end_idx]
 
     if window_df.empty:
-        if verbose:
+        if verbose >= 1:
             print("[WARN] No candle data in computed window slice")
         return None
 
@@ -97,7 +97,7 @@ def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: bool
         last_candle = df.iloc[-1 - candle_offset]
         close = last_candle["close"]
     except IndexError:
-        if verbose:
+        if verbose >= 1:
             print(f"[ERROR] Not enough candles to read offset {candle_offset}")
         return None
 
@@ -112,7 +112,7 @@ def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: bool
         "window_position": round(window_position, 4)
     }
 
-    if verbose:
+    if verbose >= 2:
         print(f"[get_window_data] result={result}")
 
     return result
