@@ -128,4 +128,12 @@ def evaluate_buy_df(
             f"Window {{p={window_pos:.4f}}}"
         )
 
+    if verbose >= 2:
+        fish_decision = should_buy_fish(candle, window_data, tick, cooldowns)
+        whale_decision = should_buy_whale(candle, window_data, tick, cooldowns)
+        knife_decision = should_buy_knife(candle, window_data, tick, cooldowns)
+        summary = f"[BUY RESULT] Tick {tick} | Knife: {knife_decision} | Whale: {whale_decision} | Fish: {fish_decision}"
+        tqdm.write(summary)
+
+
     return triggered

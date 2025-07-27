@@ -34,11 +34,34 @@ def evaluate_sell_df(
 
         strategy = note.get("strategy")
 
-        if strategy == "fish_catch" and should_sell_fish(candle, window_data, note):
+    for note in notes:
+        entry_price = note.get("entry_price")
+        if not entry_price:
+            continue
+
+        current_price = candle.get("close")
+        gain_pct = (current_price - entry_price) / entry_price
+
+        if gain_pct < MIN_GAIN_PCT:
+            if verbose >= 2:
+                tqdm.write(f"[HOLD] {note['strategy']} | Tick {tick} | Gain {gain_pct:.2%} < Min Gain")
+            continue
+
+        strategy = note.get("strategy")
+
+        fish_decision = should_sell_fish(candle, window_data, note)
+        whale_decision = should_sell_whale(candle, window_data, note)
+        knife_decision = should_sell_knife(candle, window_data, note, verbose=verbose)
+
+        if strategy == "fish_catch" and fish_decision:
             sell_list.append(note)
-        elif strategy == "whale_catch" and should_sell_whale(candle, window_data, note):
+        elif strategy == "whale_catch" and whale_decision:
             sell_list.append(note)
-        elif strategy == "knife_catch" and should_sell_knife(candle, window_data, note, verbose=verbose):
+        elif strategy == "knife_catch" and knife_decision:
             sell_list.append(note)
+
+    if verbose >= 2:
+        tqdm.write(f"[EVAL] Active Notes: {len(notes)}")
+
 
     return sell_list
