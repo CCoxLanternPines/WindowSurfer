@@ -9,7 +9,7 @@ def evaluate_sell_df(
     window_data: dict,
     tick: int,
     notes: list[dict],
-    verbose: bool = False
+    verbose: int = 0
 ) -> list[dict]:
     """Given current market state and open notes, returns list of notes to be sold."""
     sell_list = []
@@ -23,7 +23,7 @@ def evaluate_sell_df(
         gain_pct = (current_price - entry_price) / entry_price
 
         if gain_pct < MIN_GAIN_PCT:
-            if verbose:
+            if verbose >= 2:
                 print(f"[HOLD] {note['strategy']} | Tick {tick} | Gain {gain_pct:.2%} < Min Gain")
             continue
 
@@ -33,7 +33,7 @@ def evaluate_sell_df(
             sell_list.append(note)
         elif strategy == "whale_catch" and should_sell_whale(candle, window_data, note):
             sell_list.append(note)
-        elif strategy == "knife_catch" and should_sell_knife(candle, window_data, note):
+        elif strategy == "knife_catch" and should_sell_knife(candle, window_data, note, verbose=verbose):
             sell_list.append(note)
 
     return sell_list
