@@ -17,7 +17,7 @@ def esc_listener(should_exit_flag):
     if not msvcrt:
         return
     while True:
-        if msvcrt.kbhit():
+        if msvcrt and msvcrt.kbhit():
             key = msvcrt.getch()
             if key == b'\x1b':  # ESC
                 should_exit_flag.append(True)
