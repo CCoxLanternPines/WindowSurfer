@@ -39,9 +39,9 @@ def run_simulation(tag: str, window: str, verbose: bool = False) -> None:
     precomputed_windows = [get_window_data_df(df, window, candle_offset=i) for i in range(total_rows)]
 
     cooldowns = {
-        "knife_catch": 0,
+        "knife_catch": 1,
         "whale_catch": 0,
-        "fish_catch": 0
+        "fish_catch": 2
     }
 
     last_triggered = {
@@ -151,15 +151,4 @@ def print_simulation_summary(ledger, ticks_run=None, candle_minutes=60) -> None:
 
         tqdm.write(f"Avg Gain %/mo:  {gain_per_month:.2%}")
         tqdm.write(f"Avg ROI %/mo:   {roi_per_month:.2%}")
-def get_avg_gain_per_month(self, candle_count: int, candle_minutes: int = 60) -> float:
-    """
-    Returns average gain percent per month over the simulation duration.
-    Based on average gain per trade, normalized across months.
-    """
-    if not candle_count:
-        return 0.0
 
-    months = max((candle_count * candle_minutes) / (30 * 24 * 60), 1)
-    total_gain = sum(float(n.get("gain_pct", 0)) for n in self.closed_notes)
-    avg_gain = total_gain / max(len(self.closed_notes), 1)
-    return avg_gain / months

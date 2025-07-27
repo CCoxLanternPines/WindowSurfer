@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import List, Dict
-
+import uuid
 
 class LedgerBase(ABC):
     """Abstract interface for ledger implementations."""
@@ -37,7 +37,10 @@ class RamLedger(LedgerBase):
     # Convenience helpers -------------------------------------------------
     def add_note(self, note: Dict) -> None:
         """Add a new open note to the ledger."""
+        if "note_id" not in note:
+            note["note_id"] = str(uuid.uuid4())
         self.open_notes.append(note)
+
 
     def close_note(self, note: Dict) -> None:
         """Move ``note`` from open to closed and update PnL."""
@@ -119,3 +122,5 @@ class RamLedger(LedgerBase):
         total_gain = sum(float(n.get("gain_pct", 0)) for n in self.closed_notes)
         avg_gain = total_gain / max(len(self.closed_notes), 1)
         return avg_gain / months
+    
+    
