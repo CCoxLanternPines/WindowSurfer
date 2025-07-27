@@ -83,7 +83,7 @@ def evaluate_buy_df(
             return False
 
     def create_note(strategy: str) -> dict:
-        entry_amount = 50.0
+        entry_amount = 25.0
         entry_usdt = close_price * entry_amount
         note = {
             "symbol": symbol,
