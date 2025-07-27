@@ -37,8 +37,9 @@ def listen_for_keys(tick_delay, should_exit_flag):
                     should_exit_flag.append(True)
 
 
-def run_simulation(tag: str, window: str) -> None:
-    tqdm.write(f"[SIM] Starting simulation for {tag} on window {window}")
+def run_simulation(tag: str, window: str, verbose: bool = False) -> None:
+    if verbose:
+        tqdm.write(f"[SIM] Starting simulation for {tag} on window {window}")
 
     root = find_project_root()
     path = root / "data" / "raw" / f"{tag.upper()}.csv"
@@ -46,7 +47,8 @@ def run_simulation(tag: str, window: str) -> None:
     total_rows = len(df)
 
     if total_rows == 0:
-        tqdm.write("❌ No data in CSV.")
+        if verbose:
+            tqdm.write("❌ No data in CSV.")
         return
 
     tick_delay = [0.15]
@@ -64,17 +66,20 @@ def run_simulation(tag: str, window: str) -> None:
     ) as pbar:
         for step in range(total_rows):
             if should_exit:
-                tqdm.write("\n🚪 ESC detected — exiting simulation early.")
+                if verbose:
+                    tqdm.write("\n🚪 ESC detected — exiting simulation early.")
                 break
 
-            candle = get_candle_data(tag, row_offset=step)
-            window_data = get_window_data(tag, window, candle_offset=step)
+            candle = get_candle_data(tag, row_offset=step, verbose=verbose)
+            window_data = get_window_data(tag, window, candle_offset=step, verbose=verbose)
             if candle and window_data:
-                evaluate_buy(candle, window_data)
+                evaluate_buy(candle, window_data, verbose=verbose)
             else:
-                 tqdm.write(f"[STEP {step+1}] ❌ Incomplete data (candle or window)")
+                if verbose:
+                    tqdm.write(f"[STEP {step+1}] ❌ Incomplete data (candle or window)")
 
             time.sleep(tick_delay[0])
             pbar.update(1)
 
-    tqdm.write("\n✅ Simulation complete.")
+    if verbose:
+        tqdm.write("\n✅ Simulation complete.")
