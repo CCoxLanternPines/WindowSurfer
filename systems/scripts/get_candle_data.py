@@ -70,7 +70,7 @@ def get_candle_data_json(tag: str, row_offset: int = 0) -> dict | None:
     return _extract_candle_row(df, row_offset)
 
 
-def get_candle_data(tag: str, row_offset: int = 0, verbose: bool = False) -> Dict[str, Any]:
+def get_candle_data(tag: str, row_offset: int = 0, verbose: int = 0) -> Dict[str, Any]:
     """Return the most recent candle for ``tag`` from the raw CSV data.
 
     Parameters
@@ -95,7 +95,7 @@ def get_candle_data(tag: str, row_offset: int = 0, verbose: bool = False) -> Dic
         If the requested row does not exist in the file.
     """
 
-    if verbose:
+    if verbose >= 1:
         print(f"[get_candle_data] tag={tag} row_offset={row_offset}")
 
     root = find_project_root()
@@ -137,7 +137,7 @@ def get_candle_data(tag: str, row_offset: int = 0, verbose: bool = False) -> Dic
         "volume": float(row["volume"]),
     }
 
-    if verbose:
+    if verbose >= 2:
         print(f"[get_candle_data] result={result}")
 
     return result
