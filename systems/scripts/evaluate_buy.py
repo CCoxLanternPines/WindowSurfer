@@ -66,6 +66,8 @@ def evaluate_buy_df(
     window_type = window_data.get("window", "1m")
 
     def create_note(strategy: str):
+        entry_amount = 50.0
+        entry_usdt = close_price * entry_amount
         return {
             "symbol": symbol,
             "strategy": strategy,
@@ -73,10 +75,11 @@ def evaluate_buy_df(
             "entry_ts": ts,
             "entry_tick": tick,
             "window": window_type,
-            "entry_usdt": close_price * 1.0,  # 1 unit placeholder
-            "entry_amount": 1.0,
+            "entry_usdt": entry_usdt,
+            "entry_amount": entry_amount,
             "status": "Open"
         }
+
 
     # 🐟 Fish Catch
     if should_buy_fish(candle, window_data, tick, cooldowns):

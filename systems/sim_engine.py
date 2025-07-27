@@ -8,6 +8,8 @@ from systems.scripts.get_window_data import get_window_data_df
 from systems.scripts.evaluate_buy import evaluate_buy_df
 from systems.scripts.evaluate_sell import evaluate_sell_df
 import pandas as pd
+from systems.utils.time import duration_from_candle_count
+
 
 def listen_for_keys(should_exit_flag: list) -> None:
     if not msvcrt:
@@ -58,8 +60,16 @@ def run_simulation(tag: str, window: str, verbose: bool = False) -> None:
         for step in range(total_rows):
             if should_exit:
                 tqdm.write("\n🚪 ESC detected — exiting simulation early.")
+                
+                # ✅ Get and print time range
+                elapsed = duration_from_candle_count(step + 1, candle_interval_minutes=60)
+                tqdm.write(f"⏱️  Simulated Range: {elapsed} ({step + 1} ticks of {total_rows})")
+
+                # ✅ Save and show ledger summary
                 save_ledger_to_file(ledger)
+                print_simulation_summary(ledger, ticks_run=step + 1)
                 break
+
 
 
             candle = precomputed_candles[step]
@@ -84,7 +94,18 @@ def run_simulation(tag: str, window: str, verbose: bool = False) -> None:
                     notes=ledger.get_active_notes(),
                     verbose=verbose,
                 )
+                
+                exit_price = candle["close"]
+                
                 for note in to_sell:
+                    
+                    note["exit_price"] = exit_price
+                    note["exit_ts"] = candle.get("ts", 0)
+                    note["exit_tick"] = step
+                    note["exit_usdt"] = exit_price * note["entry_amount"]
+                    note["gain_pct"] = (note["exit_usdt"] - note["entry_usdt"]) / note["entry_usdt"]
+                    note["status"] = "Closed"
+                    
                     ledger.close_note(note)
                     tqdm.write(
                         f"[SELL] Tick {step} | Strategy: {note['strategy']} | Gain: {note.get('gain_pct', 0):.2%}"
@@ -112,4 +133,33 @@ def save_ledger_to_file(ledger, filename="ledgersimulation.json") -> None:
 
     from tqdm import tqdm
     tqdm.write(f"\n🧾 Ledger saved to: {output_path}")
+    
+def print_simulation_summary(ledger, ticks_run=None, candle_minutes=60) -> None:
+    summary = ledger.get_summary()
 
+    tqdm.write("\n📊 Simulation Summary")
+    tqdm.write(f"Open Notes:     {summary['num_open']}")
+    tqdm.write(f"Closed Notes:   {summary['num_closed']}")
+    tqdm.write(f"Investment:     ${summary['total_invested_usdt']:.2f}")
+    tqdm.write(f"Net PnL:        ${summary['total_pnl_usdt']:.2f}")
+    tqdm.write(f"Avg Gain %:     {summary['total_gain_pct']:.2%}")
+    tqdm.write(f"Est Balance:    ${summary['estimated_kraken_balance']:.2f}")
+
+    if ticks_run:
+        gain_per_month = ledger.get_avg_gain_per_month(ticks_run, candle_minutes)
+        roi_per_month = ledger.get_roi_per_month(ticks_run, candle_minutes)
+
+        tqdm.write(f"Avg Gain %/mo:  {gain_per_month:.2%}")
+        tqdm.write(f"Avg ROI %/mo:   {roi_per_month:.2%}")
+def get_avg_gain_per_month(self, candle_count: int, candle_minutes: int = 60) -> float:
+    """
+    Returns average gain percent per month over the simulation duration.
+    Based on average gain per trade, normalized across months.
+    """
+    if not candle_count:
+        return 0.0
+
+    months = max((candle_count * candle_minutes) / (30 * 24 * 60), 1)
+    total_gain = sum(float(n.get("gain_pct", 0)) for n in self.closed_notes)
+    avg_gain = total_gain / max(len(self.closed_notes), 1)
+    return avg_gain / months

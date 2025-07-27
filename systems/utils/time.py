@@ -34,3 +34,28 @@ def parse_relative_time(value: str) -> tuple[float, float]:
     end = datetime.now(tz=timezone.utc).timestamp()
     start = end - delta.total_seconds()
     return start, end
+
+def duration_from_candle_count(candle_count: int, candle_interval_minutes: int = 60) -> str:
+    """
+    Converts a number of candles into a human-readable time duration.
+    Outputs years, months, days, hours (rounded, no zeroes).
+    """
+    total_minutes = candle_count * candle_interval_minutes
+    total_hours = total_minutes // 60
+
+    days, rem_hours = divmod(total_hours, 24)
+    years, rem_days = divmod(days, 365)
+    months, days = divmod(rem_days, 30)
+
+    parts = []
+    if years:
+        parts.append(f"{years}y")
+    if months:
+        parts.append(f"{months}mo")
+    if days:
+        parts.append(f"{days}d")
+    if rem_hours:
+        parts.append(f"{rem_hours}h")
+
+    return " ".join(parts)
+

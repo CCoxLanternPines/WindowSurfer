@@ -77,10 +77,45 @@ class RamLedger(LedgerBase):
         open_balance = sum(float(n.get("entry_usdt", 0)) for n in self.open_notes)
         estimated_balance = closed_balance + open_balance
 
+        invested_total = sum(
+            float(n.get("entry_usdt", 0)) for n in self.closed_notes + self.open_notes
+        )
+
         return {
             "num_open": num_open,
             "num_closed": num_closed,
             "total_pnl_usdt": total_pnl_usdt,
             "total_gain_pct": total_gain_pct,
             "estimated_kraken_balance": estimated_balance,
+            "total_invested_usdt": invested_total
         }
+        
+    def get_roi_per_month(self, candle_count: int, candle_minutes: int = 60) -> float:
+        """
+        Calculates ROI per month from closed trades.
+        ROI = (total pnl / total invested) / months
+        """
+        if not candle_count:
+            return 0.0
+
+        months = max((candle_count * candle_minutes) / (30 * 24 * 60), 1)
+        pnl = sum(n["exit_usdt"] - n["entry_usdt"] for n in self.closed_notes)
+        invested = sum(n["entry_usdt"] for n in self.closed_notes)
+
+        if invested == 0:
+            return 0.0
+
+        return pnl / invested / months
+
+    def get_avg_gain_per_month(self, candle_count: int, candle_minutes: int = 60) -> float:
+        """
+        Returns average gain percent per month over the simulation duration.
+        Based on average gain per trade, normalized across months.
+        """
+        if not candle_count:
+            return 0.0
+
+        months = max((candle_count * candle_minutes) / (30 * 24 * 60), 1)
+        total_gain = sum(float(n.get("gain_pct", 0)) for n in self.closed_notes)
+        avg_gain = total_gain / max(len(self.closed_notes), 1)
+        return avg_gain / months
