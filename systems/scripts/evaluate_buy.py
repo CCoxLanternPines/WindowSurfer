@@ -65,10 +65,10 @@ def evaluate_buy_df(
     symbol = candle.get("symbol", "UNKNOWN")
     window_type = window_data.get("window", "1m")
 
-    def create_note(strategy: str):
+    def create_note(strategy: str) -> dict:
         entry_amount = 50.0
         entry_usdt = close_price * entry_amount
-        return {
+        note = {
             "symbol": symbol,
             "strategy": strategy,
             "entry_price": close_price,
@@ -80,10 +80,17 @@ def evaluate_buy_df(
             "status": "Open"
         }
 
+        # Inject window memory if required
+        if strategy == "knife_catch":
+            note["window_position_at_entry"] = window_pos
+
+        return note
+
+
 
     # 🐟 Fish Catch
     if should_buy_fish(candle, window_data, tick, cooldowns):
-        cooldowns["fish_catch"] = 10
+        cooldowns["fish_catch"] = 4
         last_triggered["fish_catch"] = tick
         tqdm.write(f"[BUY] Fish Catch triggered at tick {tick}")
         if ledger:
@@ -92,7 +99,7 @@ def evaluate_buy_df(
 
     # 🐋 Whale Catch
     if should_buy_whale(candle, window_data, tick, cooldowns):
-        cooldowns["whale_catch"] = 5
+        cooldowns["whale_catch"] = 2
         last_triggered["whale_catch"] = tick
         tqdm.write(f"[BUY] Whale Catch triggered at tick {tick}")
         if ledger:
@@ -101,7 +108,7 @@ def evaluate_buy_df(
 
     # 🔪 Knife Catch
     if should_buy_knife(candle, window_data, tick, cooldowns):
-        cooldowns["knife_catch"] = 8
+        cooldowns["knife_catch"] = 1
         last_triggered["knife_catch"] = tick
         tqdm.write(f"[BUY] Knife Catch triggered at tick {tick}")
         if ledger:

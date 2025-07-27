@@ -13,8 +13,9 @@ def should_sell_knife(candle, window_data, note) -> bool:
     tunnel_pos = window_data.get("tunnel_position")
     window_pos = window_data.get("window_position")
     saved_window_pos = note.get("window_position_at_entry")
-
-    if tunnel_pos is not None and tunnel_pos > 0.9:
+    
+    if tunnel_pos is not None and tunnel_pos > 0.90:
         if saved_window_pos is not None and window_pos >= saved_window_pos:
+            print("[KNIFE] ✅ SELL triggered")
             return True
     return False
