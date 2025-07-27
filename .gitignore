@@ -27,6 +27,7 @@ Thumbs.db
 
 # Ignore data outputs
 data/raw/
+!data/raw/
 data/market/
 data/labeled/
 data/enriched/
@@ -44,3 +45,5 @@ kraken.yaml
 
 # Ignore all trained models
 data/models/model_*.json
+!data/raw/DOGEUSD.csv
+
