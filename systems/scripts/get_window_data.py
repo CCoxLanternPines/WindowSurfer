@@ -53,7 +53,7 @@ def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: bool
 
     range_val = ceiling - floor
     tunnel_position = (close - floor) / range_val if range_val != 0 else 0.5
-    window_position = floor / range_val if range_val != 0 else 0.0
+    window_position = floor if range_val != 0 else 0.0
 
     result = {
         "window_ceiling": round(ceiling, 8),
