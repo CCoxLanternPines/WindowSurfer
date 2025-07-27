@@ -24,14 +24,12 @@ def listen_for_keys(tick_delay, should_exit_flag):
     while True:
         if msvcrt.kbhit():
             key = msvcrt.getch()
-            if key == b'+':
-                tick_delay[0] = max(0.01, tick_delay[0] - 0.05)
-            elif key == b'-':
-                tick_delay[0] += 0.05
+            if key == b'-':
+                tick_delay[0] = min(1, tick_delay[0] + 0.05)
             elif key == b'=':
-                tick_delay[0] = 0.15
+                tick_delay[0] = max(0, tick_delay[0] - 0.05)
             elif key == b'\x08':  # Backspace
-                tick_delay[0] = 0.15
+                tick_delay[0] = .15
             elif key == b'\x1b':  # ESC
                 if not should_exit_flag:
                     should_exit_flag.append(True)
