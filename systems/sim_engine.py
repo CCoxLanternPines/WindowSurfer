@@ -7,8 +7,8 @@ import sys
 from systems.utils.path import find_project_root
 sys.path.append(str(find_project_root()))
 
-from systems.scripts.get_candle_data import get_candle_data
-from systems.scripts.get_window_data import get_window_data
+from systems.scripts.get_candle_data import get_candle_data_df
+from systems.scripts.get_window_data import get_window_data_df
 from systems.scripts.evaluate_buy import evaluate_buy
 
 try:
@@ -70,8 +70,8 @@ def run_simulation(tag: str, window: str, verbose: bool = False) -> None:
                     tqdm.write("\n🚪 ESC detected — exiting simulation early.")
                 break
 
-            candle = get_candle_data(tag, row_offset=step, verbose=verbose)
-            window_data = get_window_data(tag, window, candle_offset=step, verbose=verbose)
+            candle = get_candle_data_df(df, row_offset=step)
+            window_data = get_window_data_df(df, window, candle_offset=step)
             if candle and window_data:
                 evaluate_buy(candle, window_data, verbose=verbose)
             else:

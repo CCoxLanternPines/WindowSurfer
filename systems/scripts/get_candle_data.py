@@ -8,6 +8,68 @@ from typing import Dict, Any
 from systems.utils.path import find_project_root
 
 
+def _extract_candle_row(df, row_offset: int = 0) -> dict | None:
+    """Return a candle row from a dataframe if available."""
+    if df is None or df.empty or row_offset >= len(df):
+        return None
+
+    row = df.iloc[-(1 + row_offset)]
+    return {
+        "timestamp": int(row["timestamp"]),
+        "open": float(row["open"]),
+        "high": float(row["high"]),
+        "low": float(row["low"]),
+        "close": float(row["close"]),
+        "volume": float(row["volume"]),
+    }
+
+
+def get_candle_data_df(df, row_offset: int = 0) -> dict | None:
+    """Return candle data from a preloaded dataframe."""
+    try:
+        import pandas as pd  # noqa: F401
+    except Exception:  # pragma: no cover - pandas may not be installed
+        return None
+
+    return _extract_candle_row(df, row_offset)
+
+
+def get_candle_data_json(tag: str, row_offset: int = 0) -> dict | None:
+    """Load candle data from CSV for ``tag`` and return a row."""
+    try:
+        import pandas as pd
+    except Exception:  # pragma: no cover - pandas may not be installed
+        pd = None  # type: ignore
+
+    root = find_project_root()
+    path: Path = root / "data" / "raw" / f"{tag.upper()}.csv"
+
+    if pd is None:
+        if not path.exists():
+            return None
+        with path.open(newline="") as f:
+            reader = csv.DictReader(f)
+            last_rows = deque(reader, maxlen=row_offset + 1)
+            if len(last_rows) <= row_offset:
+                return None
+            row = last_rows[-(1 + row_offset)]
+            return {
+                "timestamp": int(row["timestamp"]),
+                "open": float(row["open"]),
+                "high": float(row["high"]),
+                "low": float(row["low"]),
+                "close": float(row["close"]),
+                "volume": float(row["volume"]),
+            }
+
+    try:
+        df = pd.read_csv(path)
+    except FileNotFoundError:
+        return None
+
+    return _extract_candle_row(df, row_offset)
+
+
 def get_candle_data(tag: str, row_offset: int = 0, verbose: bool = False) -> Dict[str, Any]:
     """Return the most recent candle for ``tag`` from the raw CSV data.
 

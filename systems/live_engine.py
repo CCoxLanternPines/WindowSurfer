@@ -4,6 +4,9 @@ import threading
 from datetime import datetime, timedelta, timezone
 from tqdm import tqdm
 
+from systems.scripts.get_candle_data import get_candle_data_json
+from systems.scripts.get_window_data import get_window_data_json
+
 try:
     import msvcrt  # Windows-only
 except ImportError:
@@ -54,3 +57,8 @@ def run_live(tag: str, window: str, verbose: bool = False) -> None:
 
         if verbose:
             tqdm.write("\n🕐 Top of hour reached! Restarting countdown...\n")
+
+        candle = get_candle_data_json(tag, row_offset=0)
+        window_data = get_window_data_json(tag, window, candle_offset=0)
+        if candle and window_data:
+            pass
