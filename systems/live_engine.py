@@ -43,7 +43,7 @@ def run_live(tag: str, window: str, verbose: int = 0, debug: bool = False) -> No
         if debug:
             if verbose >= 1:
                 tqdm.write("[DEBUG] Pretending top of hour reached — skipping wait.\n")
-                handle_top_of_hour(tag=tag, window=window, verbose=verbose)
+                handle_top_of_hour(tag=tag, window=window, verbose=verbose, debug=debug)
                 sys.exit()
             if verbose >= 1:
                 tqdm.write("[DEBUG] One-shot live execution complete. Exiting.")
@@ -73,10 +73,10 @@ def run_live(tag: str, window: str, verbose: int = 0, debug: bool = False) -> No
                 now = datetime.now(timezone.utc)
                 tqdm.write(f"\n🕐 Top of hour reached at {now.strftime('%Y-%m-%d %H:%M:%S %Z')} — Restarting countdown...\n")
 
-        handle_top_of_hour(tag=tag, window=window, verbose=verbose)
+        handle_top_of_hour(tag=tag, window=window, verbose=verbose, debug=debug)
 
 
-def handle_top_of_hour(tag: str, window: str, verbose: int = 0) -> None:
+def handle_top_of_hour(tag: str, window: str, verbose: int = 0, debug: bool = False) -> None:
     ensure_latest_candles(tag, lookback="48h", verbose=verbose)
 
     candle = get_candle_data_json(tag, row_offset=0)
@@ -108,7 +108,8 @@ def handle_top_of_hour(tag: str, window: str, verbose: int = 0) -> None:
             cooldowns=cooldowns,
             last_triggered=last_triggered,
             tag=tag,
-            verbose=verbose
+            verbose=verbose,
+            debug=debug
         )
 
     else:
@@ -123,10 +124,17 @@ def evaluate_live_tick(
     cooldowns: dict,
     last_triggered: dict,
     tag: str,
-    verbose: int = 0
+    verbose: int = 0,
+    debug: bool = False
 ) -> None:
     from systems.scripts.evaluate_buy import evaluate_buy_df
     from systems.scripts.evaluate_sell import evaluate_sell_df
+    from systems.scripts.execution_handler import sell_order
+    from systems.utils.resolve_symbol import resolve_symbol
+
+    live = not debug
+    symbols = resolve_symbol(tag)
+    kraken_symbol = symbols["kraken"]
 
     evaluate_buy_df(
         candle=candle,
@@ -137,7 +145,8 @@ def evaluate_live_tick(
         tag=tag,
         sim=False,
         verbose=verbose,
-        ledger=ledger
+        ledger=ledger,
+        debug=debug
     )
 
     to_sell = evaluate_sell_df(
@@ -152,11 +161,20 @@ def evaluate_live_tick(
     exit_price = candle["close"]
 
     for note in to_sell:
-        note["exit_price"] = exit_price
-        note["exit_ts"] = candle.get("ts", 0)
+        if live:
+            fills = sell_order(kraken_symbol, note["entry_amount"])
+            note["exit_price"] = fills["price"]
+            note["exit_amount"] = fills["amount"]
+            note["exit_usdt"] = fills["cost"]
+            note["fee"] = fills["fee"]
+            note["exit_ts"] = fills["ts"]
+            note["kraken_txid"] = fills["txid"]
+        else:
+            note["exit_price"] = exit_price
+            note["exit_ts"] = candle.get("ts", 0)
+            note["exit_usdt"] = exit_price * note["entry_amount"]
         note["exit_tick"] = 0
-        note["exit_usdt"] = exit_price * note["entry_amount"]
-        note["gain_pct"] = (note["exit_usdt"] - note["entry_usdt"]) / note["entry_usdt"]
+        note["gain_pct"] = (note.get("exit_usdt", 0) - note["entry_usdt"]) / note["entry_usdt"]
         note["status"] = "Closed"
         ledger.close_note(note)
 

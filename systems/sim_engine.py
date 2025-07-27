@@ -92,7 +92,8 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                     tag=tag,
                     sim=True,
                     verbose=verbose,
-                    ledger=ledger  # ✅ Inject ledger
+                    ledger=ledger,  # ✅ Inject ledger
+                    debug=False
                 )
 
                 to_sell = evaluate_sell_df(
