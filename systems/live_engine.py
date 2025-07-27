@@ -3,7 +3,6 @@ import sys
 import threading
 from datetime import datetime, timedelta, timezone
 from tqdm import tqdm
-from datetime import datetime, timezone
 from systems.scripts.get_candle_data import get_candle_data_json
 from systems.scripts.get_window_data import get_window_data_json
 from systems.fetch import fetch_missing_candles
