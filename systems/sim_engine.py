@@ -1,6 +1,9 @@
 
 import threading
-import msvcrt
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - Windows-only
+    msvcrt = None
 from tqdm import tqdm
 from systems.utils.path import find_project_root
 from systems.scripts.get_candle_data import get_candle_data_df
@@ -15,12 +18,11 @@ def listen_for_keys(should_exit_flag: list) -> None:
     if not msvcrt:
         return
     while True:
-        if msvcrt.kbhit():
+        if msvcrt and msvcrt.kbhit():
             key = msvcrt.getch()
             if key == b'\x1b':  # ESC
                 if not should_exit_flag:
                     should_exit_flag.append(True)
-                    
                     break
 
 def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
