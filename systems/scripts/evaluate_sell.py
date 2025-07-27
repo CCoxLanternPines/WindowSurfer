@@ -1,7 +1,7 @@
 from systems.decision_logic.fish_catch import should_sell_fish
 from systems.decision_logic.whale_catch import should_sell_whale
 from systems.decision_logic.knife_catch import should_sell_knife
-
+from tqdm import tqdm
 MIN_GAIN_PCT = 0.05  # Require at least +5% ROI to sell
 
 def evaluate_sell_df(
@@ -13,6 +13,10 @@ def evaluate_sell_df(
 ) -> list[dict]:
     """Given current market state and open notes, returns list of notes to be sold."""
     sell_list = []
+
+    if verbose >= 2:
+        tqdm.write(f"[EVAL] Evaluating Sell for 🐟🐋🔪")
+
 
     for note in notes:
         entry_price = note.get("entry_price")

@@ -24,6 +24,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=0,
         help="Increase verbosity level (use -v or -vv)",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Run live mode in debug mode (skip countdown, run immediately)",
+    )
+
     return parser.parse_args(argv)
 
 
@@ -38,7 +44,8 @@ def main(argv: list[str] | None = None) -> None:
     if mode == "sim":
         run_simulation(tag=tag, window=window, verbose=verbose)
     elif mode == "live":
-        run_live(tag=tag, window=window, verbose=verbose)
+        run_live(tag=tag, window=window, verbose=verbose, debug=args.debug)
+
     else:
         print("Error: --mode must be either 'sim' or 'live'", file=sys.stderr)
         sys.exit(1)

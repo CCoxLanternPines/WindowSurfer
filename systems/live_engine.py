@@ -3,7 +3,7 @@ import sys
 import threading
 from datetime import datetime, timedelta, timezone
 from tqdm import tqdm
-
+from datetime import datetime, timezone
 from systems.scripts.get_candle_data import get_candle_data_json
 from systems.scripts.get_window_data import get_window_data_json
 
@@ -24,50 +24,133 @@ def esc_listener(should_exit_flag):
                 break
 
 
-def run_live(tag: str, window: str, verbose: int = 0, debug = False) -> None:
+def run_live(tag: str, window: str, verbose: int = 0, debug: bool = False) -> None:
     if verbose >= 1:
         tqdm.write(f"[LIVE] Running live mode for {tag} on window {window}")
+
     should_exit = []
 
     if msvcrt:
         threading.Thread(target=esc_listener, args=(should_exit,), daemon=True).start()
 
-    while not should_exit:
+    loop_forever = not debug
+
+    while True:
         if debug:
-            if verbose:
-                tqdm.write("[DEBUG] Skipping countdown, running top-of-hour logic now...")
-            run_now = True
+            if verbose >= 1:
+                tqdm.write("[DEBUG] Pretending top of hour reached — skipping wait.\n")
+                handle_top_of_hour(tag=tag, window=window, verbose=verbose)
+                sys.exit()
+            if verbose >= 1:
+                tqdm.write("[DEBUG] One-shot live execution complete. Exiting.")
+            break
         else:
             now = datetime.utcnow().replace(tzinfo=timezone.utc)
-            top_of_hour = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
-            total_secs = 3600
-            elapsed_secs = int(now.minute * 60 + now.second)
-            remaining_secs = total_secs - elapsed_secs
-            run_now = False
-            total_secs = 3600
-        elapsed_secs = int(now.minute * 60 + now.second)
-        remaining_secs = total_secs - elapsed_secs
+            elapsed_secs = now.minute * 60 + now.second
+            remaining_secs = 3600 - elapsed_secs
 
-        with tqdm(
-            total=total_secs,
-            initial=elapsed_secs,
-            desc="⏳ Time to next hour",
-            bar_format="{l_bar}{bar}| {percentage:3.0f}% {remaining}s",
-            leave=True,
-            dynamic_ncols=True
-        ) as pbar:
-            for _ in range(remaining_secs):
-                if should_exit:
-                    if verbose >= 1:
-                        tqdm.write("\n🚪 ESC detected — exiting live mode.")
-                    return
-                time.sleep(1)
-                pbar.update(1)
+            with tqdm(
+                total=3600,
+                initial=elapsed_secs,
+                desc="⏳ Time to next hour",
+                bar_format="{l_bar}{bar}| {percentage:3.0f}% {remaining}s",
+                leave=True,
+                dynamic_ncols=True
+            ) as pbar:
+                for _ in range(remaining_secs):
+                    if should_exit:
+                        if verbose >= 1:
+                            tqdm.write("\n🚪 ESC detected — exiting live mode.")
+                        return
+                    time.sleep(1)
+                    pbar.update(1)
+
+            if verbose >= 0:
+                now = datetime.now(timezone.utc)
+                tqdm.write(f"\n🕐 Top of hour reached at {now.strftime('%Y-%m-%d %H:%M:%S %Z')} — Restarting countdown...\n")
+
+
+        handle_top_of_hour(tag=tag, window=window, verbose=verbose)
+
+
+def handle_top_of_hour(tag: str, window: str, verbose: int = 0) -> None:
+    candle = get_candle_data_json(tag, row_offset=0)
+    window_data = get_window_data_json(tag, window, candle_offset=0)
+
+    if verbose >= 2:
+        tqdm.write("[TRACE] Candle and window data pulled.")
+
+    if candle and window_data:
+        from systems.scripts.ledger import RamLedger
+
+        # Initialize on first run, or eventually pass as arg
+        ledger = RamLedger()
+        cooldowns = {
+            "knife_catch": 1,
+            "whale_catch": 0,
+            "fish_catch": 2
+        }
+        last_triggered = {
+            "knife_catch": None,
+            "whale_catch": None,
+            "fish_catch": None
+        }
+
+        evaluate_live_tick(
+            candle=candle,
+            window_data=window_data,
+            ledger=ledger,
+            cooldowns=cooldowns,
+            last_triggered=last_triggered,
+            verbose=verbose
+        )
+
+        pass
+    else:
+        if verbose >= 1:
+            tqdm.write("[WARN] Missing candle or window data. Skipping this cycle.")
+
+def evaluate_live_tick(
+    candle: dict,
+    window_data: dict,
+    ledger,
+    cooldowns: dict,
+    last_triggered: dict,
+    verbose: int = 0
+) -> None:
+    from systems.scripts.evaluate_buy import evaluate_buy_df
+    from systems.scripts.evaluate_sell import evaluate_sell_df
+
+    evaluate_buy_df(
+        candle=candle,
+        window_data=window_data,
+        tick=0,  # No time series index in live mode
+        cooldowns=cooldowns,
+        last_triggered=last_triggered,
+        sim=False,
+        verbose=verbose,
+        ledger=ledger
+    )
+
+    to_sell = evaluate_sell_df(
+        candle=candle,
+        window_data=window_data,
+        tick=0,
+        notes=ledger.get_active_notes(),
+        verbose=verbose
+    )
+
+    exit_price = candle["close"]
+
+    for note in to_sell:
+        note["exit_price"] = exit_price
+        note["exit_ts"] = candle.get("ts", 0)
+        note["exit_tick"] = 0
+        note["exit_usdt"] = exit_price * note["entry_amount"]
+        note["gain_pct"] = (note["exit_usdt"] - note["entry_usdt"]) / note["entry_usdt"]
+        note["status"] = "Closed"
+        ledger.close_note(note)
 
         if verbose >= 1:
-            tqdm.write("\n🕐 Top of hour reached! Restarting countdown...\n")
-
-        candle = get_candle_data_json(tag, row_offset=0)
-        window_data = get_window_data_json(tag, window, candle_offset=0)
-        if candle and window_data:
-            pass
+            from tqdm import tqdm
+            tqdm.write(f"[SELL] Live Tick | Strategy: {note['strategy']} | Gain: {note.get('gain_pct', 0):.2%}")

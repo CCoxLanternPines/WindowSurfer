@@ -50,7 +50,10 @@ def evaluate_buy_df(
         LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         open(LOG_PATH, "w").close()
         _log_initialized["sim"] = True
-    
+
+    if verbose >= 2:
+        tqdm.write(f"[EVAL] Evaluating Buy for 🐟🐋🔪")
+
     tunnel_pos = window_data.get("tunnel_position", 0)
     window_pos = window_data.get("window_position", 0)
     tunnel_high = window_data.get("window_ceiling", 0)
@@ -85,9 +88,7 @@ def evaluate_buy_df(
             note["window_position_at_entry"] = window_pos
 
         return note
-
-
-
+    
     # 🐟 Fish Catch
     if should_buy_fish(candle, window_data, tick, cooldowns):
         cooldowns["fish_catch"] = 4
@@ -118,7 +119,7 @@ def evaluate_buy_df(
             ledger.add_note(create_note("knife_catch"))
         triggered = True
 
-    if verbose >= 2:
+    if verbose >= 3:
         tunnel_height = tunnel_high - tunnel_low
         tunnel_pct = tunnel_pos * 100
         tqdm.write(
