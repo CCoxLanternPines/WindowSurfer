@@ -1,83 +1,74 @@
-import time
+
 import threading
-import pandas as pd
+import msvcrt
 from tqdm import tqdm
-
-import sys
 from systems.utils.path import find_project_root
-sys.path.append(str(find_project_root()))
-
 from systems.scripts.get_candle_data import get_candle_data_df
 from systems.scripts.get_window_data import get_window_data_df
-from systems.scripts.evaluate_buy import evaluate_buy
+from systems.scripts.evaluate_buy import evaluate_buy_df
+import pandas as pd
 
-try:
-    import msvcrt  # Windows only
-except ImportError:
-    msvcrt = None
-
-
-def listen_for_keys(tick_delay, should_exit_flag):
-    """Speed controls for +, -, =, Backspace, ESC"""
+def listen_for_keys(should_exit_flag: list) -> None:
     if not msvcrt:
         return
     while True:
         if msvcrt.kbhit():
             key = msvcrt.getch()
-            if key == b'-':
-                tick_delay[0] = min(1, tick_delay[0] + 0.05)
-            elif key == b'=':
-                tick_delay[0] = max(0, tick_delay[0] - 0.05)
-            elif key == b'\x08':  # Backspace
-                tick_delay[0] = .15
-            elif key == b'\x1b':  # ESC
+            if key == b'\x1b':  # ESC
                 if not should_exit_flag:
                     should_exit_flag.append(True)
-
+                    break
 
 def run_simulation(tag: str, window: str, verbose: bool = False) -> None:
-    if verbose:
-        tqdm.write(f"[SIM] Starting simulation for {tag} on window {window}")
+    print(f"[SIM] Running simulation for {tag} on window {window}")
 
-    root = find_project_root()
-    path = root / "data" / "raw" / f"{tag.upper()}.csv"
-    df = pd.read_csv(path)
+    project_root = find_project_root()
+    data_path = project_root / "data/raw" / f"{tag}.csv"
+    df = pd.read_csv(data_path)
+
+    # Cache candle and window data
     total_rows = len(df)
+    precomputed_candles = [get_candle_data_df(df, row_offset=i) for i in range(total_rows)]
+    precomputed_windows = [get_window_data_df(df, window, candle_offset=i) for i in range(total_rows)]
 
-    if total_rows == 0:
-        if verbose:
-            tqdm.write("❌ No data in CSV.")
-        return
+    cooldowns = {
+        "knife_catch": 0,
+        "whale_catch": 0,
+        "fish_catch": 0
+    }
 
-    tick_delay = [0.15]
+    last_triggered = {
+        "knife_catch": None,
+        "whale_catch": None,
+        "fish_catch": None
+    }
+
     should_exit = []
 
-    if msvcrt:
-        threading.Thread(target=listen_for_keys, args=(tick_delay, should_exit), daemon=True).start()
+    # Start ESC listener
+    listener_thread = threading.Thread(target=listen_for_keys, args=(should_exit,), daemon=True)
+    listener_thread.start()
 
-    with tqdm(
-        total=total_rows,
-        desc="📉 Sim Progress",
-        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} rows",
-        leave=True,
-        dynamic_ncols=True
-    ) as pbar:
+    with tqdm(total=total_rows, desc="📉 Sim Progress", dynamic_ncols=True) as pbar:
         for step in range(total_rows):
             if should_exit:
-                if verbose:
-                    tqdm.write("\n🚪 ESC detected — exiting simulation early.")
+                tqdm.write("\n🚪 ESC detected — exiting simulation early.")
                 break
 
-            candle = get_candle_data_df(df, row_offset=step)
-            window_data = get_window_data_df(df, window, candle_offset=step)
+            candle = precomputed_candles[step]
+            window_data = precomputed_windows[step]
+
             if candle and window_data:
-                evaluate_buy(candle, window_data, verbose=verbose)
+                evaluate_buy_df(
+                    candle=candle,
+                    window_data=window_data,
+                    tick=step,
+                    cooldowns=cooldowns,
+                    last_triggered=last_triggered,
+                    sim=True,
+                    verbose=verbose
+                )
             else:
-                if verbose:
-                    tqdm.write(f"[STEP {step+1}] ❌ Incomplete data (candle or window)")
+                tqdm.write(f"[STEP {step+1}] ❌ Incomplete data (candle or window)")
 
-            time.sleep(tick_delay[0])
             pbar.update(1)
-
-    if verbose:
-        tqdm.write("\n✅ Simulation complete.")
