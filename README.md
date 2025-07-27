@@ -29,14 +29,14 @@ Decision logic lives under ``systems/decision_logic`` with one module per strate
 Install dependencies (pandas, tqdm, requests) and run ``bot.py`` with arguments:
 
 ```bash
-python bot.py --mode sim --tag DOGEUSD --window 1m --verbose 2
+python bot.py --mode sim --window 1m --verbose 2  # uses default tag DOGEUSD
 python bot.py --mode live --tag SOLUSD --window 3mo --verbose 1
 ```
 
 CLI arguments:
 
 - ``--mode`` – ``sim`` for simulation or ``live`` for live mode.
-- ``--tag`` – trading pair symbol, e.g. ``DOGEUSD``.
+- ``--tag`` – trading pair symbol, e.g. ``DOGEUSD`` (default: ``DOGEUSD``).
 - ``--window`` – time window for tunnel metrics such as ``1m`` or ``3mo``.
 - ``--verbose`` – verbosity level (0=silent, 1=standard, 2=debug).
 

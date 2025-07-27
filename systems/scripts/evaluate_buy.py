@@ -38,6 +38,7 @@ def evaluate_buy_df(
     tick: int,
     cooldowns: dict,
     last_triggered: dict,
+    tag: str,
     sim: bool = False,
     verbose: int = 0,
     ledger=None  # <- Inject ledger if in RAM mode
@@ -52,7 +53,7 @@ def evaluate_buy_df(
         _log_initialized["sim"] = True
 
     if verbose >= 2:
-        tqdm.write(f"[EVAL] Evaluating Buy for 🐟🐋🔪")
+        tqdm.write(f"[EVAL] Evaluating Buy for {tag} 🐟🐋🔪")
 
     tunnel_pos = window_data.get("tunnel_position", 0)
     window_pos = window_data.get("window_position", 0)

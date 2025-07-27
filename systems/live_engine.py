@@ -28,6 +28,10 @@ def run_live(tag: str, window: str, verbose: int = 0, debug: bool = False) -> No
     if verbose >= 1:
         tqdm.write(f"[LIVE] Running live mode for {tag} on window {window}")
 
+    # Resolve exchange symbols for future use
+    from systems.utils.resolve_symbol import resolve_symbol
+    symbols = resolve_symbol(tag)
+
     should_exit = []
 
     if msvcrt:
@@ -103,6 +107,7 @@ def handle_top_of_hour(tag: str, window: str, verbose: int = 0) -> None:
             ledger=ledger,
             cooldowns=cooldowns,
             last_triggered=last_triggered,
+            tag=tag,
             verbose=verbose
         )
 
@@ -117,6 +122,7 @@ def evaluate_live_tick(
     ledger,
     cooldowns: dict,
     last_triggered: dict,
+    tag: str,
     verbose: int = 0
 ) -> None:
     from systems.scripts.evaluate_buy import evaluate_buy_df
@@ -128,6 +134,7 @@ def evaluate_live_tick(
         tick=0,  # No time series index in live mode
         cooldowns=cooldowns,
         last_triggered=last_triggered,
+        tag=tag,
         sim=False,
         verbose=verbose,
         ledger=ledger
@@ -138,6 +145,7 @@ def evaluate_live_tick(
         window_data=window_data,
         tick=0,
         notes=ledger.get_active_notes(),
+        tag=tag,
         verbose=verbose
     )
 
