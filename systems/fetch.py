@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List
 import sys
 import pandas as pd
+from systems.utils.resolve_symbol import resolve_symbol
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -29,10 +30,7 @@ from systems.scripts.fetch_core import (
 # **Inject** the project root so “utils” is importable:
 sys.path.insert(0, str(find_project_root()))
 
-
-
-ROOT = find_project_root()
-SYMBOLS_PATH = ROOT / "settings" / "symbol_settings.json"
+from systems.utils.resolve_symbol import resolve_symbol
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Fetch historical candles")
@@ -41,25 +39,24 @@ def main(argv: list[str] | None = None) -> None:
         required=True,
         help="Market tag in symbol_settings.json",
     )
+    
+    symbols = resolve_symbol(tag)
+    kraken_symbol = symbols["kraken"]
+    binance_symbol = symbols["binance"]
+    
     parser.add_argument("--time", required=True, help="Relative window like 10d or 2y")
     args = parser.parse_args(argv)
 
     tag = args.tag.upper()
 
-    if not SYMBOLS_PATH.exists():
-        print(" symbol_settings.json not found.")
+    try:
+        symbols = resolve_symbol(tag)
+        kraken_symbol = symbols["kraken"]
+        binance_symbol = symbols["binance"]
+    except Exception as e:
+        print(f"[ERROR] Failed to resolve symbol for tag '{tag}': {e}")
         return
 
-    with SYMBOLS_PATH.open("r", encoding="utf-8") as f:
-        config = json.load(f).get("symbols", {})
-
-    entry = config.get(tag)
-    if not entry or not entry.get("kraken_name") or not entry.get("binance_name"):
-        print(f" Tag {tag} not found or missing exchange names in symbol_settings.json.")
-        return
-
-    kraken_symbol = entry["kraken_name"]
-    binance_symbol = entry["binance_name"]
 
     start_ts, end_ts = parse_relative_time(args.time)
     out_path = get_raw_path(tag)
@@ -194,21 +191,16 @@ def main(argv: list[str] | None = None) -> None:
     else:
         print(" Raw data already complete. No candles fetched.")
 
+
 def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int = 1) -> None:
     tag = tag.upper()
 
-    if not SYMBOLS_PATH.exists():
-        raise FileNotFoundError("symbol_settings.json not found.")
-
-    with SYMBOLS_PATH.open("r", encoding="utf-8") as f:
-        config = json.load(f).get("symbols", {})
-
-    entry = config.get(tag)
-    if not entry or not entry.get("kraken_name") or not entry.get("binance_name"):
-        raise ValueError(f"Tag {tag} not found or missing exchange names in symbol_settings.json.")
-
-    kraken_symbol = entry["kraken_name"]
-    binance_symbol = entry["binance_name"]
+    try:
+        symbols = resolve_symbol(tag)
+        kraken_symbol = symbols["kraken"]
+        binance_symbol = symbols["binance"]
+    except Exception as e:
+        raise RuntimeError(f"[ERROR] Failed to resolve symbol '{tag}': {e}")
 
     start_ts, end_ts = parse_relative_time(relative_window)
     out_path = get_raw_path(tag)
