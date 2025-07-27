@@ -1,1 +1,14 @@
-{}
+settings.json
+{
+  "symbol_settings": {
+    "DOGEUSD": {
+      "kraken_name": "DOGE/USD",
+      "binance_name": "DOGEUSDT"
+    }
+  },
+  "general_settings": {
+    "knife_catch_cooldown": 0,
+    "whale_catch_cooldown": 0,
+    "fish_catch_cooldown": 0
+  }
+}
