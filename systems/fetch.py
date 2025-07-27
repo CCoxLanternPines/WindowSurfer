@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import List
 import sys
 import pandas as pd
-import ccxt
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -18,14 +17,16 @@ from systems.utils.time import parse_relative_time
 from systems.utils.path import find_project_root
 
 from tqdm import tqdm
-from systems.fetch import _fetch_kraken, _fetch_binance, _load_existing, _merge_and_save, get_raw_path, SYMBOLS_PATH
+from systems.scripts.fetch_core import (
+    _fetch_kraken,
+    _fetch_binance,
+    _load_existing,
+    _merge_and_save,
+    get_raw_path,
+    COLUMNS,
+)
 
 
-COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
-
-
-import sys
-from pathlib import Path
 
 def find_project_root() -> Path:
     path = Path(__file__).resolve().parent
@@ -42,56 +43,6 @@ sys.path.insert(0, str(find_project_root()))
 
 ROOT = find_project_root()
 SYMBOLS_PATH = ROOT / "settings" / "symbol_settings.json"
-COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
-
-def _fetch_kraken(symbol: str, start_ms: int, end_ms: int) -> List[List]:
-    exchange = ccxt.kraken({"enableRateLimit": True})
-    limit = min(720, int((end_ms - start_ms) // 3600000) + 1)
-    ohlcv = exchange.fetch_ohlcv(symbol, timeframe="1h", since=start_ms, limit=limit)
-    return [row for row in ohlcv if row and start_ms <= row[0] <= end_ms]
-
-def _fetch_binance(symbol: str, start_ms: int, end_ms: int) -> List[List]:
-    exchange = ccxt.binance({"enableRateLimit": True})
-    limit = 1000
-    rows: List[List] = []
-    current_end = end_ms
-    while current_end >= start_ms:
-        since = max(start_ms, current_end - limit * 3600000)
-        chunk = exchange.fetch_ohlcv(symbol, timeframe="1h", since=since, limit=limit)
-        if not chunk:
-            break
-        filtered = [r for r in chunk if r and since <= r[0] <= current_end]
-        rows.extend(filtered)
-        earliest = filtered[0][0]
-        if earliest <= start_ms:
-            break
-        current_end = earliest - 3600000
-    return rows
-
-def _load_existing(path: Path) -> pd.DataFrame:
-    if path.exists():
-        df = pd.read_csv(path)
-        df["timestamp"] = pd.to_numeric(df["timestamp"], errors="coerce")
-        df = df.dropna(subset=["timestamp"]).sort_values("timestamp")
-        return df
-    return pd.DataFrame(columns=COLUMNS)
-
-def _merge_and_save(path: Path, existing: pd.DataFrame, new_frames: List[pd.DataFrame]) -> int:
-    combined = pd.concat([existing] + new_frames, ignore_index=True)
-    combined = combined.drop_duplicates(subset="timestamp").sort_values("timestamp")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    combined.to_csv(path, index=False)
-    return len(combined)
-
-# new: utility for raw-data files
-def get_raw_path(tag: str, ext: str = "csv") -> Path:
-    """
-    Return the full path to the raw-data file for a given tag.
-    E.g. if tag="DOGEUSD", this yields
-      <project_root>/data/DOGEUSD/DOGEUSD.csv
-    """
-    root = find_project_root()
-    return root / "data" / "raw" / f"{tag}.{ext}"
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Fetch historical candles")
