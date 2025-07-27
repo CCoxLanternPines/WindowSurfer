@@ -6,6 +6,7 @@ from systems.utils.path import find_project_root
 from systems.scripts.get_candle_data import get_candle_data_df
 from systems.scripts.get_window_data import get_window_data_df
 from systems.scripts.evaluate_buy import evaluate_buy_df
+from systems.scripts.evaluate_sell import evaluate_sell_df
 import pandas as pd
 
 def listen_for_keys(should_exit_flag: list) -> None:
@@ -75,6 +76,19 @@ def run_simulation(tag: str, window: str, verbose: bool = False) -> None:
                     verbose=verbose,
                     ledger=ledger  # ✅ Inject ledger
                 )
+
+                to_sell = evaluate_sell_df(
+                    candle=candle,
+                    window_data=window_data,
+                    tick=step,
+                    notes=ledger.get_active_notes(),
+                    verbose=verbose,
+                )
+                for note in to_sell:
+                    ledger.close_note(note)
+                    tqdm.write(
+                        f"[SELL] Tick {step} | Strategy: {note['strategy']} | Gain: {note.get('gain_pct', 0):.2%}"
+                    )
             else:
                 tqdm.write(f"[STEP {step+1}] ❌ Incomplete data (candle or window)")
 
