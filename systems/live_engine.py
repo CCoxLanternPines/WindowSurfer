@@ -24,7 +24,7 @@ def esc_listener(should_exit_flag):
                 break
 
 
-def run_live(tag: str, window: str, verbose: bool = False) -> None:
+def run_live(tag: str, window: str, verbose: int = 0, debug: bool = False) -> None:
     if verbose:
         tqdm.write(f"[LIVE] Running live mode for {tag} on window {window}")
     should_exit = []
@@ -33,9 +33,18 @@ def run_live(tag: str, window: str, verbose: bool = False) -> None:
         threading.Thread(target=esc_listener, args=(should_exit,), daemon=True).start()
 
     while not should_exit:
-        now = datetime.utcnow().replace(tzinfo=timezone.utc)
-        top_of_hour = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
-        total_secs = 3600
+        if debug:
+            if verbose:
+                tqdm.write("[DEBUG] Skipping countdown, running top-of-hour logic now...")
+            run_now = True
+        else:
+            now = datetime.utcnow().replace(tzinfo=timezone.utc)
+            top_of_hour = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+            total_secs = 3600
+            elapsed_secs = int(now.minute * 60 + now.second)
+            remaining_secs = total_secs - elapsed_secs
+            run_now = False
+            total_secs = 3600
         elapsed_secs = int(now.minute * 60 + now.second)
         remaining_secs = total_secs - elapsed_secs
 
