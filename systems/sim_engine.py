@@ -27,6 +27,10 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
     if verbose >= 1:
         print(f"[SIM] Running simulation for {tag} on window {window}")
 
+    # Resolve exchange symbols (kraken/binance) for future use
+    from systems.utils.resolve_symbol import resolve_symbol
+    symbols = resolve_symbol(tag)
+
     from systems.scripts.ledger import RamLedger
     ledger = RamLedger()
 
@@ -85,6 +89,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                     tick=step,
                     cooldowns=cooldowns,
                     last_triggered=last_triggered,
+                    tag=tag,
                     sim=True,
                     verbose=verbose,
                     ledger=ledger  # ✅ Inject ledger
@@ -95,6 +100,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                     window_data=window_data,
                     tick=step,
                     notes=ledger.get_active_notes(),
+                    tag=tag,
                     verbose=verbose,
                 )
                 

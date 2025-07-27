@@ -9,13 +9,14 @@ def evaluate_sell_df(
     window_data: dict,
     tick: int,
     notes: list[dict],
+    tag: str,
     verbose: int = 0
 ) -> list[dict]:
     """Given current market state and open notes, returns list of notes to be sold."""
     sell_list = []
 
     if verbose >= 2:
-        tqdm.write(f"[EVAL] Evaluating Sell for 🐟🐋🔪")
+        tqdm.write(f"[EVAL] Evaluating Sell for {tag} 🐟🐋🔪")
 
 
     for note in notes:
