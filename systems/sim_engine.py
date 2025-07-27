@@ -145,6 +145,15 @@ def print_simulation_summary(ledger, ticks_run=None, candle_minutes=60) -> None:
     tqdm.write(f"Avg Gain %:     {summary['total_gain_pct']:.2%}")
     tqdm.write(f"Est Balance:    ${summary['estimated_kraken_balance']:.2f}")
 
+    strategy_counts = ledger.get_trade_counts_by_strategy()
+
+    tqdm.write("\n🎣 Strategy Breakdown")
+    for strategy in ["knife_catch", "whale_catch", "fish_catch"]:
+        data = strategy_counts.get(strategy, {"total": 0, "open": 0})
+        total = data["total"]
+        open_count = data["open"]
+        tqdm.write(f"{strategy.replace('_', ' ').title():<15}: {total} trades ({open_count} open)")
+
     if ticks_run:
         gain_per_month = ledger.get_avg_gain_per_month(ticks_run, candle_minutes)
         roi_per_month = ledger.get_roi_per_month(ticks_run, candle_minutes)
