@@ -26,16 +26,6 @@ from systems.scripts.fetch_core import (
     COLUMNS,
 )
 
-
-
-def find_project_root() -> Path:
-    path = Path(__file__).resolve().parent
-    for _ in range(5):
-        if (path / "root").is_file() and (path / "systems" / "systems").is_file():
-            return path
-        path = path.parent
-    raise FileNotFoundError("Project root not found")
-
 # **Inject** the project root so “utils” is importable:
 sys.path.insert(0, str(find_project_root()))
 
