@@ -17,6 +17,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--window", required=True, help="Candle window, e.g. 1m or 1h"
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable debug output",
+    )
     return parser.parse_args(argv)
 
 
@@ -26,11 +31,12 @@ def main(argv: list[str] | None = None) -> None:
     mode = args.mode.lower()
     tag = args.tag
     window = args.window
+    verbose = args.verbose
 
     if mode == "sim":
-        run_simulation(tag=tag, window=window)
+        run_simulation(tag=tag, window=window, verbose=verbose)
     elif mode == "live":
-        run_live(tag=tag, window=window)
+        run_live(tag=tag, window=window, verbose=verbose)
     else:
         print("Error: --mode must be either 'sim' or 'live'", file=sys.stderr)
         sys.exit(1)

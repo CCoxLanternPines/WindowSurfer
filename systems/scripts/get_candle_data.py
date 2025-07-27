@@ -8,7 +8,7 @@ from typing import Dict, Any
 from systems.utils.path import find_project_root
 
 
-def get_candle_data(tag: str, row_offset: int = 0) -> Dict[str, Any]:
+def get_candle_data(tag: str, row_offset: int = 0, verbose: bool = False) -> Dict[str, Any]:
     """Return the most recent candle for ``tag`` from the raw CSV data.
 
     Parameters
@@ -32,6 +32,9 @@ def get_candle_data(tag: str, row_offset: int = 0) -> Dict[str, Any]:
     IndexError
         If the requested row does not exist in the file.
     """
+
+    if verbose:
+        print(f"[get_candle_data] tag={tag} row_offset={row_offset}")
 
     root = find_project_root()
     path: Path = root / "data" / "raw" / f"{tag.upper()}.csv"
@@ -63,7 +66,7 @@ def get_candle_data(tag: str, row_offset: int = 0) -> Dict[str, Any]:
                 )
             row = last_rows[-(1 + row_offset)]
 
-    return {
+    result = {
         "timestamp": int(row["timestamp"]),
         "open": float(row["open"]),
         "high": float(row["high"]),
@@ -71,3 +74,8 @@ def get_candle_data(tag: str, row_offset: int = 0) -> Dict[str, Any]:
         "close": float(row["close"]),
         "volume": float(row["volume"]),
     }
+
+    if verbose:
+        print(f"[get_candle_data] result={result}")
+
+    return result
