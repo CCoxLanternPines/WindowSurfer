@@ -14,8 +14,14 @@ import ccxt
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from systems.utilities.time import parse_relative_time
-from systems.utilities.path import find_project_root
+from systems.utils.time import parse_relative_time
+from systems.utils.path import find_project_root
+
+from tqdm import tqdm
+from systems.fetch import _fetch_kraken, _fetch_binance, _load_existing, _merge_and_save, get_raw_path, SYMBOLS_PATH
+
+
+COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
 
 
 import sys
@@ -246,6 +252,96 @@ def main(argv: list[str] | None = None) -> None:
             print(" Could not retrieve full range: Kraken limited to 720 candles")
     else:
         print(" Raw data already complete. No candles fetched.")
+
+def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int = 1) -> None:
+    tag = tag.upper()
+
+    if not SYMBOLS_PATH.exists():
+        raise FileNotFoundError("symbol_settings.json not found.")
+
+    with SYMBOLS_PATH.open("r", encoding="utf-8") as f:
+        config = json.load(f).get("symbols", {})
+
+    entry = config.get(tag)
+    if not entry or not entry.get("kraken_name") or not entry.get("binance_name"):
+        raise ValueError(f"Tag {tag} not found or missing exchange names in symbol_settings.json.")
+
+    kraken_symbol = entry["kraken_name"]
+    binance_symbol = entry["binance_name"]
+
+    start_ts, end_ts = parse_relative_time(relative_window)
+    out_path = get_raw_path(tag)
+    existing = _load_existing(out_path)
+
+    existing_rows = existing[(existing["timestamp"] >= start_ts) & (existing["timestamp"] <= end_ts)]
+    earliest = existing_rows["timestamp"].min() if not existing_rows.empty else float("nan")
+    latest = existing_rows["timestamp"].max() if not existing_rows.empty else float("nan")
+
+    early_gap = None
+    late_gap = None
+    if existing_rows.empty:
+        early_gap = (start_ts, end_ts)
+    else:
+        if earliest > start_ts or pd.isna(earliest):
+            early_gap = (start_ts, min(earliest - 3600, end_ts)) if not pd.isna(earliest) else (start_ts, end_ts)
+        if latest < end_ts or pd.isna(latest):
+            late_gap = (max(latest + 3600, start_ts) if not pd.isna(latest) else start_ts, end_ts)
+
+    new_frames: List[pd.DataFrame] = []
+    added_binance = 0
+    added_kraken = 0
+
+    def fetch_and_store_combined(gap):
+        nonlocal added_kraken, added_binance
+        if not gap or gap[0] > gap[1]:
+            return
+
+        start_ms = int(gap[0] * 1000)
+        end_ms = int(gap[1] * 1000)
+        diff_hours = int((end_ms - start_ms) // 3600000) + 1
+
+        if diff_hours <= 720:
+            try:
+                rows = _fetch_kraken(kraken_symbol, start_ms, end_ms)
+                if rows:
+                    df = pd.DataFrame(rows, columns=COLUMNS)
+                    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True).astype("int64") // 1_000_000_000
+                    new_frames.append(df)
+                    added_kraken += len(df)
+            except Exception as e:
+                if verbose >= 1:
+                    tqdm.write(f"[WARN] Kraken fetch error: {e}")
+        else:
+            kraken_end_ms = start_ms + 720 * 3600000
+            try:
+                rows = _fetch_kraken(kraken_symbol, start_ms, kraken_end_ms)
+                if rows:
+                    df_k = pd.DataFrame(rows, columns=COLUMNS)
+                    df_k["timestamp"] = pd.to_datetime(df_k["timestamp"], unit="ms", utc=True).astype("int64") // 1_000_000_000
+                    new_frames.append(df_k)
+                    added_kraken += len(df_k)
+            except Exception as e:
+                if verbose >= 1:
+                    tqdm.write(f"[WARN] Kraken fetch error: {e}")
+
+            try:
+                rows = _fetch_binance(binance_symbol, kraken_end_ms + 3600000, end_ms)
+                if rows:
+                    df_b = pd.DataFrame(rows, columns=COLUMNS)
+                    df_b["timestamp"] = pd.to_datetime(df_b["timestamp"], unit="ms", utc=True).astype("int64") // 1_000_000_000
+                    new_frames.append(df_b)
+                    added_binance += len(df_b)
+            except Exception as e:
+                if verbose >= 1:
+                    tqdm.write(f"[WARN] Binance fetch error: {e}")
+
+    fetch_and_store_combined(early_gap)
+    fetch_and_store_combined(late_gap)
+
+    _merge_and_save(out_path, existing, new_frames)
+
+    if verbose >= 1:
+        tqdm.write(f"[SYNC] Added {added_kraken} candles from Kraken, {added_binance} from Binance")
 
 
 if __name__ == "__main__":

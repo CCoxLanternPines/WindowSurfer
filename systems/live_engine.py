@@ -6,6 +6,7 @@ from tqdm import tqdm
 from datetime import datetime, timezone
 from systems.scripts.get_candle_data import get_candle_data_json
 from systems.scripts.get_window_data import get_window_data_json
+from systems.fetch import fetch_missing_candles
 
 try:
     import msvcrt  # Windows-only
@@ -69,11 +70,12 @@ def run_live(tag: str, window: str, verbose: int = 0, debug: bool = False) -> No
                 now = datetime.now(timezone.utc)
                 tqdm.write(f"\n🕐 Top of hour reached at {now.strftime('%Y-%m-%d %H:%M:%S %Z')} — Restarting countdown...\n")
 
-
         handle_top_of_hour(tag=tag, window=window, verbose=verbose)
 
 
 def handle_top_of_hour(tag: str, window: str, verbose: int = 0) -> None:
+    ensure_latest_candles(tag, lookback="48h", verbose=verbose)
+
     candle = get_candle_data_json(tag, row_offset=0)
     window_data = get_window_data_json(tag, window, candle_offset=0)
 
@@ -105,10 +107,10 @@ def handle_top_of_hour(tag: str, window: str, verbose: int = 0) -> None:
             verbose=verbose
         )
 
-        pass
     else:
         if verbose >= 1:
             tqdm.write("[WARN] Missing candle or window data. Skipping this cycle.")
+
 
 def evaluate_live_tick(
     candle: dict,
@@ -154,3 +156,13 @@ def evaluate_live_tick(
         if verbose >= 1:
             from tqdm import tqdm
             tqdm.write(f"[SELL] Live Tick | Strategy: {note['strategy']} | Gain: {note.get('gain_pct', 0):.2%}")
+
+
+def ensure_latest_candles(tag: str, lookback: str = "48h", verbose: int = 1) -> None:
+    try:
+        if verbose >= 1:
+            tqdm.write(f"[SYNC] Checking for missing candles in last {lookback} for {tag}")
+        fetch_missing_candles(tag, relative_window=lookback, verbose=verbose)
+    except Exception as e:
+        if verbose >= 1:
+            tqdm.write(f"[ERROR] Failed to fetch missing candles: {e}")

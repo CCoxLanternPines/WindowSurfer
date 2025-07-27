@@ -64,7 +64,7 @@ def evaluate_buy_df(
 
     triggered = False
     close_price = candle["close"]
-    ts = candle.get("ts", 0)  # or `None` if you want it explicit
+    ts = candle.get("ts", 720)  # or `None` if you want it explicit
     symbol = candle.get("symbol", "UNKNOWN")
     window_type = window_data.get("window", "1m")
 
