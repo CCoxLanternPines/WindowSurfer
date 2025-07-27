@@ -122,5 +122,21 @@ class RamLedger(LedgerBase):
         total_gain = sum(float(n.get("gain_pct", 0)) for n in self.closed_notes)
         avg_gain = total_gain / max(len(self.closed_notes), 1)
         return avg_gain / months
-    
-    
+
+    def get_trade_counts_by_strategy(self) -> dict:
+        """Count total and open trades per strategy."""
+        counts = {}
+
+        for note in self.closed_notes + self.open_notes:
+            strategy = note.get("strategy", "unknown")
+            if strategy not in counts:
+                counts[strategy] = {"total": 0, "open": 0}
+            counts[strategy]["total"] += 1
+
+        for note in self.open_notes:
+            strategy = note.get("strategy", "unknown")
+            if strategy not in counts:
+                counts[strategy] = {"total": 0, "open": 0}
+            counts[strategy]["open"] += 1
+
+        return counts
