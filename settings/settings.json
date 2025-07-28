@@ -6,11 +6,11 @@
     }
   },
   "general_settings": {
-    "knife_catch_cooldown": 0,
-    "whale_catch_cooldown": 0,
-    "fish_catch_cooldown": 0
+    "knife_catch_cooldown": 4,
+    "whale_catch_cooldown": 1,
+    "fish_catch_cooldown": 3
   },
   "simulation_capital": 1000,
-  "investment_size": 0.7,
+  "investment_size": 0.07,
   "minimum_note_size": 50
 }
