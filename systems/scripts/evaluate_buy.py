@@ -140,14 +140,26 @@ def evaluate_buy_df(
             note = create_note("fish_catch")
             if note:
                 if live:
-                    fills = buy_order(kraken_symbol, note["entry_usdt"])
+                    addlog(
+                        f"[EXEC] Live buy triggered for {tag}",
+                        verbose_int=1,
+                        verbose_state=verbose,
+                    )
+                    fills = buy_order(tag, note["entry_amount"], verbose=verbose)
+
                     note["entry_price"] = fills["price"]
                     note["entry_amount"] = fills["volume"]
                     note["entry_usdt"] = fills["cost"]
                     note["fee"] = fills["fee"]
                     note["entry_ts"] = fills["timestamp"]
                     note["kraken_txid"] = fills["kraken_txid"]
-                ledger.add_note(note)
+                else:
+                    note["entry_price"] = candle["close"]
+                    note["entry_amount"] = note["entry_usdt"] / candle["close"]
+                    note["entry_ts"] = candle.get("ts", 0)
+
+                note["status"] = "Open"
+                ledger.open_note(note)
                 if on_buy:
                     on_buy(note)
                 triggered = True
@@ -161,14 +173,26 @@ def evaluate_buy_df(
             note = create_note("whale_catch")
             if note:
                 if live:
-                    fills = buy_order(kraken_symbol, note["entry_usdt"])
+                    addlog(
+                        f"[EXEC] Live buy triggered for {tag}",
+                        verbose_int=1,
+                        verbose_state=verbose,
+                    )
+                    fills = buy_order(tag, note["entry_amount"], verbose=verbose)
+
                     note["entry_price"] = fills["price"]
                     note["entry_amount"] = fills["volume"]
                     note["entry_usdt"] = fills["cost"]
                     note["fee"] = fills["fee"]
                     note["entry_ts"] = fills["timestamp"]
                     note["kraken_txid"] = fills["kraken_txid"]
-                ledger.add_note(note)
+                else:
+                    note["entry_price"] = candle["close"]
+                    note["entry_amount"] = note["entry_usdt"] / candle["close"]
+                    note["entry_ts"] = candle.get("ts", 0)
+
+                note["status"] = "Open"
+                ledger.open_note(note)
                 if on_buy:
                     on_buy(note)
                 triggered = True
@@ -182,14 +206,26 @@ def evaluate_buy_df(
             note = create_note("knife_catch")
             if note:
                 if live:
-                    fills = buy_order(kraken_symbol, note["entry_usdt"])
+                    addlog(
+                        f"[EXEC] Live buy triggered for {tag}",
+                        verbose_int=1,
+                        verbose_state=verbose,
+                    )
+                    fills = buy_order(tag, note["entry_amount"], verbose=verbose)
+
                     note["entry_price"] = fills["price"]
                     note["entry_amount"] = fills["volume"]
                     note["entry_usdt"] = fills["cost"]
                     note["fee"] = fills["fee"]
                     note["entry_ts"] = fills["timestamp"]
                     note["kraken_txid"] = fills["kraken_txid"]
-                ledger.add_note(note)
+                else:
+                    note["entry_price"] = candle["close"]
+                    note["entry_amount"] = note["entry_usdt"] / candle["close"]
+                    note["entry_ts"] = candle.get("ts", 0)
+
+                note["status"] = "Open"
+                ledger.open_note(note)
                 if on_buy:
                     on_buy(note)
                 triggered = True
