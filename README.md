@@ -39,6 +39,7 @@ CLI arguments:
 - ``--tag`` – trading pair symbol, e.g. ``DOGEUSD`` (default: ``DOGEUSD``).
 - ``--window`` – time window for tunnel metrics such as ``1m`` or ``3mo``.
 - ``--verbose`` – verbosity level (0=silent, 1=standard, 2=debug).
+- ``--log`` – write all output to ``data/tmp/log.txt``.
 
 ## Simulation Features
 The simulator reads raw candle data from ``data/raw/<TAG>.csv`` and computes tunnel metrics for each step. For every candle tick it:

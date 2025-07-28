@@ -7,6 +7,7 @@ except ImportError:  # pragma: no cover - Windows-only
 import json
 from tqdm import tqdm
 from systems.utils.path import find_project_root
+from systems.utils.logger import addlog
 from systems.scripts.get_candle_data import get_candle_data_df
 from systems.scripts.get_window_data import get_window_data_df
 from systems.scripts.evaluate_buy import evaluate_buy_df
@@ -30,8 +31,11 @@ def listen_for_keys(should_exit_flag: list) -> None:
                     break
 
 def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
-    if verbose >= 1:
-        print(f"[SIM] Running simulation for {tag} on window {window}")
+    addlog(
+        f"[SIM] Running simulation for {tag} on window {window}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
 
     # Resolve exchange symbols (kraken/binance) for future use
     from systems.utils.resolve_symbol import resolve_symbol
@@ -88,13 +92,19 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
     with tqdm(total=total_rows, desc="📉 Sim Progress", dynamic_ncols=True) as pbar:
         for step in range(total_rows):
             if should_exit:
-                if verbose >= 1:
-                    tqdm.write("\n🚪 ESC detected — exiting simulation early.")
+                addlog(
+                    "\n🚪 ESC detected — exiting simulation early.",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
 
                 # ✅ Get and print time range
                 elapsed = duration_from_candle_count(step + 1, candle_interval_minutes=60)
-                if verbose >= 1:
-                    tqdm.write(f"⏱️  Simulated Range: {elapsed} ({step + 1} ticks of {total_rows})")
+                addlog(
+                    f"⏱️  Simulated Range: {elapsed} ({step + 1} ticks of {total_rows})",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
 
                 # ✅ Save and show ledger summary
                 save_ledger_to_file(ledger, verbose=verbose)
@@ -123,7 +133,6 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                     sim=True,
                     verbose=verbose,
                     ledger=ledger,  # ✅ Inject ledger
-                    debug=False,
                     get_capital=get_capital,
                     on_buy=deduct_capital,
                 )
@@ -150,13 +159,17 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
 
                     ledger.close_note(note)
                     credit_capital(note)
-                    if verbose >= 1:
-                        tqdm.write(
-                            f"[SELL] Tick {step} | Strategy: {note['strategy']} | Gain: {note.get('gain_pct', 0):.2%}"
-                        )
+                    addlog(
+                        f"[SELL] Tick {step} | Strategy: {note['strategy']} | Gain: {note.get('gain_pct', 0):.2%}",
+                        verbose_int=1,
+                        verbose_state=verbose,
+                    )
             else:
-                if verbose >= 1:
-                    tqdm.write(f"[STEP {step+1}] ❌ Incomplete data (candle or window)")
+                addlog(
+                    f"[STEP {step+1}] ❌ Incomplete data (candle or window)",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
 
             pbar.update(1)
 
@@ -187,44 +200,48 @@ def save_ledger_to_file(ledger, filename="ledgersimulation.json", verbose: int =
         }, f, indent=2)
 
     from tqdm import tqdm
-    if verbose >= 1:
-        tqdm.write(f"\n🧾 Ledger saved to: {output_path}")
+    addlog(
+        f"\n🧾 Ledger saved to: {output_path}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
     
 def print_simulation_summary(ledger, starting_capital=None, ending_capital=None, ticks_run=None, candle_minutes=60, verbose: int = 0) -> None:
     summary = ledger.get_summary()
 
-    if verbose >= 1:
-        tqdm.write("\n📊 Simulation Summary")
-        if starting_capital is not None:
-            tqdm.write(f"Starting Capital: ${starting_capital:.2f}")
-        if ending_capital is not None:
-            pnl = ending_capital - starting_capital if starting_capital is not None else 0
-            pct = pnl / starting_capital * 100 if starting_capital else 0
-            tqdm.write(f"Ending Capital:   ${ending_capital:.2f}")
-            tqdm.write(f"Net PnL:          ${pnl:.2f} ({pct:.2f}%)")
-        else:
-            tqdm.write(f"Open Notes:     {summary['num_open']}")
-            tqdm.write(f"Closed Notes:   {summary['num_closed']}")
-            tqdm.write(f"Investment:     ${summary['total_invested_usdt']:.2f}")
-            tqdm.write(f"Net PnL:        ${summary['total_pnl_usdt']:.2f}")
-        tqdm.write(f"Avg Gain %:     {summary['total_gain_pct']:.2%}")
-        tqdm.write(f"Est Balance:    ${summary['estimated_kraken_balance']:.2f}")
+    addlog("\n📊 Simulation Summary", verbose_int=1, verbose_state=verbose)
+    if starting_capital is not None:
+        addlog(f"Starting Capital: ${starting_capital:.2f}", verbose_int=1, verbose_state=verbose)
+    if ending_capital is not None:
+        pnl = ending_capital - starting_capital if starting_capital is not None else 0
+        pct = pnl / starting_capital * 100 if starting_capital else 0
+        addlog(f"Ending Capital:   ${ending_capital:.2f}", verbose_int=1, verbose_state=verbose)
+        addlog(f"Net PnL:          ${pnl:.2f} ({pct:.2f}%)", verbose_int=1, verbose_state=verbose)
+    else:
+        addlog(f"Open Notes:     {summary['num_open']}", verbose_int=1, verbose_state=verbose)
+        addlog(f"Closed Notes:   {summary['num_closed']}", verbose_int=1, verbose_state=verbose)
+        addlog(f"Investment:     ${summary['total_invested_usdt']:.2f}", verbose_int=1, verbose_state=verbose)
+        addlog(f"Net PnL:        ${summary['total_pnl_usdt']:.2f}", verbose_int=1, verbose_state=verbose)
+    addlog(f"Avg Gain %:     {summary['total_gain_pct']:.2%}", verbose_int=1, verbose_state=verbose)
+    addlog(f"Est Balance:    ${summary['estimated_kraken_balance']:.2f}", verbose_int=1, verbose_state=verbose)
 
     strategy_counts = ledger.get_trade_counts_by_strategy()
 
-    if verbose >= 1:
-        tqdm.write("\n🎣 Strategy Breakdown")
-        for strategy in ["knife_catch", "whale_catch", "fish_catch"]:
-            data = strategy_counts.get(strategy, {"total": 0, "open": 0})
-            total = data["total"]
-            open_count = data["open"]
-            tqdm.write(f"{strategy.replace('_', ' ').title():<15}: {total} trades ({open_count} open)")
+    addlog("\n🎣 Strategy Breakdown", verbose_int=1, verbose_state=verbose)
+    for strategy in ["knife_catch", "whale_catch", "fish_catch"]:
+        data = strategy_counts.get(strategy, {"total": 0, "open": 0})
+        total = data["total"]
+        open_count = data["open"]
+        addlog(
+            f"{strategy.replace('_', ' ').title():<15}: {total} trades ({open_count} open)",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
 
     if ticks_run:
         gain_per_month = ledger.get_avg_gain_per_month(ticks_run, candle_minutes)
         roi_per_month = ledger.get_roi_per_month(ticks_run, candle_minutes)
 
-        if verbose >= 1:
-            tqdm.write(f"Avg Gain %/mo:  {gain_per_month:.2%}")
-            tqdm.write(f"Avg ROI %/mo:   {roi_per_month:.2%}")
+        addlog(f"Avg Gain %/mo:  {gain_per_month:.2%}", verbose_int=1, verbose_state=verbose)
+        addlog(f"Avg ROI %/mo:   {roi_per_month:.2%}", verbose_int=1, verbose_state=verbose)
 

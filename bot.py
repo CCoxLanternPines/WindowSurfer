@@ -8,6 +8,7 @@ import sys
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
 from systems.scripts.loader import load_settings
+from systems.utils.logger import init_logger, addlog
 
 SETTINGS = load_settings()
 
@@ -28,9 +29,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Increase verbosity level (use -v or -vv)",
     )
     parser.add_argument(
-        "--debug",
+        "--log",
         action="store_true",
-        help="Run live mode in debug mode (skip countdown, run immediately)",
+        help="Enable log file output",
     )
 
     return parser.parse_args(argv)
@@ -38,6 +39,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv or sys.argv[1:])
+    init_logger(logging_enabled=args.log, verbose_level=args.verbose)
 
     mode = args.mode.lower()
     tag = args.tag
@@ -47,10 +49,10 @@ def main(argv: list[str] | None = None) -> None:
     if mode == "sim":
         run_simulation(tag=tag, window=window, verbose=verbose)
     elif mode == "live":
-        run_live(tag=tag, window=window, verbose=verbose, debug=args.debug)
+        run_live(tag=tag, window=window, verbose=verbose)
 
     else:
-        print("Error: --mode must be either 'sim' or 'live'", file=sys.stderr)
+        addlog("Error: --mode must be either 'sim' or 'live'")
         sys.exit(1)
 
 
