@@ -7,7 +7,14 @@ from systems.decision_logic.fish_catch import should_buy_fish
 from systems.decision_logic.knife_catch import should_buy_knife
 from systems.decision_logic.whale_catch import should_buy_whale
 from systems.scripts.ledger import RamLedger
-from systems.scripts.execution_handler import get_kraken_balance, buy_order
+from systems.scripts.execution_handler import buy_order
+
+SETTINGS_PATH = Path(find_project_root()) / "settings" / "settings.json"
+with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
+    SETTINGS = json.load(f)
+
+INVESTMENT_SIZE = SETTINGS.get("investment_size", 0.15)
+MINIMUM_NOTE_SIZE = SETTINGS.get("minimum_note_size", 0)
 from systems.utils.resolve_symbol import resolve_symbol
 from systems.scripts.loader import load_settings
 
@@ -47,7 +54,9 @@ def evaluate_buy_df(
     sim: bool = False,
     verbose: int = 0,
     ledger=None,  # <- Inject ledger if in RAM mode
-    debug: bool = False
+    debug: bool = False,
+    get_capital=None,
+    on_buy=None,
 ) -> bool:
     """
     Evaluates buy conditions. Triggers notes via ledger if provided.
@@ -85,9 +94,19 @@ def evaluate_buy_df(
                 tqdm.write(f"[SKIP] Already have open note for {symbol} — skipping buy")
             return False
 
-    def create_note(strategy: str) -> dict:
-        entry_amount = 25.0
-        entry_usdt = close_price * entry_amount
+    def create_note(strategy: str):
+        capital = get_capital() if get_capital else 0.0
+        usd_amount = capital * INVESTMENT_SIZE
+        if usd_amount < MINIMUM_NOTE_SIZE:
+            if verbose >= 2:
+                min_size = MINIMUM_NOTE_SIZE
+                tqdm.write(
+                    f"[SKIP] Note below minimum size (${usd_amount:.2f} < ${min_size})"
+                )
+            return None
+
+        entry_amount = usd_amount / close_price
+        entry_usdt = usd_amount
         note = {
             "symbol": symbol,
             "strategy": strategy,
@@ -113,23 +132,18 @@ def evaluate_buy_df(
             tqdm.write(f"[BUY] Fish Catch triggered at tick {tick}")
         if ledger:
             note = create_note("fish_catch")
-            if live:
-                balance = get_kraken_balance()
-                available = balance.get("ZUSD", 0.0)
-                if available < note["entry_usdt"]:
-                    tqdm.write(f"[ABORT] Insufficient balance: ${available:.2f}")
-                else:
-                    fills = buy_order(kraken_symbol, note["entry_amount"])
+            if note:
+                if live:
+                    fills = buy_order(kraken_symbol, note["entry_usdt"])
                     note["entry_price"] = fills["price"]
-                    note["entry_amount"] = fills["amount"]
+                    note["entry_amount"] = fills["volume"]
                     note["entry_usdt"] = fills["cost"]
                     note["fee"] = fills["fee"]
-                    note["entry_ts"] = fills["ts"]
-                    note["kraken_txid"] = fills["txid"]
-                    ledger.add_note(note)
-                    triggered = True
-            else:
+                    note["entry_ts"] = fills["timestamp"]
+                    note["kraken_txid"] = fills["kraken_txid"]
                 ledger.add_note(note)
+                if on_buy:
+                    on_buy(note)
                 triggered = True
 
     # 🐋 Whale Catch
@@ -140,23 +154,18 @@ def evaluate_buy_df(
             tqdm.write(f"[BUY] Whale Catch triggered at tick {tick}")
         if ledger:
             note = create_note("whale_catch")
-            if live:
-                balance = get_kraken_balance()
-                available = balance.get("ZUSD", 0.0)
-                if available < note["entry_usdt"]:
-                    tqdm.write(f"[ABORT] Insufficient balance: ${available:.2f}")
-                else:
-                    fills = buy_order(kraken_symbol, note["entry_amount"])
+            if note:
+                if live:
+                    fills = buy_order(kraken_symbol, note["entry_usdt"])
                     note["entry_price"] = fills["price"]
-                    note["entry_amount"] = fills["amount"]
+                    note["entry_amount"] = fills["volume"]
                     note["entry_usdt"] = fills["cost"]
                     note["fee"] = fills["fee"]
-                    note["entry_ts"] = fills["ts"]
-                    note["kraken_txid"] = fills["txid"]
-                    ledger.add_note(note)
-                    triggered = True
-            else:
+                    note["entry_ts"] = fills["timestamp"]
+                    note["kraken_txid"] = fills["kraken_txid"]
                 ledger.add_note(note)
+                if on_buy:
+                    on_buy(note)
                 triggered = True
 
     # 🔪 Knife Catch
@@ -167,23 +176,18 @@ def evaluate_buy_df(
             tqdm.write(f"[BUY] Knife Catch triggered at tick {tick}")
         if ledger:
             note = create_note("knife_catch")
-            if live:
-                balance = get_kraken_balance()
-                available = balance.get("ZUSD", 0.0)
-                if available < note["entry_usdt"]:
-                    tqdm.write(f"[ABORT] Insufficient balance: ${available:.2f}")
-                else:
-                    fills = buy_order(kraken_symbol, note["entry_amount"])
+            if note:
+                if live:
+                    fills = buy_order(kraken_symbol, note["entry_usdt"])
                     note["entry_price"] = fills["price"]
-                    note["entry_amount"] = fills["amount"]
+                    note["entry_amount"] = fills["volume"]
                     note["entry_usdt"] = fills["cost"]
                     note["fee"] = fills["fee"]
-                    note["entry_ts"] = fills["ts"]
-                    note["kraken_txid"] = fills["txid"]
-                    ledger.add_note(note)
-                    triggered = True
-            else:
+                    note["entry_ts"] = fills["timestamp"]
+                    note["kraken_txid"] = fills["kraken_txid"]
                 ledger.add_note(note)
+                if on_buy:
+                    on_buy(note)
                 triggered = True
 
     if verbose >= 3:

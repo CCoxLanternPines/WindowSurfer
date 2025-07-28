@@ -3,12 +3,13 @@ import sys
 import threading
 from datetime import datetime, timedelta, timezone
 from tqdm import tqdm
+import ccxt
 from systems.scripts.get_candle_data import get_candle_data_json
 from systems.scripts.get_window_data import get_window_data_json
 from systems.fetch import fetch_missing_candles
 from systems.scripts.loader import load_settings
+from systems.scripts.execution_handler import get_available_fiat_balance
 
-SETTINGS = load_settings()
 
 try:
     import msvcrt  # Windows-only
@@ -139,6 +140,11 @@ def evaluate_live_tick(
     symbols = resolve_symbol(tag)
     kraken_symbol = symbols["kraken"]
 
+    exchange = ccxt.kraken({"enableRateLimit": True})
+
+    def get_capital():
+        return get_available_fiat_balance(exchange, "USD")
+
     evaluate_buy_df(
         candle=candle,
         window_data=window_data,
@@ -149,7 +155,8 @@ def evaluate_live_tick(
         sim=False,
         verbose=verbose,
         ledger=ledger,
-        debug=debug
+        debug=debug,
+        get_capital=get_capital
     )
 
     to_sell = evaluate_sell_df(
@@ -165,13 +172,13 @@ def evaluate_live_tick(
 
     for note in to_sell:
         if live:
-            fills = sell_order(kraken_symbol, note["entry_amount"])
+            fills = sell_order(kraken_symbol, note["entry_usdt"])
             note["exit_price"] = fills["price"]
-            note["exit_amount"] = fills["amount"]
+            note["exit_amount"] = fills["volume"]
             note["exit_usdt"] = fills["cost"]
             note["fee"] = fills["fee"]
-            note["exit_ts"] = fills["ts"]
-            note["kraken_txid"] = fills["txid"]
+            note["exit_ts"] = fills["timestamp"]
+            note["kraken_txid"] = fills["kraken_txid"]
         else:
             note["exit_price"] = exit_price
             note["exit_ts"] = candle.get("ts", 0)

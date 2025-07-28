@@ -4,6 +4,7 @@ try:
     import msvcrt
 except ImportError:  # pragma: no cover - Windows-only
     msvcrt = None
+import json
 from tqdm import tqdm
 from systems.utils.path import find_project_root
 from systems.scripts.get_candle_data import get_candle_data_df
@@ -38,6 +39,24 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
 
     from systems.scripts.ledger import RamLedger
     ledger = RamLedger()
+
+    settings_path = find_project_root() / "settings" / "settings.json"
+    with open(settings_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    sim_capital = float(config.get("simulation_capital", 0))
+    start_capital = sim_capital
+
+    def get_capital():
+        return sim_capital
+
+    def deduct_capital(note):
+        nonlocal sim_capital
+        sim_capital -= note.get("entry_usdt", 0.0)
+
+    def credit_capital(note):
+        nonlocal sim_capital
+        sim_capital += note.get("exit_usdt", 0.0)
 
     project_root = find_project_root()
     data_path = project_root / "data/raw" / f"{tag}.csv"
@@ -79,7 +98,13 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
 
                 # ✅ Save and show ledger summary
                 save_ledger_to_file(ledger, verbose=verbose)
-                print_simulation_summary(ledger, ticks_run=step + 1, verbose=verbose)
+                print_simulation_summary(
+                    ledger,
+                    starting_capital=start_capital,
+                    ending_capital=sim_capital,
+                    ticks_run=step + 1,
+                    verbose=verbose,
+                )
                 break
 
 
@@ -98,7 +123,9 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                     sim=True,
                     verbose=verbose,
                     ledger=ledger,  # ✅ Inject ledger
-                    debug=False
+                    debug=False,
+                    get_capital=get_capital,
+                    on_buy=deduct_capital,
                 )
 
                 to_sell = evaluate_sell_df(
@@ -120,8 +147,9 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                     note["exit_usdt"] = exit_price * note["entry_amount"]
                     note["gain_pct"] = (note["exit_usdt"] - note["entry_usdt"]) / note["entry_usdt"]
                     note["status"] = "Closed"
-                    
+
                     ledger.close_note(note)
+                    credit_capital(note)
                     if verbose >= 1:
                         tqdm.write(
                             f"[SELL] Tick {step} | Strategy: {note['strategy']} | Gain: {note.get('gain_pct', 0):.2%}"
@@ -131,6 +159,16 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                     tqdm.write(f"[STEP {step+1}] ❌ Incomplete data (candle or window)")
 
             pbar.update(1)
+
+    # End of simulation loop
+    save_ledger_to_file(ledger, verbose=verbose)
+    print_simulation_summary(
+        ledger,
+        starting_capital=start_capital,
+        ending_capital=sim_capital,
+        ticks_run=total_rows,
+        verbose=verbose,
+    )
 
 def save_ledger_to_file(ledger, filename="ledgersimulation.json", verbose: int = 0) -> None:
     """Save the current state of a RamLedger to /data/filename.json"""
@@ -152,15 +190,23 @@ def save_ledger_to_file(ledger, filename="ledgersimulation.json", verbose: int =
     if verbose >= 1:
         tqdm.write(f"\n🧾 Ledger saved to: {output_path}")
     
-def print_simulation_summary(ledger, ticks_run=None, candle_minutes=60, verbose: int = 0) -> None:
+def print_simulation_summary(ledger, starting_capital=None, ending_capital=None, ticks_run=None, candle_minutes=60, verbose: int = 0) -> None:
     summary = ledger.get_summary()
 
     if verbose >= 1:
         tqdm.write("\n📊 Simulation Summary")
-        tqdm.write(f"Open Notes:     {summary['num_open']}")
-        tqdm.write(f"Closed Notes:   {summary['num_closed']}")
-        tqdm.write(f"Investment:     ${summary['total_invested_usdt']:.2f}")
-        tqdm.write(f"Net PnL:        ${summary['total_pnl_usdt']:.2f}")
+        if starting_capital is not None:
+            tqdm.write(f"Starting Capital: ${starting_capital:.2f}")
+        if ending_capital is not None:
+            pnl = ending_capital - starting_capital if starting_capital is not None else 0
+            pct = pnl / starting_capital * 100 if starting_capital else 0
+            tqdm.write(f"Ending Capital:   ${ending_capital:.2f}")
+            tqdm.write(f"Net PnL:          ${pnl:.2f} ({pct:.2f}%)")
+        else:
+            tqdm.write(f"Open Notes:     {summary['num_open']}")
+            tqdm.write(f"Closed Notes:   {summary['num_closed']}")
+            tqdm.write(f"Investment:     ${summary['total_invested_usdt']:.2f}")
+            tqdm.write(f"Net PnL:        ${summary['total_pnl_usdt']:.2f}")
         tqdm.write(f"Avg Gain %:     {summary['total_gain_pct']:.2%}")
         tqdm.write(f"Est Balance:    ${summary['estimated_kraken_balance']:.2f}")
 
