@@ -135,10 +135,14 @@ def evaluate_buy_df(
     if should_buy_fish(candle, window_data, tick, cooldowns):
         cooldowns["fish_catch"] = SETTINGS["general_settings"]["fish_catch_cooldown"]
         last_triggered["fish_catch"] = tick
-        addlog(f"[BUY] Fish Catch triggered at tick {tick}", verbose_int=1, verbose_state=verbose)
-        if ledger:
-            note = create_note("fish_catch")
-            if note:
+        note = create_note("fish_catch")
+        if note:
+            addlog(
+                f"[BUY] Fish Catch triggered at tick {tick} → ${note['entry_usdt']:.2f}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            if ledger:
                 if live:
                     addlog(
                         f"[EXEC] Live buy triggered for {tag}",
@@ -168,10 +172,14 @@ def evaluate_buy_df(
     if should_buy_whale(candle, window_data, tick, cooldowns):
         cooldowns["whale_catch"] = SETTINGS["general_settings"]["whale_catch_cooldown"]
         last_triggered["whale_catch"] = tick
-        addlog(f"[BUY] Whale Catch triggered at tick {tick}", verbose_int=1, verbose_state=verbose)
-        if ledger:
-            note = create_note("whale_catch")
-            if note:
+        note = create_note("whale_catch")
+        if note:
+            addlog(
+                f"[BUY] Whale Catch triggered at tick {tick} → ${note['entry_usdt']:.2f}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            if ledger:
                 if live:
                     addlog(
                         f"[EXEC] Live buy triggered for {tag}",
@@ -201,10 +209,14 @@ def evaluate_buy_df(
     if should_buy_knife(candle, window_data, tick, cooldowns):
         cooldowns["knife_catch"] = SETTINGS["general_settings"]["knife_catch_cooldown"]
         last_triggered["knife_catch"] = tick
-        addlog(f"[BUY] Knife Catch triggered at tick {tick}", verbose_int=1, verbose_state=verbose)
-        if ledger:
-            note = create_note("knife_catch")
-            if note:
+        note = create_note("knife_catch")
+        if note:
+            addlog(
+                f"[BUY] Knife Catch triggered at tick {tick} → ${note['entry_usdt']:.2f}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            if ledger:
                 if live:
                     addlog(
                         f"[EXEC] Live buy triggered for {tag}",
