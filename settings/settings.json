@@ -11,6 +11,6 @@
     "fish_catch_cooldown": 0
   },
   "simulation_capital": 1000,
-  "investment_size": 0.15,
+  "investment_size": 0.7,
   "minimum_note_size": 50
 }
