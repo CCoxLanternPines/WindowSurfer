@@ -117,10 +117,24 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
 
                 # ✅ Save and show ledger summary
                 save_ledger_to_file(ledger, verbose=verbose)
+
+                open_notes = ledger.get_active_notes()
+                if open_notes:
+                    last_price = precomputed_candles[step]["close"]
+                    unrealized_value = sum(n["entry_amount"] * last_price for n in open_notes)
+                    addlog(
+                        f"[INFO] Mark-to-market added from open notes: ${unrealized_value:.2f}",
+                        verbose_int=1,
+                        verbose_state=verbose,
+                    )
+                    ending_capital = sim_capital + unrealized_value
+                else:
+                    ending_capital = sim_capital
+
                 print_simulation_summary(
                     ledger,
                     starting_capital=start_capital,
-                    ending_capital=sim_capital,
+                    ending_capital=ending_capital,
                     ticks_run=step + 1,
                     verbose=verbose,
                 )
@@ -184,10 +198,24 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
 
     # End of simulation loop
     save_ledger_to_file(ledger, verbose=verbose)
+
+    open_notes = ledger.get_active_notes()
+    if open_notes:
+        last_price = precomputed_candles[-1]["close"]
+        unrealized_value = sum(n["entry_amount"] * last_price for n in open_notes)
+        addlog(
+            f"[INFO] Mark-to-market added from open notes: ${unrealized_value:.2f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        ending_capital = sim_capital + unrealized_value
+    else:
+        ending_capital = sim_capital
+
     print_simulation_summary(
         ledger,
         starting_capital=start_capital,
-        ending_capital=sim_capital,
+        ending_capital=ending_capital,
         ticks_run=total_rows,
         verbose=verbose,
     )
@@ -232,7 +260,6 @@ def print_simulation_summary(ledger, starting_capital=None, ending_capital=None,
         addlog(f"Investment:     ${summary['total_invested_usdt']:.2f}", verbose_int=1, verbose_state=verbose)
         addlog(f"Net PnL:        ${summary['total_pnl_usdt']:.2f}", verbose_int=1, verbose_state=verbose)
     addlog(f"Avg Gain %:     {summary['total_gain_pct']:.2%}", verbose_int=1, verbose_state=verbose)
-    addlog(f"Est Balance:    ${summary['estimated_kraken_balance']:.2f}", verbose_int=1, verbose_state=verbose)
 
     strategy_counts = ledger.get_trade_counts_by_strategy()
 
