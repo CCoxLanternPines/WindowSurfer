@@ -18,9 +18,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="WindowSurfer bot entrypoint")
     parser.add_argument("--mode", required=True, help="Execution mode: sim or live")
     parser.add_argument("--tag", required=True, help="Symbol tag, e.g. DOGEUSD")
-    parser.add_argument(
-        "--window", required=True, help="Candle window, e.g. 1m or 1h"
-    )
+    parser.add_argument("--window", required=True, help="Candle window, e.g. 1m or 1h")
     parser.add_argument(
         "-v",
         "--verbose",
@@ -33,13 +31,22 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Enable log file output",
     )
+    parser.add_argument(
+        "--telegram",
+        action="store_true",
+        help="Enable Telegram alerts",
+    )
 
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv or sys.argv[1:])
-    init_logger(logging_enabled=args.log, verbose_level=args.verbose)
+    init_logger(
+        logging_enabled=args.log,
+        verbose_level=args.verbose,
+        telegram_enabled=args.telegram,
+    )
 
     mode = args.mode.lower()
     tag = args.tag
@@ -58,4 +65,3 @@ def main(argv: list[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-
