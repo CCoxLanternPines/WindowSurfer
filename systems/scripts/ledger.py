@@ -10,6 +10,11 @@ class LedgerBase(ABC):
     """Abstract interface for ledger implementations."""
 
     @abstractmethod
+    def open_note(self, note: Dict) -> None:
+        """Add a new open note to the ledger."""
+        raise NotImplementedError
+
+    @abstractmethod
     def get_active_notes(self) -> List[Dict]:
         """Return a list of currently open notes"""
         raise NotImplementedError
@@ -40,6 +45,11 @@ class RamLedger(LedgerBase):
         if "note_id" not in note:
             note["note_id"] = str(uuid.uuid4())
         self.open_notes.append(note)
+
+    # Maintain backward compatibility with new API
+    def open_note(self, note: Dict) -> None:
+        """Alias for ``add_note`` to open a new note."""
+        self.add_note(note)
 
 
     def close_note(self, note: Dict) -> None:
