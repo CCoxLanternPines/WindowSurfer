@@ -2,6 +2,7 @@ from systems.decision_logic.fish_catch import should_sell_fish
 from systems.decision_logic.whale_catch import should_sell_whale
 from systems.decision_logic.knife_catch import should_sell_knife
 from tqdm import tqdm
+from systems.utils.logger import addlog
 MIN_GAIN_PCT = 0.05  # Require at least +5% ROI to sell
 
 def evaluate_sell_df(
@@ -15,8 +16,11 @@ def evaluate_sell_df(
     """Given current market state and open notes, returns list of notes to be sold."""
     sell_list = []
 
-    if verbose >= 2:
-        tqdm.write(f"[EVAL] Evaluating Sell for {tag} 🐟🐋🔪")
+    addlog(
+        f"[EVAL] Evaluating Sell for {tag} 🐟🐋🔪",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
 
 
     for note in notes:
@@ -28,8 +32,11 @@ def evaluate_sell_df(
         gain_pct = (current_price - entry_price) / entry_price
 
         if gain_pct < MIN_GAIN_PCT:
-            if verbose >= 2:
-                print(f"[HOLD] {note['strategy']} | Tick {tick} | Gain {gain_pct:.2%} < Min Gain")
+            addlog(
+                f"[HOLD] {note['strategy']} | Tick {tick} | Gain {gain_pct:.2%} < Min Gain",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
             continue
 
         strategy = note.get("strategy")
@@ -43,8 +50,11 @@ def evaluate_sell_df(
         gain_pct = (current_price - entry_price) / entry_price
 
         if gain_pct < MIN_GAIN_PCT:
-            if verbose >= 2:
-                tqdm.write(f"[HOLD] {note['strategy']} | Tick {tick} | Gain {gain_pct:.2%} < Min Gain")
+            addlog(
+                f"[HOLD] {note['strategy']} | Tick {tick} | Gain {gain_pct:.2%} < Min Gain",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
             continue
 
         strategy = note.get("strategy")
@@ -60,8 +70,11 @@ def evaluate_sell_df(
         elif strategy == "knife_catch" and knife_decision:
             sell_list.append(note)
 
-    if verbose >= 2:
-        tqdm.write(f"[EVAL] Active Notes: {len(notes)}")
+    addlog(
+        f"[EVAL] Active Notes: {len(notes)}",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
 
 
     return sell_list
