@@ -76,5 +76,20 @@ def evaluate_sell_df(
         verbose_state=verbose,
     )
 
+    sell_list.sort(
+        key=lambda note: (
+            note.get("entry_amount", 0) * candle["close"]
+            - note.get("entry_usdt", 0)
+        ),
+        reverse=True,
+    )
+
+    for note in sell_list:
+        projected_gain = note["entry_amount"] * candle["close"] - note["entry_usdt"]
+        addlog(
+            f"[PRIORITY SELL] Strategy: {note['strategy']} | Est Gain: ${projected_gain:.2f}",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
 
     return sell_list
