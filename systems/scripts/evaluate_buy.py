@@ -9,6 +9,9 @@ from systems.decision_logic.whale_catch import should_buy_whale
 from systems.scripts.ledger import RamLedger
 from systems.scripts.execution_handler import get_kraken_balance, buy_order
 from systems.utils.resolve_symbol import resolve_symbol
+from systems.scripts.loader import load_settings
+
+SETTINGS = load_settings()
 
 LOG_PATH = Path(find_project_root()) / "data" / "tmp" / "eval_buy_log.jsonl"
 _log_initialized = {"sim": False}
@@ -104,7 +107,7 @@ def evaluate_buy_df(
     
     # 🐟 Fish Catch
     if should_buy_fish(candle, window_data, tick, cooldowns):
-        cooldowns["fish_catch"] = 4
+        cooldowns["fish_catch"] = SETTINGS["general_settings"]["fish_catch_cooldown"]
         last_triggered["fish_catch"] = tick
         if verbose >= 1:
             tqdm.write(f"[BUY] Fish Catch triggered at tick {tick}")
@@ -131,7 +134,7 @@ def evaluate_buy_df(
 
     # 🐋 Whale Catch
     if should_buy_whale(candle, window_data, tick, cooldowns):
-        cooldowns["whale_catch"] = 2
+        cooldowns["whale_catch"] = SETTINGS["general_settings"]["whale_catch_cooldown"]
         last_triggered["whale_catch"] = tick
         if verbose >= 1:
             tqdm.write(f"[BUY] Whale Catch triggered at tick {tick}")
@@ -158,7 +161,7 @@ def evaluate_buy_df(
 
     # 🔪 Knife Catch
     if should_buy_knife(candle, window_data, tick, cooldowns):
-        cooldowns["knife_catch"] = 1
+        cooldowns["knife_catch"] = SETTINGS["general_settings"]["knife_catch_cooldown"]
         last_triggered["knife_catch"] = tick
         if verbose >= 1:
             tqdm.write(f"[BUY] Knife Catch triggered at tick {tick}")

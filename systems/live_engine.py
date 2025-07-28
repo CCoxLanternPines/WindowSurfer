@@ -6,6 +6,9 @@ from tqdm import tqdm
 from systems.scripts.get_candle_data import get_candle_data_json
 from systems.scripts.get_window_data import get_window_data_json
 from systems.fetch import fetch_missing_candles
+from systems.scripts.loader import load_settings
+
+SETTINGS = load_settings()
 
 try:
     import msvcrt  # Windows-only
@@ -91,9 +94,9 @@ def handle_top_of_hour(tag: str, window: str, verbose: int = 0, debug: bool = Fa
         # Initialize on first run, or eventually pass as arg
         ledger = RamLedger()
         cooldowns = {
-            "knife_catch": 1,
-            "whale_catch": 0,
-            "fish_catch": 2
+            "knife_catch": SETTINGS["general_settings"]["knife_catch_cooldown"],
+            "whale_catch": SETTINGS["general_settings"]["whale_catch_cooldown"],
+            "fish_catch": SETTINGS["general_settings"]["fish_catch_cooldown"]
         }
         last_triggered = {
             "knife_catch": None,

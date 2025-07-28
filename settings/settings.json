@@ -1,4 +1,3 @@
-
 {
   "symbol_settings": {
     "DOGEUSD": {
@@ -7,8 +6,8 @@
     }
   },
   "general_settings": {
-    "knife_catch_cooldown": 0,
-    "whale_catch_cooldown": 0,
-    "fish_catch_cooldown": 0
+    "knife_catch_cooldown": 1,
+    "whale_catch_cooldown": 2,
+    "fish_catch_cooldown": 4
   }
 }

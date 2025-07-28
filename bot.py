@@ -7,6 +7,9 @@ import sys
 
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
+from systems.scripts.loader import load_settings
+
+SETTINGS = load_settings()
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
