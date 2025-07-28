@@ -2,6 +2,7 @@ import time
 import argparse
 from systems.scripts.execution_handler import buy_order, sell_order
 from systems.utils.resolve_symbol import resolve_symbol
+from systems.utils.logger import addlog
 
 def main():
     parser = argparse.ArgumentParser(description="Test Kraken Buy/Sell Roundtrip")
@@ -15,19 +16,22 @@ def main():
     verbose = args.verbose  # <-- FIXED HERE
 
     kraken_pair = resolve_symbol(symbol)["kraken"]
-    if verbose >= 1:
-        print(f"[INFO] Resolved {symbol} → Kraken pair {kraken_pair}")
+    addlog(
+        f"[INFO] Resolved {symbol} → Kraken pair {kraken_pair}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
 
-    print(f"--- BUYING ${usd_amount:.2f} of {symbol} ---")
+    addlog(f"--- BUYING ${usd_amount:.2f} of {symbol} ---")
     buy_result = buy_order(symbol, usd_amount, verbose=verbose)
-    print("[✓] Buy Complete:", buy_result)
+    addlog(f"[✓] Buy Complete: {buy_result}")
 
-    print("\n⏳ Waiting 5 seconds before selling...\n")
+    addlog("\n⏳ Waiting 5 seconds before selling...\n")
     time.sleep(5)
 
-    print(f"--- SELLING ${usd_amount:.2f} of {symbol} ---")
+    addlog(f"--- SELLING ${usd_amount:.2f} of {symbol} ---")
     sell_result = sell_order(symbol, usd_amount, verbose=verbose)
-    print("[✓] Sell Complete:", sell_result)
+    addlog(f"[✓] Sell Complete: {sell_result}")
 
 if __name__ == "__main__":
     main()
