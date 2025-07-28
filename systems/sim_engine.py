@@ -13,6 +13,9 @@ from systems.scripts.evaluate_buy import evaluate_buy_df
 from systems.scripts.evaluate_sell import evaluate_sell_df
 import pandas as pd
 from systems.utils.time import duration_from_candle_count
+from systems.scripts.loader import load_settings
+
+SETTINGS = load_settings()
 
 
 def listen_for_keys(should_exit_flag: list) -> None:
@@ -65,9 +68,9 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
     precomputed_windows = [get_window_data_df(df, window, candle_offset=i) for i in range(total_rows)]
 
     cooldowns = {
-        "knife_catch": 1,
-        "whale_catch": 0,
-        "fish_catch": 2
+        "knife_catch": SETTINGS["general_settings"]["knife_catch_cooldown"],
+        "whale_catch": SETTINGS["general_settings"]["whale_catch_cooldown"],
+        "fish_catch": SETTINGS["general_settings"]["fish_catch_cooldown"]
     }
 
     last_triggered = {
