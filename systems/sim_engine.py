@@ -7,7 +7,11 @@ except ImportError:  # pragma: no cover - Windows-only
 import json
 from tqdm import tqdm
 from systems.utils.path import find_project_root
-from systems.utils.logger import addlog
+from systems.utils.logger import (
+    addlog,
+    init_logger,
+    LOGGING_ENABLED,
+)
 from systems.scripts.get_candle_data import get_candle_data_df
 from systems.scripts.get_window_data import get_window_data_df
 from systems.scripts.evaluate_buy import evaluate_buy_df
@@ -31,6 +35,11 @@ def listen_for_keys(should_exit_flag: list) -> None:
                     break
 
 def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
+    init_logger(
+        logging_enabled=LOGGING_ENABLED,
+        verbose_level=verbose,
+        telegram_enabled=False,
+    )
     addlog(
         f"[SIM] Running simulation for {tag} on window {window}",
         verbose_int=1,
