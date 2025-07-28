@@ -43,6 +43,15 @@ def get_kraken_balance(verbose: int = 0) -> dict:
         print("[INFO] Kraken balance fetched:", result)
     return {k: float(v) for k, v in result.items()}
 
+
+def get_available_fiat_balance(exchange, currency: str = "USD") -> float:
+    """Return available fiat balance from a CCXT exchange object."""
+    try:
+        balance = exchange.fetch_free_balance()
+    except Exception:
+        return 0.0
+    return float(balance.get(currency, 0.0))
+
 def buy_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
     api_key, api_secret = load_kraken_keys()
     symbols = resolve_symbol(symbol)
