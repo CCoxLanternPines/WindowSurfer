@@ -73,8 +73,28 @@ def buy_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
         return {}
 
     for slippage in SLIPPAGE_STEPS:
-        price_resp = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={pair_code}").json()
-        price = float(price_resp["result"][pair_code]["c"][0])
+        price_resp = requests.get(
+            f"https://api.kraken.com/0/public/Ticker?pair={pair_code}"
+        ).json()
+        ticker_result = price_resp.get("result", {})
+        if not ticker_result:
+            addlog(
+                "[ERROR] Invalid ticker response: missing result",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            continue
+        ticker_key = next(iter(ticker_result))
+        ticker_data = ticker_result.get(ticker_key, {})
+        close = ticker_data.get("c")
+        if not close:
+            addlog(
+                "[ERROR] Invalid ticker response: missing close price",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            continue
+        price = float(close[0])
         adjusted_price = price * (1 + slippage)
         coin_amount = round(usd_amount / adjusted_price, 8)
 
@@ -122,8 +142,18 @@ def sell_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
     symbols = resolve_symbol(symbol)
     pair_code = symbols["kraken"]
 
-    price_resp = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={pair_code}").json()
-    price = float(price_resp["result"][pair_code]["c"][0])
+    price_resp = requests.get(
+        f"https://api.kraken.com/0/public/Ticker?pair={pair_code}"
+    ).json()
+    ticker_result = price_resp.get("result", {})
+    if not ticker_result:
+        raise Exception("Invalid ticker response: missing result")
+    ticker_key = next(iter(ticker_result))
+    ticker_data = ticker_result.get(ticker_key, {})
+    close = ticker_data.get("c")
+    if not close:
+        raise Exception("Invalid ticker response: missing close price")
+    price = float(close[0])
     coin_amount = round(usd_amount / price, 8)
 
     order_resp = _kraken_request("AddOrder", {
