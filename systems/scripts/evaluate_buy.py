@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from systems.utils.path import find_project_root
 from tqdm import tqdm
+from systems.utils.logger import addlog
 
 from systems.decision_logic.fish_catch import should_buy_fish
 from systems.decision_logic.knife_catch import should_buy_knife
@@ -54,7 +55,6 @@ def evaluate_buy_df(
     sim: bool = False,
     verbose: int = 0,
     ledger=None,  # <- Inject ledger if in RAM mode
-    debug: bool = False,
     get_capital=None,
     on_buy=None,
 ) -> bool:
@@ -67,8 +67,11 @@ def evaluate_buy_df(
         open(LOG_PATH, "w").close()
         _log_initialized["sim"] = True
 
-    if verbose >= 2:
-        tqdm.write(f"[EVAL] Evaluating Buy for {tag} 🐟🐋🔪")
+    addlog(
+        f"[EVAL] Evaluating Buy for {tag} 🐟🐋🔪",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
 
     tunnel_pos = window_data.get("tunnel_position", 0)
     window_pos = window_data.get("window_position", 0)
@@ -86,23 +89,27 @@ def evaluate_buy_df(
     symbols = resolve_symbol(tag)
     kraken_symbol = symbols["kraken"]
 
-    live = not sim and not debug
+    live = not sim
 
     if live and ledger:
         if any(n.get("symbol") == symbol and n.get("status") == "Open" for n in ledger.get_active_notes()):
-            if verbose >= 1:
-                tqdm.write(f"[SKIP] Already have open note for {symbol} — skipping buy")
+            addlog(
+                f"[SKIP] Already have open note for {symbol} — skipping buy",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
             return False
 
     def create_note(strategy: str):
         capital = get_capital() if get_capital else 0.0
         usd_amount = capital * INVESTMENT_SIZE
         if usd_amount < MINIMUM_NOTE_SIZE:
-            if verbose >= 2:
-                min_size = MINIMUM_NOTE_SIZE
-                tqdm.write(
-                    f"[SKIP] Note below minimum size (${usd_amount:.2f} < ${min_size})"
-                )
+            min_size = MINIMUM_NOTE_SIZE
+            addlog(
+                f"[SKIP] Note below minimum size (${usd_amount:.2f} < ${min_size})",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
             return None
 
         entry_amount = usd_amount / close_price
@@ -128,8 +135,7 @@ def evaluate_buy_df(
     if should_buy_fish(candle, window_data, tick, cooldowns):
         cooldowns["fish_catch"] = SETTINGS["general_settings"]["fish_catch_cooldown"]
         last_triggered["fish_catch"] = tick
-        if verbose >= 1:
-            tqdm.write(f"[BUY] Fish Catch triggered at tick {tick}")
+        addlog(f"[BUY] Fish Catch triggered at tick {tick}", verbose_int=1, verbose_state=verbose)
         if ledger:
             note = create_note("fish_catch")
             if note:
@@ -150,8 +156,7 @@ def evaluate_buy_df(
     if should_buy_whale(candle, window_data, tick, cooldowns):
         cooldowns["whale_catch"] = SETTINGS["general_settings"]["whale_catch_cooldown"]
         last_triggered["whale_catch"] = tick
-        if verbose >= 1:
-            tqdm.write(f"[BUY] Whale Catch triggered at tick {tick}")
+        addlog(f"[BUY] Whale Catch triggered at tick {tick}", verbose_int=1, verbose_state=verbose)
         if ledger:
             note = create_note("whale_catch")
             if note:
@@ -172,8 +177,7 @@ def evaluate_buy_df(
     if should_buy_knife(candle, window_data, tick, cooldowns):
         cooldowns["knife_catch"] = SETTINGS["general_settings"]["knife_catch_cooldown"]
         last_triggered["knife_catch"] = tick
-        if verbose >= 1:
-            tqdm.write(f"[BUY] Knife Catch triggered at tick {tick}")
+        addlog(f"[BUY] Knife Catch triggered at tick {tick}", verbose_int=1, verbose_state=verbose)
         if ledger:
             note = create_note("knife_catch")
             if note:
@@ -190,20 +194,20 @@ def evaluate_buy_df(
                     on_buy(note)
                 triggered = True
 
-    if verbose >= 3:
-        tunnel_height = tunnel_high - tunnel_low
-        tunnel_pct = tunnel_pos * 100
-        tqdm.write(
-            f"🧠 Tunnel {{w={tunnel_low:.4f}, h={tunnel_height:.4f}, p={tunnel_pos:.4f}, t={tunnel_pct:.1f}%}} "
-            f"Window {{p={window_pos:.4f}}}"
-        )
+    tunnel_height = tunnel_high - tunnel_low
+    tunnel_pct = tunnel_pos * 100
+    addlog(
+        f"🧠 Tunnel {{w={tunnel_low:.4f}, h={tunnel_height:.4f}, p={tunnel_pos:.4f}, t={tunnel_pct:.1f}%}} "
+        f"Window {{p={window_pos:.4f}}}",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
 
-    if verbose >= 2:
-        fish_decision = should_buy_fish(candle, window_data, tick, cooldowns)
-        whale_decision = should_buy_whale(candle, window_data, tick, cooldowns)
-        knife_decision = should_buy_knife(candle, window_data, tick, cooldowns)
-        summary = f"[BUY RESULT] Tick {tick} | Knife: {knife_decision} | Whale: {whale_decision} | Fish: {fish_decision}"
-        tqdm.write(summary)
+    fish_decision = should_buy_fish(candle, window_data, tick, cooldowns)
+    whale_decision = should_buy_whale(candle, window_data, tick, cooldowns)
+    knife_decision = should_buy_knife(candle, window_data, tick, cooldowns)
+    summary = f"[BUY RESULT] Tick {tick} | Knife: {knife_decision} | Whale: {whale_decision} | Fish: {fish_decision}"
+    addlog(summary, verbose_int=2, verbose_state=verbose)
 
 
     return triggered

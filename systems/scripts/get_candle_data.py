@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 from systems.utils.path import find_project_root
+from systems.utils.logger import addlog
 
 
 def _extract_candle_row(df, row_offset: int = 0) -> dict | None:
@@ -95,8 +96,11 @@ def get_candle_data(tag: str, row_offset: int = 0, verbose: int = 0) -> Dict[str
         If the requested row does not exist in the file.
     """
 
-    if verbose >= 1:
-        print(f"[get_candle_data] tag={tag} row_offset={row_offset}")
+    addlog(
+        f"[get_candle_data] tag={tag} row_offset={row_offset}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
 
     root = find_project_root()
     path: Path = root / "data" / "raw" / f"{tag.upper()}.csv"
@@ -137,7 +141,10 @@ def get_candle_data(tag: str, row_offset: int = 0, verbose: int = 0) -> Dict[str
         "volume": float(row["volume"]),
     }
 
-    if verbose >= 2:
-        print(f"[get_candle_data] result={result}")
+    addlog(
+        f"[get_candle_data] result={result}",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
 
     return result

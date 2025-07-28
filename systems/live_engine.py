@@ -4,6 +4,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from tqdm import tqdm
 import ccxt
+from systems.utils.logger import addlog
 from systems.scripts.get_candle_data import get_candle_data_json
 from systems.scripts.get_window_data import get_window_data_json
 from systems.fetch import fetch_missing_candles
@@ -28,9 +29,8 @@ def esc_listener(should_exit_flag):
                 break
 
 
-def run_live(tag: str, window: str, verbose: int = 0, debug: bool = False) -> None:
-    if verbose >= 1:
-        tqdm.write(f"[LIVE] Running live mode for {tag} on window {window}")
+def run_live(tag: str, window: str, verbose: int = 0) -> None:
+    addlog(f"[LIVE] Running live mode for {tag} on window {window}", verbose_int=1, verbose_state=verbose)
 
     # Resolve exchange symbols for future use
     from systems.utils.resolve_symbol import resolve_symbol
@@ -41,53 +41,43 @@ def run_live(tag: str, window: str, verbose: int = 0, debug: bool = False) -> No
     if msvcrt:
         threading.Thread(target=esc_listener, args=(should_exit,), daemon=True).start()
 
-    loop_forever = not debug
-
     while True:
-        if debug:
-            if verbose >= 1:
-                tqdm.write("[DEBUG] Pretending top of hour reached — skipping wait.\n")
-                handle_top_of_hour(tag=tag, window=window, verbose=verbose, debug=debug)
-                sys.exit()
-            if verbose >= 1:
-                tqdm.write("[DEBUG] One-shot live execution complete. Exiting.")
-            break
-        else:
-            now = datetime.utcnow().replace(tzinfo=timezone.utc)
-            elapsed_secs = now.minute * 60 + now.second
-            remaining_secs = 3600 - elapsed_secs
+        now = datetime.utcnow().replace(tzinfo=timezone.utc)
+        elapsed_secs = now.minute * 60 + now.second
+        remaining_secs = 3600 - elapsed_secs
 
-            with tqdm(
+        with tqdm(
                 total=3600,
                 initial=elapsed_secs,
                 desc="⏳ Time to next hour",
                 bar_format="{l_bar}{bar}| {percentage:3.0f}% {remaining}s",
                 leave=True,
                 dynamic_ncols=True
-            ) as pbar:
-                for _ in range(remaining_secs):
-                    if should_exit:
-                        if verbose >= 1:
-                            tqdm.write("\n🚪 ESC detected — exiting live mode.")
-                        return
-                    time.sleep(1)
-                    pbar.update(1)
+        ) as pbar:
+            for _ in range(remaining_secs):
+                if should_exit:
+                    addlog("\n🚪 ESC detected — exiting live mode.", verbose_int=1, verbose_state=verbose)
+                    return
+                time.sleep(1)
+                pbar.update(1)
 
-            if verbose >= 0:
-                now = datetime.now(timezone.utc)
-                tqdm.write(f"\n🕐 Top of hour reached at {now.strftime('%Y-%m-%d %H:%M:%S %Z')} — Restarting countdown...\n")
+        now = datetime.now(timezone.utc)
+        addlog(
+            f"\n🕐 Top of hour reached at {now.strftime('%Y-%m-%d %H:%M:%S %Z')} — Restarting countdown...\n",
+            verbose_int=0,
+            verbose_state=verbose,
+        )
 
-        handle_top_of_hour(tag=tag, window=window, verbose=verbose, debug=debug)
+        handle_top_of_hour(tag=tag, window=window, verbose=verbose)
 
 
-def handle_top_of_hour(tag: str, window: str, verbose: int = 0, debug: bool = False) -> None:
+def handle_top_of_hour(tag: str, window: str, verbose: int = 0) -> None:
     ensure_latest_candles(tag, lookback="48h", verbose=verbose)
 
     candle = get_candle_data_json(tag, row_offset=0)
     window_data = get_window_data_json(tag, window, candle_offset=0)
 
-    if verbose >= 2:
-        tqdm.write("[TRACE] Candle and window data pulled.")
+    addlog("[TRACE] Candle and window data pulled.", verbose_int=2, verbose_state=verbose)
 
     if candle and window_data:
         from systems.scripts.ledger import RamLedger
@@ -112,13 +102,15 @@ def handle_top_of_hour(tag: str, window: str, verbose: int = 0, debug: bool = Fa
             cooldowns=cooldowns,
             last_triggered=last_triggered,
             tag=tag,
-            verbose=verbose,
-            debug=debug
+            verbose=verbose
         )
 
     else:
-        if verbose >= 1:
-            tqdm.write("[WARN] Missing candle or window data. Skipping this cycle.")
+        addlog(
+            "[WARN] Missing candle or window data. Skipping this cycle.",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
 
 
 def evaluate_live_tick(
@@ -128,15 +120,14 @@ def evaluate_live_tick(
     cooldowns: dict,
     last_triggered: dict,
     tag: str,
-    verbose: int = 0,
-    debug: bool = False
+    verbose: int = 0
 ) -> None:
     from systems.scripts.evaluate_buy import evaluate_buy_df
     from systems.scripts.evaluate_sell import evaluate_sell_df
     from systems.scripts.execution_handler import sell_order
     from systems.utils.resolve_symbol import resolve_symbol
 
-    live = not debug
+    live = True
     symbols = resolve_symbol(tag)
     kraken_symbol = symbols["kraken"]
 
@@ -155,7 +146,6 @@ def evaluate_live_tick(
         sim=False,
         verbose=verbose,
         ledger=ledger,
-        debug=debug,
         get_capital=get_capital
     )
 
@@ -188,16 +178,24 @@ def evaluate_live_tick(
         note["status"] = "Closed"
         ledger.close_note(note)
 
-        if verbose >= 1:
-            from tqdm import tqdm
-            tqdm.write(f"[SELL] Live Tick | Strategy: {note['strategy']} | Gain: {note.get('gain_pct', 0):.2%}")
+        addlog(
+            f"[SELL] Live Tick | Strategy: {note['strategy']} | Gain: {note.get('gain_pct', 0):.2%}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
 
 
 def ensure_latest_candles(tag: str, lookback: str = "48h", verbose: int = 1) -> None:
     try:
-        if verbose >= 1:
-            tqdm.write(f"[SYNC] Checking for missing candles in last {lookback} for {tag}")
+        addlog(
+            f"[SYNC] Checking for missing candles in last {lookback} for {tag}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
         fetch_missing_candles(tag, relative_window=lookback, verbose=verbose)
     except Exception as e:
-        if verbose >= 1:
-            tqdm.write(f"[ERROR] Failed to fetch missing candles: {e}")
+        addlog(
+            f"[ERROR] Failed to fetch missing candles: {e}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )

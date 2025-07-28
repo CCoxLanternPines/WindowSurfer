@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.utils.resolve_symbol import resolve_symbol
+from systems.utils.logger import addlog
 
 KRAKEN_ORDER_TIMEOUT = 6
 SLIPPAGE_STEPS = [0.0, 0.002, 0.004, 0.007, 0.01]
@@ -39,8 +40,11 @@ def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) ->
 def get_kraken_balance(verbose: int = 0) -> dict:
     api_key, api_secret = load_kraken_keys()
     result = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
-    if verbose >= 2:
-        print("[INFO] Kraken balance fetched:", result)
+    addlog(
+        f"[INFO] Kraken balance fetched: {result}",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
     return {k: float(v) for k, v in result.items()}
 
 
@@ -61,8 +65,11 @@ def buy_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
     balance = get_kraken_balance(verbose)
     available_usd = balance.get("ZUSD", 0.0)
     if available_usd < usd_amount:
-        if verbose >= 1:
-            print(f"[ABORT] Not enough USDT to buy: ${available_usd:.2f} available, need ${usd_amount:.2f}")
+        addlog(
+            f"[ABORT] Not enough USDT to buy: ${available_usd:.2f} available, need ${usd_amount:.2f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
         return {}
 
     for slippage in SLIPPAGE_STEPS:
@@ -71,8 +78,11 @@ def buy_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
         adjusted_price = price * (1 + slippage)
         coin_amount = round(usd_amount / adjusted_price, 8)
 
-        if verbose >= 1:
-            print(f"\nTrying buy with slippage {slippage*100:.2f}% → volume {coin_amount:.6f}")
+        addlog(
+            f"\nTrying buy with slippage {slippage*100:.2f}% → volume {coin_amount:.6f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
 
         order_resp = _kraken_request("AddOrder", {
             "pair": pair_code,
@@ -83,8 +93,7 @@ def buy_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
         }, api_key, api_secret)
 
         txid = order_resp["result"]["txid"][0]
-        if verbose >= 1:
-            print(f"Order placed: {txid}")
+        addlog(f"Order placed: {txid}", verbose_int=1, verbose_state=verbose)
 
         start = time.time()
         while time.time() - start < KRAKEN_ORDER_TIMEOUT:
@@ -92,8 +101,7 @@ def buy_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
             trades = trades_resp["result"]["trades"]
             for tid, trade in trades.items():
                 if trade["ordertxid"] == txid:
-                    if verbose >= 1:
-                        print("Trade found in history")
+                    addlog("Trade found in history", verbose_int=1, verbose_state=verbose)
                     return {
                         "kraken_txid": txid,
                         "symbol": symbol,
@@ -105,8 +113,7 @@ def buy_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
                     }
             time.sleep(0.6)
 
-        if verbose >= 1:
-            print("Slippage level failed, trying next...")
+        addlog("Slippage level failed, trying next...", verbose_int=1, verbose_state=verbose)
 
     raise Exception("Buy order failed — no fill found within timeout.")
 
@@ -128,8 +135,7 @@ def sell_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
     }, api_key, api_secret)
 
     txid = order_resp["result"]["txid"][0]
-    if verbose >= 1:
-        print(f"Sell Order placed: {txid}")
+    addlog(f"Sell Order placed: {txid}", verbose_int=1, verbose_state=verbose)
 
     start = time.time()
     while time.time() - start < KRAKEN_ORDER_TIMEOUT:
@@ -137,8 +143,7 @@ def sell_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
         trades = trades_resp["result"]["trades"]
         for tid, trade in trades.items():
             if trade["ordertxid"] == txid:
-                if verbose >= 1:
-                    print("Sell trade found in history")
+                addlog("Sell trade found in history", verbose_int=1, verbose_state=verbose)
                 return {
                     "kraken_txid": txid,
                     "symbol": symbol,

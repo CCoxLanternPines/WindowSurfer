@@ -16,7 +16,7 @@ def should_sell_knife(candle, window_data, note, verbose: int = 0) -> bool:
     
     if tunnel_pos is not None and tunnel_pos > 0.90:
         if saved_window_pos is not None and window_pos >= saved_window_pos:
-            if verbose >= 1:
-                print("[KNIFE] ✅ SELL triggered")
+            from systems.utils.logger import addlog
+            addlog("[KNIFE] ✅ SELL triggered", verbose_int=1, verbose_state=verbose)
             return True
     return False
