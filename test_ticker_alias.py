@@ -1,9 +1,6 @@
 import importlib
 import sys
 import types
-import os
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # stub modules before importing execution_handler
 price_response = {"result": {"XDGUSD": {"c": ["0.1"]}}}
@@ -34,11 +31,9 @@ class DummyKraken:
 
 execution_handler._kraken_request = DummyKraken()
 
-
 def test_buy_order_alias():
     result = execution_handler.buy_order('DOGEUSD', 1.0)
     assert result['price'] == 0.1
-
 
 def test_sell_order_alias():
     result = execution_handler.sell_order('DOGEUSD', 1.0)
