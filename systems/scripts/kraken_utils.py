@@ -5,6 +5,9 @@ import hmac
 import base64
 from urllib.parse import urlencode
 
+from systems.scripts.kraken_auth import load_kraken_keys
+from systems.utils.logger import addlog
+
 KRAKEN_API_URL = "https://api.kraken.com"
 
 def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) -> dict:
@@ -33,3 +36,17 @@ def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) ->
         raise Exception(f"Kraken API error: {result['error']}")
 
     return result
+
+
+def get_kraken_balance(verbose: int = 0) -> dict:
+    # Import here to avoid circular dependency when execution_handler imports this module
+    from systems.scripts.execution_handler import _kraken_request
+
+    api_key, api_secret = load_kraken_keys()
+    result = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
+    addlog(
+        f"[INFO] Kraken balance fetched: {result}",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
+    return {k: float(v) for k, v in result.items()}

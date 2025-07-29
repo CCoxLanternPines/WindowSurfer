@@ -117,10 +117,24 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
 
                 # ✅ Save and show ledger summary
                 save_ledger_to_file(ledger, verbose=verbose)
+
+                open_notes = ledger.get_active_notes()
+                if open_notes:
+                    last_price = precomputed_candles[step]["close"]
+                    unrealized_value = sum(n["entry_amount"] * last_price for n in open_notes)
+                    addlog(
+                        f"[INFO] Mark-to-market added from open notes: ${unrealized_value:.2f}",
+                        verbose_int=1,
+                        verbose_state=verbose,
+                    )
+                    ending_capital = sim_capital + unrealized_value
+                else:
+                    ending_capital = sim_capital
+
                 print_simulation_summary(
                     ledger,
                     starting_capital=start_capital,
-                    ending_capital=sim_capital,
+                    ending_capital=ending_capital,
                     ticks_run=step + 1,
                     verbose=verbose,
                 )
@@ -184,10 +198,24 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
 
     # End of simulation loop
     save_ledger_to_file(ledger, verbose=verbose)
+
+    open_notes = ledger.get_active_notes()
+    if open_notes:
+        last_price = precomputed_candles[-1]["close"]
+        unrealized_value = sum(n["entry_amount"] * last_price for n in open_notes)
+        addlog(
+            f"[INFO] Mark-to-market added from open notes: ${unrealized_value:.2f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        ending_capital = sim_capital + unrealized_value
+    else:
+        ending_capital = sim_capital
+
     print_simulation_summary(
         ledger,
         starting_capital=start_capital,
-        ending_capital=sim_capital,
+        ending_capital=ending_capital,
         ticks_run=total_rows,
         verbose=verbose,
     )
@@ -215,42 +243,50 @@ def save_ledger_to_file(ledger, filename="ledgersimulation.json", verbose: int =
         verbose_state=verbose,
     )
     
-def print_simulation_summary(ledger, starting_capital=None, ending_capital=None, ticks_run=None, candle_minutes=60, verbose: int = 0) -> None:
+def print_simulation_summary(
+    ledger,
+    starting_capital=None,
+    ending_capital=None,
+    ticks_run=None,
+    candle_minutes=60,
+    verbose: int = 0,
+) -> None:
     summary = ledger.get_summary()
-
-    addlog("\n📊 Simulation Summary", verbose_int=1, verbose_state=verbose)
-    if starting_capital is not None:
-        addlog(f"Starting Capital: ${starting_capital:.2f}", verbose_int=1, verbose_state=verbose)
-    if ending_capital is not None:
-        pnl = ending_capital - starting_capital if starting_capital is not None else 0
-        pct = pnl / starting_capital * 100 if starting_capital else 0
-        addlog(f"Ending Capital:   ${ending_capital:.2f}", verbose_int=1, verbose_state=verbose)
-        addlog(f"Net PnL:          ${pnl:.2f} ({pct:.2f}%)", verbose_int=1, verbose_state=verbose)
-    else:
-        addlog(f"Open Notes:     {summary['num_open']}", verbose_int=1, verbose_state=verbose)
-        addlog(f"Closed Notes:   {summary['num_closed']}", verbose_int=1, verbose_state=verbose)
-        addlog(f"Investment:     ${summary['total_invested_usdt']:.2f}", verbose_int=1, verbose_state=verbose)
-        addlog(f"Net PnL:        ${summary['total_pnl_usdt']:.2f}", verbose_int=1, verbose_state=verbose)
-    addlog(f"Avg Gain %:     {summary['total_gain_pct']:.2%}", verbose_int=1, verbose_state=verbose)
-    addlog(f"Est Balance:    ${summary['estimated_kraken_balance']:.2f}", verbose_int=1, verbose_state=verbose)
-
     strategy_counts = ledger.get_trade_counts_by_strategy()
 
-    addlog("\n🎣 Strategy Breakdown", verbose_int=1, verbose_state=verbose)
+    output = ["📊 Simulation Summary"]
+
+    if starting_capital is not None and ending_capital is not None:
+        pnl = ending_capital - starting_capital
+        pct = (pnl / starting_capital) * 100 if starting_capital else 0
+        output += [
+            f"Starting Capital: ${starting_capital:.2f}",
+            f"Ending Capital:   ${ending_capital:.2f}",
+            f"Net PnL:          ${pnl:.2f} ({pct:.2f}%)",
+        ]
+    else:
+        output += [
+            f"Open Notes:     {summary['num_open']}",
+            f"Closed Notes:   {summary['num_closed']}",
+            f"Investment:     ${summary['total_invested_usdt']:.2f}",
+            f"Net PnL:        ${summary['total_pnl_usdt']:.2f}",
+        ]
+
+    output.append(f"Avg Gain %:     {summary['total_gain_pct']:.2%}")
+    output.append("\n🎣 Strategy Breakdown")
+
     for strategy in ["knife_catch", "whale_catch", "fish_catch"]:
         data = strategy_counts.get(strategy, {"total": 0, "open": 0})
-        total = data["total"]
-        open_count = data["open"]
-        addlog(
-            f"{strategy.replace('_', ' ').title():<15}: {total} trades ({open_count} open)",
-            verbose_int=1,
-            verbose_state=verbose,
+        output.append(
+            f"{strategy.replace('_', ' ').title():<15}: {data['total']} trades ({data['open']} open)"
         )
 
     if ticks_run:
         gain_per_month = ledger.get_avg_gain_per_month(ticks_run, candle_minutes)
         roi_per_month = ledger.get_roi_per_month(ticks_run, candle_minutes)
+        output += [
+            f"Avg Gain %/mo:  {gain_per_month:.2%}",
+            f"Avg ROI %/mo:   {roi_per_month:.2%}",
+        ]
 
-        addlog(f"Avg Gain %/mo:  {gain_per_month:.2%}", verbose_int=1, verbose_state=verbose)
-        addlog(f"Avg ROI %/mo:   {roi_per_month:.2%}", verbose_int=1, verbose_state=verbose)
-
+    addlog("\n" + "\n".join(output), verbose_int=0, verbose_state=verbose)

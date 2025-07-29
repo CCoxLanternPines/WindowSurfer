@@ -1,8 +1,11 @@
-from systems.decision_logic.fish_catch import should_sell_fish
-from systems.decision_logic.whale_catch import should_sell_whale
-from systems.decision_logic.knife_catch import should_sell_knife
+from systems.decision_logic.fish_catch import should_sell_notes as fish_should_sell_notes
+from systems.decision_logic.whale_catch import should_sell_notes as whale_should_sell_notes
+from systems.decision_logic.knife_catch import should_sell_notes as knife_should_sell_notes
 from tqdm import tqdm
 from systems.utils.logger import addlog
+from systems.scripts.loader import load_settings
+
+SETTINGS = load_settings()
 MIN_GAIN_PCT = 0.05  # Require at least +5% ROI to sell
 
 def evaluate_sell_df(
@@ -16,59 +19,29 @@ def evaluate_sell_df(
     """Given current market state and open notes, returns list of notes to be sold."""
     sell_list = []
 
-    addlog(
-        f"[EVAL] Evaluating Sell for {tag} 🐟🐋🔪",
-        verbose_int=2,
-        verbose_state=verbose,
-    )
 
+    # Separate notes by strategy for routing
+    fish_notes = [n for n in notes if n.get("strategy") == "fish_catch"]
+    whale_notes = [n for n in notes if n.get("strategy") == "whale_catch"]
+    knife_notes = [n for n in notes if n.get("strategy") == "knife_catch"]
 
-    for note in notes:
-        entry_price = note.get("entry_price")
-        if not entry_price:
-            continue
+    active_strategies = {n.get("strategy") for n in notes}
 
-        current_price = candle.get("close")
-        gain_pct = (current_price - entry_price) / entry_price
+    # Provide window data and gain requirement to strategy functions via settings
+    strategy_settings = {
+        **SETTINGS,
+        "window_data": window_data,
+        "min_gain_pct": MIN_GAIN_PCT,
+    }
 
-        if gain_pct < MIN_GAIN_PCT:
-            addlog(
-                f"[HOLD] {note['strategy']} | Tick {tick} | Gain {gain_pct:.2%} < Min Gain",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-            continue
+    if "fish_catch" in active_strategies:
+        sell_list += fish_should_sell_notes(fish_notes, candle, strategy_settings, verbose)
 
-        strategy = note.get("strategy")
+    if "whale_catch" in active_strategies:
+        sell_list += whale_should_sell_notes(whale_notes, candle, strategy_settings, verbose)
 
-    for note in notes:
-        entry_price = note.get("entry_price")
-        if not entry_price:
-            continue
-
-        current_price = candle.get("close")
-        gain_pct = (current_price - entry_price) / entry_price
-
-        if gain_pct < MIN_GAIN_PCT:
-            addlog(
-                f"[HOLD] {note['strategy']} | Tick {tick} | Gain {gain_pct:.2%} < Min Gain",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-            continue
-
-        strategy = note.get("strategy")
-
-        fish_decision = should_sell_fish(candle, window_data, note)
-        whale_decision = should_sell_whale(candle, window_data, note)
-        knife_decision = should_sell_knife(candle, window_data, note, verbose=verbose)
-
-        if strategy == "fish_catch" and fish_decision:
-            sell_list.append(note)
-        elif strategy == "whale_catch" and whale_decision:
-            sell_list.append(note)
-        elif strategy == "knife_catch" and knife_decision:
-            sell_list.append(note)
+    if "knife_catch" in active_strategies:
+        sell_list += knife_should_sell_notes(knife_notes, candle, strategy_settings, verbose)
 
     addlog(
         f"[EVAL] Active Notes: {len(notes)}",
@@ -76,5 +49,20 @@ def evaluate_sell_df(
         verbose_state=verbose,
     )
 
+    sell_list.sort(
+        key=lambda note: (
+            note.get("entry_amount", 0) * candle["close"]
+            - note.get("entry_usdt", 0)
+        ),
+        reverse=True,
+    )
+
+    for note in sell_list:
+        projected_gain = note["entry_amount"] * candle["close"] - note["entry_usdt"]
+        addlog(
+            f"[PRIORITY SELL] Strategy: {note['strategy']} | Est Gain: ${projected_gain:.2f}",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
 
     return sell_list
