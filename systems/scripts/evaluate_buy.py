@@ -67,12 +67,6 @@ def evaluate_buy_df(
         open(LOG_PATH, "w").close()
         _log_initialized["sim"] = True
 
-    addlog(
-        f"[EVAL] Evaluating Buy for {tag} 🐟🐋🔪",
-        verbose_int=2,
-        verbose_state=verbose,
-    )
-
     if verbose >= 3:
         for strat in cooldowns:
             last = last_triggered.get(strat)
