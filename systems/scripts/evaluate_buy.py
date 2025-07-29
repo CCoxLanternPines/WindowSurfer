@@ -91,16 +91,25 @@ def evaluate_buy_df(
 
     live = not sim
 
+    # Fetch capital once at the start
     if live:
         kraken_bal = get_kraken_balance(verbose=verbose)
-        usd_balance = kraken_bal.get("ZUSD", 0.0)
-        if usd_balance < MINIMUM_NOTE_SIZE:
-            addlog(
-                f"[SKIP] Not enough capital to trade (${usd_balance:.2f} < ${MINIMUM_NOTE_SIZE:.2f})",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-            return False
+        available_capital = float(kraken_bal.get("ZUSD", 0.0))
+        addlog(
+            f"[INFO] Available capital: ${available_capital:.2f}",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+    else:
+        available_capital = float(get_capital() if get_capital else 0.0)
+
+    if available_capital < MINIMUM_NOTE_SIZE:
+        addlog(
+            f"[SKIP] Not enough capital to trade (${available_capital:.2f} < ${MINIMUM_NOTE_SIZE:.2f})",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return False
 
     open_notes = ledger.get_active_notes() if ledger else []
     knife_notes = [n for n in open_notes if n.get("strategy") == "knife_catch"]
@@ -115,16 +124,19 @@ def evaluate_buy_df(
             return False
 
     def create_note(strategy: str):
-        capital = get_capital() if get_capital else 0.0
-        usd_amount = capital * INVESTMENT_SIZE
+        nonlocal available_capital
+        usd_amount = available_capital * INVESTMENT_SIZE
         if usd_amount < MINIMUM_NOTE_SIZE:
             min_size = MINIMUM_NOTE_SIZE
             addlog(
                 f"[SKIP] Note below minimum size (${usd_amount:.2f} < ${min_size})",
-                verbose_int=2,
+                verbose_int=1,
                 verbose_state=verbose,
             )
             return None
+
+        # Deduct from local capital so sequential notes honor updates
+        available_capital -= usd_amount
 
         entry_amount = usd_amount / close_price
         entry_usdt = usd_amount
