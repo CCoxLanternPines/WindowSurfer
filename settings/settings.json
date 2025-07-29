@@ -12,5 +12,6 @@
   },
   "simulation_capital": 1000,
   "investment_size": 0.07,
-  "minimum_note_size": 50
+  "minimum_note_size": 50,
+  "knife_group_roi_margin": 0.30
 }
