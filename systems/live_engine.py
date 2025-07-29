@@ -1,6 +1,8 @@
 import time
 import sys
 import threading
+import os
+import json
 from datetime import datetime, timedelta, timezone
 from tqdm import tqdm
 import ccxt
@@ -30,6 +32,16 @@ def esc_listener(should_exit_flag):
                 break
 
 
+def ensure_ledger(tag: str) -> str:
+    """Ensure a ledger file exists for ``tag`` and return its path."""
+    os.makedirs("data/ledgers", exist_ok=True)
+    ledger_path = f"data/ledgers/{tag}.json"
+    if not os.path.exists(ledger_path):
+        with open(ledger_path, "w", encoding="utf-8") as f:
+            json.dump({"open_notes": [], "closed_notes": []}, f)
+    return ledger_path
+
+
 def run_live(tag: str, window: str, verbose: int = 0) -> None:
     addlog(f"[LIVE] Running live mode for {tag} on window {window}", verbose_int=1, verbose_state=verbose)
 
@@ -37,8 +49,9 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
     from systems.utils.resolve_symbol import resolve_symbol
     symbols = resolve_symbol(tag)
 
-    from systems.scripts.ledger import RamLedger
-    ledger = RamLedger()
+    ledger_path = ensure_ledger(tag)
+    from systems.scripts.ledger import FileLedger
+    ledger = FileLedger(ledger_path)
     cooldowns = {
         "knife_catch": get_strategy_cooldown("knife_catch"),
         "whale_catch": get_strategy_cooldown("whale_catch"),
