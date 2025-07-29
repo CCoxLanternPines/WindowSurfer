@@ -19,12 +19,6 @@ def evaluate_sell_df(
     """Given current market state and open notes, returns list of notes to be sold."""
     sell_list = []
 
-    addlog(
-        f"[EVAL] Evaluating Sell for {tag} 🐟🐋🔪",
-        verbose_int=2,
-        verbose_state=verbose,
-    )
-
 
     # Separate notes by strategy for routing
     fish_notes = [n for n in notes if n.get("strategy") == "fish_catch"]
