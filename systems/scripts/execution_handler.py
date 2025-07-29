@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.utils.resolve_symbol import resolve_symbol
 from systems.utils.logger import addlog
+from systems.scripts.kraken_utils import get_kraken_balance  # use shared util now
 
 KRAKEN_ORDER_TIMEOUT = 6
 SLIPPAGE_STEPS = [0.0, 0.002, 0.004, 0.007, 0.01]
@@ -36,17 +37,6 @@ def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) ->
     if "error" in result and result["error"]:
         raise Exception(f"Kraken API error: {result['error']}")
     return result
-
-def get_kraken_balance(verbose: int = 0) -> dict:
-    api_key, api_secret = load_kraken_keys()
-    result = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
-    addlog(
-        f"[INFO] Kraken balance fetched: {result}",
-        verbose_int=2,
-        verbose_state=verbose,
-    )
-    return {k: float(v) for k, v in result.items()}
-
 
 def get_available_fiat_balance(exchange, currency: str = "USD") -> float:
     """Return available fiat balance from a CCXT exchange object."""

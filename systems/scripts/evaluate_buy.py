@@ -9,6 +9,7 @@ from systems.decision_logic.knife_catch import should_buy_knife
 from systems.decision_logic.whale_catch import should_buy_whale
 from systems.scripts.ledger import RamLedger
 from systems.scripts.execution_handler import buy_order
+from systems.scripts.kraken_utils import get_kraken_balance
 
 SETTINGS_PATH = Path(find_project_root()) / "settings" / "settings.json"
 with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
@@ -93,6 +94,17 @@ def evaluate_buy_df(
     kraken_symbol = symbols["kraken"]
 
     live = not sim
+
+    if live:
+        kraken_bal = get_kraken_balance(verbose=verbose)
+        usd_balance = kraken_bal.get("ZUSD", 0.0)
+        if usd_balance < MINIMUM_NOTE_SIZE:
+            addlog(
+                f"[SKIP] Not enough capital to trade (${usd_balance:.2f} < ${MINIMUM_NOTE_SIZE:.2f})",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            return False
 
     open_notes = ledger.get_active_notes() if ledger else []
     knife_notes = [n for n in open_notes if n.get("strategy") == "knife_catch"]
