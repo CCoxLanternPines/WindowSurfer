@@ -3,6 +3,7 @@ from typing import Optional
 from tqdm import tqdm
 import yaml
 import requests
+import logging
 
 
 LOGFILE_PATH = "data/tmp/log.txt"
@@ -13,6 +14,14 @@ TELEGRAM_ENABLED = False
 TELEGRAM_TOKEN: Optional[str] = None
 TELEGRAM_CHAT_ID: Optional[str] = None
 _TELEGRAM_WARNED = False
+
+logger = logging.getLogger("windowsurfer")
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _formatter = logging.Formatter("%(message)s")
+    _handler.setFormatter(_formatter)
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
 
 
 def init_logger(
@@ -56,6 +65,7 @@ def addlog(
 
     if should_output:
         tqdm.write(message)
+        logger.info(message)
         if TELEGRAM_ENABLED and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
             try:
                 url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
