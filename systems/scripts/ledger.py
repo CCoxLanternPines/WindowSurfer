@@ -169,8 +169,9 @@ class FileLedger(RamLedger):
         try:
             with open(self.path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            self.open_notes = data.get("open_notes", [])
-            self.closed_notes = data.get("closed_notes", [])
+            # Support legacy key names from older ledgers
+            self.open_notes = data.get("open_notes", data.get("open", []))
+            self.closed_notes = data.get("closed_notes", data.get("closed", []))
             self.pnl = sum(
                 float(n.get("exit_usdt", 0)) - float(n.get("entry_usdt", 0))
                 for n in self.closed_notes
