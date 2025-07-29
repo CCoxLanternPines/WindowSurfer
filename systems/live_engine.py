@@ -108,7 +108,7 @@ def handle_top_of_hour(tag: str, window: str, verbose: int = 0) -> None:
     else:
         addlog(
             "[WARN] Missing candle or window data. Skipping this cycle.",
-            verbose_int=1,
+            verbose_int=0,
             verbose_state=verbose,
         )
 
