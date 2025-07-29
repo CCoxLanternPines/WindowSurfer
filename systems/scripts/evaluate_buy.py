@@ -93,8 +93,27 @@ def evaluate_buy_df(
 
     # Fetch capital once at the start
     if live:
-        kraken_bal = get_kraken_balance(verbose=verbose)
-        available_capital = float(kraken_bal.get("ZUSD", 0.0))
+        if get_capital:
+            try:
+                available_capital = float(get_capital())
+            except Exception as exc:
+                addlog(
+                    f"[ERROR] Unable to get available capital: {exc}",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
+                return False
+        else:
+            try:
+                kraken_bal = get_kraken_balance(verbose=verbose)
+                available_capital = float(kraken_bal.get("ZUSD", 0.0))
+            except Exception as exc:
+                addlog(
+                    f"[ERROR] Failed to fetch Kraken balance: {exc}",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
+                return False
         addlog(
             f"[INFO] Available capital: ${available_capital:.2f}",
             verbose_int=2,
@@ -183,7 +202,7 @@ def evaluate_buy_df(
                         verbose_int=1,
                         verbose_state=verbose,
                     )
-                    fills = buy_order(tag, note["entry_amount"], verbose=verbose)
+                    fills = buy_order(tag, note["entry_usdt"], verbose=verbose)
 
                     note["entry_price"] = fills["price"]
                     note["entry_amount"] = fills["volume"]
@@ -221,7 +240,7 @@ def evaluate_buy_df(
                         verbose_int=1,
                         verbose_state=verbose,
                     )
-                    fills = buy_order(tag, note["entry_amount"], verbose=verbose)
+                    fills = buy_order(tag, note["entry_usdt"], verbose=verbose)
 
                     note["entry_price"] = fills["price"]
                     note["entry_amount"] = fills["volume"]
@@ -267,7 +286,7 @@ def evaluate_buy_df(
                         verbose_int=1,
                         verbose_state=verbose,
                     )
-                    fills = buy_order(tag, note["entry_amount"], verbose=verbose)
+                    fills = buy_order(tag, note["entry_usdt"], verbose=verbose)
 
                     note["entry_price"] = fills["price"]
                     note["entry_amount"] = fills["volume"]
