@@ -11,9 +11,9 @@
     "fish_catch_cooldown": 3
   },
   "simulation_capital": 1000,
-  "investment_size": 0.07,
+  "investment_size": 0.05,
   "active_strategies": ["fish_catch", "whale_catch", "knife_catch"],
-  "minimum_note_size": 20,
+  "minimum_note_size": 10,
 
   "strategy_limits": {
     "knife_catch": {
