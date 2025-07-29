@@ -10,8 +10,6 @@ from systems.sim_engine import run_simulation
 from systems.utils.settings_loader import load_settings
 from systems.utils.logger import init_logger, addlog
 
-SETTINGS = load_settings()
-
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse command line arguments."""
