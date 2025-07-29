@@ -73,6 +73,15 @@ def evaluate_buy_df(
         verbose_state=verbose,
     )
 
+    if verbose >= 3:
+        for strat in cooldowns:
+            last = last_triggered.get(strat)
+            addlog(
+                f"[DEBUG] {strat}: cooldown={cooldowns[strat]} | last_triggered={last}",
+                verbose_int=3,
+                verbose_state=verbose,
+            )
+
     tunnel_pos = window_data.get("tunnel_position", 0)
     window_pos = window_data.get("window_position", 0)
     tunnel_high = window_data.get("window_ceiling", 0)
