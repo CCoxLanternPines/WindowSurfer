@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 from tqdm import tqdm
 import ccxt
 from systems.utils.logger import addlog
+from systems.utils.loggers import logger
+from systems.utils.top_hour_report import format_top_of_hour_report
 from systems.scripts.get_candle_data import get_candle_data_json
 from systems.scripts.get_window_data import get_window_data_json
 from systems.fetch import fetch_missing_candles
@@ -110,6 +112,8 @@ def handle_top_of_hour(
         for strat in cooldowns:
             cooldowns[strat] = max(0, cooldowns[strat] - 1)
 
+        prev_triggers = last_triggered.copy()
+
         evaluate_live_tick(
             candle=candle,
             window_data=window_data,
@@ -119,6 +123,52 @@ def handle_top_of_hour(
             tag=tag,
             verbose=verbose
         )
+
+        # Summary report -------------------------------------------------
+        from systems.utils.resolve_symbol import resolve_symbol
+
+        exchange = ccxt.kraken({"enableRateLimit": True})
+        usd_balance = get_available_fiat_balance(exchange, "USD")
+        coin_balance_usd = sum(
+            float(n.get("entry_usdt", 0.0)) for n in ledger.get_active_notes()
+        )
+        total_liquid = usd_balance + coin_balance_usd
+
+        trade_counts = ledger.get_trade_counts_by_strategy()
+
+        def _counts(key: str):
+            data = trade_counts.get(key, {"total": 0, "open": 0})
+            open_n = data.get("open", 0)
+            closed_n = data.get("total", 0) - open_n
+            return open_n, closed_n
+
+        note_counts = {
+            "Fish": _counts("fish_catch"),
+            "Whale": _counts("whale_catch"),
+            "Knife": _counts("knife_catch"),
+        }
+
+        triggered = {
+            "Fish": last_triggered.get("fish_catch") != prev_triggers.get("fish_catch"),
+            "Whale": last_triggered.get("whale_catch") != prev_triggers.get("whale_catch"),
+            "Knife": last_triggered.get("knife_catch") != prev_triggers.get("knife_catch"),
+        }
+
+        coin_symbol = resolve_symbol(tag)["kraken"].split("/")[0]
+
+        report = format_top_of_hour_report(
+            symbol=tag,
+            ts=datetime.now(),
+            usd_balance=usd_balance,
+            coin_balance_usd=coin_balance_usd,
+            coin_symbol=coin_symbol,
+            total_liquid_value=total_liquid,
+            triggered_strategies=triggered,
+            note_counts=note_counts,
+        )
+
+        if verbose == 0:
+            logger.info(report)
 
     else:
         addlog(
