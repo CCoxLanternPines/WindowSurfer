@@ -94,8 +94,11 @@ def evaluate_buy_df(
 
     live = not sim
 
+    open_notes = ledger.get_active_notes() if ledger else []
+    knife_notes = [n for n in open_notes if n.get("strategy") == "knife_catch"]
+
     if live and ledger:
-        if any(n.get("symbol") == symbol and n.get("status") == "Open" for n in ledger.get_active_notes()):
+        if any(n.get("symbol") == symbol and n.get("status") == "Open" for n in open_notes):
             addlog(
                 f"[SKIP] Already have open note for {symbol} — skipping buy",
                 verbose_int=1,
@@ -219,7 +222,15 @@ def evaluate_buy_df(
                 triggered = True
 
     # 🔪 Knife Catch
-    if "knife_catch" in active and should_buy_knife(candle, window_data, tick, cooldowns):
+    if "knife_catch" in active and should_buy_knife(
+        candle,
+        window_data,
+        tick,
+        cooldowns,
+        knife_notes,
+        settings=SETTINGS,
+        verbose=verbose,
+    ):
         cooldowns["knife_catch"] = SETTINGS["general_settings"]["knife_catch_cooldown"]
         last_triggered["knife_catch"] = tick
         note = create_note("knife_catch")
@@ -267,7 +278,15 @@ def evaluate_buy_df(
 
     fish_decision = should_buy_fish(candle, window_data, tick, cooldowns)
     whale_decision = should_buy_whale(candle, window_data, tick, cooldowns)
-    knife_decision = should_buy_knife(candle, window_data, tick, cooldowns)
+    knife_decision = should_buy_knife(
+        candle,
+        window_data,
+        tick,
+        cooldowns,
+        knife_notes,
+        settings=SETTINGS,
+        verbose=verbose,
+    )
     summary = f"[BUY RESULT] Tick {tick} | Knife: {knife_decision} | Whale: {whale_decision} | Fish: {fish_decision}"
     addlog(summary, verbose_int=2, verbose_state=verbose)
 
