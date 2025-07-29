@@ -23,7 +23,17 @@ def evaluate_sell_df(
     )
 
 
-    for note in notes:
+    # Separate notes by strategy so each strategy's logic only considers its own trades
+    fish_notes = [n for n in notes if n.get("strategy") == "fish_catch"]
+    whale_notes = [n for n in notes if n.get("strategy") == "whale_catch"]
+    knife_notes = [n for n in notes if n.get("strategy") == "knife_catch"]
+
+    # Placeholder for future knife group exit logic
+    # if knife_group_should_exit(knife_notes, candle):
+    #     for n in knife_notes:
+    #         sell_list.append(n)
+
+    for note in fish_notes:
         entry_price = note.get("entry_price")
         if not entry_price:
             continue
@@ -39,9 +49,10 @@ def evaluate_sell_df(
             )
             continue
 
-        strategy = note.get("strategy")
+        if should_sell_fish(candle, window_data, note):
+            sell_list.append(note)
 
-    for note in notes:
+    for note in whale_notes:
         entry_price = note.get("entry_price")
         if not entry_price:
             continue
@@ -57,17 +68,26 @@ def evaluate_sell_df(
             )
             continue
 
-        strategy = note.get("strategy")
-
-        fish_decision = should_sell_fish(candle, window_data, note)
-        whale_decision = should_sell_whale(candle, window_data, note)
-        knife_decision = should_sell_knife(candle, window_data, note, verbose=verbose)
-
-        if strategy == "fish_catch" and fish_decision:
+        if should_sell_whale(candle, window_data, note):
             sell_list.append(note)
-        elif strategy == "whale_catch" and whale_decision:
-            sell_list.append(note)
-        elif strategy == "knife_catch" and knife_decision:
+
+    for note in knife_notes:
+        entry_price = note.get("entry_price")
+        if not entry_price:
+            continue
+
+        current_price = candle.get("close")
+        gain_pct = (current_price - entry_price) / entry_price
+
+        if gain_pct < MIN_GAIN_PCT:
+            addlog(
+                f"[HOLD] {note['strategy']} | Tick {tick} | Gain {gain_pct:.2%} < Min Gain",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
+            continue
+
+        if should_sell_knife(candle, window_data, note, verbose=verbose):
             sell_list.append(note)
 
     addlog(
