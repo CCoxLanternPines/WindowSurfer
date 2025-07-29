@@ -3,7 +3,7 @@ from systems.decision_logic.whale_catch import should_sell_notes as whale_should
 from systems.decision_logic.knife_catch import should_sell_notes as knife_should_sell_notes
 from tqdm import tqdm
 from systems.utils.logger import addlog
-from systems.scripts.loader import load_settings
+from systems.utils.settings_loader import load_settings
 
 SETTINGS = load_settings()
 MIN_GAIN_PCT = 0.05  # Require at least +5% ROI to sell
