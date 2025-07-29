@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import List, Dict
 import uuid
+import os
+import json
 
 class LedgerBase(ABC):
     """Abstract interface for ledger implementations."""
@@ -150,3 +152,48 @@ class RamLedger(LedgerBase):
             counts[strategy]["open"] += 1
 
         return counts
+
+
+class FileLedger(RamLedger):
+    """Ledger that persists all notes to a JSON file."""
+
+    def __init__(self, path: str) -> None:
+        self.path = path
+        super().__init__()
+        self._load()
+
+    def _load(self) -> None:
+        """Load existing ledger data from ``self.path`` if available."""
+        if not os.path.exists(self.path):
+            return
+        try:
+            with open(self.path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.open_notes = data.get("open_notes", [])
+            self.closed_notes = data.get("closed_notes", [])
+            self.pnl = sum(
+                float(n.get("exit_usdt", 0)) - float(n.get("entry_usdt", 0))
+                for n in self.closed_notes
+            )
+        except Exception:
+            # If loading fails just start with empty ledger
+            self.open_notes = []
+            self.closed_notes = []
+            self.pnl = 0.0
+
+    def _sync(self) -> None:
+        """Write current ledger state to ``self.path``."""
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump({
+                "open_notes": self.open_notes,
+                "closed_notes": self.closed_notes
+            }, f, indent=2)
+
+    def open_note(self, note: Dict) -> None:
+        super().open_note(note)
+        self._sync()
+
+    def close_note(self, note: Dict) -> None:
+        super().close_note(note)
+        self._sync()
