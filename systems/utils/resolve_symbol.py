@@ -1,4 +1,4 @@
-from systems.scripts.loader import load_settings
+from systems.utils.settings_loader import load_settings
 
 SETTINGS = load_settings()
 
