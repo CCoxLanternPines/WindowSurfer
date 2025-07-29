@@ -8,7 +8,7 @@ from systems.utils.logger import addlog
 from systems.scripts.get_candle_data import get_candle_data_json
 from systems.scripts.get_window_data import get_window_data_json
 from systems.fetch import fetch_missing_candles
-from systems.utilities.path import load_settings
+from systems.utils.settings_loader import get_strategy_cooldown
 from systems.scripts.execution_handler import get_available_fiat_balance
 
 
@@ -35,6 +35,19 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
     # Resolve exchange symbols for future use
     from systems.utils.resolve_symbol import resolve_symbol
     symbols = resolve_symbol(tag)
+
+    from systems.scripts.ledger import RamLedger
+    ledger = RamLedger()
+    cooldowns = {
+        "knife_catch": get_strategy_cooldown("knife_catch"),
+        "whale_catch": get_strategy_cooldown("whale_catch"),
+        "fish_catch": get_strategy_cooldown("fish_catch"),
+    }
+    last_triggered = {
+        "knife_catch": None,
+        "whale_catch": None,
+        "fish_catch": None,
+    }
 
     should_exit = []
 
@@ -68,10 +81,24 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
             verbose_state=verbose,
         )
 
-        handle_top_of_hour(tag=tag, window=window, verbose=verbose)
+        handle_top_of_hour(
+            tag=tag,
+            window=window,
+            ledger=ledger,
+            cooldowns=cooldowns,
+            last_triggered=last_triggered,
+            verbose=verbose,
+        )
 
 
-def handle_top_of_hour(tag: str, window: str, verbose: int = 0) -> None:
+def handle_top_of_hour(
+    tag: str,
+    window: str,
+    ledger,
+    cooldowns: dict,
+    last_triggered: dict,
+    verbose: int = 0,
+) -> None:
     ensure_latest_candles(tag, lookback="48h", verbose=verbose)
 
     candle = get_candle_data_json(tag, row_offset=0)
@@ -80,21 +107,8 @@ def handle_top_of_hour(tag: str, window: str, verbose: int = 0) -> None:
     addlog("[TRACE] Candle and window data pulled.", verbose_int=2, verbose_state=verbose)
 
     if candle and window_data:
-        from systems.scripts.ledger import RamLedger
-
-        # Initialize on first run, or eventually pass as arg
-        ledger = RamLedger()
-        settings = load_settings()
-        cooldowns = {
-            "knife_catch": settings["general_settings"]["knife_catch_cooldown"],
-            "whale_catch": settings["general_settings"]["whale_catch_cooldown"],
-            "fish_catch": settings["general_settings"]["fish_catch_cooldown"]
-        }
-        last_triggered = {
-            "knife_catch": None,
-            "whale_catch": None,
-            "fish_catch": None
-        }
+        for strat in cooldowns:
+            cooldowns[strat] = max(0, cooldowns[strat] - 1)
 
         evaluate_live_tick(
             candle=candle,
