@@ -24,24 +24,29 @@ def should_sell_knife(candle, window_data, note, verbose: int = 0) -> bool:
 
 
 def should_sell_notes(notes: list, candle: dict, settings: dict, verbose: int = 0) -> list:
-    """Return all knife notes if any single note hits the ROI margin."""
-
+    to_sell = []
     margin = settings.get("knife_group_roi_margin", 0.30)
     current_price = candle["close"]
 
-    for note in notes:
+    trigger_hit = False
+    for i, note in enumerate(notes):
         roi = (current_price * note["entry_amount"] - note["entry_usdt"]) / note["entry_usdt"]
-        addlog(
-            f"[KNIFE SELL DEBUG] Note ROI: {roi:.2%} vs Margin: {margin:.2%}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        if roi >= margin:
-            addlog(
-                "[KNIFE SELL TRIGGER] ✅ Exiting all knives — trigger met",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-            return notes  # Sell ALL knife notes
 
-    return []
+        addlog(
+            f"[KNIFE SELL DEBUG] Note {i} ROI: {roi:.2%} | Entry @ ${note['entry_usdt']:.2f} | Now @ ${current_price:.2f}",
+            verbose_int=2,
+            verbose_state=verbose
+        )
+
+        if roi < 0:
+            addlog(f"[KNIFE SELL BLOCKED] ❌ Note {i} still negative ({roi:.2%}) — cancel group exit", verbose_int=3, verbose_state=verbose)
+            return []  # Cancel group exit if any note is negative
+
+        if roi >= margin:
+            trigger_hit = True
+
+    if trigger_hit:
+        addlog("[KNIFE SELL TRIGGER] ✅ ROI met & all notes profitable — selling all", verbose_int=3, verbose_state=verbose)
+        return notes
+
+    return []  # No trigger met, or not all green
