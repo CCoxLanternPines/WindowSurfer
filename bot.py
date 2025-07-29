@@ -16,12 +16,26 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--mode", required=True, help="Execution mode: sim or live")
     parser.add_argument("--tag", required=True, help="Symbol tag, e.g. DOGEUSD")
     parser.add_argument("--window", required=True, help="Candle window, e.g. 1m or 1h")
+    class VerbosityAction(argparse.Action):
+        """Allow ``-v`` flags to stack and ``--verbose`` to accept a level."""
+
+        def __call__(self, parser, namespace, values, option_string=None):
+            level = getattr(namespace, self.dest, 0)
+            if values is None:
+                setattr(namespace, self.dest, level + 1)
+            else:
+                try:
+                    setattr(namespace, self.dest, int(values))
+                except ValueError:
+                    parser.error("--verbose level must be an integer")
+
     parser.add_argument(
         "-v",
         "--verbose",
-        action="count",
+        nargs="?",
+        action=VerbosityAction,
         default=0,
-        help="Increase verbosity level (use -v or -vv)",
+        help="Verbosity level (use -v/-vv or --verbose N)",
     )
     parser.add_argument(
         "--log",
