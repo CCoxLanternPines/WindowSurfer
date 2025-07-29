@@ -135,6 +135,8 @@ def evaluate_buy_df(
             "status": "Open",
         }
 
+        note["strategy"] = strategy  # ensure strategy explicitly recorded
+
         if strategy == "knife_catch":
             note["window_position_at_entry"] = window_pos
 
@@ -172,6 +174,7 @@ def evaluate_buy_df(
                     note["entry_ts"] = candle.get("ts", 0)
 
                 note["status"] = "Open"
+                note["strategy"] = "fish_catch"
                 ledger.open_note(note)
                 if on_buy:
                     on_buy(note)
@@ -209,6 +212,7 @@ def evaluate_buy_df(
                     note["entry_ts"] = candle.get("ts", 0)
 
                 note["status"] = "Open"
+                note["strategy"] = "whale_catch"
                 ledger.open_note(note)
                 if on_buy:
                     on_buy(note)
@@ -246,6 +250,7 @@ def evaluate_buy_df(
                     note["entry_ts"] = candle.get("ts", 0)
 
                 note["status"] = "Open"
+                note["strategy"] = "knife_catch"
                 ledger.open_note(note)
                 if on_buy:
                     on_buy(note)
