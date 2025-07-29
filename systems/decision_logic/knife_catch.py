@@ -20,3 +20,41 @@ def should_sell_knife(candle, window_data, note, verbose: int = 0) -> bool:
             addlog("[KNIFE] ✅ SELL triggered", verbose_int=1, verbose_state=verbose)
             return True
     return False
+
+
+def should_sell_notes(
+    notes: list,
+    candle: dict,
+    settings: dict,
+    verbose: int = 0,
+) -> list:
+    """Return knife_catch notes that should be sold this tick."""
+
+    from systems.utils.logger import addlog
+
+    knife_notes = [n for n in notes if n.get("strategy") == "knife_catch"]
+    to_sell: list = []
+
+    if len(knife_notes) >= 3:
+        current_price = candle["close"]
+        current_roi = lambda n: (
+            current_price * n["entry_amount"] - n["entry_usdt"]
+        ) / n["entry_usdt"]
+
+        highest_roi = max(current_roi(n) for n in knife_notes)
+        margin = settings.get("knife_group_roi_margin", 0.0)
+        trigger_roi = (
+            current_price * sum(n["entry_amount"] for n in knife_notes)
+            - sum(n["entry_usdt"] for n in knife_notes)
+        ) / sum(n["entry_usdt"] for n in knife_notes)
+
+        addlog(
+            f"[KNIFE GROUP] {len(knife_notes)} open | Highest ROI: {highest_roi:.2%} | Trigger ROI: {trigger_roi:.2%}",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+
+        if trigger_roi >= highest_roi + margin:
+            to_sell = knife_notes
+
+    return to_sell
