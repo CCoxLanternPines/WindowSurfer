@@ -15,6 +15,12 @@
   "active_strategies": [ "knife_catch"],
   "minimum_note_size": 20,
 
-  "knife_group_roi_margin": 0.20
+  "strategy_limits": {
+    "knife_catch": {
+      "max_open_notes": 3
+    }
+  },
+
+  "knife_group_roi_margin": 0.15
 
 }
