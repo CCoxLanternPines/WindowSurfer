@@ -140,10 +140,16 @@ def evaluate_buy_df(
         if strategy == "knife_catch":
             note["window_position_at_entry"] = window_pos
 
+
         return note
+
+    active = SETTINGS.get(
+        "active_strategies",
+        ["fish_catch", "whale_catch", "knife_catch"],
+    )
     
     # 🐟 Fish Catch
-    if should_buy_fish(candle, window_data, tick, cooldowns):
+    if "fish_catch" in active and should_buy_fish(candle, window_data, tick, cooldowns):
         cooldowns["fish_catch"] = SETTINGS["general_settings"]["fish_catch_cooldown"]
         last_triggered["fish_catch"] = tick
         note = create_note("fish_catch")
@@ -181,7 +187,7 @@ def evaluate_buy_df(
                 triggered = True
 
     # 🐋 Whale Catch
-    if should_buy_whale(candle, window_data, tick, cooldowns):
+    if "whale_catch" in active and should_buy_whale(candle, window_data, tick, cooldowns):
         cooldowns["whale_catch"] = SETTINGS["general_settings"]["whale_catch_cooldown"]
         last_triggered["whale_catch"] = tick
         note = create_note("whale_catch")
@@ -219,7 +225,7 @@ def evaluate_buy_df(
                 triggered = True
 
     # 🔪 Knife Catch
-    if should_buy_knife(candle, window_data, tick, cooldowns):
+    if "knife_catch" in active and should_buy_knife(candle, window_data, tick, cooldowns):
         cooldowns["knife_catch"] = SETTINGS["general_settings"]["knife_catch_cooldown"]
         last_triggered["knife_catch"] = tick
         note = create_note("knife_catch")
