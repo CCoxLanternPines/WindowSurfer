@@ -57,19 +57,32 @@ def should_sell_notes(notes: list, candle: dict, settings: dict, verbose: int = 
     margin = settings.get("knife_group_roi_margin", 0.30)
     current_price = candle["close"]
 
-    for note in notes:
+    trigger_hit = False
+    for i, note in enumerate(notes):
         roi = (current_price * note["entry_amount"] - note["entry_usdt"]) / note["entry_usdt"]
         addlog(
             f"[KNIFE SELL DEBUG] Note ROI: {roi:.2%} vs Margin: {margin:.2%}",
             verbose_int=2,
             verbose_state=verbose,
         )
-        if roi >= margin:
+
+        if roi < 0:
             addlog(
-                "[KNIFE SELL TRIGGER] ✅ Exiting all knives — trigger met",
+                f"[KNIFE SELL BLOCKED] Note {i} still negative ({roi:.2%}) \u2014 cancel group exit",
                 verbose_int=1,
                 verbose_state=verbose,
             )
-            return notes  # Sell ALL knife notes
+            return []  # Block all
+
+        if roi >= margin:
+            trigger_hit = True
+
+    if trigger_hit:
+        addlog(
+            "[KNIFE GROUP] \u2705 ROI target met & all notes positive \u2014 selling all",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return notes
 
     return []
