@@ -11,16 +11,12 @@ from systems.scripts.ledger import RamLedger
 from systems.scripts.execution_handler import buy_order
 from systems.scripts.kraken_utils import get_kraken_balance
 
-SETTINGS_PATH = Path(find_project_root()) / "settings" / "settings.json"
-with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
-    SETTINGS = json.load(f)
-
-INVESTMENT_SIZE = SETTINGS.get("investment_size", 0.15)
-MINIMUM_NOTE_SIZE = SETTINGS.get("minimum_note_size", 0)
+from systems.utils.settings_loader import load_settings, get_strategy_cooldown
 from systems.utils.resolve_symbol import resolve_symbol
-from systems.scripts.loader import load_settings
 
 SETTINGS = load_settings()
+INVESTMENT_SIZE = SETTINGS.get("investment_size", 0.15)
+MINIMUM_NOTE_SIZE = SETTINGS.get("minimum_note_size", 0)
 
 LOG_PATH = Path(find_project_root()) / "data" / "tmp" / "eval_buy_log.jsonl"
 _log_initialized = {"sim": False}
@@ -83,11 +79,11 @@ def evaluate_buy_df(
     tunnel_low = window_data.get("window_floor", 0)
 
     for key in cooldowns:
-        cooldowns[key] -= 1
+        cooldowns[key] = max(0, cooldowns[key] - 1)
 
     triggered = False
     close_price = candle["close"]
-    ts = candle.get("ts", 720)  # or `None` if you want it explicit
+    ts = candle.get("ts", candle.get("timestamp", 0))
     symbol = candle.get("symbol", "UNKNOWN")
     window_type = window_data.get("window", "1m")
     symbols = resolve_symbol(tag)
@@ -159,8 +155,8 @@ def evaluate_buy_df(
     
     # 🐟 Fish Catch
     if "fish_catch" in active and should_buy_fish(candle, window_data, tick, cooldowns):
-        cooldowns["fish_catch"] = SETTINGS["general_settings"]["fish_catch_cooldown"]
-        last_triggered["fish_catch"] = tick
+        cooldowns["fish_catch"] = get_strategy_cooldown("fish_catch")
+        last_triggered["fish_catch"] = tick if sim else ts
         note = create_note("fish_catch")
         if note:
             addlog(
@@ -197,8 +193,8 @@ def evaluate_buy_df(
 
     # 🐋 Whale Catch
     if "whale_catch" in active and should_buy_whale(candle, window_data, tick, cooldowns):
-        cooldowns["whale_catch"] = SETTINGS["general_settings"]["whale_catch_cooldown"]
-        last_triggered["whale_catch"] = tick
+        cooldowns["whale_catch"] = get_strategy_cooldown("whale_catch")
+        last_triggered["whale_catch"] = tick if sim else ts
         note = create_note("whale_catch")
         if note:
             addlog(
@@ -243,8 +239,8 @@ def evaluate_buy_df(
         settings=SETTINGS,
         verbose=verbose,
     ):
-        cooldowns["knife_catch"] = SETTINGS["general_settings"]["knife_catch_cooldown"]
-        last_triggered["knife_catch"] = tick
+        cooldowns["knife_catch"] = get_strategy_cooldown("knife_catch")
+        last_triggered["knife_catch"] = tick if sim else ts
         note = create_note("knife_catch")
         if note:
             addlog(
