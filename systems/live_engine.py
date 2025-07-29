@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 from tqdm import tqdm
 import ccxt
 from systems.utils.logger import addlog
-from systems.utils.loggers import logger
 from systems.utils.top_hour_report import format_top_of_hour_report
 from systems.scripts.get_candle_data import get_candle_data_json
 from systems.scripts.get_window_data import get_window_data_json
@@ -168,7 +167,7 @@ def handle_top_of_hour(
         )
 
         if verbose == 0:
-            logger.info(report)
+            addlog(report, verbose_int=0, verbose_state=verbose)
 
     else:
         addlog(
