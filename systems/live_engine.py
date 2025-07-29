@@ -155,6 +155,10 @@ def handle_top_of_hour(
 
         coin_symbol = resolve_symbol(tag)["kraken"].split("/")[0]
 
+        tqdm.write(
+            f"[DEBUG] usd_balance={usd_balance}, coin_balance_usd={coin_balance_usd}, total_liquid={total_liquid}, coin_symbol={coin_symbol}, triggered={triggered}, note_counts={note_counts}"
+        )
+
         report = format_top_of_hour_report(
             symbol=tag,
             ts=datetime.now(),
