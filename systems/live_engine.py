@@ -166,8 +166,7 @@ def handle_top_of_hour(
             note_counts=note_counts,
         )
 
-        if verbose == 0:
-            addlog(report, verbose_int=0, verbose_state=verbose)
+        addlog(report, verbose_int=0, verbose_state=verbose)
 
     else:
         addlog(
