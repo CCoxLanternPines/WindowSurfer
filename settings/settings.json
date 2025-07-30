@@ -9,10 +9,10 @@
     },
     "SOLUSD": {
     "owner": "Travis",
-    "wallet_code": "SOL",
+    "wallet_code": "SOL.F",
     "kraken_name": "SOL/USD",
     "binance_name": "SOLUSDT",
-    "fiat": "DAL"
+    "fiat": "DAI"
   }
   },
   "general_settings": {
