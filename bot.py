@@ -14,7 +14,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="WindowSurfer bot entrypoint")
     parser.add_argument("--mode", required=True, help="Execution mode: sim or live")
-    parser.add_argument("--tag", required=True, help="Symbol tag, e.g. DOGEUSD")
+    parser.add_argument(
+        "--tag",
+        required=False,
+        help=(
+            "Symbol tag, e.g. DOGEUSD. If omitted, all symbols from config are "
+            "processed every hour"
+        ),
+    )
     parser.add_argument("--window", required=True, help="Candle window, e.g. 1m or 1h")
     parser.add_argument(
         "-v",

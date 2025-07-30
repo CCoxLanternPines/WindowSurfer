@@ -2,14 +2,10 @@ import time
 import sys
 import threading
 from datetime import datetime, timezone
-import ccxt
 from tqdm import tqdm
 from systems.utils.logger import addlog
-from systems.utils.top_hour_report import format_top_of_hour_report
-from systems.scripts.get_candle_data import get_candle_data_json
-from systems.scripts.get_window_data import get_window_data_json
 from systems.fetch import fetch_missing_candles
-from systems.utils.settings_loader import get_strategy_cooldown, load_settings
+from systems.utils.settings_loader import load_settings
 from systems.scripts.execution_handler import get_available_fiat_balance, buy_order, sell_order
 from systems.scripts.ledger import load_ledger, save_ledger
 from systems.scripts.kraken_utils import get_kraken_balance
@@ -96,30 +92,20 @@ def evaluate_live_tick(
             verbose_state=verbose,
         )
 
-def run_live(tag: str, window: str, verbose: int = 0) -> None:
+def run_live(tag: str | None, window: str, verbose: int = 0) -> None:
+    """Continuously execute ``handle_top_of_hour`` every hour."""
+    from systems.top_hour import handle_top_of_hour
+
+    settings = load_settings()
+    tags = [tag.upper()] if tag else list(settings.get("symbol_settings", {}))
+
     addlog(
-        f"[LIVE] Running live mode for {tag} on window {window}",
+        f"[LIVE] Running live mode on window {window} for: {', '.join(tags)}",
         verbose_int=2,
         verbose_state=verbose,
     )
 
-    settings = load_settings()
-    meta = settings["symbol_settings"][tag]
-    meta["window"] = window 
-
-    ledger = load_ledger(tag)
-    cooldowns = {
-        "knife_catch": 0,
-        "whale_catch": 0,
-        "fish_catch": 0,
-    }
-    last_triggered = {
-        "knife_catch": None,
-        "whale_catch": None,
-        "fish_catch": None,
-    }
-
-    should_exit = []
+    should_exit: list[bool] = []
 
     def esc_listener():
         if not msvcrt:
@@ -152,51 +138,16 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
                 time.sleep(1)
                 pbar.update(1)
 
-        ensure_latest_candles(tag, lookback="48h", verbose=verbose)
-        candle = get_candle_data_json(tag, row_offset=0)
-        window_data = get_window_data_json(tag, window, candle_offset=0)
+        for t in tags:
+            if t not in settings.get("symbol_settings", {}):
+                addlog(f"[WARN] Unknown symbol tag: {t}", verbose_int=1, verbose_state=verbose)
+                continue
 
-        if not candle or not window_data:
-            addlog(
-                "[ERROR] Missing candle or window data",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-            continue
-
-        exchange = ccxt.kraken({"enableRateLimit": True})
-        usd_balance = get_available_fiat_balance(exchange, meta["fiat"])
-
-        kraken_balance = get_kraken_balance(verbose)
-        fiat_asset = meta["fiat"]
-        wallet_code = meta.get("wallet_code", meta["kraken_name"].replace("USD", ""))
-
-        available_usd = float(kraken_balance.get(fiat_asset, 0.0))
-        available_coin = float(kraken_balance.get(wallet_code, 0.0))
-        coin_price = candle["close"]
-        coin_balance_usd = available_coin * coin_price
-
-        evaluate_live_tick(
-            candle=candle,
-            window_data=window_data,
-            ledger=ledger,
-            cooldowns=cooldowns,
-            last_triggered=last_triggered,
-            tag=tag,
-            meta=meta,
-            exchange=exchange,
-            verbose=verbose
-        )
-        save_ledger(tag, ledger)
-
-        def active_count(name):
-            return sum(1 for n in ledger.get_active_notes() if n["strategy"] == name)
-
-        emoji_report = (
-            f"\U0001f4ca {tag} | \U0001fa75 ${available_usd:.0f} + \U0001fa99 ${coin_balance_usd:.2f} | "
-            f"\U0001f41f {active_count('fish_catch')} \U0001f40b {active_count('whale_catch')} \U0001f52a {active_count('knife_catch')}"
-        )
-        addlog(emoji_report, verbose_int=1, verbose_state=verbose)
+            try:
+                handle_top_of_hour(t, window=window, verbose=verbose)
+            except KeyboardInterrupt:
+                addlog("[EXIT] KeyboardInterrupt received. Exiting live mode.", verbose_int=1, verbose_state=verbose)
+                return
 
         addlog(
             "[CYCLE] Top-of-hour cycle complete. Waiting for next hour...",
