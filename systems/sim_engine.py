@@ -289,4 +289,4 @@ def print_simulation_summary(
             f"Avg ROI %/mo:   {roi_per_month:.2%}",
         ]
 
-    addlog("\n" + "\n".join(output), verbose_int=0, verbose_state=verbose)
+    addlog("\n" + "\n".join(output), verbose_int=1, verbose_state=verbose)
