@@ -51,10 +51,13 @@ def evaluate_buy_df(
     tag: str,
     sim: bool = False,
     verbose: int = 0,
-    ledger=None,  # <- Inject ledger if in RAM mode
+    ledger=None,
     get_capital=None,
     on_buy=None,
+    meta=None  # ✅ THIS IS THE KEY FIX
 ) -> bool:
+
+
     """
     Evaluates buy conditions. Triggers notes via ledger if provided.
     Returns True if any buy was triggered.
@@ -94,9 +97,10 @@ def evaluate_buy_df(
     # Fetch capital once at the start
     if live:
         kraken_bal = get_kraken_balance(verbose=verbose)
-        available_capital = float(kraken_bal.get("ZUSD", 0.0))
+        fiat = meta.get("fiat", "ZUSD") if meta else "ZUSD"
+        available_capital = float(kraken_bal.get(fiat, 0.0))
         addlog(
-            f"[INFO] Available capital: ${available_capital:.2f}",
+            f"[INFO] Available capital in {fiat}: ${available_capital:.2f}",
             verbose_int=2,
             verbose_state=verbose,
         )
@@ -113,15 +117,6 @@ def evaluate_buy_df(
 
     open_notes = ledger.get_active_notes() if ledger else []
     knife_notes = [n for n in open_notes if n.get("strategy") == "knife_catch"]
-
-    if live and ledger:
-        if any(n.get("symbol") == symbol and n.get("status") == "Open" for n in open_notes):
-            addlog(
-                f"[SKIP] Already have open note for {symbol} — skipping buy",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-            return False
 
     def create_note(strategy: str):
         nonlocal available_capital
@@ -141,13 +136,13 @@ def evaluate_buy_df(
         entry_amount = usd_amount / close_price
         entry_usdt = usd_amount
         note = {
-            "symbol": symbol,
+            "symbol": tag,
             "strategy": strategy,
             "entry_price": close_price,
             "entry_ts": ts,
             "entry_tick": tick,
-            "window": window_type,
-            "entry_usdt": entry_usdt,
+            "window": meta["window"] if meta else window_type,
+            "entry_usdt": entry_usdt,          # ✅ REQUIRED — missing before
             "entry_amount": entry_amount,
             "status": "Open",
         }
@@ -179,12 +174,13 @@ def evaluate_buy_df(
             if ledger:
                 if live:
                     addlog(
-                        f"[EXEC] Live buy triggered for {tag}",
+                        f"[BUY] Fish Catch triggered at tick {tick} → ${note['entry_usdt']:.2f}",
                         verbose_int=1,
                         verbose_state=verbose,
                     )
-                    fills = buy_order(tag, note["entry_amount"], verbose=verbose)
-
+                    pair_code = meta["kraken_name"] if meta else "UNKNOWN"
+                    fiat = meta["fiat"] if meta else "ZUSD"
+                    fills = buy_order(pair_code, fiat, note["entry_usdt"], verbose=verbose)
                     note["entry_price"] = fills["price"]
                     note["entry_amount"] = fills["volume"]
                     note["entry_usdt"] = fills["cost"]
@@ -217,12 +213,13 @@ def evaluate_buy_df(
             if ledger:
                 if live:
                     addlog(
-                        f"[EXEC] Live buy triggered for {tag}",
-                        verbose_int=1,
+                        f"[SKIP] Fish Catch triggered but note creation failed (likely capital too low)",
+                        verbose_int=2,
                         verbose_state=verbose,
                     )
-                    fills = buy_order(tag, note["entry_amount"], verbose=verbose)
-
+                    pair_code = meta["kraken_name"] if meta else "UNKNOWN"
+                    fiat = meta["fiat"] if meta else "ZUSD"
+                    fills = buy_order(pair_code, fiat, note["entry_usdt"], verbose=verbose)
                     note["entry_price"] = fills["price"]
                     note["entry_amount"] = fills["volume"]
                     note["entry_usdt"] = fills["cost"]
@@ -267,8 +264,9 @@ def evaluate_buy_df(
                         verbose_int=1,
                         verbose_state=verbose,
                     )
-                    fills = buy_order(tag, note["entry_amount"], verbose=verbose)
-
+                    pair_code = meta["kraken_name"] if meta else "UNKNOWN"
+                    fiat = meta["fiat"] if meta else "ZUSD"
+                    fills = buy_order(pair_code, fiat, note["entry_usdt"], verbose=verbose)
                     note["entry_price"] = fills["price"]
                     note["entry_amount"] = fills["volume"]
                     note["entry_usdt"] = fills["cost"]

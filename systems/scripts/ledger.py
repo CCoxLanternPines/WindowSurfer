@@ -5,6 +5,35 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import List, Dict
 import uuid
+import os
+import json
+
+LEDGER_DIR = "data/ledgers"
+
+def load_ledger(tag: str) -> RamLedger:
+    """Load a RamLedger from disk if it exists, otherwise return a new one."""
+    path = os.path.join(LEDGER_DIR, f"{tag}.json")
+    ledger = RamLedger()
+
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            data = json.load(f)
+            ledger.open_notes = data.get("open_notes", [])
+            ledger.closed_notes = data.get("closed_notes", [])
+            ledger.pnl = data.get("pnl", 0.0)
+
+    return ledger
+
+def save_ledger(tag: str, ledger: RamLedger) -> None:
+    """Save a RamLedger to disk."""
+    os.makedirs(LEDGER_DIR, exist_ok=True)
+    path = os.path.join(LEDGER_DIR, f"{tag}.json")
+    with open(path, "w") as f:
+        json.dump({
+            "open_notes": ledger.open_notes,
+            "closed_notes": ledger.closed_notes,
+            "pnl": ledger.pnl
+        }, f, indent=2)
 
 class LedgerBase(ABC):
     """Abstract interface for ledger implementations."""
