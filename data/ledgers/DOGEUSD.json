@@ -1,0 +1,20 @@
+{
+  "open_notes": [
+    {
+      "symbol": "DOGEUSD",
+      "strategy": "fish_catch",
+      "entry_price": 0.223648161,
+      "entry_ts": 1753898421,
+      "entry_tick": 0,
+      "window": "3d",
+      "entry_usdt": 37.875625227,
+      "entry_amount": 169.35361768,
+      "status": "Open",
+      "fee": 0.1515025,
+      "kraken_txid": "O3MSKT-5P5ML-CTS6R4",
+      "note_id": "696ea91a-0563-43e3-8a7f-bd983ab98057"
+    }
+  ],
+  "closed_notes": [],
+  "pnl": 0.0
+}
