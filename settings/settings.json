@@ -6,7 +6,14 @@
       "kraken_name": "DOGE/USD",
       "binance_name": "DOGEUSDT",
 	  "fiat": "ZUSD"
-    }
+    },
+    "SOLUSD": {
+    "owner": "Travis",
+    "wallet_code": "SOL",
+    "kraken_name": "SOL/USD",
+    "binance_name": "SOLUSDT",
+    "fiat": "DAL"
+  }
   },
   "general_settings": {
     "knife_catch_cooldown": 0,
