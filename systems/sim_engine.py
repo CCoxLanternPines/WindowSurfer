@@ -42,7 +42,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
     )
     addlog(
         f"[SIM] Running simulation for {tag} on window {window}",
-        verbose_int=1,
+        verbose_int=2,
         verbose_state=verbose,
     )
 
@@ -103,7 +103,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
             if should_exit:
                 addlog(
                     "\n🚪 ESC detected — exiting simulation early.",
-                    verbose_int=1,
+                    verbose_int=2,
                     verbose_state=verbose,
                 )
 
@@ -111,7 +111,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                 elapsed = duration_from_candle_count(step + 1, candle_interval_minutes=60)
                 addlog(
                     f"⏱️  Simulated Range: {elapsed} ({step + 1} ticks of {total_rows})",
-                    verbose_int=1,
+                    verbose_int=2,
                     verbose_state=verbose,
                 )
 
@@ -124,7 +124,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                     unrealized_value = sum(n["entry_amount"] * last_price for n in open_notes)
                     addlog(
                         f"[INFO] Mark-to-market added from open notes: ${unrealized_value:.2f}",
-                        verbose_int=1,
+                        verbose_int=2,
                         verbose_state=verbose,
                     )
                     ending_capital = sim_capital + unrealized_value
@@ -190,7 +190,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
             else:
                 addlog(
                     f"[STEP {step+1}] ❌ Incomplete data (candle or window)",
-                    verbose_int=1,
+                    verbose_int=2,
                     verbose_state=verbose,
                 )
 
@@ -205,7 +205,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
         unrealized_value = sum(n["entry_amount"] * last_price for n in open_notes)
         addlog(
             f"[INFO] Mark-to-market added from open notes: ${unrealized_value:.2f}",
-            verbose_int=1,
+            verbose_int=2,
             verbose_state=verbose,
         )
         ending_capital = sim_capital + unrealized_value
@@ -239,7 +239,7 @@ def save_ledger_to_file(ledger, filename="ledgersimulation.json", verbose: int =
     from tqdm import tqdm
     addlog(
         f"\n🧾 Ledger saved to: {output_path}",
-        verbose_int=1,
+        verbose_int=2,
         verbose_state=verbose,
     )
     

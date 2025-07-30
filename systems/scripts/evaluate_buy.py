@@ -290,7 +290,7 @@ def evaluate_buy_df(
     addlog(
         f"🧠 Tunnel {{w={tunnel_low:.4f}, h={tunnel_height:.4f}, p={tunnel_pos:.4f}, t={tunnel_pct:.1f}%}} "
         f"Window {{p={window_pos:.4f}}}",
-        verbose_int=2,
+        verbose_int=3,
         verbose_state=verbose,
     )
 

@@ -98,7 +98,7 @@ def get_candle_data(tag: str, row_offset: int = 0, verbose: int = 0) -> Dict[str
 
     addlog(
         f"[get_candle_data] tag={tag} row_offset={row_offset}",
-        verbose_int=1,
+        verbose_int=3,
         verbose_state=verbose,
     )
 
@@ -143,7 +143,7 @@ def get_candle_data(tag: str, row_offset: int = 0, verbose: int = 0) -> Dict[str
 
     addlog(
         f"[get_candle_data] result={result}",
-        verbose_int=2,
+        verbose_int=3,
         verbose_state=verbose,
     )
 

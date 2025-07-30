@@ -59,7 +59,7 @@ def get_window_data_json(tag: str, window: str, candle_offset: int = 0) -> dict 
 def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: int = 0) -> dict | None:
     addlog(
         f"[get_window_data] tag={tag} window={window} candle_offset={candle_offset}",
-        verbose_int=1,
+        verbose_int=3,
         verbose_state=verbose,
     )
 
@@ -71,13 +71,13 @@ def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: int 
     except FileNotFoundError:
         addlog(
             f"[ERROR] Data file not found: {path}",
-            verbose_int=1,
+            verbose_int=2,
             verbose_state=verbose,
         )
         return None
 
     if df.empty:
-        addlog("[WARN] CSV is empty", verbose_int=1, verbose_state=verbose)
+        addlog("[WARN] CSV is empty", verbose_int=2, verbose_state=verbose)
         return None
 
     # Convert window to duration in candles (assume hourly)
@@ -92,7 +92,7 @@ def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: int 
     if window_df.empty:
         addlog(
             "[WARN] No candle data in computed window slice",
-            verbose_int=1,
+            verbose_int=2,
             verbose_state=verbose,
         )
         return None
@@ -106,7 +106,7 @@ def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: int 
     except IndexError:
         addlog(
             f"[ERROR] Not enough candles to read offset {candle_offset}",
-            verbose_int=1,
+            verbose_int=2,
             verbose_state=verbose,
         )
         return None
@@ -124,7 +124,7 @@ def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: int 
 
     addlog(
         f"[get_window_data] result={result}",
-        verbose_int=2,
+        verbose_int=3,
         verbose_state=verbose,
     )
 
