@@ -32,13 +32,14 @@ krakenex, ccxt and pyyaml) and run ``bot.py`` with arguments:
 ```bash
 python bot.py --mode sim --window 1m --verbose 2  # uses default tag DOGEUSD
 python bot.py --mode live --tag SOLUSD --window 3mo --verbose 1 --telegram
+python bot.py --mode top --verbose 1              # run hourly for all symbols
 ```
 
 CLI arguments:
 
-- ``--mode`` – ``sim`` for simulation or ``live`` for live mode.
-- ``--tag`` – trading pair symbol, e.g. ``DOGEUSD`` (default: ``DOGEUSD``).
-- ``--window`` – time window for tunnel metrics such as ``1m`` or ``3mo``.
+- ``--mode`` – ``sim`` for simulation, ``live`` for live mode, or ``top`` for hourly reports.
+- ``--tag`` – trading pair symbol. For ``sim`` and ``live`` it is required; in ``top`` mode omitting it processes all symbols.
+- ``--window`` – time window for tunnel metrics such as ``1m`` or ``3mo`` (default ``3d``).
 - ``--verbose`` – verbosity level (0=silent, 1=standard, 2=debug).
 - ``--log`` – write all output to ``data/tmp/log.txt``.
 - ``--telegram`` – enable Telegram alerts (requires ``telegram.yaml``).
