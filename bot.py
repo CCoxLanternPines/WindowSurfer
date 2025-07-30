@@ -6,16 +6,16 @@ import argparse
 import sys
 
 from systems.live_engine import run_live
-from systems.sim_engine import run_simulation
+from systems.sim_engine import run_simulation, run_top_hour_loop
 from systems.utils.logger import init_logger, addlog
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="WindowSurfer bot entrypoint")
-    parser.add_argument("--mode", required=True, help="Execution mode: sim or live")
-    parser.add_argument("--tag", required=True, help="Symbol tag, e.g. DOGEUSD")
-    parser.add_argument("--window", required=True, help="Candle window, e.g. 1m or 1h")
+    parser.add_argument("--mode", required=True, help="Execution mode: sim, live or top")
+    parser.add_argument("--tag", required=False, help="Symbol tag, e.g. DOGEUSD")
+    parser.add_argument("--window", required=False, default="3d", help="Candle window, e.g. 1h or 3d")
     parser.add_argument(
         "-v",
         "--verbose",
@@ -46,17 +46,24 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     mode = args.mode.lower()
-    tag = args.tag
+    tag = args.tag.upper() if args.tag else None
     window = args.window
     verbose = args.verbose
 
     if mode == "sim":
+        if not tag:
+            addlog("Error: --tag is required for simulation")
+            sys.exit(1)
         run_simulation(tag=tag, window=window, verbose=verbose)
     elif mode == "live":
+        if not tag:
+            addlog("Error: --tag is required for live mode")
+            sys.exit(1)
         run_live(tag=tag, window=window, verbose=verbose)
-
+    elif mode == "top":
+        run_top_hour_loop(tag=tag, window=window, verbose=verbose)
     else:
-        addlog("Error: --mode must be either 'sim' or 'live'")
+        addlog("Error: --mode must be 'sim', 'live', or 'top'")
         sys.exit(1)
 
 

@@ -19,6 +19,9 @@ from systems.scripts.evaluate_sell import evaluate_sell_df
 import pandas as pd
 from systems.utils.time import duration_from_candle_count
 from systems.scripts.loader import load_settings
+from systems.top_hour import run_top_hour_all, DEFAULT_WINDOW as TOP_DEFAULT_WINDOW
+from datetime import datetime, timezone
+import time
 
 SETTINGS = load_settings()
 
@@ -290,3 +293,48 @@ def print_simulation_summary(
         ]
 
     addlog("\n" + "\n".join(output), verbose_int=1, verbose_state=verbose)
+
+
+def run_top_hour_loop(tag: str | None = None, window: str = TOP_DEFAULT_WINDOW, verbose: int = 0) -> None:
+    """Continuously execute top-of-hour checks using ``run_top_hour_all``."""
+    init_logger(
+        logging_enabled=LOGGING_ENABLED,
+        verbose_level=verbose,
+        telegram_enabled=False,
+    )
+
+    addlog(
+        f"[TOP-LOOP] Starting hourly loop for {'all symbols' if not tag else tag}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+
+    should_exit: list[bool] = []
+    listener_thread = threading.Thread(target=listen_for_keys, args=(should_exit,), daemon=True)
+    listener_thread.start()
+
+    while True:
+        if should_exit:
+            addlog("[EXIT] ESC pressed. Exiting hourly loop.", verbose_int=1, verbose_state=verbose)
+            break
+
+        run_top_hour_all(tag=tag, window=window, verbose=verbose)
+
+        now = datetime.utcnow().replace(tzinfo=timezone.utc)
+        elapsed_secs = now.minute * 60 + now.second
+        remaining_secs = 3600 - elapsed_secs
+
+        with tqdm(
+            total=3600,
+            initial=elapsed_secs,
+            desc="⏳ Time to next hour",
+            bar_format="{l_bar}{bar}| {percentage:3.0f}% {remaining}s",
+            leave=True,
+            dynamic_ncols=True,
+        ) as pbar:
+            for _ in range(remaining_secs):
+                if should_exit:
+                    addlog("[EXIT] ESC pressed. Exiting hourly loop.", verbose_int=1, verbose_state=verbose)
+                    return
+                time.sleep(1)
+                pbar.update(1)
