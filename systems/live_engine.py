@@ -161,7 +161,11 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
 
         available_usd = float(kraken_balance.get(fiat_asset, 0.0))
         available_coin = float(kraken_balance.get(wallet_code, 0.0))
+        if not candle:
+            addlog("[ERROR] Candle is None — skipping evaluation.", verbose_int=1, verbose_state=verbose)
+            continue
         coin_price = candle["close"]
+
         coin_balance_usd = available_coin * coin_price
 
         if candle and window_data:
