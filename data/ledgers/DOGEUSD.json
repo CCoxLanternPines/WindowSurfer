@@ -1,0 +1,48 @@
+{
+  "open_notes": [
+    {
+      "symbol": "DOGEUSD",
+      "strategy": "fish_catch",
+      "entry_price": 0.2176479,
+      "entry_ts": 1753884018,
+      "entry_tick": 0,
+      "window": "3d",
+      "entry_usdt": 64.485413345,
+      "entry_amount": 296.28318649,
+      "status": "Open",
+      "fee": 0.257941653,
+      "kraken_txid": "OOBOC5-PF26K-RDEQSI",
+      "note_id": "ebdeab10-0500-48dd-a919-e78e768592a6"
+    },
+    {
+      "symbol": "DOGEUSD",
+      "strategy": "whale_catch",
+      "entry_price": 0.2176479,
+      "entry_ts": 1753884028,
+      "entry_tick": 0,
+      "window": "3d",
+      "entry_usdt": 59.99347788,
+      "entry_amount": 275.64464385,
+      "status": "Open",
+      "fee": 0.239973912,
+      "kraken_txid": "OO2BWY-4QW2Y-IYSRK3",
+      "note_id": "2c9e379f-dff1-4000-8b7f-407af957bd67"
+    },
+    {
+      "symbol": "DOGEUSD",
+      "strategy": "fish_catch",
+      "entry_price": 0.2212553,
+      "entry_ts": 1753894808,
+      "entry_tick": 0,
+      "window": "3d",
+      "entry_usdt": 39.849145667,
+      "entry_amount": 180.10481858,
+      "status": "Open",
+      "fee": 0.159396582,
+      "kraken_txid": "O5EJAJ-D5SBW-Y53CTZ",
+      "note_id": "8cf2ddae-d05b-4c68-aeb1-963402131282"
+    }
+  ],
+  "closed_notes": [],
+  "pnl": 0.0
+}
