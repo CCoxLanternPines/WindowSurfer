@@ -61,13 +61,21 @@ def buy_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int 
         price_resp = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={pair_code}").json()
         ticker_result = price_resp.get("result", {})
         if not ticker_result:
-            addlog("[ERROR] Invalid ticker response: missing result", verbose_int=1, verbose_state=verbose)
+            addlog(
+                "[ERROR] Invalid ticker response: missing result",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
             continue
         ticker_key = next(iter(ticker_result))
         ticker_data = ticker_result.get(ticker_key, {})
         close = ticker_data.get("c")
         if not close:
-            addlog("[ERROR] Invalid ticker response: missing close price", verbose_int=1, verbose_state=verbose)
+            addlog(
+                "[ERROR] Invalid ticker response: missing close price",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
             continue
 
         price = float(close[0])
@@ -76,7 +84,7 @@ def buy_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int 
 
         addlog(
             f"\nTrying buy with slippage {slippage*100:.2f}% → volume {coin_amount:.6f}",
-            verbose_int=1,
+            verbose_int=3,
             verbose_state=verbose,
         )
 
@@ -97,7 +105,7 @@ def buy_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int 
             trades = trades_resp["result"]["trades"]
             for tid, trade in trades.items():
                 if trade["ordertxid"] == txid:
-                    addlog("Trade found in history", verbose_int=1, verbose_state=verbose)
+                    addlog("Trade found in history", verbose_int=2, verbose_state=verbose)
                     return {
                         "kraken_txid": txid,
                         "symbol": pair_code,
@@ -109,7 +117,7 @@ def buy_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int 
                     }
             time.sleep(0.6)
 
-        addlog("Slippage level failed, trying next...", verbose_int=1, verbose_state=verbose)
+        addlog("Slippage level failed, trying next...", verbose_int=3, verbose_state=verbose)
 
     raise Exception("Buy order failed — no fill found within timeout.")
 
@@ -145,7 +153,7 @@ def sell_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int
         trades = trades_resp["result"]["trades"]
         for tid, trade in trades.items():
             if trade["ordertxid"] == txid:
-                addlog("Sell trade found in history", verbose_int=1, verbose_state=verbose)
+                addlog("Sell trade found in history", verbose_int=2, verbose_state=verbose)
                 return {
                     "kraken_txid": txid,
                     "symbol": pair_code,

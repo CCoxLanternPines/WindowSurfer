@@ -23,14 +23,14 @@ def ensure_latest_candles(tag: str, lookback: str = "48h", verbose: int = 1) -> 
     try:
         addlog(
             f"[SYNC] Checking for missing candles in last {lookback} for {tag}",
-            verbose_int=1,
+            verbose_int=2,
             verbose_state=verbose,
         )
         fetch_missing_candles(tag, relative_window=lookback, verbose=verbose)
     except Exception as e:
         addlog(
             f"[ERROR] Failed to fetch missing candles: {e}",
-            verbose_int=1,
+            verbose_int=2,
             verbose_state=verbose,
         )
 
@@ -97,7 +97,11 @@ def evaluate_live_tick(
         )
 
 def run_live(tag: str, window: str, verbose: int = 0) -> None:
-    addlog(f"[LIVE] Running live mode for {tag} on window {window}", verbose_int=1, verbose_state=verbose)
+    addlog(
+        f"[LIVE] Running live mode for {tag} on window {window}",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
 
     settings = load_settings()
     meta = settings["symbol_settings"][tag]
@@ -153,7 +157,11 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
         window_data = get_window_data_json(tag, window, candle_offset=0)
 
         if not candle or not window_data:
-            addlog("[ERROR] Missing candle or window data", verbose_int=1, verbose_state=verbose)
+            addlog(
+                "[ERROR] Missing candle or window data",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
             continue
 
         exchange = ccxt.kraken({"enableRateLimit": True})
@@ -190,4 +198,8 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
         )
         addlog(emoji_report, verbose_int=1, verbose_state=verbose)
 
-        addlog("[CYCLE] Top-of-hour cycle complete. Waiting for next hour...", verbose_int=1, verbose_state=verbose)
+        addlog(
+            "[CYCLE] Top-of-hour cycle complete. Waiting for next hour...",
+            verbose_int=2,
+            verbose_state=verbose,
+        )

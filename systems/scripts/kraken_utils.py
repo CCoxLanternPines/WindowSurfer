@@ -46,7 +46,7 @@ def get_kraken_balance(verbose: int = 0) -> dict:
     result = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
     addlog(
         f"[INFO] Kraken balance fetched: {result}",
-        verbose_int=2,
+        verbose_int=3,
         verbose_state=verbose,
     )
     return {k: float(v) for k, v in result.items()}

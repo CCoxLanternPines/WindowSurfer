@@ -61,7 +61,7 @@ def should_sell_notes(notes: list, candle: dict, settings: dict, verbose: int = 
 
         addlog(
             f"[KNIFE SELL DEBUG] Note {i} ROI: {roi:.2%} | Entry @ ${note['entry_usdt']:.2f} | Now @ ${current_price:.2f} | Margin: {margin:.2%}",
-            verbose_int=2,
+            verbose_int=3,
             verbose_state=verbose,
         )
 
@@ -79,7 +79,7 @@ def should_sell_notes(notes: list, candle: dict, settings: dict, verbose: int = 
     if trigger_hit:
         addlog(
             "[KNIFE SELL TRIGGER] ✅ ROI met & all notes profitable — selling all",
-            verbose_int=1,
+            verbose_int=2,
             verbose_state=verbose,
         )
         return notes
