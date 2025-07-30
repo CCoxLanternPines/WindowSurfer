@@ -1,9 +1,9 @@
 import time
 import sys
 import threading
-from datetime import datetime, timedelta, timezone
-from tqdm import tqdm
+from datetime import datetime, timezone
 import ccxt
+from tqdm import tqdm
 from systems.utils.logger import addlog
 from systems.utils.loggers import logger
 from systems.utils.top_hour_report import format_top_of_hour_report
@@ -102,6 +102,7 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
 
     settings = load_settings()
     meta = settings["symbol_settings"][tag]
+    meta["window"] = window 
 
     ledger = load_ledger(tag)
     cooldowns = {
@@ -152,6 +153,10 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
         candle = get_candle_data_json(tag, row_offset=0)
         window_data = get_window_data_json(tag, window, candle_offset=0)
 
+        if not candle or not window_data:
+            addlog("[ERROR] Missing candle or window data", verbose_int=1, verbose_state=verbose)
+            continue
+
         exchange = ccxt.kraken({"enableRateLimit": True})
         usd_balance = get_available_fiat_balance(exchange, meta["fiat"])
 
@@ -161,48 +166,29 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
 
         available_usd = float(kraken_balance.get(fiat_asset, 0.0))
         available_coin = float(kraken_balance.get(wallet_code, 0.0))
-        if not candle:
-            addlog("[ERROR] Candle is None — skipping evaluation.", verbose_int=1, verbose_state=verbose)
-            continue
         coin_price = candle["close"]
-
         coin_balance_usd = available_coin * coin_price
 
-        if candle and window_data:
-            evaluate_live_tick(
-                candle=candle,
-                window_data=window_data,
-                ledger=ledger,
-                cooldowns=cooldowns,
-                last_triggered=last_triggered,
-                tag=tag,
-                meta=meta,
-                exchange=exchange,
-                verbose=verbose
-            )
-            save_ledger(tag, ledger)
-
-        report = format_top_of_hour_report(
-            symbol=tag,
-            ts=datetime.now(),
-            usd_balance=available_usd,
-            coin_balance_usd=coin_balance_usd,
-            coin_symbol=wallet_code,
-            total_liquid_value=available_usd + coin_balance_usd,
-            triggered_strategies={
-                "Fish": last_triggered["fish_catch"] is not None,
-                "Whale": last_triggered["whale_catch"] is not None,
-                "Knife": last_triggered["knife_catch"] is not None,
-            },
-            note_counts={
-                "Fish": (sum(1 for n in ledger.get_active_notes() if n["strategy"] == "fish_catch"),
-                         sum(1 for n in ledger.get_closed_notes() if n["strategy"] == "fish_catch")),
-                "Whale": (sum(1 for n in ledger.get_active_notes() if n["strategy"] == "whale_catch"),
-                          sum(1 for n in ledger.get_closed_notes() if n["strategy"] == "whale_catch")),
-                "Knife": (sum(1 for n in ledger.get_active_notes() if n["strategy"] == "knife_catch"),
-                          sum(1 for n in ledger.get_closed_notes() if n["strategy"] == "knife_catch")),
-            }
+        evaluate_live_tick(
+            candle=candle,
+            window_data=window_data,
+            ledger=ledger,
+            cooldowns=cooldowns,
+            last_triggered=last_triggered,
+            tag=tag,
+            meta=meta,
+            exchange=exchange,
+            verbose=verbose
         )
-        addlog(report, verbose_int=0, verbose_state=verbose)
+        save_ledger(tag, ledger)
+
+        def active_count(name):
+            return sum(1 for n in ledger.get_active_notes() if n["strategy"] == name)
+
+        emoji_report = (
+            f"\U0001f4ca {tag} | \U0001fa75 ${available_usd:.0f} + \U0001fa99 {available_coin:.2f} {wallet_code} | "
+            f"\U0001f41f {active_count('fish_catch')} \U0001f40b {active_count('whale_catch')} \U0001f52a {active_count('knife_catch')}"
+        )
+        addlog(emoji_report, verbose_int=0, verbose_state=verbose)
 
         addlog("[CYCLE] Top-of-hour cycle complete. Waiting for next hour...", verbose_int=1, verbose_state=verbose)
