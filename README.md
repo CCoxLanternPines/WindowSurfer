@@ -26,7 +26,8 @@ Decision logic lives under ``systems/decision_logic`` with one module per strate
 - Utility helpers in ``systems/utils`` for path and time parsing.
 
 ## How to Use
-Install dependencies (pandas, tqdm, requests) and run ``bot.py`` with arguments:
+Install dependencies from ``requirements.txt`` (pandas, tqdm, requests,
+krakenex, ccxt and pyyaml) and run ``bot.py`` with arguments:
 
 ```bash
 python bot.py --mode sim --window 1m --verbose 2  # uses default tag DOGEUSD
@@ -41,6 +42,9 @@ CLI arguments:
 - ``--verbose`` – verbosity level (0=silent, 1=standard, 2=debug).
 - ``--log`` – write all output to ``data/tmp/log.txt``.
 - ``--telegram`` – enable Telegram alerts (requires ``telegram.yaml``).
+
+Press ``ESC`` during a simulation to abort early. The current ledger state is saved
+to ``data/tmp/ledgersimulation.json`` and a summary is printed.
 
 ## Simulation Features
 The simulator reads raw candle data from ``data/raw/<TAG>.csv`` and computes tunnel metrics for each step. For every candle tick it:
@@ -64,4 +68,18 @@ Results are stored in ``ledgersimulation.json`` under ``data/tmp``. Each note re
 - Not a predictive AI model.
 - Does not attempt to maximize profit above structural rules.
 - Not yet hardened for long unattended deployments.
+
+## Additional Scripts and Configuration
+
+- ``systems/fetch.py`` – fetch historical candles from Kraken/Binance and merge
+  them into ``data/raw/<TAG>.csv``. Example:
+
+  ```bash
+  python -m systems.fetch --tag DOGEUSD --time 30d
+  ```
+
+- ``settings/settings.json`` – adjust strategy cooldowns, investment size and
+  other behavior. ``simulation_capital`` and ``active_strategies`` live here.
+- ``data/ledgers/<TAG>.json`` – live trading ledger persisted between runs.
+- ``telegram.yaml`` – credentials for the optional Telegram alert feature.
 
