@@ -6,7 +6,6 @@ import base64
 from urllib.parse import urlencode
 
 from systems.scripts.kraken_auth import load_kraken_keys
-from systems.utils.resolve_symbol import resolve_symbol
 from systems.utils.logger import addlog
 from systems.scripts.kraken_utils import get_kraken_balance  # use shared util now
 
@@ -39,51 +38,38 @@ def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) ->
     return result
 
 def get_available_fiat_balance(exchange, currency: str = "USD") -> float:
-    """Return available fiat balance from a CCXT exchange object."""
     try:
         balance = exchange.fetch_free_balance()
     except Exception:
         return 0.0
     return float(balance.get(currency, 0.0))
 
-def buy_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
+def buy_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int = 0) -> dict:
     api_key, api_secret = load_kraken_keys()
-    symbols = resolve_symbol(symbol)
-    pair_code = symbols["kraken"]
 
-    # Check balance
     balance = get_kraken_balance(verbose)
-    available_usd = balance.get("ZUSD", 0.0)
+    available_usd = balance.get(fiat_symbol, 0.0)
     if available_usd < usd_amount:
         addlog(
-            f"[ABORT] Not enough USDT to buy: ${available_usd:.2f} available, need ${usd_amount:.2f}",
+            f"[ABORT] Not enough {fiat_symbol} to buy: ${available_usd:.2f} available, need ${usd_amount:.2f}",
             verbose_int=1,
             verbose_state=verbose,
         )
         return {}
 
     for slippage in SLIPPAGE_STEPS:
-        price_resp = requests.get(
-            f"https://api.kraken.com/0/public/Ticker?pair={pair_code}"
-        ).json()
+        price_resp = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={pair_code}").json()
         ticker_result = price_resp.get("result", {})
         if not ticker_result:
-            addlog(
-                "[ERROR] Invalid ticker response: missing result",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
+            addlog("[ERROR] Invalid ticker response: missing result", verbose_int=1, verbose_state=verbose)
             continue
         ticker_key = next(iter(ticker_result))
         ticker_data = ticker_result.get(ticker_key, {})
         close = ticker_data.get("c")
         if not close:
-            addlog(
-                "[ERROR] Invalid ticker response: missing close price",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
+            addlog("[ERROR] Invalid ticker response: missing close price", verbose_int=1, verbose_state=verbose)
             continue
+
         price = float(close[0])
         adjusted_price = price * (1 + slippage)
         coin_amount = round(usd_amount / adjusted_price, 8)
@@ -114,7 +100,7 @@ def buy_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
                     addlog("Trade found in history", verbose_int=1, verbose_state=verbose)
                     return {
                         "kraken_txid": txid,
-                        "symbol": symbol,
+                        "symbol": pair_code,
                         "price": float(trade["price"]),
                         "volume": float(trade["vol"]),
                         "cost": float(trade["cost"]),
@@ -127,14 +113,10 @@ def buy_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
 
     raise Exception("Buy order failed — no fill found within timeout.")
 
-def sell_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
+def sell_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int = 0) -> dict:
     api_key, api_secret = load_kraken_keys()
-    symbols = resolve_symbol(symbol)
-    pair_code = symbols["kraken"]
 
-    price_resp = requests.get(
-        f"https://api.kraken.com/0/public/Ticker?pair={pair_code}"
-    ).json()
+    price_resp = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={pair_code}").json()
     ticker_result = price_resp.get("result", {})
     if not ticker_result:
         raise Exception("Invalid ticker response: missing result")
@@ -166,7 +148,7 @@ def sell_order(symbol: str, usd_amount: float, verbose: int = 0) -> dict:
                 addlog("Sell trade found in history", verbose_int=1, verbose_state=verbose)
                 return {
                     "kraken_txid": txid,
-                    "symbol": symbol,
+                    "symbol": pair_code,
                     "price": float(trade["price"]),
                     "volume": float(trade["vol"]),
                     "cost": float(trade["cost"]),

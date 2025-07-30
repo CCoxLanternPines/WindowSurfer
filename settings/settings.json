@@ -1,8 +1,11 @@
 {
   "symbol_settings": {
     "DOGEUSD": {
+	  "owner": "Chris",
+	  "wallet_code": "XXDG",
       "kraken_name": "DOGE/USD",
-      "binance_name": "DOGEUSDT"
+      "binance_name": "DOGEUSDT",
+	  "fiat": "ZUSD"
     }
   },
   "general_settings": {
