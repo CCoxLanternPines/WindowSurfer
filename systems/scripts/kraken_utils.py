@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.utils.logger import addlog
+from systems.utils.price_fetcher import get_price
 
 KRAKEN_API_URL = "https://api.kraken.com"
 
@@ -44,9 +45,21 @@ def get_kraken_balance(verbose: int = 0) -> dict:
 
     api_key, api_secret = load_kraken_keys()
     result = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
+
+    usd_balances = {}
+    for asset, amount in result.items():
+        amount = float(amount)
+        if asset.upper() in {"ZUSD", "USD", "USDT"}:
+            usd_balances[asset] = amount
+        else:
+            price = get_price(f"{asset}USD")
+            if price:
+                usd_balances[asset] = amount * price
+
     addlog(
-        f"[INFO] Kraken balance fetched: {result}",
+        f"[INFO] Kraken balance fetched (USD): {usd_balances}",
         verbose_int=3,
         verbose_state=verbose,
     )
+
     return {k: float(v) for k, v in result.items()}

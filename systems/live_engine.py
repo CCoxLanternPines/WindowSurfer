@@ -193,7 +193,7 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
             return sum(1 for n in ledger.get_active_notes() if n["strategy"] == name)
 
         emoji_report = (
-            f"\U0001f4ca {tag} | \U0001fa75 ${available_usd:.0f} + \U0001fa99 {available_coin:.2f} {wallet_code} | "
+            f"\U0001f4ca {tag} | \U0001fa75 ${available_usd:.0f} + \U0001fa99 ${coin_balance_usd:.2f} | "
             f"\U0001f41f {active_count('fish_catch')} \U0001f40b {active_count('whale_catch')} \U0001f52a {active_count('knife_catch')}"
         )
         addlog(emoji_report, verbose_int=1, verbose_state=verbose)

@@ -81,9 +81,10 @@ def buy_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int 
         price = float(close[0])
         adjusted_price = price * (1 + slippage)
         coin_amount = round(usd_amount / adjusted_price, 8)
+        usd_equiv = coin_amount * adjusted_price
 
         addlog(
-            f"\nTrying buy with slippage {slippage*100:.2f}% → volume {coin_amount:.6f}",
+            f"\nTrying buy with slippage {slippage*100:.2f}% → ${usd_equiv:.2f}",
             verbose_int=3,
             verbose_state=verbose,
         )
