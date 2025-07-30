@@ -20,10 +20,6 @@ try:
 except ImportError:
     msvcrt = None
 
-if datetime.utcnow().minute != 0:
-    print("[SKIP] Not top of the hour. Exiting.")
-    sys.exit(0)
-
 def ensure_latest_candles(tag: str, lookback: str = "48h", verbose: int = 1) -> None:
     try:
         addlog(
@@ -119,37 +115,70 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
         "fish_catch": None,
     }
 
-    ensure_latest_candles(tag, lookback="48h", verbose=verbose)
-    candle = get_candle_data_json(tag, row_offset=0)
-    window_data = get_window_data_json(tag, window, candle_offset=0)
+    should_exit = []
 
-    exchange = ccxt.kraken({"enableRateLimit": True})
-    usd_balance = get_available_fiat_balance(exchange, meta["fiat"])
+    def esc_listener():
+        if not msvcrt:
+            return
+        while True:
+            if msvcrt.kbhit() and msvcrt.getch() == b'\x1b':
+                should_exit.append(True)
+                break
 
-    kraken_balance = get_kraken_balance(verbose)
-    fiat_asset = meta["fiat"]
-    wallet_code = meta.get("wallet_code", meta["kraken_name"].replace("USD", ""))
+    if msvcrt:
+        threading.Thread(target=esc_listener, daemon=True).start()
 
-    available_usd = float(kraken_balance.get(fiat_asset, 0.0))
-    available_coin = float(kraken_balance.get(wallet_code, 0.0))
-    coin_price = candle["close"]
-    coin_balance_usd = available_coin * coin_price
+    while True:
+        now = datetime.utcnow().replace(tzinfo=timezone.utc)
+        elapsed_secs = now.minute * 60 + now.second
+        remaining_secs = 3600 - elapsed_secs
 
-    if candle and window_data:
-        evaluate_live_tick(
-            candle=candle,
-            window_data=window_data,
-            ledger=ledger,
-            cooldowns=cooldowns,
-            last_triggered=last_triggered,
-            tag=tag,
-            meta=meta,
-            exchange=exchange,
-            verbose=verbose
-        )
-        save_ledger(tag, ledger)
+        with tqdm(
+            total=3600,
+            initial=elapsed_secs,
+            desc="⏳ Time to next hour",
+            bar_format="{l_bar}{bar}| {percentage:3.0f}% {remaining}s",
+            leave=True,
+            dynamic_ncols=True
+        ) as pbar:
+            for _ in range(remaining_secs):
+                if should_exit:
+                    addlog("[EXIT] ESC pressed. Exiting live mode.", verbose_int=1, verbose_state=verbose)
+                    return
+                time.sleep(1)
+                pbar.update(1)
 
-    report = format_top_of_hour_report(
+        ensure_latest_candles(tag, lookback="48h", verbose=verbose)
+        candle = get_candle_data_json(tag, row_offset=0)
+        window_data = get_window_data_json(tag, window, candle_offset=0)
+
+        exchange = ccxt.kraken({"enableRateLimit": True})
+        usd_balance = get_available_fiat_balance(exchange, meta["fiat"])
+
+        kraken_balance = get_kraken_balance(verbose)
+        fiat_asset = meta["fiat"]
+        wallet_code = meta.get("wallet_code", meta["kraken_name"].replace("USD", ""))
+
+        available_usd = float(kraken_balance.get(fiat_asset, 0.0))
+        available_coin = float(kraken_balance.get(wallet_code, 0.0))
+        coin_price = candle["close"]
+        coin_balance_usd = available_coin * coin_price
+
+        if candle and window_data:
+            evaluate_live_tick(
+                candle=candle,
+                window_data=window_data,
+                ledger=ledger,
+                cooldowns=cooldowns,
+                last_triggered=last_triggered,
+                tag=tag,
+                meta=meta,
+                exchange=exchange,
+                verbose=verbose
+            )
+            save_ledger(tag, ledger)
+
+        report = format_top_of_hour_report(
             symbol=tag,
             ts=datetime.now(),
             usd_balance=available_usd,
@@ -170,6 +199,6 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
                           sum(1 for n in ledger.get_closed_notes() if n["strategy"] == "knife_catch")),
             }
         )
-    addlog(report, verbose_int=0, verbose_state=verbose)
+        addlog(report, verbose_int=0, verbose_state=verbose)
 
-    addlog("[EXIT] Completed top-of-hour logic. Exiting live mode.", verbose_int=1, verbose_state=verbose)
+        addlog("[CYCLE] Top-of-hour cycle complete. Waiting for next hour...", verbose_int=1, verbose_state=verbose)
