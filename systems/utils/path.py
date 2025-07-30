@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 
 
 def find_project_root() -> Path:
@@ -13,3 +14,11 @@ def find_project_root() -> Path:
             break
         path = path.parent
     raise FileNotFoundError("Project root not found using 'root' and 'systems' markers")
+
+
+def load_settings() -> dict:
+    """Load settings.json from the project settings directory."""
+    root = find_project_root()
+    settings_path = root / "settings" / "settings.json"
+    with open(settings_path, "r", encoding="utf-8") as f:
+        return json.load(f)
