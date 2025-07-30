@@ -12,6 +12,12 @@ systems/__pycache__/
 .env
 *.env
 
+# Ignore Python virtual environments
+venv/
+.venv/
+ENV/
+.env/
+
 # Notebook checkpoints
 .ipynb_checkpoints/
 
