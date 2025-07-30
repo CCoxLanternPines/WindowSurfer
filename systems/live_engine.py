@@ -189,6 +189,36 @@ def run_live(tag: str, window: str, verbose: int = 0) -> None:
         )
         save_ledger(tag, ledger)
 
+        counts = ledger.get_trade_counts_by_strategy()
+
+        def count_tuple(key: str) -> tuple:
+            data = counts.get(key, {"total": 0, "open": 0})
+            return data["open"], data["total"] - data["open"]
+
+        note_counts = {
+            "Fish": count_tuple("fish_catch"),
+            "Whale": count_tuple("whale_catch"),
+            "Knife": count_tuple("knife_catch"),
+        }
+
+        triggered = {
+            "Fish": last_triggered.get("fish_catch") is not None,
+            "Whale": last_triggered.get("whale_catch") is not None,
+            "Knife": last_triggered.get("knife_catch") is not None,
+        }
+
+        ledger_line = format_top_of_hour_report(
+            symbol=tag,
+            ts=now,
+            usd_balance=available_usd,
+            coin_balance_usd=coin_balance_usd,
+            coin_symbol=wallet_code,
+            total_liquid_value=available_usd + coin_balance_usd,
+            triggered_strategies=triggered,
+            note_counts=note_counts,
+        )
+        addlog(ledger_line, verbose_int=1, verbose_state=verbose)
+
         def active_count(name):
             return sum(1 for n in ledger.get_active_notes() if n["strategy"] == name)
 
