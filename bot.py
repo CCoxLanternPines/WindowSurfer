@@ -13,7 +13,12 @@ from systems.utils.logger import init_logger, addlog
 def parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="WindowSurfer bot entrypoint")
-    parser.add_argument("--mode", required=True, help="Execution mode: sim or live")
+    parser.add_argument(
+        "--mode",
+        required=True,
+        choices=["sim", "live", "wallet"],
+        help="Execution mode: sim, live, or wallet",
+    )
     parser.add_argument(
         "--tag",
         required=False,
@@ -22,7 +27,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "processed every hour"
         ),
     )
-    parser.add_argument("--window", required=True, help="Candle window, e.g. 1m or 1h")
+    parser.add_argument("--window", required=False, help="Candle window, e.g. 1m or 1h")
     parser.add_argument(
         "-v",
         "--verbose",
@@ -57,13 +62,38 @@ def main(argv: list[str] | None = None) -> None:
     window = args.window
     verbose = args.verbose
 
+    if mode == "wallet":
+        from systems.scripts.kraken_utils import get_kraken_balance
+
+        balances = get_kraken_balance(verbose)
+
+        if verbose >= 1:
+            print("[WALLET] Kraken Balance")
+            if verbose >= 2:
+                print(balances)
+            for asset, amount in balances.items():
+                val = float(amount)
+                if val == 0:
+                    continue
+                fmt = f"{val:.2f}" if val > 1 else f"{val:.6f}"
+                if asset.upper() in {"ZUSD", "USD", "USDT"}:
+                    print(f"{asset}: ${fmt}")
+                else:
+                    print(f"{asset}: {fmt}")
+        return
+
     if mode == "sim":
+        if not window:
+            addlog("Error: --window is required for sim mode")
+            sys.exit(1)
         run_simulation(tag=tag, window=window, verbose=verbose)
     elif mode == "live":
+        if not window:
+            addlog("Error: --window is required for live mode")
+            sys.exit(1)
         run_live(tag=tag, window=window, verbose=verbose)
-
     else:
-        addlog("Error: --mode must be either 'sim' or 'live'")
+        addlog("Error: --mode must be either 'sim', 'live', or 'wallet'")
         sys.exit(1)
 
 
