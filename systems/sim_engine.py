@@ -120,7 +120,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:  # noqa: AR
                     verbose=verbose,
                 )
                 before_pnl = ledger.pnl
-                sim_capital = handle_sells(
+                sim_capital, closed_notes = handle_sells(
                     ledger=ledger,
                     name=name,
                     tick=tick,
@@ -128,6 +128,15 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:  # noqa: AR
                     sim_capital=sim_capital,
                     verbose=verbose,
                 )
+                for note in closed_notes:
+                    addlog(
+                        (
+                            f"[SELL] Tick {tick} | Window: {note['window']} | "
+                            f"Gain: +${note['gain_usdt']:.2f} ({note['gain_pct']:.2%})"
+                        ),
+                        verbose_int=2,
+                        verbose_state=verbose,
+                    )
                 realised_gain = ledger.pnl - before_pnl
                 if realised_gain:
                     realised_pnl += realised_gain
