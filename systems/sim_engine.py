@@ -101,6 +101,9 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
 
     with tqdm(total=total_rows, desc="📉 Sim Progress", dynamic_ncols=True) as pbar:
         for step in range(total_rows):
+            candle = precomputed_candles[step]
+            window_data = precomputed_windows[step]
+
             if should_exit:
                 addlog(
                     "\n🚪 ESC detected — exiting simulation early.",
@@ -116,12 +119,13 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                     verbose_state=verbose,
                 )
 
-                # ✅ Save and show ledger summary
+                # ✅ Save ledger
                 save_ledger_to_file(ledger, verbose=verbose)
 
+                # ✅ Recalculate capital using mark-to-market
                 open_notes = ledger.get_active_notes()
                 if open_notes:
-                    last_price = precomputed_candles[step]["close"]
+                    last_price = candle["close"]
                     unrealized_value = sum(n["entry_amount"] * last_price for n in open_notes)
                     addlog(
                         f"[INFO] Mark-to-market added from open notes: ${unrealized_value:.2f}",
@@ -132,6 +136,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                 else:
                     ending_capital = sim_capital
 
+                # ✅ Print truthful summary
                 print_simulation_summary(
                     ledger,
                     starting_capital=start_capital,
@@ -140,11 +145,6 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                     verbose=verbose,
                 )
                 break
-
-
-
-            candle = precomputed_candles[step]
-            window_data = precomputed_windows[step]
 
             if candle and window_data:
                 evaluate_buy_df(
