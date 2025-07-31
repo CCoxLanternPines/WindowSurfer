@@ -48,28 +48,5 @@ def init_logger(
 def addlog(
     message: str, verbose_int: int = 1, verbose_state: int | None = None
 ) -> None:
-    """Write a log message if ``verbose_int`` is within ``verbose_state``."""
-    if verbose_state is None:
-        verbose_state = DEFAULT_VERBOSE_STATE
-
-    should_output = verbose_int <= verbose_state
-
-    if should_output:
-        tqdm.write(message)
-        if TELEGRAM_ENABLED and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
-            try:
-                url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-                requests.post(
-                    url,
-                    data={"chat_id": TELEGRAM_CHAT_ID, "text": message},
-                    timeout=5,
-                )
-            except Exception as exc:
-                global _TELEGRAM_WARNED
-                if not _TELEGRAM_WARNED:
-                    tqdm.write(f"[WARN] Telegram send failed: {exc}")
-                    _TELEGRAM_WARNED = True
-
-    if LOGGING_ENABLED:
-        with open(LOGFILE_PATH, "a", encoding="utf-8") as f:
-            f.write(message + "\n")
+    """Temporary stub to bypass logger and output directly."""
+    print(message)
