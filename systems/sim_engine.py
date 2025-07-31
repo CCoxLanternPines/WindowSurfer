@@ -1,4 +1,3 @@
-
 import threading
 try:
     import msvcrt
@@ -59,6 +58,8 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
 
     sim_capital = float(config.get("simulation_capital", 0))
     start_capital = sim_capital
+
+    max_note_usdt = SETTINGS["general_settings"].get("max_note_usdt", 999999)
 
     def get_capital():
         return sim_capital
@@ -158,6 +159,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                     ledger=ledger,  # ✅ Inject ledger
                     get_capital=get_capital,
                     on_buy=deduct_capital,
+                    max_note_usdt=max_note_usdt,
                 )
 
                 to_sell = evaluate_sell_df(

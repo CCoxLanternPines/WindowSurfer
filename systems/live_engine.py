@@ -44,8 +44,15 @@ def evaluate_live_tick(
     from systems.scripts.evaluate_buy import evaluate_buy_df
     from systems.scripts.evaluate_sell import evaluate_sell_df
 
+    settings = load_settings()
+
     def get_capital():
         return get_available_fiat_balance(exchange, meta["fiat"])
+
+    max_note_usdt = meta.get(
+        "max_note_usdt",
+        settings["general_settings"].get("max_note_usdt", 999999),
+    )
 
     evaluate_buy_df(
         candle=candle,
@@ -58,7 +65,8 @@ def evaluate_live_tick(
         verbose=verbose,
         ledger=ledger,
         get_capital=get_capital,
-        meta=meta
+        meta=meta,
+        max_note_usdt=max_note_usdt,
     )
 
     to_sell = evaluate_sell_df(
