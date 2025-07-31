@@ -62,9 +62,13 @@ def handle_sells(
     price: float,
     sim_capital: float,
     verbose: int,
-) -> float:
-    """Close notes that have reached their target price."""
+) -> tuple[float, list]:
+    """Close notes that have reached their target price.
+
+    Returns updated capital and the list of notes closed at this tick.
+    """
     to_close = []
+    closed: list = []
     for note in ledger.get_active_notes():
         if note["window"] != name:
             continue
@@ -72,15 +76,12 @@ def handle_sells(
             note["exit_tick"] = tick
             note["exit_price"] = price
             note["exit_usdt"] = note["entry_amount"] * price
-            note["gain_pct"] = (note["exit_usdt"] - note["entry_usdt"]) / note["entry_usdt"]
+            note["gain_usdt"] = note["exit_usdt"] - note["entry_usdt"]
+            note["gain_pct"] = note["gain_usdt"] / note["entry_usdt"]
             note["status"] = "Closed"
             to_close.append(note)
     for note in to_close:
         ledger.close_note(note)
         sim_capital += note["exit_usdt"]
-        addlog(
-            f"[SELL] {name} tick {tick} gain={note['gain_pct']:.2%}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-    return sim_capital
+        closed.append(note)
+    return sim_capital, closed
