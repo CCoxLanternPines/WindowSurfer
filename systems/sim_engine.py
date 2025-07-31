@@ -32,11 +32,18 @@ def summarize_simulation(
     idle_capital: float,
     realised_pnl: float,
     open_value: float,
-    end_value: float,
     total_ticks: int,
     verbose: int,
 ) -> None:
-    """Log and persist simulation results."""
+    """Log and persist simulation results.
+
+    The final account value is derived from ``idle_capital`` and the
+    mark-to-market value of any open notes. ``realised_pnl`` is reported for
+    informational purposes only and is not added to the ending value since it
+    has already been credited to ``idle_capital`` when notes were closed.
+    """
+
+    end_value = idle_capital + open_value
 
     addlog(f"[SIM] Completed {total_ticks} ticks.", verbose_int=1, verbose_state=verbose)
     addlog(
@@ -167,14 +174,12 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     open_value = sum(
         n["entry_amount"] * last_price for n in ledger.get_active_notes()
     )
-    end_value = sim_capital + open_value
     summarize_simulation(
         ledger=ledger,
         start_capital=start_capital,
         idle_capital=sim_capital,
         realised_pnl=realised_pnl,
         open_value=open_value,
-        end_value=end_value,
         total_ticks=len(df),
         verbose=verbose,
     )
