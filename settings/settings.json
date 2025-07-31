@@ -16,21 +16,35 @@
     }
   },
   "general_settings": {
-    "knife_catch_cooldown": 0,
-    "whale_catch_cooldown": 1,
-    "fish_catch_cooldown": 3,
+    "windows": {
+      "fish": {
+        "window_size": "3d",
+        "cooldown": 3,
+        "investment_fraction": 0.10,
+        "buy_floor": 0.1,
+        "sell_ceiling": 0.9,
+        "max_open_notes": 10
+      },
+      "whale": {
+        "window_size": "14d",
+        "cooldown": 1,
+        "investment_fraction": 0.07,
+        "buy_floor": 0.1,
+        "sell_ceiling": 0.9,
+        "max_open_notes": 10
+      },
+      "knife": {
+        "window_size": "30d",
+        "cooldown": 0,
+        "investment_fraction": 0.05,
+        "buy_floor": 0.1,
+        "sell_ceiling": 0.9,
+        "max_open_notes": 10
+      }
+    },
+    "roi_gain_multiplier": 1.0,
     "max_note_usdt": 300.0,
-    "knife_investment_size": 0.05,
-    "whale_investment_size": 0.07,
-    "fish_investment_size": 0.10
+    "minimum_note_size": 10
   },
-  "simulation_capital": 1000,
-  "active_strategies": ["fish_catch", "whale_catch", "knife_catch"],
-  "minimum_note_size": 10,
-  "strategy_limits": {
-    "knife_catch": {
-      "max_open_notes": 10
-    }
-  },
-  "knife_group_roi_margin": 0.25
+  "simulation_capital": 1000
 }

@@ -1,0 +1,55 @@
+# Ignore all Python cache and compiled files
+/__pycache__/
+*.py[cod]
+*.pyo
+systems/__pycache__/
+
+# VSCode / IDE config
+.vscode/
+.idea/
+
+# Environment files
+.env
+*.env
+
+# Ignore Python virtual environments
+venv/
+.venv/
+ENV/
+.env/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Mac + Windows cruft
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary run state
+*.pid
+
+# Ignore data outputs
+data/raw/
+!data/raw/
+data/market/
+data/labeled/
+data/enriched/
+data/training/
+data/simledger.csv
+
+# Strategy test or scratch outputs
+data/test/
+data/tmp/
+data/temp/
+/data/logs/
+
+apikeys.yaml
+kraken.yaml
+
+# Ignore all trained models
+data/models/model_*.json
+!data/raw/DOGEUSD.csv
+

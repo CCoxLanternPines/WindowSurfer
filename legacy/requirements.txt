@@ -1,0 +1,6 @@
+pandas
+tqdm
+requests
+krakenex
+ccxt
+pyyaml

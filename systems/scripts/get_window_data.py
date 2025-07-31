@@ -1,13 +1,19 @@
-from __future__ import annotations
+def get_wave_window_data_df(df, window: str, candle_offset: int = 0) -> dict | None:
+    """
+    Return window-relative wave structure data for current price.
 
-import pandas as pd
-from systems.utils.path import find_project_root
-from systems.utils.time import parse_cutoff
-from systems.utils.logger import addlog
+    Returns:
+        dict with:
+            - window: str (e.g. "3d")
+            - floor: float
+            - ceiling: float
+            - range: float
+            - price: float
+            - position_in_window: float (0 = floor, 1 = ceiling)
+    """
+    from systems.utils.time import parse_cutoff
 
-
-def _extract_window_data(df: pd.DataFrame, window: str, candle_offset: int = 0) -> dict | None:
-    if df.empty:
+    if df is None or df.empty:
         return None
 
     duration = parse_cutoff(window)
@@ -20,112 +26,22 @@ def _extract_window_data(df: pd.DataFrame, window: str, candle_offset: int = 0) 
     if window_df.empty:
         return None
 
-    ceiling = window_df["high"].max()
-    floor = window_df["low"].min()
-
     try:
         last_candle = df.iloc[-1 - candle_offset]
-        close = last_candle["close"]
+        price = float(last_candle["close"])
     except IndexError:
         return None
 
+    floor = float(window_df["low"].min())
+    ceiling = float(window_df["high"].max())
     range_val = ceiling - floor
-    tunnel_position = (close - floor) / range_val if range_val != 0 else 0.5
-    window_position = floor if range_val != 0 else 0.0
+    position = (price - floor) / range_val if range_val != 0 else 0.5
 
     return {
-        "window_ceiling": round(ceiling, 8),
-        "window_floor": round(floor, 8),
-        "tunnel_position": round(tunnel_position, 4),
-        "window_position": round(window_position, 4),
+        "window": window,
+        "floor": round(floor, 6),
+        "ceiling": round(ceiling, 6),
+        "range": round(range_val, 6),
+        "price": round(price, 6),
+        "position_in_window": round(position, 4)
     }
-
-
-def get_window_data_df(df: pd.DataFrame, window: str, candle_offset: int = 0) -> dict | None:
-    return _extract_window_data(df, window, candle_offset)
-
-
-def get_window_data_json(tag: str, window: str, candle_offset: int = 0) -> dict | None:
-    root = find_project_root()
-    path = root / "data" / "raw" / f"{tag.upper()}.csv"
-    try:
-        df = pd.read_csv(path)
-    except FileNotFoundError:
-        return None
-
-    return _extract_window_data(df, window, candle_offset)
-
-
-def get_window_data(tag: str, window: str, candle_offset: int = 0, verbose: int = 0) -> dict | None:
-    addlog(
-        f"[get_window_data] tag={tag} window={window} candle_offset={candle_offset}",
-        verbose_int=3,
-        verbose_state=verbose,
-    )
-
-    root = find_project_root()
-    path = root / "data" / "raw" / f"{tag.upper()}.csv"
-
-    try:
-        df = pd.read_csv(path)
-    except FileNotFoundError:
-        addlog(
-            f"[ERROR] Data file not found: {path}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        return None
-
-    if df.empty:
-        addlog("[WARN] CSV is empty", verbose_int=2, verbose_state=verbose)
-        return None
-
-    # Convert window to duration in candles (assume hourly)
-    duration = parse_cutoff(window)
-    num_candles = int(duration.total_seconds() // 3600)
-
-    # Truncate if not enough candles for full window
-    start_idx = max(0, len(df) - candle_offset - num_candles)
-    end_idx = len(df) - candle_offset if candle_offset != 0 else None
-    window_df = df.iloc[start_idx:end_idx]
-
-    if window_df.empty:
-        addlog(
-            "[WARN] No candle data in computed window slice",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        return None
-
-    ceiling = window_df["high"].max()
-    floor = window_df["low"].min()
-
-    try:
-        last_candle = df.iloc[-1 - candle_offset]
-        close = last_candle["close"]
-    except IndexError:
-        addlog(
-            f"[ERROR] Not enough candles to read offset {candle_offset}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        return None
-
-    range_val = ceiling - floor
-    tunnel_position = (close - floor) / range_val if range_val != 0 else 0.5
-    window_position = floor if range_val != 0 else 0.0
-
-    result = {
-        "window_ceiling": round(ceiling, 8),
-        "window_floor": round(floor, 8),
-        "tunnel_position": round(tunnel_position, 4),
-        "window_position": round(window_position, 4)
-    }
-
-    addlog(
-        f"[get_window_data] result={result}",
-        verbose_int=3,
-        verbose_state=verbose,
-    )
-
-    return result
