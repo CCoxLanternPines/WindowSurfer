@@ -1,8 +1,13 @@
 import os
 from typing import Optional
-from tqdm import tqdm
-import yaml
-import requests
+
+try:
+    from tqdm import tqdm
+except ImportError:  # pragma: no cover - fallback when tqdm missing
+    class tqdm:  # type: ignore
+        @staticmethod
+        def write(msg: str) -> None:
+            print(msg)
 
 
 LOGFILE_PATH = "data/tmp/log.txt"
@@ -34,19 +39,15 @@ def init_logger(
         open(LOGFILE_PATH, "w").close()
 
     if TELEGRAM_ENABLED:
-        try:
-            with open("telegram.yaml", "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
-                TELEGRAM_TOKEN = data["telegram"]["token"]
-                TELEGRAM_CHAT_ID = str(data["telegram"]["chat_id"])
-        except Exception as exc:
-            tqdm.write(f"[WARN] Telegram not initialized: {exc}")
-            TELEGRAM_ENABLED = False
-            _TELEGRAM_WARNED = True
+        tqdm.write("[WARN] Telegram not initialized: yaml dependency missing")
+        TELEGRAM_ENABLED = False
+        _TELEGRAM_WARNED = True
 
 
 def addlog(
     message: str, verbose_int: int = 1, verbose_state: int | None = None
 ) -> None:
-    """Temporary stub to bypass logger and output directly."""
-    print(message)
+    """Minimal logger respecting verbosity levels."""
+    level = DEFAULT_VERBOSE_STATE if verbose_state is None else verbose_state
+    if level >= verbose_int:
+        print(message)

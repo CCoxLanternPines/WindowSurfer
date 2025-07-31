@@ -10,7 +10,21 @@ are recorded in a lightweight in-memory ledger.
 
 import json
 
-from tqdm import tqdm
+try:
+    from tqdm import tqdm
+except ImportError:  # pragma: no cover - fallback when tqdm is missing
+    class tqdm:  # type: ignore
+        def __init__(self, total=None, **kwargs):
+            self.total = total
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):  # noqa: D401 - silence pydocstyle
+            return False
+
+        def update(self, *args, **kwargs):
+            pass
 
 from scripts.fetch_canles import fetch_candles
 from scripts.ledger_manager import RamLedger, save_ledger
@@ -82,10 +96,11 @@ def summarize_simulation(
     )
 
 
-def run_simulation(tag: str, verbose: int = 0) -> None:
+def run_simulation(tag: str, *, settings: dict | None = None, verbose: int = 0) -> None:
     """Run a historical simulation for ``tag``."""
     print("[SIM] Simulation engine entered")
-    settings = load_settings()
+    if settings is None:
+        settings = load_settings()
     print("[SIM] Settings loaded:", list(settings.get("general_settings", {}).keys()))
     tag = tag.upper()
     symbol_meta = settings.get("symbol_settings", {}).get(tag)
