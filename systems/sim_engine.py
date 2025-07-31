@@ -74,13 +74,17 @@ def summarize_simulation(
     )
 
 
-def run_simulation(tag: str, window: str, verbose: int = 0) -> None:  # noqa: ARG001
+def run_simulation(tag: str, verbose: int = 0) -> None:
     """Run a historical simulation for ``tag``."""
     settings = load_settings()
     tag = tag.upper()
     symbol_meta = settings.get("symbol_settings", {}).get(tag)
     if symbol_meta is None:
         raise ValueError(f"Unknown symbol tag: {tag}")
+
+    windows = settings.get("general_settings", {}).get("windows", {})
+    if not windows:
+        raise ValueError("No windows defined in settings['general_settings']['windows']")
 
     sim_capital = float(settings.get("simulation_capital", 0))
     start_capital = sim_capital
@@ -90,19 +94,23 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:  # noqa: AR
     addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
 
     df = fetch_candles(tag)
-    windows = settings.get("general_settings", {}).get("windows", {})
     max_note_usdt = settings.get("general_settings", {}).get("max_note_usdt", sim_capital)
     min_note_usdt = settings.get("general_settings", {}).get("minimum_note_size", 0)
 
     last_buy_tick = {name: float("-inf") for name in windows}
 
-    with tqdm(total=len(df), desc="📉 Sim Progress", dynamic_ncols=True) as pbar:
-        for tick in range(len(df)):
-            current_df = df.iloc[: tick + 1]
-            price = float(current_df.iloc[-1]["close"])
+    total = len(df)
+    with tqdm(total=total, desc="📉 Sim Progress", dynamic_ncols=True) as pbar:
+        for tick in range(total):
+            offset = total - tick - 1
+            price = float(df.iloc[tick]["close"])
 
             for name, cfg in windows.items():
-                wave = get_wave_window_data_df(current_df, cfg["window_size"])
+                wave = get_wave_window_data_df(
+                    df,
+                    window=cfg["window_size"],
+                    candle_offset=offset,
+                )
                 if not wave:
                     continue
 

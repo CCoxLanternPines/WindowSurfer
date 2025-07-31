@@ -27,7 +27,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "processed every hour"
         ),
     )
-    parser.add_argument("--window", required=False, help="Candle window, e.g. 1m or 1h")
     parser.add_argument(
         "-v",
         "--verbose",
@@ -58,8 +57,6 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     mode = args.mode.lower()
-    tag = args.tag
-    window = args.window
     verbose = args.verbose
 
     if mode == "wallet":
@@ -83,15 +80,9 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if mode == "sim":
-        if not window:
-            addlog("Error: --window is required for sim mode")
-            sys.exit(1)
-        run_simulation(tag=tag, window=window, verbose=verbose)
+        run_simulation(tag=args.tag.upper(), verbose=args.verbose)
     elif mode == "live":
-        if not window:
-            addlog("Error: --window is required for live mode")
-            sys.exit(1)
-        run_live(tag=tag, window=window, verbose=verbose)
+        run_live(tag=args.tag.upper() if args.tag else None, verbose=args.verbose)
     else:
         addlog("Error: --mode must be either 'sim', 'live', or 'wallet'")
         sys.exit(1)
