@@ -160,7 +160,6 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                 realised_gain = ledger.pnl - before_pnl
                 if realised_gain:
                     realised_pnl += realised_gain
-                    sim_capital -= realised_gain
 
             pbar.update(1)
 
@@ -168,7 +167,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     open_value = sum(
         n["entry_amount"] * last_price for n in ledger.get_active_notes()
     )
-    end_value = sim_capital + open_value + realised_pnl
+    end_value = sim_capital + open_value
     summarize_simulation(
         ledger=ledger,
         start_capital=start_capital,
