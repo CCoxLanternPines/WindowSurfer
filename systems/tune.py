@@ -14,9 +14,6 @@ from systems.utils.path import find_project_root
 from systems.sim_engine import run_simulation
 
 
-_DEF_ROLE = "fish"
-
-
 def _load_knobs() -> Dict[str, Dict[str, Any]]:
     """Load knob definitions from ``settings/knobs.json``."""
     root = find_project_root()
@@ -25,19 +22,10 @@ def _load_knobs() -> Dict[str, Dict[str, Any]]:
         return json.load(f)
 
 
-def run_tuner(
-    *,
-    tag: str,
-    window: str,
-    role: str = _DEF_ROLE,
-    trials: int = 20,
-    verbose: int = 0,
-) -> None:
-    """Run Optuna tuner for a single role."""
+def run_tuner(*, tag: str, trials: int = 20, verbose: int = 0) -> None:
+    """Run Optuna tuner across all defined window roles."""
     tag = tag.upper()
-    knobs = _load_knobs().get(role)
-    if knobs is None:
-        raise ValueError(f"Unknown role '{role}' in knobs.json")
+    knob_space = _load_knobs()
 
     root = find_project_root()
     settings_path = root / "settings" / "settings.json"
@@ -48,19 +36,26 @@ def run_tuner(
 
     def objective(trial: optuna.trial.Trial) -> float:
         settings = json.loads(json.dumps(base_settings))
-        window_cfg = settings.setdefault("general_settings", {}).setdefault("windows", {}).setdefault(role, {})
-        for key, spec in knobs.items():
-            if isinstance(spec, list) and spec and isinstance(spec[0], str):
-                val = trial.suggest_categorical(key, spec)
-            elif isinstance(spec, list) and len(spec) == 2:
-                low, high = spec
-                if isinstance(low, int) and isinstance(high, int):
-                    val = trial.suggest_int(key, low, high)
+        trial_windows: Dict[str, Dict[str, Any]] = {}
+        flat_params: Dict[str, Any] = {}
+        for role, knobs in knob_space.items():
+            role_cfg: Dict[str, Any] = {}
+            for key, spec in knobs.items():
+                name = f"{role}_{key}"
+                if isinstance(spec, list) and spec and isinstance(spec[0], str):
+                    val = trial.suggest_categorical(name, spec)
+                elif isinstance(spec, list) and len(spec) == 2:
+                    low, high = spec
+                    if isinstance(low, int) and isinstance(high, int):
+                        val = trial.suggest_int(name, low, high)
+                    else:
+                        val = trial.suggest_float(name, float(low), float(high))
                 else:
-                    val = trial.suggest_float(key, float(low), float(high))
-            else:
-                raise ValueError(f"Invalid spec for {key}: {spec}")
-            window_cfg[key] = val
+                    raise ValueError(f"Invalid spec for {key}: {spec}")
+                role_cfg[key] = val
+                flat_params[name] = val
+            trial_windows[role] = role_cfg
+        settings.setdefault("general_settings", {})["windows"] = trial_windows
 
         import systems.sim_engine as sim_engine  # local import for patching
 
@@ -90,16 +85,13 @@ def run_tuner(
         for tick, delta in sorted(events, key=lambda x: x[0]):
             active += delta
             capital_used = max(capital_used, active)
-        if capital_used == 0:
-            score = 0.0
-        else:
-            score = net_pnl / capital_used
+        score = 0.0 if capital_used == 0 else net_pnl / capital_used
         trial_records.append(
             {
                 "score": score,
                 "net_gain": net_pnl,
                 "capital_used": capital_used,
-                **trial.params,
+                **flat_params,
             }
         )
         return score
@@ -108,8 +100,18 @@ def run_tuner(
     study = optuna.create_study(direction="maximize")
     study.optimize(objective, n_trials=trials)
 
-    best = study.best_params
-    addlog(f"[TUNE] Best params for {role}: {best}", verbose_int=1, verbose_state=verbose)
+    best_flat = study.best_params
+    addlog(
+        f"[TUNE] Best params: {best_flat}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+
+    best_nested: Dict[str, Dict[str, Any]] = {}
+    for role, knobs in knob_space.items():
+        best_nested[role] = {
+            key: best_flat[f"{role}_{key}"] for key in knobs.keys()
+        }
 
     out_dir = Path(root / "data" / "tmp")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -122,9 +124,9 @@ def run_tuner(
         print("\n🏆 Top 10 Tuning Results:")
         print(df.head(10).to_string(index=False))
 
-    out_path = out_dir / f"tune_best_{role}.json"
+    out_path = out_dir / "tune_best_multi.json"
     with out_path.open("w", encoding="utf-8") as f:
-        json.dump(best, f, indent=2)
+        json.dump(best_nested, f, indent=2)
 
-    print(f"Best parameters for {role}: {best}")
+    print(f"Best parameters: {best_nested}")
 
