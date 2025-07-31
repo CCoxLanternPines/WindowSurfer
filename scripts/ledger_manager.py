@@ -45,14 +45,19 @@ def save_ledger(ledger: RamLedger, capital: float) -> None:
     out_dir = root / "data" / "tmp"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "ledgersimulation.json"
-    with out_path.open("w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "capital": capital,
-                "open_notes": ledger.open_notes,
-                "closed_notes": ledger.closed_notes,
-                "pnl": ledger.pnl,
-            },
-            f,
-            indent=2,
-        )
+    print("[LEDGER] Saving ledger to:", out_path)
+    try:
+        with out_path.open("w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "capital": capital,
+                    "open_notes": ledger.open_notes,
+                    "closed_notes": ledger.closed_notes,
+                    "pnl": ledger.pnl,
+                },
+                f,
+                indent=2,
+            )
+    except Exception as exc:
+        print("[LEDGER] Failed to save ledger:", exc)
+        print("[LEDGER] Ledger summary:", json.dumps(ledger.get_summary()))

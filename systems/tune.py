@@ -42,6 +42,7 @@ def run_tuner(*, tag: str, trials: int = 20, verbose: int = 0) -> None:
     trial_records: List[Dict[str, Any]] = []
 
     def objective(trial: optuna.trial.Trial) -> float:
+        print(f"[TUNE] Trial {trial.number} started")
         settings = json.loads(json.dumps(base_settings))
         trial_windows: Dict[str, Dict[str, Any]] = {}
         flat_params: Dict[str, Any] = {}
@@ -73,6 +74,7 @@ def run_tuner(*, tag: str, trials: int = 20, verbose: int = 0) -> None:
 
         run_simulation(tag=tag, verbose=0)
 
+        print("[TUNE] Simulation completed, reading ledger...")
         ledger_path = root / "data" / "tmp" / "ledgersimulation.json"
         with ledger_path.open("r", encoding="utf-8") as f:
             ledger = json.load(f)

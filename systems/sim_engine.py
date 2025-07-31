@@ -84,7 +84,9 @@ def summarize_simulation(
 
 def run_simulation(tag: str, verbose: int = 0) -> None:
     """Run a historical simulation for ``tag``."""
+    print("[SIM] Simulation engine entered")
     settings = load_settings()
+    print("[SIM] Settings loaded:", list(settings.get("general_settings", {}).keys()))
     tag = tag.upper()
     symbol_meta = settings.get("symbol_settings", {}).get(tag)
     if symbol_meta is None:
@@ -169,4 +171,5 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
         total_ticks=len(df),
         verbose=verbose,
     )
+    print("[SIM] Exiting simulation")
 
