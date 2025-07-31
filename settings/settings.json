@@ -18,7 +18,8 @@
   "general_settings": {
     "knife_catch_cooldown": 0,
     "whale_catch_cooldown": 1,
-    "fish_catch_cooldown": 3
+    "fish_catch_cooldown": 3,
+    "max_note_usdt": 300.0
   },
   "simulation_capital": 1000,
   "investment_size": 0.05,

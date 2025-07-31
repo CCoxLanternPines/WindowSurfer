@@ -54,7 +54,8 @@ def evaluate_buy_df(
     ledger=None,
     get_capital=None,
     on_buy=None,
-    meta=None  # ✅ THIS IS THE KEY FIX
+    meta=None,  # ✅ THIS IS THE KEY FIX
+    max_note_usdt: float = 999999,
 ) -> bool:
 
 
@@ -121,20 +122,20 @@ def evaluate_buy_df(
     def create_note(strategy: str):
         nonlocal available_capital
         usd_amount = available_capital * INVESTMENT_SIZE
-        if usd_amount < MINIMUM_NOTE_SIZE:
+        entry_usdt = min(usd_amount, max_note_usdt)
+        if entry_usdt < MINIMUM_NOTE_SIZE:
             min_size = MINIMUM_NOTE_SIZE
             addlog(
-                f"[SKIP] Note below minimum size (${usd_amount:.2f} < ${min_size})",
+                f"[SKIP] Note below minimum size (${entry_usdt:.2f} < ${min_size})",
                 verbose_int=1,
                 verbose_state=verbose,
             )
             return None
 
         # Deduct from local capital so sequential notes honor updates
-        available_capital -= usd_amount
+        available_capital -= entry_usdt
 
-        entry_amount = usd_amount / close_price
-        entry_usdt = usd_amount
+        entry_amount = entry_usdt / close_price
         note = {
             "symbol": tag,
             "strategy": strategy,

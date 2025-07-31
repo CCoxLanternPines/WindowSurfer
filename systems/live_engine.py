@@ -30,22 +30,29 @@ def ensure_latest_candles(tag: str, lookback: str = "48h", verbose: int = 1) -> 
             verbose_state=verbose,
         )
 
-def evaluate_live_tick(
-    candle: dict,
-    window_data: dict,
-    ledger,
-    cooldowns: dict,
-    last_triggered: dict,
-    tag: str,
-    meta: dict,
-    exchange,
-    verbose: int = 0
-) -> None:
+  def evaluate_live_tick(
+      candle: dict,
+      window_data: dict,
+      ledger,
+      cooldowns: dict,
+      last_triggered: dict,
+      tag: str,
+      meta: dict,
+      exchange,
+      verbose: int = 0
+  ) -> None:
     from systems.scripts.evaluate_buy import evaluate_buy_df
     from systems.scripts.evaluate_sell import evaluate_sell_df
 
+    settings = load_settings()
+
     def get_capital():
         return get_available_fiat_balance(exchange, meta["fiat"])
+
+    max_note_usdt = meta.get(
+        "max_note_usdt",
+        settings["general_settings"].get("max_note_usdt", 999999),
+    )
 
     evaluate_buy_df(
         candle=candle,
@@ -58,7 +65,8 @@ def evaluate_live_tick(
         verbose=verbose,
         ledger=ledger,
         get_capital=get_capital,
-        meta=meta
+        meta=meta,
+        max_note_usdt=max_note_usdt,
     )
 
     to_sell = evaluate_sell_df(
