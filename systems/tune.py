@@ -3,9 +3,11 @@ from __future__ import annotations
 """Optuna-based hyperparameter tuner for window strategies."""
 
 import json
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, List
 
 import optuna
+import pandas as pd
 
 from systems.utils.logger import addlog
 from systems.utils.path import find_project_root
@@ -42,6 +44,8 @@ def run_tuner(
     with settings_path.open("r", encoding="utf-8") as f:
         base_settings = json.load(f)
 
+    trial_records: List[Dict[str, Any]] = []
+
     def objective(trial: optuna.trial.Trial) -> float:
         settings = json.loads(json.dumps(base_settings))
         window_cfg = settings.setdefault("general_settings", {}).setdefault("windows", {}).setdefault(role, {})
@@ -71,7 +75,7 @@ def run_tuner(
         with ledger_path.open("r", encoding="utf-8") as f:
             ledger = json.load(f)
 
-        pnl = float(ledger.get("pnl", 0.0))
+        net_pnl = float(ledger.get("pnl", 0.0))
         notes = ledger.get("open_notes", []) + ledger.get("closed_notes", [])
         events = []
         for note in notes:
@@ -87,8 +91,18 @@ def run_tuner(
             active += delta
             capital_used = max(capital_used, active)
         if capital_used == 0:
-            return 0.0
-        return pnl / capital_used
+            score = 0.0
+        else:
+            score = net_pnl / capital_used
+        trial_records.append(
+            {
+                "score": score,
+                "net_gain": net_pnl,
+                "capital_used": capital_used,
+                **trial.params,
+            }
+        )
+        return score
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(direction="maximize")
@@ -97,8 +111,17 @@ def run_tuner(
     best = study.best_params
     addlog(f"[TUNE] Best params for {role}: {best}", verbose_int=1, verbose_state=verbose)
 
-    out_dir = root / "data" / "tmp"
+    out_dir = Path(root / "data" / "tmp")
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    leaderboard_path = out_dir / "tune_leaderboard.csv"
+    df = pd.DataFrame(trial_records)
+    df.sort_values("score", ascending=False, inplace=True)
+    df.to_csv(leaderboard_path, index=False)
+    if verbose >= 1:
+        print("\n🏆 Top 10 Tuning Results:")
+        print(df.head(10).to_string(index=False))
+
     out_path = out_dir / f"tune_best_{role}.json"
     with out_path.open("w", encoding="utf-8") as f:
         json.dump(best, f, indent=2)
