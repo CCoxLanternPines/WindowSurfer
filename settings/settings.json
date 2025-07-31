@@ -1,19 +1,19 @@
 {
   "symbol_settings": {
     "DOGEUSD": {
-	  "owner": "Chris",
-	  "wallet_code": "XXDG",
+      "owner": "Chris",
+      "wallet_code": "XXDG",
       "kraken_name": "DOGE/USD",
       "binance_name": "DOGEUSDT",
-	  "fiat": "ZUSD"
+      "fiat": "ZUSD"
     },
     "SOLUSD": {
-    "owner": "Travis",
-    "wallet_code": "SOL.F",
-    "kraken_name": "SOL/USD",
-    "binance_name": "SOLUSDT",
-    "fiat": "DAI"
-  }
+      "owner": "Travis",
+      "wallet_code": "SOL.F",
+      "kraken_name": "SOL/USD",
+      "binance_name": "SOLUSDT",
+      "fiat": "DAI"
+    }
   },
   "general_settings": {
     "knife_catch_cooldown": 0,
@@ -25,13 +25,10 @@
   "investment_size": 0.05,
   "active_strategies": ["fish_catch", "whale_catch", "knife_catch"],
   "minimum_note_size": 10,
-
   "strategy_limits": {
     "knife_catch": {
       "max_open_notes": 10
     }
   },
-
   "knife_group_roi_margin": 0.25
-
 }
