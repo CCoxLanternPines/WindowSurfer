@@ -25,34 +25,50 @@ from systems.utils.settings_loader import load_settings
 # ---------------------------------------------------------------------------
 
 
-def summarize_simulation(*, ledger: RamLedger, start_capital: float, end_capital: float, total_ticks: int, verbose: int) -> None:
+def summarize_simulation(
+    *,
+    ledger: RamLedger,
+    start_capital: float,
+    idle_capital: float,
+    realised_pnl: float,
+    open_value: float,
+    end_value: float,
+    total_ticks: int,
+    verbose: int,
+) -> None:
     """Log and persist simulation results."""
 
+    addlog(f"[SIM] Completed {total_ticks} ticks.", verbose_int=1, verbose_state=verbose)
     addlog(
-        f"[SIM] Completed {total_ticks} ticks. Realised PnL: {ledger.pnl:.2f}",
+        f"[SIM] Starting capital: {start_capital:.2f}",
         verbose_int=1,
         verbose_state=verbose,
     )
     addlog(
-        f"[SIM] Remaining capital: {end_capital:.2f}",
+        f"[SIM] Realised PnL: {realised_pnl:.2f}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+    addlog(
+        f"[SIM] Idle capital: {idle_capital:.2f}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+    addlog(
+        f"[SIM] Open note value: {open_value:.2f}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+    addlog(
+        f"[SIM] Ending value: {end_value:.2f}",
         verbose_int=1,
         verbose_state=verbose,
     )
 
-    save_ledger(ledger, end_capital)
+    save_ledger(ledger, end_value)
     summary = ledger.get_summary()
     addlog(
         f"[SIM] Ledger summary: {json.dumps(summary, indent=2)}",
-        verbose_int=2,
-        verbose_state=verbose,
-    )
-    addlog(
-        f"[SIM] Starting capital: {start_capital:.2f}",
-        verbose_int=2,
-        verbose_state=verbose,
-    )
-    addlog(
-        f"[SIM] Ending capital: {end_capital:.2f}",
         verbose_int=2,
         verbose_state=verbose,
     )
@@ -68,6 +84,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:  # noqa: AR
 
     sim_capital = float(settings.get("simulation_capital", 0))
     start_capital = sim_capital
+    realised_pnl = 0.0
     ledger = RamLedger()
 
     addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
@@ -102,7 +119,7 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:  # noqa: AR
                     min_note_usdt=min_note_usdt,
                     verbose=verbose,
                 )
-
+                before_pnl = ledger.pnl
                 sim_capital = handle_sells(
                     ledger=ledger,
                     name=name,
@@ -111,13 +128,25 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:  # noqa: AR
                     sim_capital=sim_capital,
                     verbose=verbose,
                 )
+                realised_gain = ledger.pnl - before_pnl
+                if realised_gain:
+                    realised_pnl += realised_gain
+                    sim_capital -= realised_gain
 
             pbar.update(1)
 
+    last_price = float(df.iloc[-1]["close"])
+    open_value = sum(
+        n["entry_amount"] * last_price for n in ledger.get_active_notes()
+    )
+    end_value = sim_capital + open_value + realised_pnl
     summarize_simulation(
         ledger=ledger,
         start_capital=start_capital,
-        end_capital=sim_capital,
+        idle_capital=sim_capital,
+        realised_pnl=realised_pnl,
+        open_value=open_value,
+        end_value=end_value,
         total_ticks=len(df),
         verbose=verbose,
     )
