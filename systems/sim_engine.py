@@ -93,6 +93,11 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
         "fish_catch": None
     }
 
+    active_strategies = SETTINGS.get(
+        "active_strategies",
+        ["fish_catch", "whale_catch", "knife_catch"],
+    )
+
     should_exit = []
 
     # Start ESC listener
@@ -147,20 +152,25 @@ def run_simulation(tag: str, window: str, verbose: int = 0) -> None:
                 break
 
             if candle and window_data:
-                evaluate_buy_df(
-                    candle=candle,
-                    window_data=window_data,
-                    tick=step,
-                    cooldowns=cooldowns,
-                    last_triggered=last_triggered,
-                    tag=tag,
-                    sim=True,
-                    verbose=verbose,
-                    ledger=ledger,  # ✅ Inject ledger
-                    get_capital=get_capital,
-                    on_buy=deduct_capital,
-                    max_note_usdt=max_note_usdt,
-                )
+                for key in cooldowns:
+                    cooldowns[key] = max(0, cooldowns[key] - 1)
+
+                for strat in active_strategies:
+                    evaluate_buy_df(
+                        candle=candle,
+                        window_data=window_data,
+                        tick=step,
+                        cooldowns=cooldowns,
+                        last_triggered=last_triggered,
+                        tag=tag,
+                        strategy=strat,
+                        sim=True,
+                        verbose=verbose,
+                        ledger=ledger,  # ✅ Inject ledger
+                        get_capital=get_capital,
+                        on_buy=deduct_capital,
+                        max_note_usdt=max_note_usdt,
+                    )
 
                 to_sell = evaluate_sell_df(
                     candle=candle,

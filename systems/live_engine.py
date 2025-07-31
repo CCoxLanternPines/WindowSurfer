@@ -54,20 +54,30 @@ def evaluate_live_tick(
         settings["general_settings"].get("max_note_usdt", 999999),
     )
 
-    evaluate_buy_df(
-        candle=candle,
-        window_data=window_data,
-        tick=0,
-        cooldowns=cooldowns,
-        last_triggered=last_triggered,
-        tag=tag,
-        sim=False,
-        verbose=verbose,
-        ledger=ledger,
-        get_capital=get_capital,
-        meta=meta,
-        max_note_usdt=max_note_usdt,
+    for key in cooldowns:
+        cooldowns[key] = max(0, cooldowns[key] - 1)
+
+    active = settings.get(
+        "active_strategies",
+        ["fish_catch", "whale_catch", "knife_catch"],
     )
+
+    for strat in active:
+        evaluate_buy_df(
+            candle=candle,
+            window_data=window_data,
+            tick=0,
+            cooldowns=cooldowns,
+            last_triggered=last_triggered,
+            tag=tag,
+            strategy=strat,
+            sim=False,
+            verbose=verbose,
+            ledger=ledger,
+            get_capital=get_capital,
+            meta=meta,
+            max_note_usdt=max_note_usdt,
+        )
 
     to_sell = evaluate_sell_df(
         candle=candle,

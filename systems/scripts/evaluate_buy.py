@@ -15,7 +15,6 @@ from systems.utils.settings_loader import load_settings, get_strategy_cooldown
 from systems.utils.resolve_symbol import resolve_symbol
 
 SETTINGS = load_settings()
-INVESTMENT_SIZE = SETTINGS.get("investment_size", 0.15)
 MINIMUM_NOTE_SIZE = SETTINGS.get("minimum_note_size", 0)
 
 LOG_PATH = Path(find_project_root()) / "data" / "tmp" / "eval_buy_log.jsonl"
@@ -49,6 +48,7 @@ def evaluate_buy_df(
     cooldowns: dict,
     last_triggered: dict,
     tag: str,
+    strategy: str,
     sim: bool = False,
     verbose: int = 0,
     ledger=None,
@@ -77,13 +77,12 @@ def evaluate_buy_df(
                 verbose_state=verbose,
             )
 
+    assert strategy in {"knife_catch", "whale_catch", "fish_catch"}, f"Unknown strategy: {strategy}"
+
     tunnel_pos = window_data.get("tunnel_position", 0)
     window_pos = window_data.get("window_position", 0)
     tunnel_high = window_data.get("window_ceiling", 0)
     tunnel_low = window_data.get("window_floor", 0)
-
-    for key in cooldowns:
-        cooldowns[key] = max(0, cooldowns[key] - 1)
 
     triggered = False
     close_price = candle["close"]
@@ -121,7 +120,12 @@ def evaluate_buy_df(
 
     def create_note(strategy: str):
         nonlocal available_capital
-        usd_amount = available_capital * INVESTMENT_SIZE
+        base_strat = strategy.replace("_catch", "")
+        investment_key = f"{base_strat}_investment_size"
+        investment_size = meta.get(investment_key) if meta else None
+        if investment_size is None:
+            investment_size = SETTINGS["general_settings"].get(investment_key, 0.05)
+        usd_amount = available_capital * investment_size
         entry_usdt = min(usd_amount, max_note_usdt)
         if entry_usdt < MINIMUM_NOTE_SIZE:
             min_size = MINIMUM_NOTE_SIZE
@@ -160,12 +164,14 @@ def evaluate_buy_df(
         "active_strategies",
         ["fish_catch", "whale_catch", "knife_catch"],
     )
-    
-    # 🐟 Fish Catch
-    if "fish_catch" in active and should_buy_fish(candle, window_data, tick, cooldowns):
-        cooldowns["fish_catch"] = get_strategy_cooldown("fish_catch")
-        last_triggered["fish_catch"] = tick if sim else ts
-        note = create_note("fish_catch")
+
+    if strategy not in active:
+        return False
+
+    if strategy == "fish_catch" and should_buy_fish(candle, window_data, tick, cooldowns):
+        cooldowns[strategy] = get_strategy_cooldown(strategy)
+        last_triggered[strategy] = tick if sim else ts
+        note = create_note(strategy)
         if note:
             addlog(
                 f"[BUY] Fish Catch triggered at tick {tick} → ${note['entry_usdt']:.2f}",
@@ -174,11 +180,6 @@ def evaluate_buy_df(
             )
             if ledger:
                 if live:
-                    addlog(
-                        f"[BUY] Fish Catch triggered at tick {tick} → ${note['entry_usdt']:.2f}",
-                        verbose_int=1,
-                        verbose_state=verbose,
-                    )
                     pair_code = meta["kraken_name"] if meta else "UNKNOWN"
                     fiat = meta["fiat"] if meta else "ZUSD"
                     fills = buy_order(pair_code, fiat, note["entry_usdt"], verbose=verbose)
@@ -194,17 +195,16 @@ def evaluate_buy_df(
                     note["entry_ts"] = candle.get("ts", 0)
 
                 note["status"] = "Open"
-                note["strategy"] = "fish_catch"
+                note["strategy"] = strategy
                 ledger.open_note(note)
                 if on_buy:
                     on_buy(note)
                 triggered = True
 
-    # 🐋 Whale Catch
-    if "whale_catch" in active and should_buy_whale(candle, window_data, tick, cooldowns):
-        cooldowns["whale_catch"] = get_strategy_cooldown("whale_catch")
-        last_triggered["whale_catch"] = tick if sim else ts
-        note = create_note("whale_catch")
+    elif strategy == "whale_catch" and should_buy_whale(candle, window_data, tick, cooldowns):
+        cooldowns[strategy] = get_strategy_cooldown(strategy)
+        last_triggered[strategy] = tick if sim else ts
+        note = create_note(strategy)
         if note:
             addlog(
                 f"[BUY] Whale Catch triggered at tick {tick} → ${note['entry_usdt']:.2f}",
@@ -213,11 +213,6 @@ def evaluate_buy_df(
             )
             if ledger:
                 if live:
-                    addlog(
-                        f"[SKIP] Fish Catch triggered but note creation failed (likely capital too low)",
-                        verbose_int=2,
-                        verbose_state=verbose,
-                    )
                     pair_code = meta["kraken_name"] if meta else "UNKNOWN"
                     fiat = meta["fiat"] if meta else "ZUSD"
                     fills = buy_order(pair_code, fiat, note["entry_usdt"], verbose=verbose)
@@ -233,14 +228,13 @@ def evaluate_buy_df(
                     note["entry_ts"] = candle.get("ts", 0)
 
                 note["status"] = "Open"
-                note["strategy"] = "whale_catch"
+                note["strategy"] = strategy
                 ledger.open_note(note)
                 if on_buy:
                     on_buy(note)
                 triggered = True
 
-    # 🔪 Knife Catch
-    if "knife_catch" in active and should_buy_knife(
+    elif strategy == "knife_catch" and should_buy_knife(
         candle,
         window_data,
         tick,
@@ -249,9 +243,9 @@ def evaluate_buy_df(
         settings=SETTINGS,
         verbose=verbose,
     ):
-        cooldowns["knife_catch"] = get_strategy_cooldown("knife_catch")
-        last_triggered["knife_catch"] = tick if sim else ts
-        note = create_note("knife_catch")
+        cooldowns[strategy] = get_strategy_cooldown(strategy)
+        last_triggered[strategy] = tick if sim else ts
+        note = create_note(strategy)
         if note:
             addlog(
                 f"[BUY] Knife Catch triggered at tick {tick} → ${note['entry_usdt']:.2f}",
@@ -280,7 +274,7 @@ def evaluate_buy_df(
                     note["entry_ts"] = candle.get("ts", 0)
 
                 note["status"] = "Open"
-                note["strategy"] = "knife_catch"
+                note["strategy"] = strategy
                 ledger.open_note(note)
                 if on_buy:
                     on_buy(note)
@@ -295,19 +289,11 @@ def evaluate_buy_df(
         verbose_state=verbose,
     )
 
-    fish_decision = should_buy_fish(candle, window_data, tick, cooldowns)
-    whale_decision = should_buy_whale(candle, window_data, tick, cooldowns)
-    knife_decision = should_buy_knife(
-        candle,
-        window_data,
-        tick,
-        cooldowns,
-        knife_notes,
-        settings=SETTINGS,
-        verbose=verbose,
+    addlog(
+        f"[BUY RESULT] Tick {tick} | Strategy: {strategy} | Triggered: {triggered}",
+        verbose_int=2,
+        verbose_state=verbose,
     )
-    summary = f"[BUY RESULT] Tick {tick} | Knife: {knife_decision} | Whale: {whale_decision} | Fish: {fish_decision}"
-    addlog(summary, verbose_int=2, verbose_state=verbose)
 
 
     return triggered
