@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-"""Optuna-based hyperparameter tuner for window strategies."""
+"""Optuna-based hyperparameter tuner for multi-window strategies.
+
+This module was inspired by the single-window tuner found in ``/legacy``.
+It expands the approach so that each *window role* (``fish``, ``whale``,
+``knife``...) can be tuned simultaneously.  Parameters for every role are
+read from :mod:`settings.knobs`, sampled with Optuna and then injected into
+the simulation settings as a composite configuration.
+"""
 
 import json
 from pathlib import Path
@@ -122,7 +129,14 @@ def run_tuner(*, tag: str, trials: int = 20, verbose: int = 0) -> None:
     df.to_csv(leaderboard_path, index=False)
     if verbose >= 1:
         print("\n🏆 Top 10 Tuning Results:")
-        print(df.head(10).to_string(index=False))
+        top = df.head(10)
+        ordered = [
+            "score",
+            "net_gain",
+            "capital_used",
+            *[c for c in top.columns if c not in {"score", "net_gain", "capital_used"}],
+        ]
+        print(top[ordered].to_string(index=False))
 
     out_path = out_dir / "tune_best_multi.json"
     with out_path.open("w", encoding="utf-8") as f:
