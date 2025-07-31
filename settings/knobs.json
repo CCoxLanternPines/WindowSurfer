@@ -1,0 +1,10 @@
+{
+  "fish": {
+    "window_size": ["2d", "3d", "4d", "5d"],
+    "cooldown": [0, 6],
+    "investment_fraction": [0.01, 0.2],
+    "buy_floor": [0.05, 0.3],
+    "sell_ceiling": [0.7, 0.99],
+    "max_open_notes": [5, 15]
+  }
+}

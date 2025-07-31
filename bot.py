@@ -16,8 +16,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         required=True,
-        choices=["sim", "live", "wallet"],
-        help="Execution mode: sim, live, or wallet",
+        choices=["sim", "live", "wallet", "tune"],
+        help="Execution mode: sim, live, wallet, or tune",
     )
     parser.add_argument(
         "--tag",
@@ -27,6 +27,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "processed every hour"
         ),
     )
+    parser.add_argument("--window", required=False, help="Candle window, e.g. 1m or 1h")
     parser.add_argument(
         "-v",
         "--verbose",
@@ -57,6 +58,8 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     mode = args.mode.lower()
+    tag = args.tag.upper() if args.tag else None
+    window = args.window
     verbose = args.verbose
 
     if mode == "wallet":
@@ -80,11 +83,15 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if mode == "sim":
-        run_simulation(tag=args.tag.upper(), verbose=args.verbose)
+        run_simulation(tag=tag or "DOGEUSD", verbose=verbose)
     elif mode == "live":
-        run_live(tag=args.tag.upper() if args.tag else None, verbose=args.verbose)
+        run_live(tag=tag, verbose=verbose)
+    elif mode == "tune":
+        from systems.tune import run_tuner
+
+        run_tuner(tag=tag or "DOGEUSD", window=window or "1h", verbose=verbose)
     else:
-        addlog("Error: --mode must be either 'sim', 'live', or 'wallet'")
+        addlog("Error: --mode must be either 'sim', 'live', 'wallet', or 'tune'")
         sys.exit(1)
 
 
