@@ -89,7 +89,7 @@ def main(argv: list[str] | None = None) -> None:
     elif mode == "tune":
         from systems.tune import run_tuner
 
-        run_tuner(tag=tag or "DOGEUSD", window=window or "1h", verbose=verbose)
+        run_tuner(tag=tag or "DOGEUSD", verbose=verbose)
     else:
         addlog("Error: --mode must be either 'sim', 'live', 'wallet', or 'tune'")
         sys.exit(1)
