@@ -14,7 +14,8 @@ from tqdm import tqdm
 
 from scripts.fetch_canles import fetch_candles
 from scripts.ledger_manager import RamLedger, save_ledger
-from scripts.trade_logic import maybe_buy
+from scripts.evaluate_buy import evaluate_buy
+from scripts.evaluate_sell import evaluate_sell
 from systems.scripts.get_window_data import get_wave_window_data_df
 from systems.utils.logger import addlog
 from systems.utils.settings_loader import load_settings
@@ -122,12 +123,13 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                 if not wave:
                     continue
 
-                sim_capital = maybe_buy(
+                sim_capital = evaluate_buy(
                     ledger=ledger,
                     name=name,
                     cfg=cfg,
                     wave=wave,
                     tick=tick,
+                    total_ticks=total,
                     price=price,
                     sim_capital=sim_capital,
                     last_buy_tick=last_buy_tick,
@@ -136,35 +138,19 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                     verbose=verbose,
                 )
                 before_pnl = ledger.pnl
-                cooldown = cfg.get("cooldown", 0)
-                if tick - last_sell_tick.get(name, -9999) >= cooldown:
-                    active_notes = [
-                        n for n in ledger.get_active_notes() if n["window"] == name
-                    ]
-                    if active_notes:
-                        active_notes.sort(
-                            key=lambda n: n.get("entry_usdt", 0), reverse=True
-                        )
-                        note = active_notes[0]
-                        if price >= note["mature_price"]:
-                            note["exit_tick"] = tick
-                            note["exit_price"] = price
-                            note["exit_usdt"] = note["entry_amount"] * price
-                            note["gain_usdt"] = note["exit_usdt"] - note["entry_usdt"]
-                            note["gain_pct"] = note["gain_usdt"] / note["entry_usdt"]
-                            note["status"] = "Closed"
-                            ledger.close_note(note)
-                            sim_capital += note["exit_usdt"]
-                            last_sell_tick[name] = tick
-                            addlog(
-                                (
-                                    f"[SELL] Tick {tick} | Window: {note['window']} | "
-                                    f"Gain: +${note['gain_usdt']:.2f} ({note['gain_pct']:.2%})"
-                                ),
-                                verbose_int=2,
-                                verbose_state=verbose,
-                            )
-                realised_gain = ledger.pnl - before_pnl
+                sim_capital, closed = evaluate_sell(
+                    ledger=ledger,
+                    name=name,
+                    cfg=cfg,
+                    wave=wave,
+                    tick=tick,
+                    total_ticks=total,
+                    price=price,
+                    sim_capital=sim_capital,
+                    last_sell_tick=last_sell_tick,
+                    verbose=verbose,
+                )
+                realised_gain = sum(n.get("gain_usdt", 0) for n in closed)
                 if realised_gain:
                     realised_pnl += realised_gain
 
