@@ -18,7 +18,7 @@ from systems.scripts.evaluate_buy import evaluate_buy_df
 from systems.scripts.evaluate_sell import evaluate_sell_df
 import pandas as pd
 from systems.utils.time import duration_from_candle_count
-from systems.scripts.loader import load_settings
+from systems.utils.settings_loader import load_settings
 
 SETTINGS = load_settings()
 
