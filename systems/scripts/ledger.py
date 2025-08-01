@@ -93,7 +93,13 @@ class Ledger:
         return ledger
 
     @staticmethod
-    def save_ledger(tag: str, ledger: "Ledger") -> None:
+    def save_ledger(
+        tag: str,
+        ledger: "Ledger",
+        *,
+        final_tick: int | None = None,
+        summary: dict | None = None,
+    ) -> None:
         """Persist ``ledger`` to ``data/ledgers/<tag>.json``."""
         root = find_project_root()
         out_dir = root / "data" / "ledgers"
@@ -104,6 +110,16 @@ class Ledger:
             "open_notes": ledger.get_open_notes(),
             "closed_notes": ledger.get_closed_notes(),
         }
+
+        if final_tick is not None:
+            ledger_data["final_tick"] = final_tick
+
+        if summary:
+            ledger_data["closed_notes_count"] = summary.get("closed_notes")
+            ledger_data["open_notes_count"] = summary.get("open_notes")
+            ledger_data["realized_gain"] = summary.get("realized_gain")
+            ledger_data["final_value"] = summary.get("total_value")
+
         metadata = ledger.get_metadata()
         if metadata:
             ledger_data["metadata"] = metadata

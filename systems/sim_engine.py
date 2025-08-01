@@ -106,10 +106,23 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
 
     print(f"[SIM] Completed {len(df)} ticks.")
 
+    final_tick = len(df) - 1 if total else -1
     final_price = float(df.iloc[-1]["close"])
     summary = ledger.get_account_summary(final_price)
 
-    Ledger.save_ledger(tag, ledger)
+    print(f"[DEBUG] Final tick: {final_tick}")
+    Ledger.save_ledger(tag, ledger, final_tick=final_tick, summary=summary)
+
+    saved_summary = Ledger.load_ledger(tag).get_account_summary(final_price)
+    if (
+        saved_summary["closed_notes"] != summary["closed_notes"]
+        or saved_summary["realized_gain"] != summary["realized_gain"]
+    ):
+        print(
+            "[WARN] Summary/ledger mismatch: "
+            f"closed_notes {summary['closed_notes']} vs {saved_summary['closed_notes']}, "
+            f"realized_gain {summary['realized_gain']:.2f} vs {saved_summary['realized_gain']:.2f}"
+        )
 
     print(f"Final Price: ${summary['final_price']:.2f}")
     print(f"Total Coin Held: {summary['open_coin_amount']:.6f}")
