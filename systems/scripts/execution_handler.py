@@ -179,6 +179,7 @@ def execute_buy(
     fiat_code: str,
     price: float,
     amount_usd: float,
+    symbol_info: dict | None = None,
     verbose: int = 0,
 ) -> dict:
     """Place a real buy order and normalise the result structure.
@@ -188,17 +189,46 @@ def execute_buy(
     """
     if client is None:
         balance = get_kraken_balance(verbose)
-        fiat_balance = float(balance.get(fiat_code, 0.0))
+
+        wallet_key = None
+        if symbol_info:
+            wallet_key = symbol_info.get("wallet_code") or symbol_info.get("fiat")
+
+        if not wallet_key:
+            addlog(
+                f"[SKIP] No wallet code found for {symbol} — skipping buy",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            return None
+
+        fiat_balance_raw = balance.get(wallet_key)
+        if fiat_balance_raw is None:
+            addlog(
+                f"[SKIP] Missing wallet balance for {wallet_key} — skipping buy",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            return None
+
+        fiat_balance = float(fiat_balance_raw)
+        if fiat_balance < amount_usd:
+            addlog(
+                f"[SKIP] Insufficient funds to buy {symbol} — need ${amount_usd:.2f}, have ${fiat_balance:.2f} in {wallet_key}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            return None
+
     else:
         fiat_balance = get_available_fiat_balance(client, fiat_code)
-
-    if fiat_balance < amount_usd:
-        addlog(
-            f"[SKIP] Insufficient funds to buy {symbol} — need ${amount_usd:.2f}, have ${fiat_balance:.2f}",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-        return None
+        if fiat_balance < amount_usd:
+            addlog(
+                f"[SKIP] Insufficient funds to buy {symbol} — need ${amount_usd:.2f}, have ${fiat_balance:.2f}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            return None
 
     fills = buy_order(symbol, fiat_code, amount_usd, verbose)
     if not fills:

@@ -112,6 +112,7 @@ def handle_top_of_hour(
                                     fiat_code=fiat,
                                     price=price,
                                     amount_usd=invest,
+                                    symbol_info=ledger_cfg,
                                 )
                                 if result:
                                     note = {
