@@ -11,6 +11,32 @@ from systems.utils.price_fetcher import get_price
 
 KRAKEN_API_URL = "https://api.kraken.com"
 
+
+def get_live_price(kraken_pair: str) -> float:
+    """Return the current best ask price for ``kraken_pair``.
+
+    Parameters
+    ----------
+    kraken_pair:
+        Asset pair in Kraken's format (e.g. ``"DOGE/USD"`` or ``"DOGEUSD"``).
+
+    Returns
+    -------
+    float
+        The best ask price if available, otherwise ``0.0``.
+    """
+    pair = kraken_pair.replace("/", "")
+    try:
+        resp = requests.get(
+            f"{KRAKEN_API_URL}/0/public/Ticker", params={"pair": pair}, timeout=10
+        )
+        data = resp.json()
+        result = next(iter(data.get("result", {}).values()), {})
+        ask = result.get("a", [None])[0]
+        return float(ask) if ask is not None else 0.0
+    except Exception:
+        return 0.0
+
 def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) -> dict:
     url_path = f"/0/private/{endpoint}"
     url = KRAKEN_API_URL + url_path
