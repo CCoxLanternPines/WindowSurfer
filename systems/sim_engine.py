@@ -12,9 +12,7 @@ from tqdm import tqdm
 
 from systems.scripts.fetch_canles import fetch_candles
 from systems.scripts.ledger import Ledger
-from systems.scripts.evaluate_buy import evaluate_buy
-from systems.scripts.evaluate_sell import evaluate_sell
-from systems.scripts.get_window_data import get_wave_window_data_df
+from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.logger import addlog
 from systems.utils.settings_loader import load_settings
 
@@ -46,62 +44,36 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     sell_cooldown_skips = {name: 0 for name in windows}
     min_roi_gate_hits = 0
 
+    state = {
+        "capital": sim_capital,
+        "last_buy_tick": last_buy_tick,
+        "last_sell_tick": last_sell_tick,
+        "buy_cooldown_skips": buy_cooldown_skips,
+        "sell_cooldown_skips": sell_cooldown_skips,
+        "min_roi_gate_hits": min_roi_gate_hits,
+    }
+
     total = len(df)
     with tqdm(total=total, desc="📉 Sim Progress", dynamic_ncols=True) as pbar:
         for tick in range(total):
             offset = total - tick - 1
-            price = float(df.iloc[tick]["close"])
+            candle = df.iloc[tick].to_dict()
 
-            for name, cfg in windows.items():
-                wave = get_wave_window_data_df(
-                    df,
-                    window=cfg["window_size"],
-                    candle_offset=offset,
-                )
-                if not wave:
-                    continue
-
-                sim_capital, buy_skipped = evaluate_buy(
-                    ledger=ledger,
-                    name=name,
-                    cfg=cfg,
-                    wave=wave,
+            if tick % 60 == 0:
+                handle_top_of_hour(
                     tick=tick,
-                    price=price,
-                    sim_capital=sim_capital,
-                    last_buy_tick=last_buy_tick,
+                    candle=candle,
+                    ledger=ledger,
+                    settings=settings,
+                    sim=True,
+                    df=df,
+                    offset=offset,
+                    state=state,
                     max_note_usdt=max_note_usdt,
                     min_note_usdt=min_note_usdt,
                     verbose=verbose,
                 )
-                if buy_skipped:
-                    buy_cooldown_skips[name] += 1
 
-                if tick - last_sell_tick[name] < cfg.get("sell_cooldown", 0):
-                    sell_cooldown_skips[name] += 1
-                    continue
-
-                sim_capital, closed, roi_skipped = evaluate_sell(
-                    ledger=ledger,
-                    name=name,
-                    tick=tick,
-                    price=price,
-                    cfg=cfg,
-                    sim_capital=sim_capital,
-                    verbose=verbose,
-                )
-                min_roi_gate_hits += roi_skipped
-                if closed:
-                    last_sell_tick[name] = tick
-                    for note in closed:
-                        addlog(
-                            (
-                                f"[SELL] Tick {tick} | Window: {note['window']} | "
-                                f"Gain: +${note['gain']:.2f} ({note['gain_pct']:.2%})"
-                            ),
-                            verbose_int=2,
-                            verbose_state=verbose,
-                        )
             pbar.update(1)
 
     print(f"[SIM] Completed {len(df)} ticks.")
@@ -129,7 +101,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     print(f"Final Value (USD): ${summary['total_value']:.2f}")
 
     if verbose:
-        print(f"Buy cooldown skips: {buy_cooldown_skips}")
-        print(f"Sell cooldown skips: {sell_cooldown_skips}")
-    print(f"Min ROI gate hits: {min_roi_gate_hits}")
+        print(f"Buy cooldown skips: {state['buy_cooldown_skips']}")
+        print(f"Sell cooldown skips: {state['sell_cooldown_skips']}")
+    print(f"Min ROI gate hits: {state['min_roi_gate_hits']}")
 
