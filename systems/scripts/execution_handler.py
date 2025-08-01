@@ -186,6 +186,15 @@ def execute_buy(
     Parameters are kept for API compatibility; ``client`` and ``price`` are
     currently unused as ``buy_order`` pulls pricing from Kraken directly.
     """
+    if client is not None:
+        fiat_balance = get_available_fiat_balance(client, fiat_code)
+        if fiat_balance < amount_usd:
+            addlog(
+                f"[SKIP] Insufficient funds to buy {symbol} — need ${amount_usd:.2f}, have ${fiat_balance:.2f}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            return None
 
     fills = buy_order(symbol, fiat_code, amount_usd, verbose)
     if not fills:
