@@ -21,7 +21,7 @@
         "window_size": "1d",
         "buy_cooldown": 4,
         "sell_cooldown": 4,
-        "min_roi_pct": 2.5,
+        "min_roi": 0.04,
         "investment_fraction": 0.03,
         "buy_floor": 0.2,
         "sell_ceiling": 0.8,

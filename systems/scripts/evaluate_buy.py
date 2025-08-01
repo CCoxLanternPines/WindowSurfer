@@ -39,7 +39,7 @@ def evaluate_buy(
                 amount = invest / price
                 configured_mature = wave["floor"] + wave["range"] * cfg.get("sell_ceiling", 1)
                 configured_roi = (configured_mature - price) / price
-                min_roi = cfg.get("min_roi_pct", 0) / 100.0
+                min_roi = cfg.get("min_roi", 0)
                 target_roi = max(configured_roi, min_roi)
                 mature_price = price * (1 + target_roi)
                 note = {

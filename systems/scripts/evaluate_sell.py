@@ -22,7 +22,7 @@ def evaluate_sell(
     Returns updated capital, the list of notes closed at this tick, and the
     number of notes that failed the minimum ROI requirement.
     """
-    min_roi = cfg.get("min_roi_pct", 0) / 100.0
+    min_roi = cfg.get("min_roi", 0)
     to_close: List[Dict] = []
     roi_skipped = 0
     for note in ledger.get_active_notes():
