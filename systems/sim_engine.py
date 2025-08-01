@@ -117,13 +117,6 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
             for name, cfg in windows.items():
                 if active_cooldowns[name] > 0:
                     active_cooldowns[name] = max(0.0, active_cooldowns[name] - 1)
-
-                addlog(
-                    f"[DEBUG] Tick {tick} | Window: {name} | cooldown_timer: {active_cooldowns[name]:.2f}",
-                    verbose_int=3,
-                    verbose_state=verbose,
-                )
-
                 wave = get_wave_window_data_df(
                     df,
                     window=cfg["window_size"],
@@ -148,13 +141,19 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                 before_pnl = ledger.pnl
                 cooldown = cfg.get("cooldown", 0)
 
+                # Check if a new note was opened for this window
+                if any(n["entry_tick"] == tick and n["window"] == name for n in ledger.get_active_notes()):
+                    delta_24h = abs(wave.get("trend_direction_delta_window", 0.0))
+                    active_cooldowns[name] = max(0.0, cooldown - delta_24h)
+
+
                 if verbose >= 3 and wave:
-                    trend_direction_delta_24h = wave.get("trend_direction_delta_24h")
+                    trend_direction_delta_window = wave.get("trend_direction_delta_window")
                     position_in_window = wave.get("position_in_window")
-                    trend_direction_delta_24h = f"{trend_direction_delta_24h:+.4f}" if isinstance(trend_direction_delta_24h, (float, int)) else "N/A"
+                    trend_direction_delta_window = f"{trend_direction_delta_window:+.4f}" if isinstance(trend_direction_delta_window, (float, int)) else "N/A"
 
                     addlog(
-                        f"[DEBUG] Tick {tick} | Window: {name} | trend_direction_delta_24h: {trend_direction_delta_24h} | position_in_window {position_in_window} | cooldown: {cooldown}",
+                        f"[DEBUG] Tick {tick} | Window: {name} | trend_direction_delta_window: {trend_direction_delta_window} | position_in_window {position_in_window} | {active_cooldowns[name]:.2f}",
                         verbose_int=3,
                         verbose_state=verbose,
                     )
@@ -177,13 +176,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                             ledger.close_note(note)
                             sim_capital += note["exit_usdt"]
                             last_sell_tick[name] = tick
-                            delta_24h = abs(wave.get("trend_direction_delta_24h", 0.0))
-                            active_cooldowns[name] = max(0.0, cooldown - delta_24h)
-                            addlog(
-                                f"[DEBUG] Reset cooldown for {name}: {cooldown:.2f} - {delta_24h:.2f} = {active_cooldowns[name]:.2f}",
-                                verbose_int=3,
-                                verbose_state=verbose,
-                            )
+                            active_cooldowns[name] = max(0.0, cooldown)
                             addlog(
                                 (
                                     f"[SELL] Tick {tick} | Window: {note['window']} | "

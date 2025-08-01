@@ -18,28 +18,12 @@
   "general_settings": {
     "windows": {
       "fish": {
-        "window_size": "3d",
-        "cooldown": 6,
-        "investment_fraction": 0.10,
-        "buy_floor": 0.4,
+        "window_size": "1d",
+        "cooldown": 2,
+        "investment_fraction": 0.05,
+        "buy_floor": 0.2,
         "sell_ceiling": 0.8,
         "max_open_notes": 20
-      },
-      "whale": {
-        "window_size": "10d",
-        "cooldown": 48,
-        "investment_fraction": 0.15,
-        "buy_floor": 0.2,
-        "sell_ceiling": 0.8,
-        "max_open_notes": 15
-      },
-      "knife": {
-        "window_size": "30d",
-        "cooldown": 200,
-        "investment_fraction": 0.35,
-        "buy_floor": 0.2,
-        "sell_ceiling": 0.8,
-        "max_open_notes": 10
       }
     },
     "roi_gain_multiplier": 1.0,
