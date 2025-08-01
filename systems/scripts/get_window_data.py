@@ -16,6 +16,14 @@ def get_wave_window_data_df(df, window: str, candle_offset: int = 0) -> dict | N
     if df is None or df.empty:
         return None
 
+    try:
+        curr_close = float(df.iloc[len(df) - candle_offset - 1]["close"])
+        past_close = float(df.iloc[len(df) - candle_offset - 25]["close"])
+        # Normalize to % change: (current - past) / past
+        trend_direction_delta_24h = ((curr_close - past_close) / past_close) * 100 if past_close else 0.0
+    except (IndexError, KeyError, ZeroDivisionError):
+        trend_direction_delta_24h = 0.0
+
     duration = parse_cutoff(window)
     num_candles = int(duration.total_seconds() // 3600)
 
@@ -43,5 +51,6 @@ def get_wave_window_data_df(df, window: str, candle_offset: int = 0) -> dict | N
         "ceiling": round(ceiling, 6),
         "range": round(range_val, 6),
         "price": round(price, 6),
-        "position_in_window": round(position, 4)
+        "position_in_window": round(position, 4),
+        "trend_direction_delta_24h": trend_direction_delta_24h
     }

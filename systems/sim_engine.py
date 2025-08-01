@@ -137,7 +137,21 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                 )
                 before_pnl = ledger.pnl
                 cooldown = cfg.get("cooldown", 0)
-                if tick - last_sell_tick.get(name, -9999) >= cooldown:
+                delta_24h = wave.get("trend_direction_delta_24h", 0.0)
+                adjusted_cooldown = max(0, cooldown - abs(delta_24h))
+
+                if verbose >= 3 and wave:
+                    trend_direction_delta_24h = wave.get("trend_direction_delta_24h")
+                    position_in_window = wave.get("position_in_window")
+                    trend_direction_delta_24h = f"{trend_direction_delta_24h:+.4f}" if isinstance(trend_direction_delta_24h, (float, int)) else "N/A"
+
+                    addlog(
+                        f"[DEBUG] Tick {tick} | Window: {name} | trend_direction_delta_24h: {trend_direction_delta_24h} | position_in_window {position_in_window} | cooldown: {cooldown}",
+                        verbose_int=3,
+                        verbose_state=verbose,
+                    )
+
+                if tick - last_sell_tick.get(name, -9999) >= adjusted_cooldown:
                     active_notes = [
                         n for n in ledger.get_active_notes() if n["window"] == name
                     ]
