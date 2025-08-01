@@ -125,12 +125,10 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
             ledger.set_capital(sim_capital)
             pbar.update(1)
 
-    total_liquid = ledger.get_total_liquid_value()
-    save_ledger(ledger, total_liquid)
+    save_ledger(tag, ledger)
+    summary = ledger.get_account_summary(starting_capital)
     print(f"[SIM] Completed {len(df)} ticks.")
-    print(f"[SIM] Liquidatable value: {total_liquid:.2f}")
-    print(f"[SIM] Net gain: {total_liquid - starting_capital:.2f}")
-    print(
-        f"[SIM] ROI: {(total_liquid - starting_capital) / starting_capital * 100:.2f}%"
-    )
+    for k, v in summary.items():
+        label = k.replace("_", " ").title()
+        print(f"[SIM] {label}: {v}")
 
