@@ -58,20 +58,19 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
             offset = total - tick - 1
             candle = df.iloc[tick].to_dict()
 
-            if tick % 60 == 0:
-                handle_top_of_hour(
-                    tick=tick,
-                    candle=candle,
-                    ledger=ledger,
-                    ledger_config=ledger_config,
-                    sim=True,
-                    df=df,
-                    offset=offset,
-                    state=state,
-                    max_note_usdt=max_note_usdt,
-                    min_note_usdt=min_note_usdt,
-                    verbose=verbose,
-                )
+            handle_top_of_hour(
+                tick=tick,
+                candle=candle,
+                ledger=ledger,
+                ledger_config=ledger_config,
+                sim=True,
+                df=df,
+                offset=offset,
+                state=state,
+                max_note_usdt=max_note_usdt,
+                min_note_usdt=min_note_usdt,
+                verbose=verbose,
+            )
 
             pbar.update(1)
 
