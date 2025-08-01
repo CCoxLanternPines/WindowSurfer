@@ -12,19 +12,11 @@ from tqdm import tqdm
 
 from systems.scripts.fetch_canles import fetch_candles
 from systems.scripts.ledger import Ledger
-from systems.scripts.trade_logic import maybe_buy
+from systems.scripts.evaluate_buy import evaluate_buy
+from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.get_window_data import get_wave_window_data_df
 from systems.utils.logger import addlog
 from systems.utils.settings_loader import load_settings
-
-
-def assert_summary_match(summary_dict: dict, ledger: Ledger, starting_capital: float) -> None:
-    """Ensure ``summary_dict`` reflects ``ledger`` state."""
-    true_summary = ledger.get_account_summary(starting_capital)
-    for k, v in summary_dict.items():
-        assert abs(true_summary[k] - v) < 1e-2, (
-            f"[ASSERT FAIL] Mismatch in {k}: {v} ≠ {true_summary[k]}"
-        )
 
 
 def run_simulation(tag: str, verbose: int = 0) -> None:
@@ -40,8 +32,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
         raise ValueError("No windows defined in settings['general_settings']['windows']")
 
     sim_capital = float(settings.get("simulation_capital", 0))
-    starting_capital = sim_capital
-    ledger = Ledger(sim_capital)
+    ledger = Ledger()
 
     addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
 
@@ -50,7 +41,6 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     min_note_usdt = settings.get("general_settings", {}).get("minimum_note_size", 0)
 
     last_buy_tick = {name: float("-inf") for name in windows}
-    last_sell_tick: dict[str, int] = {}
     active_cooldowns = {name: 0.0 for name in windows}
 
     total = len(df)
@@ -70,7 +60,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                 if not wave:
                     continue
 
-                sim_capital = maybe_buy(
+                sim_capital = evaluate_buy(
                     ledger=ledger,
                     name=name,
                     cfg=cfg,
@@ -102,52 +92,35 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                         verbose_state=verbose,
                     )
                 if active_cooldowns[name] <= 0:
-                    active_notes = [
-                        n for n in ledger.get_active_notes() if n["window"] == name
-                    ]
-                    if active_notes:
-                        active_notes.sort(
-                            key=lambda n: n.get("entry_usdt", 0), reverse=True
-                        )
-                        note = active_notes[0]
-                        if price >= note["mature_price"]:
-                            note["exit_tick"] = tick
-                            note["exit_price"] = price
-                            note["exit_usdt"] = note["entry_amount"] * price
-                            note["gain_usdt"] = note["exit_usdt"] - note["entry_usdt"]
-                            note["gain_pct"] = note["gain_usdt"] / note["entry_usdt"]
-                            note["status"] = "Closed"
-                            ledger.close_note(note)
-                            sim_capital += note["exit_usdt"]
-                            last_sell_tick[name] = tick
-                            active_cooldowns[name] = max(0.0, cooldown)
+                    sim_capital, closed = evaluate_sell(
+                        ledger=ledger,
+                        name=name,
+                        tick=tick,
+                        price=price,
+                        sim_capital=sim_capital,
+                        verbose=verbose,
+                    )
+                    if closed:
+                        active_cooldowns[name] = max(0.0, cooldown)
+                        for note in closed:
                             addlog(
                                 (
                                     f"[SELL] Tick {tick} | Window: {note['window']} | "
-                                    f"Gain: +${note['gain_usdt']:.2f} ({note['gain_pct']:.2%})"
+                                    f"Gain: +${note['gain']:.2f} ({note['gain_pct']:.2%})"
                                 ),
                                 verbose_int=2,
                                 verbose_state=verbose,
                             )
-            ledger.set_capital(sim_capital)
             pbar.update(1)
 
     print(f"[SIM] Completed {len(df)} ticks.")
 
-    ledger.set_capital(sim_capital)
-    summary = ledger.get_account_summary(starting_capital)
-
-    # Debug print verification
-    print(f"[DEBUG] sim_capital: {sim_capital}")
-    print(f"[DEBUG] ledger.get_capital(): {ledger.get_capital()}")
-    print(f"[DEBUG] summary['idle_capital']: {summary.get('idle_capital')}")
+    final_price = float(df.iloc[-1]["close"])
+    summary = ledger.get_account_summary(final_price)
 
     Ledger.save_ledger(tag, ledger)
 
-    # Final SIM output
-    for k, v in summary.items():
-        label = k.replace("_", " ").title()
-        print(f"[SIM] {label}: {v}")
-
-    assert_summary_match(summary, ledger, starting_capital)
+    print(f"Final Price: ${summary['final_price']:.2f}")
+    print(f"Total Coin Held: {summary['open_coin_amount']:.6f}")
+    print(f"Final Value (USD): ${summary['total_value']:.2f}")
 
