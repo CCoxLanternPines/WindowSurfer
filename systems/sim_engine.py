@@ -106,6 +106,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
 
     last_buy_tick = {name: float("-inf") for name in windows}
     last_sell_tick: dict[str, int] = {}
+    active_cooldowns = {name: 0.0 for name in windows}
 
     total = len(df)
     with tqdm(total=total, desc="📉 Sim Progress", dynamic_ncols=True) as pbar:
@@ -114,6 +115,15 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
             price = float(df.iloc[tick]["close"])
 
             for name, cfg in windows.items():
+                if active_cooldowns[name] > 0:
+                    active_cooldowns[name] = max(0.0, active_cooldowns[name] - 1)
+
+                addlog(
+                    f"[DEBUG] Tick {tick} | Window: {name} | cooldown_timer: {active_cooldowns[name]:.2f}",
+                    verbose_int=3,
+                    verbose_state=verbose,
+                )
+
                 wave = get_wave_window_data_df(
                     df,
                     window=cfg["window_size"],
@@ -137,8 +147,6 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                 )
                 before_pnl = ledger.pnl
                 cooldown = cfg.get("cooldown", 0)
-                delta_24h = wave.get("trend_direction_delta_24h", 0.0)
-                adjusted_cooldown = max(0, cooldown - abs(delta_24h))
 
                 if verbose >= 3 and wave:
                     trend_direction_delta_24h = wave.get("trend_direction_delta_24h")
@@ -150,8 +158,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                         verbose_int=3,
                         verbose_state=verbose,
                     )
-
-                if tick - last_sell_tick.get(name, -9999) >= adjusted_cooldown:
+                if active_cooldowns[name] <= 0:
                     active_notes = [
                         n for n in ledger.get_active_notes() if n["window"] == name
                     ]
@@ -170,6 +177,13 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                             ledger.close_note(note)
                             sim_capital += note["exit_usdt"]
                             last_sell_tick[name] = tick
+                            delta_24h = abs(wave.get("trend_direction_delta_24h", 0.0))
+                            active_cooldowns[name] = max(0.0, cooldown - delta_24h)
+                            addlog(
+                                f"[DEBUG] Reset cooldown for {name}: {cooldown:.2f} - {delta_24h:.2f} = {active_cooldowns[name]:.2f}",
+                                verbose_int=3,
+                                verbose_state=verbose,
+                            )
                             addlog(
                                 (
                                     f"[SELL] Tick {tick} | Window: {note['window']} | "
