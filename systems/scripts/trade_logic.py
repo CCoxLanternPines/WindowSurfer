@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Dict
 
-from scripts.ledger_manager import RamLedger
+from systems.scripts.ledger import Ledger
 from systems.utils.logger import addlog
 
 
 def maybe_buy(
     *,
-    ledger: RamLedger,
+    ledger: Ledger,
     name: str,
     cfg: Dict,
     wave: Dict,
@@ -56,7 +56,7 @@ def maybe_buy(
 
 def handle_sells(
     *,
-    ledger: RamLedger,
+    ledger: Ledger,
     name: str,
     tick: int,
     price: float,
