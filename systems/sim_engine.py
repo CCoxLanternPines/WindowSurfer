@@ -132,9 +132,19 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
             ledger.set_capital(sim_capital)
             pbar.update(1)
 
-    Ledger.save_ledger(tag, ledger)
-    summary = ledger.get_account_summary(starting_capital)
     print(f"[SIM] Completed {len(df)} ticks.")
+
+    ledger.set_capital(sim_capital)
+    summary = ledger.get_account_summary(starting_capital)
+
+    # Debug print verification
+    print(f"[DEBUG] sim_capital: {sim_capital}")
+    print(f"[DEBUG] ledger.get_capital(): {ledger.get_capital()}")
+    print(f"[DEBUG] summary['idle_capital']: {summary.get('idle_capital')}")
+
+    Ledger.save_ledger(tag, ledger)
+
+    # Final SIM output
     for k, v in summary.items():
         label = k.replace("_", " ").title()
         print(f"[SIM] {label}: {v}")
