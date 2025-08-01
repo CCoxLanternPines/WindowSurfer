@@ -1,8 +1,65 @@
 from __future__ import annotations
 
-"""Placeholder live engine."""
+"""Live trading entry engine."""
+
+import argparse
+import time
+from datetime import datetime, timezone
+from typing import Optional
+
+from tqdm import tqdm
+
+from systems.scripts.handle_top_of_hour import handle_top_of_hour
+from systems.utils.settings_loader import load_settings
 
 
-def run_live(*args, **kwargs) -> None:  # pragma: no cover - stub
-    raise NotImplementedError("Live trading engine is not implemented in this build")
+def run_live(
+    tag: str | None = None,
+    window: str | None = None,
+    dry: bool = False,
+    verbose: int = 0,
+) -> None:
+    """Run the live trading engine.
 
+    Parameters are currently placeholders for forward compatibility.
+    """
+    settings = load_settings()
+    tick_time = datetime.now(timezone.utc)
+
+    if dry:
+        print("[LIVE] Running top of hour")
+        handle_top_of_hour(tick=tick_time, settings=settings, sim=False)
+        return
+
+    elapsed = tick_time.minute * 60 + tick_time.second
+    remaining = 3600 - elapsed
+
+    with tqdm(
+        total=remaining,
+        desc="⏳ Waiting for top of hour",
+        unit="s",
+        dynamic_ncols=True,
+    ) as pbar:
+        for _ in range(remaining):
+            time.sleep(1)
+            pbar.update(1)
+
+    print("[LIVE] Running top of hour")
+    handle_top_of_hour(tick=datetime.now(timezone.utc), settings=settings, sim=False)
+
+
+def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Live trading engine")
+    parser.add_argument("--dry", action="store_true", help="Run once immediately")
+    parser.add_argument("--tag", required=False, help="Symbol tag (unused)")
+    parser.add_argument("--window", required=False, help="Window name (unused)")
+    return parser.parse_args(argv)
+
+
+def main(argv: Optional[list[str]] = None) -> None:
+    args = _parse_args(argv)
+    run_live(tag=args.tag, window=args.window, dry=args.dry)
+
+
+if __name__ == "__main__":
+    main()

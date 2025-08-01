@@ -2,7 +2,8 @@ from __future__ import annotations
 
 """Execute trading logic at the top of each hour."""
 
-from typing import Dict, Any
+from datetime import datetime
+from typing import Any, Dict
 
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -13,11 +14,12 @@ from systems.utils.logger import addlog
 
 def handle_top_of_hour(
     *,
-    tick: int,
-    candle: dict,
-    ledger: Ledger,
-    ledger_config: dict,
+    tick: int | datetime,
     sim: bool,
+    settings: dict | None = None,
+    candle: dict | None = None,
+    ledger: Ledger | None = None,
+    ledger_config: dict | None = None,
     **kwargs: Any,
 ) -> None:
     """Run buy/sell evaluations for all windows on an hourly boundary.
@@ -40,6 +42,15 @@ def handle_top_of_hour(
         ``offset`` for window calculations along with a mutable ``state``
         dictionary containing capital and cooldown counters.
     """
+
+    if not sim:
+        print("[LIVE] Top of Hour triggered")
+        print(f"Timestamp: {tick}")
+        print("[LIVE] Placeholder for per-ledger actions")
+        return
+
+    if candle is None or ledger is None or ledger_config is None:
+        return
 
     # Extract common context
     df = kwargs.get("df")

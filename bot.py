@@ -28,6 +28,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--window",
+        required=False,
+        help="Window name (forward-compatible)",
+    )
+    parser.add_argument(
+        "--dry",
+        action="store_true",
+        help="Run live mode once immediately and exit",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="count",
@@ -82,7 +92,12 @@ def main(argv: list[str] | None = None) -> None:
     if mode == "sim":
         run_simulation(tag=args.tag.upper(), verbose=args.verbose)
     elif mode == "live":
-        run_live(tag=args.tag.upper() if args.tag else None, verbose=args.verbose)
+        run_live(
+            tag=args.tag.upper() if args.tag else None,
+            window=args.window,
+            dry=args.dry,
+            verbose=args.verbose,
+        )
     else:
         addlog("Error: --mode must be either 'sim', 'live', or 'wallet'")
         sys.exit(1)
