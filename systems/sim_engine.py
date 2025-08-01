@@ -15,19 +15,18 @@ from systems.scripts.ledger import Ledger
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.logger import addlog
 from systems.utils.settings_loader import load_settings
+from systems.utils.resolve_symbol import resolve_ledger_settings
 
 
 def run_simulation(tag: str, verbose: int = 0) -> None:
     """Run a historical simulation for ``tag``."""
     settings = load_settings()
     tag = tag.upper()
-    symbol_meta = settings.get("symbol_settings", {}).get(tag)
-    if symbol_meta is None:
-        raise ValueError(f"Unknown symbol tag: {tag}")
+    ledger_config = resolve_ledger_settings(tag, settings)
 
-    windows = settings.get("general_settings", {}).get("windows", {})
+    windows = ledger_config.get("window_settings", {})
     if not windows:
-        raise ValueError("No windows defined in settings['general_settings']['windows']")
+        raise ValueError("No windows defined for ledger")
 
     sim_capital = float(settings.get("simulation_capital", 0))
     ledger = Ledger()
@@ -64,7 +63,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                     tick=tick,
                     candle=candle,
                     ledger=ledger,
-                    settings=settings,
+                    ledger_config=ledger_config,
                     sim=True,
                     df=df,
                     offset=offset,
