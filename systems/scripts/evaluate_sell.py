@@ -13,16 +13,26 @@ def evaluate_sell(
     name: str,
     tick: int,
     price: float,
+    cfg: Dict,
     sim_capital: float,
     verbose: int,
-) -> Tuple[float, List[Dict]]:
+) -> Tuple[float, List[Dict], int]:
     """Close notes that have reached their target price.
 
-    Returns updated capital and the list of notes closed at this tick.
+    Returns updated capital, the list of notes closed at this tick, and the
+    number of notes that failed the minimum ROI requirement.
     """
+    min_roi = cfg.get("min_roi", 0)
     to_close: List[Dict] = []
+    roi_skipped = 0
     for note in ledger.get_active_notes():
         if note["window"] != name:
+            continue
+        actual_roi = (price - note["entry_price"]) / note["entry_price"]
+        if actual_roi < min_roi:
+            if not note.get("min_roi_blocked"):
+                roi_skipped += 1
+                note["min_roi_blocked"] = True
             continue
         if price >= note["mature_price"]:
             gain = (price - note["entry_price"]) * note["entry_amount"]
@@ -39,4 +49,4 @@ def evaluate_sell(
         ledger.close_note(note)
         sim_capital += note["entry_amount"] * price
         closed.append(note)
-    return sim_capital, closed
+    return sim_capital, closed, roi_skipped
