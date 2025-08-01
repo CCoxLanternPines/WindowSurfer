@@ -20,16 +20,16 @@
       "fish": {
         "window_size": "1d",
         "buy_cooldown": 4,
-        "sell_cooldown": 4,
-        "min_roi": 0.04,
-        "investment_fraction": 0.03,
-        "buy_floor": 0.2,
-        "sell_ceiling": 0.8,
+        "sell_cooldown": 8,
+        "min_roi": 0.15,
+        "investment_fraction": 0.1,
+        "buy_floor": 0.25,
+        "sell_ceiling": 0.75,
         "max_open_notes": 100
       }
     },
-    "max_note_usdt": 300.0,
-    "minimum_note_size": 5
+    "max_note_usdt": 500.0,
+    "minimum_note_size": 10
   },
-  "simulation_capital": 1000
+  "simulation_capital": 10000
 }
