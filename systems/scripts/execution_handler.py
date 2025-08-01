@@ -47,18 +47,8 @@ def get_available_fiat_balance(exchange, currency: str = "USD") -> float:
         return 0.0
     return float(balance.get(currency, 0.0))
 
-def buy_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int = 0) -> dict:
+def buy_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int = 0) -> dict | None:
     api_key, api_secret = load_kraken_keys()
-
-    balance = get_kraken_balance(verbose)
-    available_usd = balance.get(fiat_symbol, 0.0)
-    if available_usd < usd_amount:
-        addlog(
-            f"[ABORT] Not enough {fiat_symbol} to buy: ${available_usd:.2f} available, need ${usd_amount:.2f}",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-        return {}
 
     for slippage in SLIPPAGE_STEPS:
         price_resp = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={pair_code}").json()
@@ -123,7 +113,12 @@ def buy_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int 
 
         addlog("Slippage level failed, trying next...", verbose_int=3, verbose_state=verbose)
 
-    raise Exception("Buy order failed — no fill found within timeout.")
+    addlog(
+        "[ERROR] Buy order failed — no fill found within timeout.",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+    return None
 
 def sell_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int = 0) -> dict:
     api_key, api_secret = load_kraken_keys()
@@ -187,12 +182,13 @@ def execute_buy(
     Parameters are kept for API compatibility; ``client`` and ``price`` are
     currently unused as ``buy_order`` pulls pricing from Kraken directly.
     """
+
+    wallet_key = None
+    if symbol_info:
+        wallet_key = symbol_info.get("wallet_code") or symbol_info.get("fiat")
+
     if client is None:
         balance = get_kraken_balance(verbose)
-
-        wallet_key = None
-        if symbol_info:
-            wallet_key = symbol_info.get("wallet_code") or symbol_info.get("fiat")
 
         if not wallet_key:
             addlog(
@@ -221,7 +217,7 @@ def execute_buy(
             return None
 
     else:
-        fiat_balance = get_available_fiat_balance(client, fiat_code)
+        fiat_balance = get_available_fiat_balance(client, wallet_key or fiat_code)
         if fiat_balance < amount_usd:
             addlog(
                 f"[SKIP] Insufficient funds to buy {symbol} — need ${amount_usd:.2f}, have ${fiat_balance:.2f}",
@@ -230,9 +226,10 @@ def execute_buy(
             )
             return None
 
-    fills = buy_order(symbol, fiat_code, amount_usd, verbose)
+    wallet_key = wallet_key or fiat_code
+    fills = buy_order(symbol, wallet_key, amount_usd, verbose)
     if not fills:
-        return {}
+        return None
     return {
         "filled_amount": fills.get("volume", 0.0),
         "avg_price": fills.get("price", 0.0),
