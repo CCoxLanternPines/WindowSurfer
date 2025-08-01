@@ -37,13 +37,15 @@ def summarize_simulation(
 ) -> None:
     """Log and persist simulation results.
 
-    The final account value is derived from ``idle_capital`` and the
-    mark-to-market value of any open notes. ``realised_pnl`` is reported for
-    informational purposes only and is not added to the ending value since it
-    has already been credited to ``idle_capital`` when notes were closed.
+    The final account value is derived from ``idle_capital``, the
+    mark-to-market value of any open notes and ``realised_pnl`` from closed
+    notes. This ensures the ending value reflects the total account value even
+    if realised gains have not yet been moved into ``idle_capital``.
     """
 
-    end_value = idle_capital + open_value
+    total_value = realised_pnl + idle_capital + open_value
+    net_gain = total_value - start_capital
+    roi = (net_gain / start_capital) * 100 if start_capital else 0.0
 
     addlog(f"[SIM] Completed {total_ticks} ticks.", verbose_int=1, verbose_state=verbose)
     addlog(
@@ -67,12 +69,22 @@ def summarize_simulation(
         verbose_state=verbose,
     )
     addlog(
-        f"[SIM] Ending value: {end_value:.2f}",
+        f"[SIM] Ending value: {total_value:.2f}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+    addlog(
+        f"[SIM] Net Gain: {net_gain:.2f}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+    addlog(
+        f"[SIM] ROI: {roi:.2f}%",
         verbose_int=1,
         verbose_state=verbose,
     )
 
-    save_ledger(ledger, end_value)
+    save_ledger(ledger, total_value)
     summary = ledger.get_summary()
     addlog(
         f"[SIM] Ledger summary: {json.dumps(summary, indent=2)}",
