@@ -18,6 +18,14 @@ from systems.utils.logger import addlog
 from systems.utils.settings_loader import load_settings
 
 
+def assert_summary_match(summary_dict: dict, ledger: Ledger, starting_capital: float) -> None:
+    """Ensure ``summary_dict`` reflects ``ledger`` state."""
+    true_summary = ledger.get_account_summary(starting_capital)
+    for k, v in summary_dict.items():
+        assert abs(true_summary[k] - v) < 1e-2, (
+            f"[ASSERT FAIL] Mismatch in {k}: {v} ≠ {true_summary[k]}"
+        )
+
 
 def run_simulation(tag: str, verbose: int = 0) -> None:
     """Run a historical simulation for ``tag``."""
@@ -130,4 +138,6 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     for k, v in summary.items():
         label = k.replace("_", " ").title()
         print(f"[SIM] {label}: {v}")
+
+    assert_summary_match(summary, ledger, starting_capital)
 
