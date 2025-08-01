@@ -2,7 +2,10 @@ from __future__ import annotations
 
 """Simple in-memory ledger for simulations."""
 
+import json
 from typing import Dict, List
+
+from systems.utils.path import find_project_root
 
 
 class Ledger:
@@ -99,3 +102,43 @@ class Ledger:
             "closed_notes": len(self.get_closed_notes()),
             "open_notes": len(self.get_open_notes()),
         }
+
+    # Persistence -----------------------------------------------------------
+    @staticmethod
+    def load_ledger(tag: str) -> "Ledger":
+        """Load a ledger from ``data/ledgers/<tag>.json`` if it exists."""
+        root = find_project_root()
+        path = root / "data" / "ledgers" / f"{tag}.json"
+        ledger = Ledger()
+        if path.exists():
+            with path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            ledger.open_notes = data.get("open_notes", [])
+            ledger.closed_notes = data.get("closed_notes", [])
+            ledger.deposits = data.get("deposits", [])
+            ledger.withdrawals = data.get("withdrawals", [])
+            ledger.capital = data.get("capital", 0.0)
+            ledger.metadata = data.get("metadata", {})
+        return ledger
+
+    @staticmethod
+    def save_ledger(tag: str, ledger: "Ledger") -> None:
+        """Persist ``ledger`` to ``data/ledgers/<tag>.json``."""
+        root = find_project_root()
+        out_dir = root / "data" / "ledgers"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{tag}.json"
+
+        ledger_data = {
+            "open_notes": ledger.get_open_notes(),
+            "closed_notes": ledger.get_closed_notes(),
+            "deposits": ledger.get_deposits(),
+            "withdrawals": ledger.get_withdrawals(),
+            "capital": ledger.get_capital(),
+        }
+        metadata = ledger.get_metadata()
+        if metadata:
+            ledger_data["metadata"] = metadata
+
+        with out_path.open("w", encoding="utf-8") as f:
+            json.dump(ledger_data, f, indent=2)

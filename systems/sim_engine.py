@@ -10,10 +10,9 @@ are recorded in a lightweight in-memory ledger.
 
 from tqdm import tqdm
 
-from scripts.fetch_canles import fetch_candles
-from scripts.ledger_manager import save_ledger
+from systems.scripts.fetch_canles import fetch_candles
 from systems.scripts.ledger import Ledger
-from scripts.trade_logic import maybe_buy
+from systems.scripts.trade_logic import maybe_buy
 from systems.scripts.get_window_data import get_wave_window_data_df
 from systems.utils.logger import addlog
 from systems.utils.settings_loader import load_settings
@@ -125,7 +124,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
             ledger.set_capital(sim_capital)
             pbar.update(1)
 
-    save_ledger(tag, ledger)
+    Ledger.save_ledger(tag, ledger)
     summary = ledger.get_account_summary(starting_capital)
     print(f"[SIM] Completed {len(df)} ticks.")
     for k, v in summary.items():
