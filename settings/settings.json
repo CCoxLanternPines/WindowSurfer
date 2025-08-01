@@ -19,14 +19,15 @@
     "windows": {
       "fish": {
         "window_size": "1d",
-        "cooldown": 1,
+        "buy_cooldown": 4,
+        "sell_cooldown": 4,
+        "min_roi_pct": 2.5,
         "investment_fraction": 0.03,
         "buy_floor": 0.2,
         "sell_ceiling": 0.8,
         "max_open_notes": 100
       }
     },
-    "roi_gain_multiplier": 1,
     "max_note_usdt": 300.0,
     "minimum_note_size": 5
   },
