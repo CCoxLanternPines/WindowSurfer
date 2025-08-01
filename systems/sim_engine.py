@@ -8,89 +8,16 @@ range. Configuration is loaded from ``settings/settings.json`` and all trades
 are recorded in a lightweight in-memory ledger.
 """
 
-import json
-
 from tqdm import tqdm
 
 from scripts.fetch_canles import fetch_candles
-from scripts.ledger_manager import RamLedger, save_ledger
+from scripts.ledger_manager import save_ledger
+from systems.scripts.ledger import Ledger
 from scripts.trade_logic import maybe_buy
 from systems.scripts.get_window_data import get_wave_window_data_df
 from systems.utils.logger import addlog
 from systems.utils.settings_loader import load_settings
 
-
-# ---------------------------------------------------------------------------
-# Core simulation logic
-# ---------------------------------------------------------------------------
-
-
-def summarize_simulation(
-    *,
-    ledger: RamLedger,
-    start_capital: float,
-    idle_capital: float,
-    realised_pnl: float,
-    open_value: float,
-    total_ticks: int,
-    verbose: int,
-) -> None:
-    """Log and persist simulation results.
-
-    The final account value is derived from ``idle_capital``, the
-    mark-to-market value of any open notes and ``realised_pnl`` from closed
-    notes. This ensures the ending value reflects the total account value even
-    if realised gains have not yet been moved into ``idle_capital``.
-    """
-
-    total_value = realised_pnl + idle_capital + open_value
-    net_gain = total_value - start_capital
-    roi = (net_gain / start_capital) * 100 if start_capital else 0.0
-
-    addlog(f"[SIM] Completed {total_ticks} ticks.", verbose_int=1, verbose_state=verbose)
-    addlog(
-        f"[SIM] Starting capital: {start_capital:.2f}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
-    addlog(
-        f"[SIM] Realised PnL: {realised_pnl:.2f}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
-    addlog(
-        f"[SIM] Idle capital: {idle_capital:.2f}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
-    addlog(
-        f"[SIM] Open note value: {open_value:.2f}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
-    addlog(
-        f"[SIM] Ending value: {total_value:.2f}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
-    addlog(
-        f"[SIM] Net Gain: {net_gain:.2f}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
-    addlog(
-        f"[SIM] ROI: {roi:.2f}%",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
-
-    save_ledger(ledger, total_value)
-    summary = ledger.get_summary()
-    addlog(
-        f"[SIM] Ledger summary: {json.dumps(summary, indent=2)}",
-        verbose_int=2,
-        verbose_state=verbose,
-    )
 
 
 def run_simulation(tag: str, verbose: int = 0) -> None:
@@ -107,8 +34,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
 
     sim_capital = float(settings.get("simulation_capital", 0))
     start_capital = sim_capital
-    realised_pnl = 0.0
-    ledger = RamLedger()
+    ledger = Ledger(sim_capital)
 
     addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
 
@@ -150,7 +76,6 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                     min_note_usdt=min_note_usdt,
                     verbose=verbose,
                 )
-                before_pnl = ledger.pnl
                 cooldown = cfg.get("cooldown", 0)
 
                 # Check if a new note was opened for this window
@@ -197,23 +122,13 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                                 verbose_int=2,
                                 verbose_state=verbose,
                             )
-                realised_gain = ledger.pnl - before_pnl
-                if realised_gain:
-                    realised_pnl += realised_gain
-
+            ledger.set_capital(sim_capital)
             pbar.update(1)
 
-    last_price = float(df.iloc[-1]["close"])
-    open_value = sum(
-        n["entry_amount"] * last_price for n in ledger.get_active_notes()
-    )
-    summarize_simulation(
-        ledger=ledger,
-        start_capital=start_capital,
-        idle_capital=sim_capital,
-        realised_pnl=realised_pnl,
-        open_value=open_value,
-        total_ticks=len(df),
-        verbose=verbose,
-    )
+    summary = ledger.get_account_summary(start_capital)
+    save_ledger(ledger, summary["ending_value"])
+    print(f"[SIM] Completed {len(df)} ticks.")
+    for k, v in summary.items():
+        label = k.replace("_", " ").title()
+        print(f"[SIM] {label}: {v}")
 
