@@ -133,7 +133,7 @@ def handle_top_of_hour(
                                     last_buy_tick[window_name] = current_ts
                                     buy_count += 1
                                     addlog(
-                                        f"[LIVE][BUY] {tag} | {result['filled_amount']:.4f} {wallet_code} @ ${result['avg_price']:.3f}"
+                                        f"[LIVE][BUY] {ledger_name} | {tag} | {result['filled_amount']:.4f} {wallet_code} @ ${result['avg_price']:.3f}"
                                     )
 
                     sell_cd = window_cfg.get("sell_cooldown", 0) * 3600
@@ -162,11 +162,11 @@ def handle_top_of_hour(
                                 last_sell_tick[window_name] = current_ts
                                 sell_count += 1
                                 addlog(
-                                    f"[LIVE][SELL] {tag} | Gain: ${gain:.2f} ({note['gain_pct']:.2%})"
+                                    f"[LIVE][SELL] {ledger_name} | {tag} | Gain: ${gain:.2f} ({note['gain_pct']:.2%})"
                                 )
 
                 summary = ledger.get_account_summary(price)
-                print(f"[LIVE] {tag} | {window_name} window")
+                print(f"[LIVE] {ledger_name} | {tag} | {window_name} window")
                 print(
                     f"✅ Buy attempts: {buy_count} | Sells: {sell_count} | Open Notes: {summary['open_notes']} | Realized Gain: ${summary['realized_gain']:.2f}"
                 )
