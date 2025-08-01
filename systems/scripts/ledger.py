@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-"""Simple in-memory ledger for simulations."""
+"""Simple in-memory ledger for simulations and live trading."""
 
+from datetime import datetime
 import json
 from typing import Dict, List
 
@@ -79,17 +80,31 @@ class Ledger:
 
     # Persistence -----------------------------------------------------------
     @staticmethod
-    def load_ledger(tag: str) -> "Ledger":
-        """Load a ledger from ``data/ledgers/<tag>.json`` if it exists."""
+    def load_ledger(tag: str, *, sim: bool = False) -> "Ledger":
+        """Load a ledger for ``tag`` depending on mode."""
         root = find_project_root()
-        path = root / "data" / "ledgers" / f"{tag}.json"
         ledger = Ledger()
-        if path.exists():
-            with path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-            ledger.open_notes = data.get("open_notes", [])
-            ledger.closed_notes = data.get("closed_notes", [])
-            ledger.metadata = data.get("metadata", {})
+
+        if sim:
+            path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
+            if path.exists():
+                with path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                ledger.open_notes = data.get("open_notes", [])
+                ledger.closed_notes = data.get("closed_notes", [])
+                ledger.metadata = data.get("metadata", {})
+            return ledger
+
+        ledger_dir = root / "data" / "ledger" / tag
+        if ledger_dir.exists():
+            files = sorted(ledger_dir.glob("*.json"))
+            if files:
+                path = files[-1]
+                with path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                ledger.open_notes = data.get("open_notes", [])
+                ledger.closed_notes = data.get("closed_notes", [])
+                ledger.metadata = data.get("metadata", {})
         return ledger
 
     @staticmethod
@@ -97,14 +112,22 @@ class Ledger:
         tag: str,
         ledger: "Ledger",
         *,
+        sim: bool = False,
         final_tick: int | None = None,
         summary: dict | None = None,
     ) -> None:
-        """Persist ``ledger`` to ``data/ledgers/<tag>.json``."""
+        """Persist ``ledger`` to simulation or live ledger directories."""
         root = find_project_root()
-        out_dir = root / "data" / "ledgers"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{tag}.json"
+
+        if sim:
+            out_dir = root / "data" / "tmp" / "simulation"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_path = out_dir / f"{tag}.json"
+        else:
+            out_dir = root / "data" / "ledger" / tag
+            out_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+            out_path = out_dir / f"{ts}.json"
 
         ledger_data = {
             "open_notes": ledger.get_open_notes(),

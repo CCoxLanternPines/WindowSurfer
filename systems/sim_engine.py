@@ -16,6 +16,7 @@ from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.logger import addlog
 from systems.utils.settings_loader import load_settings
 from systems.utils.resolve_symbol import resolve_ledger_settings
+from systems.utils.path import find_project_root
 
 
 def run_simulation(tag: str, verbose: int = 0) -> None:
@@ -23,6 +24,11 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     settings = load_settings()
     tag = tag.upper()
     ledger_config = resolve_ledger_settings(tag, settings)
+
+    root = find_project_root()
+    sim_path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
+    if sim_path.exists():
+        sim_path.unlink()
 
     windows = ledger_config.get("window_settings", {})
     if not windows:
@@ -81,9 +87,9 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     summary = ledger.get_account_summary(final_price)
 
     print(f"[DEBUG] Final tick: {final_tick}")
-    Ledger.save_ledger(tag, ledger, final_tick=final_tick, summary=summary)
+    Ledger.save_ledger(tag, ledger, sim=True, final_tick=final_tick, summary=summary)
 
-    saved_summary = Ledger.load_ledger(tag).get_account_summary(final_price)
+    saved_summary = Ledger.load_ledger(tag, sim=True).get_account_summary(final_price)
     if (
         saved_summary["closed_notes"] != summary["closed_notes"]
         or saved_summary["realized_gain"] != summary["realized_gain"]
