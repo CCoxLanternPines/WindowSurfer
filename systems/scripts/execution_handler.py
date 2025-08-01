@@ -7,7 +7,10 @@ from urllib.parse import urlencode
 
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.utils.logger import addlog
-from systems.scripts.kraken_utils import get_kraken_balance  # use shared util now
+from systems.scripts.kraken_utils import (
+    get_kraken_balance,
+    get_live_price,
+)  # use shared util now
 
 KRAKEN_ORDER_TIMEOUT = 6
 SLIPPAGE_STEPS = [0.0, 0.002, 0.004, 0.007, 0.01]
@@ -167,3 +170,54 @@ def sell_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int
         time.sleep(0.6)
 
     raise Exception("Sell order failed — no fill found within timeout.")
+
+
+def execute_buy(
+    client,
+    *,
+    symbol: str,
+    fiat_code: str,
+    price: float,
+    amount_usd: float,
+    verbose: int = 0,
+) -> dict:
+    """Place a real buy order and normalise the result structure.
+
+    Parameters are kept for API compatibility; ``client`` and ``price`` are
+    currently unused as ``buy_order`` pulls pricing from Kraken directly.
+    """
+
+    fills = buy_order(symbol, fiat_code, amount_usd, verbose)
+    if not fills:
+        return {}
+    return {
+        "filled_amount": fills.get("volume", 0.0),
+        "avg_price": fills.get("price", 0.0),
+        "timestamp": fills.get("timestamp"),
+    }
+
+
+def execute_sell(
+    client,
+    *,
+    symbol: str,
+    coin_amount: float,
+    fiat_code: str | None = None,
+    price: float | None = None,
+    verbose: int = 0,
+) -> dict:
+    """Place a real sell order and normalise the result structure.
+
+    ``fiat_code`` defaults to ``ZUSD`` when not provided. ``price`` is optional
+    and, if absent, the current live price is fetched to estimate USD notional.
+    """
+
+    fiat = fiat_code or "ZUSD"
+    sell_price = price if price is not None else get_live_price(symbol)
+    usd_amount = coin_amount * sell_price
+    fills = sell_order(symbol, fiat, usd_amount, verbose)
+    return {
+        "filled_amount": fills.get("volume", 0.0),
+        "avg_price": fills.get("price", 0.0),
+        "timestamp": fills.get("timestamp"),
+    }
