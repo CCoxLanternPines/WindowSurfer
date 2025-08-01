@@ -46,6 +46,15 @@ class Ledger:
     def get_closed_notes(self) -> List[Dict]:
         return list(self.closed_notes)
 
+    def get_total_liquid_value(self) -> float:
+        """Return all capital that could be withdrawn immediately."""
+        realised_pnl = sum(n["gain_usdt"] for n in self.get_closed_notes())
+        open_value = sum(
+            n["entry_amount"] * n["entry_price"] for n in self.get_open_notes()
+        )
+        idle_capital = self.get_capital()
+        return realised_pnl + open_value + idle_capital
+
     # Summary ---------------------------------------------------------------
     def get_account_summary(self, starting_capital: float) -> dict:
         realised_pnl = sum(n.get("gain_usdt", 0) for n in self.get_closed_notes())
@@ -53,7 +62,7 @@ class Ledger:
         open_value = sum(
             n.get("entry_amount", 0) * n.get("entry_price", 0) for n in self.get_open_notes()
         )
-        ending_value = idle_capital + open_value + realised_pnl
+        ending_value = self.get_total_liquid_value()
         net_gain = ending_value - starting_capital
         roi = (net_gain / starting_capital) * 100 if starting_capital else 0.0
 

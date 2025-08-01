@@ -33,7 +33,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
         raise ValueError("No windows defined in settings['general_settings']['windows']")
 
     sim_capital = float(settings.get("simulation_capital", 0))
-    start_capital = sim_capital
+    starting_capital = sim_capital
     ledger = Ledger(sim_capital)
 
     addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
@@ -125,10 +125,12 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
             ledger.set_capital(sim_capital)
             pbar.update(1)
 
-    summary = ledger.get_account_summary(start_capital)
-    save_ledger(ledger, summary["ending_value"])
+    total_liquid = ledger.get_total_liquid_value()
+    save_ledger(ledger, total_liquid)
     print(f"[SIM] Completed {len(df)} ticks.")
-    for k, v in summary.items():
-        label = k.replace("_", " ").title()
-        print(f"[SIM] {label}: {v}")
+    print(f"[SIM] Liquidatable value: {total_liquid:.2f}")
+    print(f"[SIM] Net gain: {total_liquid - starting_capital:.2f}")
+    print(
+        f"[SIM] ROI: {(total_liquid - starting_capital) / starting_capital * 100:.2f}%"
+    )
 
