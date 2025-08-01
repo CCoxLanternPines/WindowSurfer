@@ -117,7 +117,6 @@ class Ledger:
             ledger.closed_notes = data.get("closed_notes", [])
             ledger.deposits = data.get("deposits", [])
             ledger.withdrawals = data.get("withdrawals", [])
-            ledger.capital = data.get("capital", 0.0)
             ledger.metadata = data.get("metadata", {})
         return ledger
 
@@ -134,7 +133,6 @@ class Ledger:
             "closed_notes": ledger.get_closed_notes(),
             "deposits": ledger.get_deposits(),
             "withdrawals": ledger.get_withdrawals(),
-            "capital": ledger.get_capital(),
         }
         metadata = ledger.get_metadata()
         if metadata:
