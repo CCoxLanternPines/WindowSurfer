@@ -60,6 +60,12 @@ def buy_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int 
         )
         return {}
 
+    addlog(
+        f"[BUY ATTEMPT] {fiat_symbol} available: ${available_usd:.2f}, attempting to buy ${usd_amount:.2f}",
+        verbose_int=3,
+        verbose_state=verbose,
+    )
+
     for slippage in SLIPPAGE_STEPS:
         price_resp = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={pair_code}").json()
         ticker_result = price_resp.get("result", {})
@@ -139,6 +145,12 @@ def sell_order(pair_code: str, fiat_symbol: str, usd_amount: float, verbose: int
         raise Exception("Invalid ticker response: missing close price")
     price = float(close[0])
     coin_amount = round(usd_amount / price, 8)
+    usd_amount = coin_amount * price
+    addlog(
+        f"[SELL ATTEMPT] Attempting to sell ${usd_amount:.2f} worth of {pair_code}",
+        verbose_int=3,
+        verbose_state=verbose,
+    )
 
     order_resp = _kraken_request("AddOrder", {
         "pair": pair_code,
