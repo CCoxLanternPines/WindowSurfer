@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import List
 import sys
 import pandas as pd
-from systems.utils.resolve_symbol import resolve_symbol
+from systems.utils.resolve_symbol import resolve_ledger_settings
 from systems.utils.settings_loader import load_settings
 
 if __package__ is None or __package__ == "":
@@ -58,12 +58,9 @@ def main(argv: list[str] | None = None) -> None:
     verbose = args.verbose
 
     settings = load_settings()
-    if tag not in settings.get("symbol_settings", {}):
-        raise ValueError(f"Unknown symbol tag: {tag}")
-
-    symbols = resolve_symbol(tag)
-    kraken_symbol = symbols["kraken"]
-    binance_symbol = symbols["binance"]
+    ledger_cfg = resolve_ledger_settings(tag, settings)
+    kraken_symbol = ledger_cfg["kraken_name"]
+    binance_symbol = ledger_cfg["binance_name"]
 
     start_ts, end_ts = parse_relative_time(time_window)
     out_path = get_raw_path(tag)
@@ -275,9 +272,10 @@ def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int =
     tag = tag.upper()
 
     try:
-        symbols = resolve_symbol(tag)
-        kraken_symbol = symbols["kraken"]
-        binance_symbol = symbols["binance"]
+        settings = load_settings()
+        ledger_cfg = resolve_ledger_settings(tag, settings)
+        kraken_symbol = ledger_cfg["kraken_name"]
+        binance_symbol = ledger_cfg["binance_name"]
     except Exception as e:
         raise RuntimeError(f"[ERROR] Failed to resolve symbol '{tag}': {e}")
 

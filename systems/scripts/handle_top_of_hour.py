@@ -16,7 +16,7 @@ def handle_top_of_hour(
     tick: int,
     candle: dict,
     ledger: Ledger,
-    settings: dict,
+    ledger_config: dict,
     sim: bool,
     **kwargs: Any,
 ) -> None:
@@ -30,8 +30,8 @@ def handle_top_of_hour(
         Candle data for this tick.
     ledger:
         Ledger tracking open and closed notes.
-    settings:
-        Application settings.
+    ledger_config:
+        Ledger-specific configuration.
     sim:
         ``True`` when running in simulation mode. Live logic is not yet
         implemented.
@@ -47,7 +47,7 @@ def handle_top_of_hour(
     state: Dict[str, Any] = kwargs.get("state", {})
     verbose = kwargs.get("verbose", 0)
 
-    windows = settings.get("general_settings", {}).get("windows", {})
+    windows = ledger_config.get("window_settings", {})
     if not windows or df is None or offset is None:
         return
 
