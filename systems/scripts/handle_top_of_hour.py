@@ -8,6 +8,7 @@ from typing import Any, Dict
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.get_window_data import get_wave_window_data_df
+from systems.scripts.kraken_utils import get_live_price
 from systems.scripts.ledger import Ledger
 from systems.utils.logger import addlog
 
@@ -44,9 +45,34 @@ def handle_top_of_hour(
     """
 
     if not sim:
-        print("[LIVE] Top of Hour triggered")
-        print(f"Timestamp: {tick}")
-        print("[LIVE] Placeholder for per-ledger actions")
+        if settings is None:
+            return
+
+        for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
+            tag = ledger_cfg.get("tag")
+            kraken_name = ledger_cfg.get("kraken_name")
+            wallet_code = ledger_cfg.get("wallet_code")
+            fiat = ledger_cfg.get("fiat")
+            window_settings = ledger_cfg.get("window_settings", {})
+
+            ledger = Ledger.load_ledger(tag=ledger_cfg["tag"])
+
+            price = get_live_price(kraken_pair=kraken_name)
+
+            for window_name, window_cfg in window_settings.items():
+                if sim:
+                    pass  # use sim logic
+                else:
+                    # live trading logic comes next
+                    pass
+
+                summary = ledger.get_account_summary(price)
+                print(f"[LIVE] {tag} | {window_name} window")
+                print(
+                    f"✅ Buy attempts: 0 | Sells: 0 | Open Notes: {summary['open_notes']} | Realized Gain: ${summary['realized_gain']:.2f}"
+                )
+
+            Ledger.save_ledger(tag=ledger_cfg["tag"], ledger=ledger)
         return
 
     if candle is None or ledger is None or ledger_config is None:
