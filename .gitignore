@@ -38,9 +38,8 @@ Thumbs.db
 !data/ledgers/
 !data/ledgers/*.json
 
-!data/kraken/
-!data/kraken/snapshots/
-!data/kraken/snapshots/*.json
+!data/snapshots/
+!data/snapshots/*.json
 
 # ❌ Exclude noisy sim or temp files
 data/tmp/
