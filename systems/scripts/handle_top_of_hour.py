@@ -12,8 +12,10 @@ import pandas as pd
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.get_window_data import get_wave_window_data_df
-from systems.scripts.kraken_utils import get_live_price, get_kraken_balance
+from systems.scripts.kraken_utils import get_live_price
 from systems.scripts.execution_handler import execute_buy, execute_sell
+from systems.scripts.prime_kraken_snapshot import prime_kraken_snapshot
+from systems.scripts.kraken_auth import load_kraken_keys
 from systems.scripts.ledger import Ledger
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.path import find_project_root
@@ -66,8 +68,12 @@ def handle_top_of_hour(
         dry_run = kwargs.get("dry", False)
 
         general_cfg = settings.get("general_settings", {})
+        api_key, api_secret = load_kraken_keys()
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
+            prime_kraken_snapshot(
+                api_key, api_secret, ledger_name, general_cfg.get("verbose", 0)
+            )
             tag = ledger_cfg.get("tag")
             kraken_name = ledger_cfg.get("kraken_name")
             wallet_code = ledger_cfg.get("wallet_code")
@@ -75,6 +81,19 @@ def handle_top_of_hour(
             window_settings = ledger_cfg.get("window_settings", {})
             triggered_strategies = {wn.title(): False for wn in window_settings}
             ledger = Ledger.load_ledger(tag=ledger_cfg["tag"])
+
+            snap_path = root / "data" / "tmp" / "kraken_snapshots" / f"{ledger_name}.json"
+            try:
+                with open(snap_path, "r") as f:
+                    snapshot = json.load(f)
+                balance = snapshot.get("balance", {})
+            except Exception:
+                addlog(
+                    "[ERROR] Kraken snapshot missing — cannot proceed in live mode.",
+                    verbose_int=1,
+                    verbose_state=True,
+                )
+                continue
 
             price = get_live_price(kraken_pair=kraken_name)
 
@@ -121,12 +140,7 @@ def handle_top_of_hour(
                             if n.get("window") == window_name
                         ]
                         if len(open_for_window) < window_cfg.get("max_open_notes", 0):
-                            try:
-                                balance = get_kraken_balance(0)
-                                available = float(balance.get(fiat, 0.0))
-                            except Exception:
-                                balance = {}
-                                available = 0.0
+                            available = float(balance.get(fiat, 0.0))
                             invest = available * window_cfg.get(
                                 "investment_fraction", 0
                             )
@@ -140,6 +154,7 @@ def handle_top_of_hour(
                                     fiat_code=fiat,
                                     price=price,
                                     amount_usd=invest,
+                                    ledger_name=ledger_name,
                                 )
                                 if result:
                                     note = {
@@ -197,7 +212,10 @@ def handle_top_of_hour(
                                 "min_roi", 0
                             ) and price >= note.get("mature_price", float("inf")):
                                 result = execute_sell(
-                                    None, symbol=tag, coin_amount=note["entry_amount"]
+                                    None,
+                                    symbol=tag,
+                                    coin_amount=note["entry_amount"],
+                                    ledger_name=ledger_name,
                                 )
                                 note["exit_price"] = result["avg_price"]
                                 note["exit_ts"] = result["timestamp"]
@@ -229,11 +247,7 @@ def handle_top_of_hour(
                     triggered_strategies[window_name.title()] = True
 
                 summary = ledger.get_account_summary(price)
-                try:
-                    balance = get_kraken_balance(0)
-                    idle_capital = float(balance.get(fiat, 0.0))
-                except Exception:
-                    idle_capital = 0.0
+                idle_capital = float(balance.get(fiat, 0.0))
                 summary["idle_capital"] = idle_capital
                 summary["total_value"] += idle_capital
                 hour_str = datetime.now().strftime("%I:%M%p")
@@ -261,13 +275,8 @@ def handle_top_of_hour(
             ledger.set_metadata(metadata)
             Ledger.save_ledger(tag=ledger_cfg["tag"], ledger=ledger)
 
-            try:
-                balance = get_kraken_balance(0)
-                usd_balance = float(balance.get(fiat, 0.0))
-                coin_balance = float(balance.get(wallet_code, 0.0))
-            except Exception:
-                usd_balance = 0.0
-                coin_balance = 0.0
+            usd_balance = float(balance.get(fiat, 0.0))
+            coin_balance = float(balance.get(wallet_code, 0.0))
             coin_balance_usd = coin_balance * price
             total_liquid_value = usd_balance + coin_balance_usd
             note_counts = {}
