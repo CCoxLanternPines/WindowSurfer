@@ -62,6 +62,8 @@ def handle_top_of_hour(
         else:
             cooldowns = {}
 
+        dry_run = kwargs.get("dry", False)
+
         general_cfg = settings.get("general_settings", {})
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
@@ -75,7 +77,9 @@ def handle_top_of_hour(
 
             price = get_live_price(kraken_pair=kraken_name)
 
-            current_ts = int(tick.timestamp()) if isinstance(tick, datetime) else int(tick)
+            current_ts = (
+                int(tick.timestamp()) if isinstance(tick, datetime) else int(tick)
+            )
 
             metadata = ledger.get_metadata()
             ledger_cooldowns = cooldowns.get(ledger_name, {})
@@ -101,17 +105,20 @@ def handle_top_of_hour(
                     position = wave.get("position_in_window", 0)
                     buy_cd = window_cfg.get("buy_cooldown", 0) * 3600
                     last_buy = last_buy_tick.get(window_name, float("-inf"))
-                    if (
-                        position <= window_cfg.get("buy_floor", 0)
-                        and current_ts - last_buy >= buy_cd
+                    if position <= window_cfg.get("buy_floor", 0) and (
+                        dry_run or current_ts - last_buy >= buy_cd
                     ):
                         open_for_window = [
-                            n for n in ledger.get_active_notes() if n.get("window") == window_name
+                            n
+                            for n in ledger.get_active_notes()
+                            if n.get("window") == window_name
                         ]
                         if len(open_for_window) < window_cfg.get("max_open_notes", 0):
                             balance = get_kraken_balance(0)
                             available = float(balance.get(fiat, 0.0))
-                            invest = available * window_cfg.get("investment_fraction", 0)
+                            invest = available * window_cfg.get(
+                                "investment_fraction", 0
+                            )
                             max_usd = general_cfg.get("max_note_usdt", invest)
                             min_usd = general_cfg.get("minimum_note_size", 0.0)
                             invest = min(invest, max_usd)
@@ -132,15 +139,16 @@ def handle_top_of_hour(
                                         "window": window_name,
                                         "status": "Open",
                                     }
-                                    configured_mature = wave["floor"] + wave["range"] * window_cfg.get(
-                                        "sell_ceiling", 1
-                                    )
+                                    configured_mature = wave["floor"] + wave[
+                                        "range"
+                                    ] * window_cfg.get("sell_ceiling", 1)
                                     configured_roi = (configured_mature - price) / price
                                     min_roi = window_cfg.get("min_roi", 0)
                                     target_roi = max(configured_roi, min_roi)
                                     note["mature_price"] = price * (1 + target_roi)
                                     ledger.open_note(note)
-                                    last_buy_tick[window_name] = current_ts
+                                    if not dry_run:
+                                        last_buy_tick[window_name] = current_ts
                                     buy_count += 1
                                     addlog(
                                         f"[LIVE][BUY] {ledger_name} | {tag} | {result['filled_amount']:.4f} {wallet_code} @ ${result['avg_price']:.3f}"
@@ -148,28 +156,32 @@ def handle_top_of_hour(
 
                     sell_cd = window_cfg.get("sell_cooldown", 0) * 3600
                     last_sell = last_sell_tick.get(window_name, float("-inf"))
-                    if current_ts - last_sell >= sell_cd:
+                    if dry_run or current_ts - last_sell >= sell_cd:
                         for note in list(ledger.get_active_notes()):
                             if note.get("window") != window_name:
                                 continue
-                            actual_roi = (price - note["entry_price"]) / note["entry_price"]
-                            if (
-                                actual_roi >= window_cfg.get("min_roi", 0)
-                                and price >= note.get("mature_price", float("inf"))
-                            ):
+                            actual_roi = (price - note["entry_price"]) / note[
+                                "entry_price"
+                            ]
+                            if actual_roi >= window_cfg.get(
+                                "min_roi", 0
+                            ) and price >= note.get("mature_price", float("inf")):
                                 result = execute_sell(
                                     None, symbol=tag, coin_amount=note["entry_amount"]
                                 )
                                 note["exit_price"] = result["avg_price"]
                                 note["exit_ts"] = result["timestamp"]
                                 note["exit_tick"] = current_ts
-                                gain = (note["exit_price"] - note["entry_price"]) * note["entry_amount"]
+                                gain = (
+                                    note["exit_price"] - note["entry_price"]
+                                ) * note["entry_amount"]
                                 note["gain"] = gain
                                 base = note["entry_price"] * note["entry_amount"] or 1
                                 note["gain_pct"] = gain / base
                                 note["status"] = "Closed"
                                 ledger.close_note(note)
-                                last_sell_tick[window_name] = current_ts
+                                if not dry_run:
+                                    last_sell_tick[window_name] = current_ts
                                 sell_count += 1
                                 addlog(
                                     f"[LIVE][SELL] {ledger_name} | {tag} | Gain: ${gain:.2f} ({note['gain_pct']:.2%})"
@@ -181,19 +193,22 @@ def handle_top_of_hour(
                     f"✅ Buy attempts: {buy_count} | Sells: {sell_count} | Open Notes: {summary['open_notes']} | Realized Gain: ${summary['realized_gain']:.2f}"
                 )
 
-            metadata["last_buy_tick"] = last_buy_tick
-            metadata["last_sell_tick"] = last_sell_tick
+            if not dry_run:
+                metadata["last_buy_tick"] = last_buy_tick
+                metadata["last_sell_tick"] = last_sell_tick
             ledger.set_metadata(metadata)
             Ledger.save_ledger(tag=ledger_cfg["tag"], ledger=ledger)
 
-            cooldowns[ledger_name] = {
-                "last_buy_tick": last_buy_tick,
-                "last_sell_tick": last_sell_tick,
-            }
+            if not dry_run:
+                cooldowns[ledger_name] = {
+                    "last_buy_tick": last_buy_tick,
+                    "last_sell_tick": last_sell_tick,
+                }
 
-        cooldown_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(cooldown_path, "w") as f:
-            json.dump(cooldowns, f, indent=2)
+        if not dry_run:
+            cooldown_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(cooldown_path, "w") as f:
+                json.dump(cooldowns, f, indent=2)
 
         return
 
@@ -277,4 +292,3 @@ def handle_top_of_hour(
         # Simulation-specific behaviour already covered through state mutation.
         # Placeholder for future live logic.
         pass
-
