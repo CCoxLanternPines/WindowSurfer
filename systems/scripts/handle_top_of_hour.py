@@ -17,6 +17,7 @@ from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.scripts.ledger import Ledger
 from systems.utils.addlog import addlog
 from systems.utils.path import find_project_root
+from systems.utils.top_hour_report import format_top_of_hour_report
 
 
 def handle_top_of_hour(
@@ -72,7 +73,7 @@ def handle_top_of_hour(
             wallet_code = ledger_cfg.get("wallet_code")
             fiat = ledger_cfg.get("fiat")
             window_settings = ledger_cfg.get("window_settings", {})
-
+            triggered_strategies = {wn.title(): False for wn in window_settings}
             ledger = Ledger.load_ledger(tag=ledger_cfg["tag"])
 
             price = get_live_price(kraken_pair=kraken_name)
@@ -218,11 +219,13 @@ def handle_top_of_hour(
                     else:
                         if not dry_run:
                             remaining = sell_cd - (current_ts - last_sell)
-                            addlog(
-                                f"[SKIP] {ledger_name} | {tag} | {window_name} → Sell blocked: cooldown active ({remaining // 60}m left)",
-                                verbose_int=3,
-                                verbose_state=True,
-                            )
+                                addlog(
+                                    f"[SKIP] {ledger_name} | {tag} | {window_name} → Sell blocked: cooldown active ({remaining // 60}m left)",
+                                    verbose_int=3,
+                                    verbose_state=True,
+                                )
+                if buy_count > 0 or sell_count > 0:
+                    triggered_strategies[window_name.title()] = True
 
                 summary = ledger.get_account_summary(price)
                 try:
@@ -253,6 +256,36 @@ def handle_top_of_hour(
                 metadata["last_sell_tick"] = last_sell_tick
             ledger.set_metadata(metadata)
             Ledger.save_ledger(tag=ledger_cfg["tag"], ledger=ledger)
+
+            try:
+                balance = get_kraken_balance(0)
+                usd_balance = float(balance.get(fiat, 0.0))
+                coin_balance = float(balance.get(wallet_code, 0.0))
+            except Exception:
+                usd_balance = 0.0
+                coin_balance = 0.0
+            coin_balance_usd = coin_balance * price
+            total_liquid_value = usd_balance + coin_balance_usd
+            note_counts = {}
+            for win in window_settings.keys():
+                open_n = sum(
+                    1 for n in ledger.get_open_notes() if n.get("window") == win
+                )
+                closed_n = sum(
+                    1 for n in ledger.get_closed_notes() if n.get("window") == win
+                )
+                note_counts[win.title()] = (open_n, closed_n)
+            report = format_top_of_hour_report(
+                tag,
+                datetime.utcnow(),
+                usd_balance,
+                coin_balance_usd,
+                wallet_code,
+                total_liquid_value,
+                triggered_strategies,
+                note_counts,
+            )
+            addlog(report, verbose_int=1, verbose_state=True)
 
             if not dry_run:
                 cooldowns[ledger_name] = {
