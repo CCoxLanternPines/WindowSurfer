@@ -79,3 +79,6 @@ def addlog(
     if LOGGING_ENABLED:
         with open(LOGFILE_PATH, "a", encoding="utf-8") as f:
             f.write(message + "\n")
+
+    if message.startswith("[LIVE][BUY]") or message.startswith("[SELL]"):
+        send_telegram_message(message)
