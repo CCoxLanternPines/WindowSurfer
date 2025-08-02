@@ -220,11 +220,11 @@ def handle_top_of_hour(
                         if not dry_run:
                             remaining = sell_cd - (current_ts - last_sell)
 
-                                addlog(
-                                    f"[SKIP] {ledger_name} | {tag} | {window_name} → Sell blocked: cooldown active ({remaining // 60}m left)",
-                                    verbose_int=3,
-                                    verbose_state=True,
-                                )
+                            addlog(
+                                f"[SKIP] {ledger_name} | {tag} | {window_name} → Sell blocked: cooldown active ({remaining // 60}m left)",
+                                verbose_int=3,
+                                verbose_state=True,
+                            )
                 if buy_count > 0 or sell_count > 0:
                     triggered_strategies[window_name.title()] = True
 
