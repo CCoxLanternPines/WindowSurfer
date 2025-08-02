@@ -13,7 +13,7 @@ from tqdm import tqdm
 from systems.scripts.fetch_canles import fetch_candles
 from systems.scripts.ledger import Ledger
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
-from systems.utils.logger import addlog
+from systems.utils.addlog import addlog
 from systems.utils.settings_loader import load_settings
 from systems.utils.resolve_symbol import resolve_ledger_settings
 from systems.utils.path import find_project_root
@@ -80,13 +80,21 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
 
             pbar.update(1)
 
-    print(f"[SIM] Completed {len(df)} ticks.")
+    addlog(
+        f"[SIM] Completed {len(df)} ticks.",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
 
     final_tick = len(df) - 1 if total else -1
     final_price = float(df.iloc[-1]["close"])
     summary = ledger.get_account_summary(final_price)
 
-    print(f"[DEBUG] Final tick: {final_tick}")
+    addlog(
+        f"[DEBUG] Final tick: {final_tick}",
+        verbose_int=3,
+        verbose_state=verbose,
+    )
     Ledger.save_ledger(tag, ledger, sim=True, final_tick=final_tick, summary=summary)
 
     saved_summary = Ledger.load_ledger(tag, sim=True).get_account_summary(final_price)
@@ -94,18 +102,44 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
         saved_summary["closed_notes"] != summary["closed_notes"]
         or saved_summary["realized_gain"] != summary["realized_gain"]
     ):
-        print(
+        addlog(
             "[WARN] Summary/ledger mismatch: "
             f"closed_notes {summary['closed_notes']} vs {saved_summary['closed_notes']}, "
-            f"realized_gain {summary['realized_gain']:.2f} vs {saved_summary['realized_gain']:.2f}"
+            f"realized_gain {summary['realized_gain']:.2f} vs {saved_summary['realized_gain']:.2f}",
+            verbose_int=1,
+            verbose_state=verbose,
         )
 
-    print(f"Final Price: ${summary['final_price']:.2f}")
-    print(f"Total Coin Held: {summary['open_coin_amount']:.6f}")
-    print(f"Final Value (USD): ${summary['total_value']:.2f}")
+    addlog(
+        f"Final Price: ${summary['final_price']:.2f}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+    addlog(
+        f"Total Coin Held: {summary['open_coin_amount']:.6f}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+    addlog(
+        f"Final Value (USD): ${summary['total_value']:.2f}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
 
     if verbose:
-        print(f"Buy cooldown skips: {state['buy_cooldown_skips']}")
-        print(f"Sell cooldown skips: {state['sell_cooldown_skips']}")
-    print(f"Min ROI gate hits: {state['min_roi_gate_hits']}")
+        addlog(
+            f"Buy cooldown skips: {state['buy_cooldown_skips']}",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+        addlog(
+            f"Sell cooldown skips: {state['sell_cooldown_skips']}",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+    addlog(
+        f"Min ROI gate hits: {state['min_roi_gate_hits']}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
 

@@ -1,0 +1,14 @@
+{
+  "open_notes": [
+    {
+      "entry_amount": 0.47202799,
+      "entry_price": 164.15429,
+      "entry_ts": 1754095813,
+      "entry_tick": 1754095785,
+      "window": "fish",
+      "status": "Open",
+      "mature_price": 196.86
+    }
+  ],
+  "closed_notes": []
+}

@@ -7,7 +7,7 @@ import sys
 
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
-from systems.utils.logger import init_logger, addlog
+from systems.utils.addlog import init_logger, addlog
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -75,18 +75,17 @@ def main(argv: list[str] | None = None) -> None:
         balances = get_kraken_balance(verbose)
 
         if verbose >= 1:
-            print("[WALLET] Kraken Balance")
-            if verbose >= 2:
-                print(balances)
+            addlog("[WALLET] Kraken Balance", verbose_int=1, verbose_state=verbose)
+            addlog(str(balances), verbose_int=2, verbose_state=verbose)
             for asset, amount in balances.items():
                 val = float(amount)
                 if val == 0:
                     continue
                 fmt = f"{val:.2f}" if val > 1 else f"{val:.6f}"
                 if asset.upper() in {"ZUSD", "USD", "USDT"}:
-                    print(f"{asset}: ${fmt}")
+                    addlog(f"{asset}: ${fmt}", verbose_int=1, verbose_state=verbose)
                 else:
-                    print(f"{asset}: {fmt}")
+                    addlog(f"{asset}: {fmt}", verbose_int=1, verbose_state=verbose)
         return
 
     if mode == "sim":
