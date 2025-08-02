@@ -87,6 +87,12 @@ def handle_top_of_hour(
             last_sell_tick = ledger_cooldowns.get("last_sell_tick", {})
 
             for window_name, window_cfg in window_settings.items():
+                addlog(
+                    f"[EVAL] {ledger_name} | {tag} | {window_name} window → evaluating",
+                    verbose_int=3,
+                    verbose_state=True,
+                )
+
                 buy_count = 0
                 sell_count = 0
 
@@ -153,6 +159,25 @@ def handle_top_of_hour(
                                     addlog(
                                         f"[LIVE][BUY] {ledger_name} | {tag} | {result['filled_amount']:.4f} {wallet_code} @ ${result['avg_price']:.3f}"
                                     )
+                    else:
+                        reasons = []
+                        if position > window_cfg.get("buy_floor", 0):
+                            reasons.append(
+                                f"position={position:.2f} above floor={window_cfg.get('buy_floor', 0)}"
+                            )
+                        if not dry_run and current_ts - last_buy < buy_cd:
+                            remaining = buy_cd - (current_ts - last_buy)
+                            reasons.append(
+                                f"cooldown active ({remaining // 60}m left)"
+                            )
+                        if not reasons:
+                            reasons.append("unknown gating condition")
+
+                        addlog(
+                            f"[SKIP] {ledger_name} | {tag} | {window_name} → Buy blocked: {', '.join(reasons)}",
+                            verbose_int=3,
+                            verbose_state=True,
+                        )
 
                     sell_cd = window_cfg.get("sell_cooldown", 0) * 3600
                     last_sell = last_sell_tick.get(window_name, float("-inf"))
@@ -186,6 +211,14 @@ def handle_top_of_hour(
                                 addlog(
                                     f"[LIVE][SELL] {ledger_name} | {tag} | Gain: ${gain:.2f} ({note['gain_pct']:.2%})"
                                 )
+                    else:
+                        if not dry_run:
+                            remaining = sell_cd - (current_ts - last_sell)
+                            addlog(
+                                f"[SKIP] {ledger_name} | {tag} | {window_name} → Sell blocked: cooldown active ({remaining // 60}m left)",
+                                verbose_int=3,
+                                verbose_state=True,
+                            )
 
                 summary = ledger.get_account_summary(price)
                 print(f"[LIVE] {ledger_name} | {tag} | {window_name} window")
