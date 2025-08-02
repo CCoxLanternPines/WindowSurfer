@@ -66,7 +66,7 @@ def send_top_hour_report(
 
     usd_balance = float(balance.get(fiat_code, 0.0))
     coin_balance = float(balance.get(wallet_code, 0.0))
-    pair_code = f"{wallet_code}{fiat_code}"
+    pair_code = ledger_cfg.get("kraken_name", "").replace("/", "")
     price = _get_latest_price(trades, pair_code)
     coin_value = coin_balance * price
     total_value = usd_balance + coin_value

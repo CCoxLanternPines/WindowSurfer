@@ -1,15 +1,14 @@
+
 import os
 from typing import Optional
 from tqdm import tqdm
 import yaml
 import requests
 
-
 LOGFILE_PATH = "data/tmp/log.txt"
 LOGGING_ENABLED = False
 DEFAULT_VERBOSE_STATE = 1
 
-TELEGRAM_ENABLED = False
 TELEGRAM_TOKEN: Optional[str] = None
 TELEGRAM_CHAT_ID: Optional[str] = None
 _TELEGRAM_WARNED = False
@@ -21,19 +20,18 @@ def init_logger(
     telegram_enabled: bool = False,
 ) -> None:
     """Initialize logger settings."""
-    global LOGGING_ENABLED, DEFAULT_VERBOSE_STATE, TELEGRAM_ENABLED
+    global LOGGING_ENABLED, DEFAULT_VERBOSE_STATE
     global TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, _TELEGRAM_WARNED
 
     LOGGING_ENABLED = logging_enabled
     DEFAULT_VERBOSE_STATE = verbose_level
-    TELEGRAM_ENABLED = telegram_enabled
     _TELEGRAM_WARNED = False
 
     if LOGGING_ENABLED:
         os.makedirs("data/tmp", exist_ok=True)
         open(LOGFILE_PATH, "w").close()
 
-    if TELEGRAM_ENABLED:
+    if telegram_enabled:
         try:
             with open("telegram.yaml", "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
@@ -41,14 +39,15 @@ def init_logger(
                 TELEGRAM_CHAT_ID = str(data["telegram"]["chat_id"])
         except Exception as exc:
             tqdm.write(f"[WARN] Telegram not initialized: {exc}")
-            TELEGRAM_ENABLED = False
+            TELEGRAM_TOKEN = None
+            TELEGRAM_CHAT_ID = None
             _TELEGRAM_WARNED = True
 
 
 def send_telegram_message(message: str) -> None:
     """Send a Telegram message if credentials are available."""
     global _TELEGRAM_WARNED
-    if not (TELEGRAM_ENABLED and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID):
+    if not (TELEGRAM_TOKEN and TELEGRAM_CHAT_ID):
         return
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
