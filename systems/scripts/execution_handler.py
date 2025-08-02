@@ -6,7 +6,7 @@ import base64
 from urllib.parse import urlencode
 
 from systems.scripts.kraken_auth import load_kraken_keys
-from systems.utils.logger import addlog
+from systems.utils.addlog import addlog
 from systems.scripts.kraken_utils import (
     get_kraken_balance,
     get_live_price,

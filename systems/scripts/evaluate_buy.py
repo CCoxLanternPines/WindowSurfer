@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Dict, Tuple
 
 from systems.scripts.ledger import Ledger
-from systems.utils.logger import addlog
+from systems.utils.addlog import addlog
 
 
 def evaluate_buy(

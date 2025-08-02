@@ -7,7 +7,7 @@ import sys
 
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
-from systems.utils.logger import init_logger, addlog
+from systems.utils.addlog import init_logger, addlog
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:

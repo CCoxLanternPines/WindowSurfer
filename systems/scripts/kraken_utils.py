@@ -6,7 +6,7 @@ import base64
 from urllib.parse import urlencode
 
 from systems.scripts.kraken_auth import load_kraken_keys
-from systems.utils.logger import addlog
+from systems.utils.addlog import addlog
 from systems.utils.price_fetcher import get_price
 
 KRAKEN_API_URL = "https://api.kraken.com"

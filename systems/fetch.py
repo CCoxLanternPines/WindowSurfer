@@ -18,7 +18,7 @@ from systems.utils.time import parse_relative_time
 from systems.utils.path import find_project_root
 
 from tqdm import tqdm
-from systems.utils.logger import addlog
+from systems.utils.addlog import addlog
 from systems.scripts.fetch_core import (
     _fetch_kraken,
     _fetch_binance,

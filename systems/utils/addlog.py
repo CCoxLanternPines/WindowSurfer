@@ -46,7 +46,10 @@ def init_logger(
 
 
 def addlog(
-    message: str, verbose_int: int = 1, verbose_state: int | None = None
+    message: str,
+    verbose_int: int = 1,
+    verbose_state: int | None = None,
+    telegram: bool = False,
 ) -> None:
     """Write a log message if ``verbose_int`` is within ``verbose_state``."""
     if verbose_state is None:
@@ -56,7 +59,7 @@ def addlog(
 
     if should_output:
         tqdm.write(message)
-        if TELEGRAM_ENABLED and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+        if telegram and TELEGRAM_ENABLED and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
             try:
                 url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
                 requests.post(
