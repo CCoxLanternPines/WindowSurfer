@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 from systems.utils.path import find_project_root
-from systems.utils.logger import addlog
+from systems.utils.addlog import addlog
 
 
 def _extract_candle_row(df, row_offset: int = 0) -> dict | None:

@@ -12,7 +12,7 @@ from tqdm import tqdm
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.settings_loader import load_settings
 from systems.fetch import fetch_missing_candles
-from systems.utils.logger import addlog
+from systems.utils.addlog import addlog
 
 
 def run_live(

@@ -13,7 +13,7 @@ from tqdm import tqdm
 from systems.scripts.fetch_canles import fetch_candles
 from systems.scripts.ledger import Ledger
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
-from systems.utils.logger import addlog
+from systems.utils.addlog import addlog
 from systems.utils.settings_loader import load_settings
 from systems.utils.resolve_symbol import resolve_ledger_settings
 from systems.utils.path import find_project_root
