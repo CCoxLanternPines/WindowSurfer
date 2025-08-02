@@ -269,7 +269,6 @@ def handle_top_of_hour(
                     verbose_int=1,
                     verbose_state=True,
                 )
-                send_telegram_message(message)
 
                 open_notes_w = [
                     n for n in ledger.get_open_notes() if n.get("window") == window_name
