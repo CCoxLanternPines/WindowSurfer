@@ -38,7 +38,7 @@ def prime_kraken_snapshot(api_key: str, api_secret: str, ledger_name: str, verbo
     }
 
     root = find_project_root()
-    snap_dir = root / "data" / "tmp" / "kraken_snapshots"
+    snap_dir = root / "data" / "snapshots"
     snap_dir.mkdir(parents=True, exist_ok=True)
     path = snap_dir / f"{ledger_name}.json"
     with open(path, "w") as f:
