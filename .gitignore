@@ -31,25 +31,23 @@ Thumbs.db
 # Temporary run state
 *.pid
 
-# Ignore data outputs
-data/raw/
-!data/raw/
-data/market/
-data/labeled/
-data/enriched/
-data/training/
-data/simledger.csv
+# Ignore everything in /data by default
+/data/*
 
-# Strategy test or scratch outputs
-data/test/
+# ✅ Allow core state folders
+!data/ledgers/
+!data/ledgers/*.json
+
+!data/kraken/
+!data/kraken/snapshots/
+!data/kraken/snapshots/*.json
+
+# ❌ Exclude noisy sim or temp files
 data/tmp/
-data/temp/
-/data/logs/
+data/results/
+data/sim_*
+data/*_backup.json
 
 apikeys.yaml
 kraken.yaml
-
-# Ignore all trained models
-data/models/model_*.json
-!data/raw/DOGEUSD.csv
 
