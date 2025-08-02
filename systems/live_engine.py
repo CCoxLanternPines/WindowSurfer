@@ -12,6 +12,7 @@ from tqdm import tqdm
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.settings_loader import load_settings
 from systems.fetch import fetch_missing_candles
+from systems.utils.logger import addlog
 
 
 def run_live(
@@ -31,8 +32,12 @@ def run_live(
         for ledger_key, ledger_cfg in settings.get("ledger_settings", {}).items():
             tag = ledger_cfg.get("tag")
             fetch_missing_candles(tag, relative_window="48h", verbose=verbose)
-            print(f"[SYNC] {ledger_key} | {tag} candles up to date")
-        print("[LIVE] Running top of hour")
+            addlog(
+                f"[SYNC] {ledger_key} | {tag} candles up to date",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+        addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
         handle_top_of_hour(
             tick=tick_time,
             settings=settings,
@@ -59,7 +64,7 @@ def run_live(
                 time.sleep(1)
                 pbar.update(1)
 
-        print("[LIVE] Running top of hour")
+        addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
         handle_top_of_hour(
             tick=datetime.now(timezone.utc),
             settings=settings,
