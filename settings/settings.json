@@ -11,18 +11,18 @@
           "window_size": "2d",
           "buy_cooldown": 5,
           "sell_cooldown": 10,
-          "min_roi": 0.2,
-          "investment_fraction": 0.05,
+          "min_roi": 0.3,
+          "investment_fraction": 0.1,
           "buy_floor": 0.25,
-          "sell_ceiling": 0.5,
+          "sell_ceiling": 0.7,
           "max_open_notes": 100
         },
-        "bull": {
+        "whale": {
           "window_size": "7d",
           "buy_cooldown": 100,
           "sell_cooldown": 200,
-          "min_roi": 0.6,
-          "investment_fraction": 0.2,
+          "min_roi": 0.9,
+          "investment_fraction": 0.3,
           "buy_floor": 0.03,
           "sell_ceiling": 0.8,
           "max_open_notes": 5
@@ -36,22 +36,22 @@
       "binance_name": "SOLUSDT",
       "fiat": "DAI",
       "window_settings": {
-        "fish": {
+        "bunny": {
           "window_size": "2d",
-          "buy_cooldown": 20,
-          "sell_cooldown": 40,
-          "min_roi": 0.2,
-          "investment_fraction": 0.05,
+          "buy_cooldown": 5,
+          "sell_cooldown": 10,
+          "min_roi": 0.3,
+          "investment_fraction": 0.1,
           "buy_floor": 0.25,
-          "sell_ceiling": 0.5,
+          "sell_ceiling": 0.7,
           "max_open_notes": 100
         },
-        "bull": {
+        "dog": {
           "window_size": "7d",
           "buy_cooldown": 100,
           "sell_cooldown": 200,
-          "min_roi": 0.6,
-          "investment_fraction": 0.1,
+          "min_roi": 0.9,
+          "investment_fraction": 0.3,
           "buy_floor": 0.03,
           "sell_ceiling": 0.8,
           "max_open_notes": 8
