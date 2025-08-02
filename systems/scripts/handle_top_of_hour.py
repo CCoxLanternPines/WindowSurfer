@@ -221,6 +221,13 @@ def handle_top_of_hour(
                             )
 
                 summary = ledger.get_account_summary(price)
+                hour_str = datetime.now().strftime("%I:%M%p")
+                addlog(
+                    f"[SUMMARY] {hour_str} | {ledger_name} | \U0001F4B0 ${summary['total_value']:.2f} | "
+                    f"\U0001F4B5 ${summary['idle_capital']:.2f} | \U0001FA99 ${summary['open_value']:.2f}",
+                    verbose_int=2,
+                    verbose_state=True,
+                )
                 print(f"[LIVE] {ledger_name} | {tag} | {window_name} window")
                 print(
                     f"✅ Buy attempts: {buy_count} | Sells: {sell_count} | Open Notes: {summary['open_notes']} | Realized Gain: ${summary['realized_gain']:.2f}"
