@@ -15,7 +15,7 @@ from systems.scripts.get_window_data import get_wave_window_data_df
 from systems.scripts.kraken_utils import get_live_price, get_kraken_balance
 from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.scripts.ledger import Ledger
-from systems.utils.addlog import addlog
+from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.path import find_project_root
 from systems.utils.top_hour_report import format_top_of_hour_report
 
@@ -243,14 +243,17 @@ def handle_top_of_hour(
                     verbose_int=2,
                     verbose_state=True,
                 )
-                addlog(
+                message = (
                     f"[LIVE] {ledger_name} | {tag} | {window_name} window\n"
                     f"✅ Buy attempts: {buy_count} | Sells: {sell_count} | "
-                    f"Open Notes: {summary['open_notes']} | Realized Gain: ${summary['realized_gain']:.2f}",
+                    f"Open Notes: {summary['open_notes']} | Realized Gain: ${summary['realized_gain']:.2f}"
+                )
+                addlog(
+                    message,
                     verbose_int=1,
                     verbose_state=True,
-                    telegram=True,
                 )
+                send_telegram_message(message)
 
             if not dry_run:
                 metadata["last_buy_tick"] = last_buy_tick

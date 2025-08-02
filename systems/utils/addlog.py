@@ -45,11 +45,28 @@ def init_logger(
             _TELEGRAM_WARNED = True
 
 
+def send_telegram_message(message: str) -> None:
+    """Send a Telegram message if credentials are available."""
+    global _TELEGRAM_WARNED
+    if not (TELEGRAM_ENABLED and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID):
+        return
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        requests.post(
+            url,
+            data={"chat_id": TELEGRAM_CHAT_ID, "text": message},
+            timeout=5,
+        )
+    except Exception as exc:
+        if not _TELEGRAM_WARNED:
+            tqdm.write(f"[WARN] Telegram send failed: {exc}")
+            _TELEGRAM_WARNED = True
+
+
 def addlog(
     message: str,
     verbose_int: int = 1,
     verbose_state: int | None = None,
-    telegram: bool = False,
 ) -> None:
     """Write a log message if ``verbose_int`` is within ``verbose_state``."""
     if verbose_state is None:
@@ -59,19 +76,6 @@ def addlog(
 
     if should_output:
         tqdm.write(message)
-        if telegram and TELEGRAM_ENABLED and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
-            try:
-                url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-                requests.post(
-                    url,
-                    data={"chat_id": TELEGRAM_CHAT_ID, "text": message},
-                    timeout=5,
-                )
-            except Exception as exc:
-                global _TELEGRAM_WARNED
-                if not _TELEGRAM_WARNED:
-                    tqdm.write(f"[WARN] Telegram send failed: {exc}")
-                    _TELEGRAM_WARNED = True
 
     if LOGGING_ENABLED:
         with open(LOGFILE_PATH, "a", encoding="utf-8") as f:
