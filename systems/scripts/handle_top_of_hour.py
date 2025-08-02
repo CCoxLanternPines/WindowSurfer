@@ -178,9 +178,13 @@ def handle_top_of_hour(
                                     if not dry_run:
                                         last_buy_tick[window_name] = current_ts
                                     buy_count += 1
-                                    addlog(
-                                        f"[LIVE][BUY] {ledger_name} | {tag} | {result['filled_amount']:.4f} {wallet_code} @ ${result['avg_price']:.3f}"
+                                    msg = (
+                                        f"[LIVE][BUY] {ledger_name} | {tag} | "
+                                        f"{result['filled_amount']:.4f} {wallet_code} @ "
+                                        f"${result['avg_price']:.3f}"
                                     )
+                                    addlog(msg)
+                                    send_telegram_message(msg)
                     else:
                         reasons = []
                         if position > window_cfg.get("buy_floor", 0):
@@ -413,14 +417,12 @@ def handle_top_of_hour(
         if closed:
             last_sell_tick[name] = tick
             for note in closed:
-                addlog(
-                    (
-                        f"[SELL] Tick {tick} | Window: {note['window']} | "
-                        f"Gain: +${note['gain']:.2f} ({note['gain_pct']:.2%})"
-                    ),
-                    verbose_int=2,
-                    verbose_state=verbose,
+                msg = (
+                    f"[SELL] Tick {tick} | Window: {note['window']} | "
+                    f"Gain: +${note['gain']:.2f} ({note['gain_pct']:.2%})"
                 )
+                addlog(msg, verbose_int=2, verbose_state=verbose)
+                send_telegram_message(msg)
 
     if sim:
         # Simulation-specific behaviour already covered through state mutation.
