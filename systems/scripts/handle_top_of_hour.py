@@ -3,8 +3,10 @@ from __future__ import annotations
 """Execute trading logic at the top of each hour."""
 
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict
 
+import json
 import pandas as pd
 
 from systems.scripts.evaluate_buy import evaluate_buy
@@ -52,6 +54,14 @@ def handle_top_of_hour(
         if settings is None:
             return
 
+        root: Path = find_project_root()
+        cooldown_path = root / "data" / "tmp" / "cooldowns.json"
+        if cooldown_path.exists():
+            with open(cooldown_path, "r") as f:
+                cooldowns = json.load(f)
+        else:
+            cooldowns = {}
+
         general_cfg = settings.get("general_settings", {})
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
@@ -65,12 +75,12 @@ def handle_top_of_hour(
 
             price = get_live_price(kraken_pair=kraken_name)
 
-            root = find_project_root()
             current_ts = int(tick.timestamp()) if isinstance(tick, datetime) else int(tick)
 
             metadata = ledger.get_metadata()
-            last_buy_tick = metadata.get("last_buy_tick", {})
-            last_sell_tick = metadata.get("last_sell_tick", {})
+            ledger_cooldowns = cooldowns.get(ledger_name, {})
+            last_buy_tick = ledger_cooldowns.get("last_buy_tick", {})
+            last_sell_tick = ledger_cooldowns.get("last_sell_tick", {})
 
             for window_name, window_cfg in window_settings.items():
                 buy_count = 0
@@ -175,6 +185,16 @@ def handle_top_of_hour(
             metadata["last_sell_tick"] = last_sell_tick
             ledger.set_metadata(metadata)
             Ledger.save_ledger(tag=ledger_cfg["tag"], ledger=ledger)
+
+            cooldowns[ledger_name] = {
+                "last_buy_tick": last_buy_tick,
+                "last_sell_tick": last_sell_tick,
+            }
+
+        cooldown_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cooldown_path, "w") as f:
+            json.dump(cooldowns, f, indent=2)
+
         return
 
     if candle is None or ledger is None or ledger_config is None:
