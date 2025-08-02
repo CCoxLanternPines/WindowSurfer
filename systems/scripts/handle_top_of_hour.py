@@ -239,9 +239,15 @@ def handle_top_of_hour(
                     verbose_int=2,
                     verbose_state=True,
                 )
-                print(f"[LIVE] {ledger_name} | {tag} | {window_name} window")
-                print(
-                    f"✅ Buy attempts: {buy_count} | Sells: {sell_count} | Open Notes: {summary['open_notes']} | Realized Gain: ${summary['realized_gain']:.2f}"
+                addlog(
+                    f"[LIVE] {ledger_name} | {tag} | {window_name} window",
+                    verbose_int=1,
+                    verbose_state=True,
+                )
+                addlog(
+                    f"✅ Buy attempts: {buy_count} | Sells: {sell_count} | Open Notes: {summary['open_notes']} | Realized Gain: ${summary['realized_gain']:.2f}",
+                    verbose_int=1,
+                    verbose_state=True,
                 )
 
             if not dry_run:
