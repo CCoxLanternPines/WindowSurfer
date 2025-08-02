@@ -18,6 +18,7 @@ from systems.scripts.prime_kraken_snapshot import prime_kraken_snapshot
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.scripts.ledger import Ledger
 from systems.utils.addlog import addlog, send_telegram_message
+from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.path import find_project_root
 from systems.utils.top_hour_report import format_top_of_hour_report
 
@@ -80,6 +81,7 @@ def handle_top_of_hour(
             fiat = ledger_cfg.get("fiat")
             window_settings = ledger_cfg.get("window_settings", {})
             triggered_strategies = {wn.title(): False for wn in window_settings}
+            strategy_summary: dict[str, dict] = {}
             ledger = Ledger.load_ledger(tag=ledger_cfg["tag"])
 
             snap_path = root / "data" / "tmp" / "kraken_snapshots" / f"{ledger_name}.json"
@@ -269,6 +271,31 @@ def handle_top_of_hour(
                 )
                 send_telegram_message(message)
 
+                open_notes_w = [
+                    n for n in ledger.get_open_notes() if n.get("window") == window_name
+                ]
+                closed_notes_w = [
+                    n for n in ledger.get_closed_notes() if n.get("window") == window_name
+                ]
+                unrealized = sum(
+                    (price - n.get("entry_price", 0.0)) * n.get("entry_amount", 0.0)
+                    for n in open_notes_w
+                )
+                realized = sum(n.get("gain", 0.0) for n in closed_notes_w)
+                total_gain = unrealized + realized
+                invested = sum(
+                    n.get("entry_price", 0.0) * n.get("entry_amount", 0.0)
+                    for n in open_notes_w + closed_notes_w
+                )
+                roi = (total_gain / invested * 100.0) if invested else 0.0
+                strategy_summary[window_name.title()] = {
+                    "buys": buy_count,
+                    "sells": sell_count,
+                    "open": len(open_notes_w),
+                    "roi": roi,
+                    "total": total_gain,
+                }
+
             if not dry_run:
                 metadata["last_buy_tick"] = last_buy_tick
                 metadata["last_sell_tick"] = last_sell_tick
@@ -299,6 +326,13 @@ def handle_top_of_hour(
                 note_counts,
             )
             addlog(report, verbose_int=1, verbose_state=True)
+
+            send_top_hour_report(
+                ledger_name=ledger_name,
+                tag=tag,
+                strategy_summary=strategy_summary,
+                verbose=general_cfg.get("verbose", 0),
+            )
 
             if not dry_run:
                 cooldowns[ledger_name] = {
