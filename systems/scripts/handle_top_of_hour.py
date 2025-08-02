@@ -120,8 +120,12 @@ def handle_top_of_hour(
                             if n.get("window") == window_name
                         ]
                         if len(open_for_window) < window_cfg.get("max_open_notes", 0):
-                            balance = get_kraken_balance(0)
-                            available = float(balance.get(fiat, 0.0))
+                            try:
+                                balance = get_kraken_balance(0)
+                                available = float(balance.get(fiat, 0.0))
+                            except Exception:
+                                balance = {}
+                                available = 0.0
                             invest = available * window_cfg.get(
                                 "investment_fraction", 0
                             )
@@ -221,6 +225,13 @@ def handle_top_of_hour(
                             )
 
                 summary = ledger.get_account_summary(price)
+                try:
+                    balance = get_kraken_balance(0)
+                    idle_capital = float(balance.get(fiat, 0.0))
+                except Exception:
+                    idle_capital = 0.0
+                summary["idle_capital"] = idle_capital
+                summary["total_value"] += idle_capital
                 hour_str = datetime.now().strftime("%I:%M%p")
                 addlog(
                     f"[SUMMARY] {hour_str} | {ledger_name} | \U0001F4B0 ${summary['total_value']:.2f} | "
