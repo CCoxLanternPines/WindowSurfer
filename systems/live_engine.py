@@ -42,27 +42,31 @@ def run_live(
         )
         return
 
-    elapsed = tick_time.minute * 60 + tick_time.second
-    remaining = 3600 - elapsed
+    while True:
+        now = datetime.utcnow().replace(tzinfo=timezone.utc)
+        elapsed_secs = now.minute * 60 + now.second
+        remaining_secs = 3600 - elapsed_secs
 
-    with tqdm(
-        total=remaining,
-        desc="⏳ Waiting for top of hour",
-        unit="s",
-        dynamic_ncols=True,
-    ) as pbar:
-        for _ in range(remaining):
-            time.sleep(1)
-            pbar.update(1)
+        with tqdm(
+            total=3600,
+            initial=elapsed_secs,
+            desc="⏳ Time to next hour",
+            bar_format="{l_bar}{bar}| {percentage:3.0f}% {remaining}s",
+            leave=True,
+            dynamic_ncols=True,
+        ) as pbar:
+            for _ in range(remaining_secs):
+                time.sleep(1)
+                pbar.update(1)
 
-    print("[LIVE] Running top of hour")
-    handle_top_of_hour(
-        tick=datetime.now(timezone.utc),
-        settings=settings,
-        sim=False,
-        dry=dry,
-        verbose=verbose,
-    )
+        print("[LIVE] Running top of hour")
+        handle_top_of_hour(
+            tick=datetime.now(timezone.utc),
+            settings=settings,
+            sim=False,
+            dry=dry,
+            verbose=verbose,
+        )
 
 
 def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
