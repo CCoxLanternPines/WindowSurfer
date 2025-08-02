@@ -33,7 +33,13 @@ def run_live(
             fetch_missing_candles(tag, relative_window="48h", verbose=verbose)
             print(f"[SYNC] {ledger_key} | {tag} candles up to date")
         print("[LIVE] Running top of hour")
-        handle_top_of_hour(tick=tick_time, settings=settings, sim=False)
+        handle_top_of_hour(
+            tick=tick_time,
+            settings=settings,
+            sim=False,
+            dry=dry,
+            verbose=verbose,
+        )
         return
 
     elapsed = tick_time.minute * 60 + tick_time.second
@@ -50,7 +56,13 @@ def run_live(
             pbar.update(1)
 
     print("[LIVE] Running top of hour")
-    handle_top_of_hour(tick=datetime.now(timezone.utc), settings=settings, sim=False)
+    handle_top_of_hour(
+        tick=datetime.now(timezone.utc),
+        settings=settings,
+        sim=False,
+        dry=dry,
+        verbose=verbose,
+    )
 
 
 def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
