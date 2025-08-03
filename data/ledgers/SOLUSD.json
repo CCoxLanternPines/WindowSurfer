@@ -8,6 +8,15 @@
       "window": "dog",
       "status": "Open",
       "mature_price": 291.42
+    },
+    {
+      "entry_amount": 2.82976906,
+      "entry_price": 161.61,
+      "entry_ts": 1754235360,
+      "entry_tick": 1754235353,
+      "window": "dog",
+      "status": "Open",
+      "mature_price": 290.898
     }
   ],
   "closed_notes": [],
