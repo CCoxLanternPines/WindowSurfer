@@ -30,8 +30,8 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
     knobs_path = root / "settings" / "knobs.json"
 
     base_settings = _load_json(settings_path)
-    knobs_cfg = _load_json(knobs_path).get(tag)
-    if knobs_cfg is None:
+    knob_ranges = _load_json(knobs_path)
+    if tag not in knob_ranges:
         raise ValueError(f"No knob configuration found for tag: {tag}")
 
     ledger_key = None
@@ -59,16 +59,17 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
     import systems.sim_engine as sim_engine
 
     window_settings = base_settings["ledger_settings"][ledger_key]["window_settings"]
-    for window_name in window_settings:
-        window_knobs = knobs_cfg.get(window_name)
-        if not window_knobs:
+    valid_windows = knob_ranges.get(tag, {}).keys()
+    for window_name in valid_windows:
+        if window_name not in window_settings:
             if verbose:
                 addlog(
-                    f"[TUNE] No knob ranges for window '{window_name}', skipping",
+                    f"[TUNE] Window '{window_name}' not in settings, skipping",
                     verbose_int=1,
                     verbose_state=verbose,
                 )
             continue
+        window_knobs = knob_ranges[tag][window_name]
 
         def objective(trial: optuna.trial.Trial) -> float:
             trial_settings = copy.deepcopy(base_settings)
@@ -126,8 +127,18 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
                     verbose_int=1,
                     verbose_state=verbose,
                 )
-            # Persist knobs after every trial
-            best_knobs[window_name] = dict(trial.params)
+            return score
+
+        if verbose <= 0:
+            optuna.logging.set_verbosity(optuna.logging.WARNING)
+        else:
+            optuna.logging.set_verbosity(optuna.logging.INFO)
+
+        study = optuna.create_study(direction="maximize")
+        study.optimize(objective, n_trials=50)
+
+        if study.best_trial is not None:
+            best_knobs[window_name] = study.best_params
             try:
                 with out_path.open("w", encoding="utf-8") as f:
                     json.dump(best_knobs, f, indent=2)
@@ -139,15 +150,6 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
                     verbose_int=1,
                     verbose_state=verbose,
                 )
-            return score
-
-        if verbose <= 0:
-            optuna.logging.set_verbosity(optuna.logging.WARNING)
-        else:
-            optuna.logging.set_verbosity(optuna.logging.INFO)
-
-        study = optuna.create_study(direction="maximize")
-        study.optimize(objective, n_trials=50)
 
         addlog(
             f"[TUNE][{window_name}] Best parameters: {study.best_params}",
