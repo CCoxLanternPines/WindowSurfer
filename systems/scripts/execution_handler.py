@@ -23,35 +23,52 @@ def now_utc_timestamp() -> int:
     return int(time.time())
 
 
-def load_snapshot(tag: str) -> dict:
+def load_snapshot(tag: str) -> dict | None:
     root = find_project_root()
-    snap_path = root / "data" / "tmp" / "kraken_snapshots" / f"{tag}.json"
+    snap_path = root / "data" / "snapshots" / f"{tag}.json"
     if not snap_path.exists():
-        return {}
+        return None
     try:
         with snap_path.open("r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
-        return {}
+        return None
+
+
+def save_snapshot(tag: str, snapshot: dict) -> None:
+    root = find_project_root()
+    snap_dir = root / "data" / "snapshots"
+    snap_dir.mkdir(parents=True, exist_ok=True)
+    with (snap_dir / f"{tag}.json").open("w", encoding="utf-8") as f:
+        json.dump(snapshot, f)
+
+
+def fetch_snapshot_from_kraken(tag: str) -> dict:
+    api_key, api_secret = load_kraken_keys()
+    balance_resp = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
+    trades_resp = _kraken_request(
+        "TradesHistory",
+        {"type": "all", "trades": True},
+        api_key,
+        api_secret,
+    ).get("result", {})
+    return {
+        "last_updated": now_utc_timestamp(),
+        "balance": balance_resp,
+        "trades": trades_resp.get("trades", trades_resp),
+    }
+
+
+def load_or_fetch_snapshot(tag: str) -> dict:
+    snapshot = load_snapshot(tag)
+    if snapshot is None or snapshot.get("last_updated", 0) < now_utc_timestamp() - 60:
+        snapshot = fetch_snapshot_from_kraken(tag)
+        save_snapshot(tag, snapshot)
+    return snapshot
 
 
 def _get_snapshot(tag: str, api_key: str, api_secret: str) -> dict:
-    snapshot = load_snapshot(tag)
-    now = now_utc_timestamp()
-    if snapshot.get("last_updated", 0) < now - 60:
-        balance_resp = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
-        trades_resp = _kraken_request(
-            "TradesHistory",
-            {"type": "all", "trades": True},
-            api_key,
-            api_secret,
-        ).get("result", {})
-        snapshot = {
-            "last_updated": now,
-            "balance": balance_resp,
-            "trades": trades_resp.get("trades", trades_resp),
-        }
-    return snapshot
+    return load_or_fetch_snapshot(tag)
 
 def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) -> dict:
     url_path = f"/0/private/{endpoint}"
