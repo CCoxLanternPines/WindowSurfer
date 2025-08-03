@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -146,6 +147,16 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
         try:
             with out_path.open("w", encoding="utf-8") as f:
                 json.dump(best_knobs, f, indent=2)
-            addlog(f"[TUNE] ✅ Saved best knobs for {tag} → {out_path}", verbose_int=1, verbose_state=verbose)
+                f.flush()
+                os.fsync(f.fileno())
+            addlog(
+                f"[TUNE] ✅ Saved best knobs for {tag} → {out_path.resolve()}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
         except Exception as e:
-            addlog(f"[ERROR] Failed to write best_knobs file: {e}", verbose_int=1, verbose_state=verbose)
+            addlog(
+                f"[ERROR] Failed to write best_knobs file: {e}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
