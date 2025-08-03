@@ -8,25 +8,15 @@
       "binance_name": "DOGEUSDT",
       "fiat": "ZUSD",
       "window_settings": {
-        "fish": {
-          "window_size": "1d",
-          "buy_cooldown": 2,
-          "sell_cooldown": 22,
-          "min_roi": 0.1,
-          "investment_fraction": 0.10,
-          "buy_floor": 0.25,
-          "sell_ceiling": 0.7,
-          "max_open_notes": 30
-        },
-        "whale": {
-          "window_size": "4d",
-          "buy_cooldown": 20,
-          "sell_cooldown": 100,
-          "min_roi": 0.5,
-          "investment_fraction": 0.3,
-          "buy_floor": 0.25,
-          "sell_ceiling": 0.9,
-          "max_open_notes": 5
+        "dog": {
+          "window_size": "7d",
+          "buy_cooldown": 108,
+          "sell_cooldown": 80,
+          "min_roi": 0.625321491513477,
+          "investment_fraction": 0.1,
+          "buy_floor": 0.251297141853029,
+          "sell_ceiling": 0.539091086750003,
+          "max_open_notes": 100
         }
       }
     },
@@ -39,24 +29,14 @@
       "fiat": "DAI",
       "window_settings": {
         "bunny": {
-          "window_size": "2d",
+          "window_size": "7d",
           "buy_cooldown": 2,
-          "sell_cooldown": 18,
-          "min_roi": 0.4,
-          "investment_fraction": 0.15,
-          "buy_floor": 0.25,
-          "sell_ceiling": 0.7,
-          "max_open_notes": 100
-        },
-        "dog": {
-          "window_size": "5d",
-          "buy_cooldown": 10,
-          "sell_cooldown": 100,
-          "min_roi": 0.8,
-          "investment_fraction": 0.3,
-          "buy_floor": 0.25,
-          "sell_ceiling": 0.9,
-          "max_open_notes": 10
+            "sell_cooldown": 148,
+            "min_roi": 0.543280801644922,
+            "investment_fraction": 0.1,
+            "buy_floor": 0.490153492110162,
+            "sell_ceiling": 0.642255110294084,
+            "max_open_notes": 100
         }
       }
     }

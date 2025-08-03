@@ -47,3 +47,6 @@ data/*_backup.json
 apikeys.yaml
 kraken.yaml
 
+# Ignore all files in data/tmp/
+data/tmp/tune_trails
+

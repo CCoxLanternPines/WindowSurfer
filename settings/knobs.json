@@ -1,18 +1,22 @@
 {
   "DOGEUSD": {
-    "fish": {
-      "buy_cooldown": [1, 12],
-      "sell_cooldown": [4, 24],
+    "dog": {
+      "buy_cooldown": [1, 200],
+      "sell_cooldown": [1, 200],
       "min_roi": [0.1, 1.0],
       "buy_floor": [0.1, 0.5],
       "sell_ceiling": [0.5, 1.0]
-    },
-    "whale": {
-      "buy_cooldown": [1, 12],
-      "sell_cooldown": [4, 24],
+    }
+  },
+  "SOLUSD": {
+    "bunny": {
+      "buy_cooldown": [1, 200],
+      "sell_cooldown": [1, 200],
       "min_roi": [0.1, 1.0],
       "buy_floor": [0.1, 0.5],
       "sell_ceiling": [0.5, 1.0]
     }
   }
 }
+
+
