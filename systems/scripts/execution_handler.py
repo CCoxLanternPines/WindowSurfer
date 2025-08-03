@@ -140,7 +140,9 @@ def buy_order(
         txid = order_resp["result"]["txid"][0]
         addlog(f"Order placed: {txid}", verbose_int=1, verbose_state=verbose)
 
-        trades = snapshot.get("trades", {})
+        trades_resp = _kraken_request("TradesHistory", {}, api_key, api_secret)
+        trades = trades_resp.get("result", {}).get("trades", {})
+
         for tid, trade in trades.items():
             if trade.get("ordertxid") == txid:
                 addlog(
