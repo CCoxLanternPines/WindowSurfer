@@ -145,6 +145,16 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
         best_knobs[window_name] = study.best_params
 
         try:
+            addlog(
+                f"[DEBUG] Writing to: {out_path.resolve()}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            addlog(
+                f"[DEBUG] Content: {json.dumps(study.best_params)}",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
             with out_path.open("w", encoding="utf-8") as f:
                 json.dump(best_knobs, f, indent=2)
                 f.flush()
