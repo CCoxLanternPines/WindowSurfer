@@ -49,7 +49,7 @@ def _load_snapshot(ledger_name: str) -> dict:
         If the snapshot is missing or older than the current hour.
     """
     root = find_project_root()
-    path = root / "data" / "tmp" / "snapshots" / f"{ledger_name}.json"
+    path = root / "data" / "snapshots" / f"{ledger_name}.json"
     if not path.exists():
         raise RuntimeError(
             "[ERROR] Kraken snapshot missing — cannot proceed in live mode."
