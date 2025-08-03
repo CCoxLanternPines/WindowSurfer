@@ -152,7 +152,7 @@ def handle_top_of_hour(
                             if invest >= min_usd and invest <= available and invest > 0:
                                 result = execute_buy(
                                     None,
-                                    symbol=ledger_cfg["kraken_name"],
+                                    symbol=tag,
                                     fiat_code=fiat,
                                     price=price,
                                     amount_usd=invest,
@@ -219,7 +219,7 @@ def handle_top_of_hour(
                             ) and price >= note.get("mature_price", float("inf")):
                                 result = execute_sell(
                                     None,
-                                    symbol=ledger_cfg["kraken_name"],
+                                    symbol=tag,
                                     coin_amount=note["entry_amount"],
                                     ledger_name=ledger_name,
                                 )
