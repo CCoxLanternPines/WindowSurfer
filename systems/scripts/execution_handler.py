@@ -3,11 +3,12 @@ import requests
 import hashlib
 import hmac
 import base64
+import json
 from urllib.parse import urlencode
 
 from systems.scripts.kraken_auth import load_kraken_keys
-from systems.utils.addlog import addlog
-from systems.scripts.kraken_utils import ensure_snapshot  # use shared util now
+from systems.utils.addlog import addlog, send_telegram_message
+from systems.utils.path import find_project_root
 
 
 def fetch_price_data(symbol: str) -> dict:
@@ -20,6 +21,37 @@ def fetch_price_data(symbol: str) -> dict:
 
 def now_utc_timestamp() -> int:
     return int(time.time())
+
+
+def load_snapshot(tag: str) -> dict:
+    root = find_project_root()
+    snap_path = root / "data" / "tmp" / "kraken_snapshots" / f"{tag}.json"
+    if not snap_path.exists():
+        return {}
+    try:
+        with snap_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _get_snapshot(tag: str, api_key: str, api_secret: str) -> dict:
+    snapshot = load_snapshot(tag)
+    now = now_utc_timestamp()
+    if snapshot.get("last_updated", 0) < now - 60:
+        balance_resp = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
+        trades_resp = _kraken_request(
+            "TradesHistory",
+            {"type": "all", "trades": True},
+            api_key,
+            api_secret,
+        ).get("result", {})
+        snapshot = {
+            "last_updated": now,
+            "balance": balance_resp,
+            "trades": trades_resp.get("trades", trades_resp),
+        }
+    return snapshot
 
 def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) -> dict:
     url_path = f"/0/private/{endpoint}"
@@ -64,15 +96,7 @@ def buy_order(
 ) -> dict:
     api_key, api_secret = load_kraken_keys()
 
-    snapshot = ensure_snapshot(ledger_name)
-    if not snapshot:
-        addlog(
-            "[ABORT] Kraken snapshot unavailable — cannot place buy order",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-        return {}
-
+    snapshot = _get_snapshot(ledger_name, api_key, api_secret)
     balance = snapshot.get("balance", {})
     available_usd = float(balance.get(fiat_symbol, 0.0))
 
@@ -117,7 +141,14 @@ def buy_order(
         )
     except Exception as e:
         if "EOrder:Insufficient funds" in str(e):
-            addlog("[SKIP] Kraken rejected buy — insufficient funds", verbose_int=1, verbose_state=verbose)
+            addlog(
+                "[SKIP] Kraken rejected order — insufficient funds",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            send_telegram_message(
+                f"⚠️ Kraken rejected order for {ledger_name}: insufficient funds."
+            )
             return {}
         raise
 
@@ -140,24 +171,10 @@ def sell_order(
 ) -> dict:
     api_key, api_secret = load_kraken_keys()
 
-    if not ensure_snapshot(ledger_name):
-        addlog(
-            "[ABORT] Kraken snapshot unavailable — cannot place sell order",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-        return {}
+    snapshot = _get_snapshot(ledger_name, api_key, api_secret)
 
-    price_resp = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={pair_code}").json()
-    ticker_result = price_resp.get("result", {})
-    if not ticker_result:
-        raise Exception("Invalid ticker response: missing result")
-    ticker_key = next(iter(ticker_result))
-    ticker_data = ticker_result.get(ticker_key, {})
-    close = ticker_data.get("c")
-    if not close:
-        raise Exception("Invalid ticker response: missing close price")
-    price = float(close[0])
+    price_data = fetch_price_data(pair_code)
+    price = float(price_data.get("c", [0])[0])
     coin_amount = round(usd_amount / price, 8)
     usd_amount = coin_amount * price
     addlog(
@@ -166,40 +183,45 @@ def sell_order(
         verbose_state=verbose,
     )
 
-    order_resp = _kraken_request(
-        "AddOrder",
-        {
-            "pair": pair_code,
-            "type": "sell",
-            "ordertype": "market",
-            "volume": coin_amount,
-            "trades": True,
-        },
-        api_key,
-        api_secret,
-    )
-
-    txid = order_resp["result"]["txid"][0]
-    addlog(f"Sell Order placed: {txid}", verbose_int=1, verbose_state=verbose)
-
-    snapshot = ensure_snapshot(ledger_name)
-    trades = snapshot.get("trades", {}) if snapshot else {}
-    for tid, trade in trades.items():
-        if trade.get("ordertxid") == txid:
+    try:
+        order_resp = _kraken_request(
+            "AddOrder",
+            {
+                "pair": pair_code,
+                "type": "sell",
+                "ordertype": "market",
+                "volume": coin_amount,
+                "trades": True,
+            },
+            api_key,
+            api_secret,
+        )
+    except Exception as e:
+        if "EOrder:Insufficient funds" in str(e):
             addlog(
-                "Sell trade found in snapshot history", verbose_int=2, verbose_state=verbose
+                "[SKIP] Kraken rejected order — insufficient funds",
+                verbose_int=1,
+                verbose_state=verbose,
             )
-            return {
-                "kraken_txid": txid,
-                "symbol": pair_code,
-                "price": float(trade["price"]),
-                "volume": float(trade["vol"]),
-                "cost": float(trade["cost"]),
-                "fee": float(trade["fee"]),
-                "timestamp": int(trade["time"]),
-            }
+            send_telegram_message(
+                f"⚠️ Kraken rejected order for {ledger_name}: insufficient funds."
+            )
+            return {}
+        raise
 
-    raise Exception("Sell order failed — no fill found in snapshot.")
+    txid_list = order_resp.get("result", {}).get("txid")
+    txid = txid_list[0] if txid_list else None
+    if not txid:
+        raise Exception("Sell order failed — no txid returned")
+
+    return {
+        "txid": txid,
+        "volume": coin_amount,
+        "price": price,
+        "filled_amount": coin_amount,
+        "avg_price": price,
+        "timestamp": now_utc_timestamp(),
+    }
 
 
 def execute_buy(
