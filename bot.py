@@ -16,8 +16,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         required=True,
-        choices=["sim", "live", "wallet"],
-        help="Execution mode: sim, live, or wallet",
+        choices=["sim", "simtune", "live", "wallet"],
+        help="Execution mode: sim, simtune, live, or wallet",
     )
     parser.add_argument(
         "--tag",
@@ -90,6 +90,13 @@ def main(argv: list[str] | None = None) -> None:
 
     if mode == "sim":
         run_simulation(tag=args.tag.upper(), verbose=args.verbose)
+    elif mode == "simtune":
+        if not args.tag:
+            addlog("Error: --tag is required for simtune", verbose_int=1, verbose_state=verbose)
+            sys.exit(1)
+        from systems.scripts.sim_tuner import run_sim_tuner
+
+        run_sim_tuner(tag=args.tag.upper(), verbose=args.verbose)
     elif mode == "live":
         run_live(
             tag=args.tag.upper() if args.tag else None,
@@ -98,7 +105,11 @@ def main(argv: list[str] | None = None) -> None:
             verbose=args.verbose,
         )
     else:
-        addlog("Error: --mode must be either 'sim', 'live', or 'wallet'")
+        addlog(
+            "Error: --mode must be either 'sim', 'simtune', 'live', or 'wallet'",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
         sys.exit(1)
 
 
