@@ -2,7 +2,6 @@ from __future__ import annotations
 
 """Simple in-memory ledger for simulations and live trading."""
 
-from datetime import datetime
 import json
 from typing import Dict, List
 
@@ -95,40 +94,38 @@ class Ledger:
                 ledger.metadata = data.get("metadata", {})
             return ledger
 
-        ledger_dir = root / "data" / "ledger" / tag
-        if ledger_dir.exists():
-            files = sorted(ledger_dir.glob("*.json"))
-            if files:
-                path = files[-1]
-                with path.open("r", encoding="utf-8") as f:
-                    data = json.load(f)
-                ledger.open_notes = data.get("open_notes", [])
-                ledger.closed_notes = data.get("closed_notes", [])
-                ledger.metadata = data.get("metadata", {})
+        path = root / "data" / "ledgers" / f"{tag}.json"
+        if path.exists():
+            with path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            ledger.open_notes = data.get("open_notes", [])
+            ledger.closed_notes = data.get("closed_notes", [])
+            ledger.metadata = data.get("metadata", {})
         return ledger
 
-    @staticmethod
-    def save_ledger(
-        tag: str,
-        ledger: "Ledger",
-        *,
-        sim: bool = False,
-        final_tick: int | None = None,
-        summary: dict | None = None,
-    ) -> None:
-        """Persist ``ledger`` to simulation or live ledger directories."""
-        root = find_project_root()
 
-        if sim:
-            out_dir = root / "data" / "tmp" / "simulation"
-            out_dir.mkdir(parents=True, exist_ok=True)
-            out_path = out_dir / f"{tag}.json"
-        else:
-            out_dir = root / "data" / "ledger" / tag
-            out_dir.mkdir(parents=True, exist_ok=True)
-            ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-            out_path = out_dir / f"{ts}.json"
+def save_ledger(
+    ledger_name: str,
+    ledger: "Ledger" | dict,
+    *,
+    sim: bool = False,
+    final_tick: int | None = None,
+    summary: dict | None = None,
+) -> None:
+    """Persist ``ledger`` data to the canonical ledger directory."""
 
+    root = find_project_root()
+
+    if sim:
+        out_dir = root / "data" / "tmp" / "simulation"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{ledger_name}.json"
+    else:
+        out_dir = root / "data" / "ledgers"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{ledger_name}.json"
+
+    if isinstance(ledger, Ledger):
         ledger_data = {
             "open_notes": ledger.get_open_notes(),
             "closed_notes": ledger.get_closed_notes(),
@@ -146,6 +143,8 @@ class Ledger:
         metadata = ledger.get_metadata()
         if metadata:
             ledger_data["metadata"] = metadata
+    else:
+        ledger_data = ledger
 
-        with out_path.open("w", encoding="utf-8") as f:
-            json.dump(ledger_data, f, indent=2)
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(ledger_data, f, indent=2)
