@@ -3,8 +3,10 @@ from __future__ import annotations
 """Sequential per-window simulation tuner using Optuna."""
 
 import copy
+import csv
 import json
 import os
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict
 
@@ -44,16 +46,9 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
 
     init_capital = float(base_settings.get("simulation_capital", 0))
 
-    out_dir = root / "data" / "tmp" / "best_knobs"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"{tag}.json"
-    print("[DEBUG] Saving to:", out_path.resolve())
-
-    if out_path.exists():
-        with out_path.open("r", encoding="utf-8") as f:
-            best_knobs: Dict[str, Any] = json.load(f)
-    else:
-        best_knobs = {}
+    results_path = root / "data" / "tmp" / "sim_tune_results.csv"
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    best_knobs: Dict[str, Any] = {}
 
     import systems.utils.settings_loader as settings_loader
     import systems.sim_engine as sim_engine
@@ -126,19 +121,6 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
                     verbose_int=1,
                     verbose_state=verbose,
                 )
-            # Persist knobs after every trial
-            best_knobs[window_name] = dict(trial.params)
-            try:
-                with out_path.open("w", encoding="utf-8") as f:
-                    json.dump(best_knobs, f, indent=2)
-                    f.flush()
-                    os.fsync(f.fileno())
-            except Exception as e:
-                addlog(
-                    f"[ERROR] Failed to write best_knobs file: {e}",
-                    verbose_int=1,
-                    verbose_state=verbose,
-                )
             return score
 
         if verbose <= 0:
@@ -149,8 +131,24 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=50)
 
+        best_score = study.best_value
+        best_params = study.best_params
+        best_knobs[window_name] = best_params
+
         addlog(
-            f"[TUNE][{window_name}] Best parameters: {study.best_params}",
+            f"[TUNE][{window_name}] Best parameters: {best_params}",
             verbose_int=1,
             verbose_state=verbose,
         )
+
+        row = OrderedDict([("tag", tag), ("window", window_name), ("score", best_score)])
+        for k, v in best_params.items():
+            row[k] = v
+        file_exists = results_path.exists()
+        with results_path.open("a", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=row.keys())
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(row)
+            csvfile.flush()
+            os.fsync(csvfile.fileno())
