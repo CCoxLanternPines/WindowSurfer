@@ -127,7 +127,7 @@ def buy_order(
 
     if available_usd < usd_amount:
         addlog(
-            f"[SKIP] Not enough {fiat_symbol} to buy: ${available_usd:.2f} available, need ${usd_amount:.2f}",
+            f"[SKIP] Insufficient {fiat_symbol}",
             verbose_int=1,
             verbose_state=verbose,
         )
@@ -174,6 +174,29 @@ def buy_order(
     txid = txid_list[0] if txid_list else None
     if not txid:
         raise Exception("Buy order failed — no txid returned")
+
+    # Verify deduction from the expected fiat wallet
+    post_balance = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
+    new_fiat_balance = float(post_balance.get(fiat_symbol, 0.0))
+    spent = available_usd - new_fiat_balance
+    if spent < usd_amount * 0.8:  # fiat wallet unchanged or wrong wallet used
+        for code, prev_amt in balance.items():
+            if code == fiat_symbol:
+                continue
+            drop = float(prev_amt) - float(post_balance.get(code, 0.0))
+            if drop > usd_amount * 0.8:
+                addlog(
+                    f"[ERROR] Fiat mismatch: {code} decreased instead of {fiat_symbol}",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
+                break
+        else:
+            addlog(
+                f"[ERROR] Fiat mismatch: {fiat_symbol} balance unchanged after buy",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
 
     return {
         "txid": txid,

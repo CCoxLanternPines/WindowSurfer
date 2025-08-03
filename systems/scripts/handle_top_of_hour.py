@@ -69,14 +69,15 @@ def handle_top_of_hour(
             cooldowns = {}
 
         dry_run = kwargs.get("dry", False)
+        client = kwargs.get("client")
 
         general_cfg = settings.get("general_settings", {})
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
-            tag = ledger_cfg.get("tag")
-            kraken_name = ledger_cfg.get("kraken_name")
-            wallet_code = ledger_cfg.get("wallet_code")
-            fiat = ledger_cfg.get("fiat")
+            tag = ledger_cfg["tag"]
+            kraken_pair = ledger_cfg["kraken_name"]
+            wallet_code = ledger_cfg["wallet_code"]
+            fiat = ledger_cfg["fiat"]
             window_settings = ledger_cfg.get("window_settings", {})
             triggered_strategies = {wn.title(): False for wn in window_settings}
             strategy_summary: dict[str, dict] = {}
@@ -92,7 +93,7 @@ def handle_top_of_hour(
                 continue
             balance = snapshot.get("balance", {})
 
-            price = get_live_price(kraken_pair=kraken_name)
+            price = get_live_price(kraken_pair=kraken_pair)
 
             current_ts = (
                 int(tick.timestamp()) if isinstance(tick, datetime) else int(tick)
@@ -146,8 +147,8 @@ def handle_top_of_hour(
                             invest = min(invest, max_usd)
                             if invest >= min_usd and invest <= available and invest > 0:
                                 result = execute_buy(
-                                    None,
-                                    symbol=ledger_cfg["kraken_pair"],
+                                    client=client,
+                                    symbol=kraken_pair,
                                     fiat_code=fiat,
                                     price=price,
                                     amount_usd=invest,
@@ -214,9 +215,10 @@ def handle_top_of_hour(
                                 "min_roi", 0
                             ) and price >= note.get("mature_price", float("inf")):
                                 result = execute_sell(
-                                    None,
-                                    symbol=ledger_cfg["kraken_pair"],
+                                    client=client,
+                                    symbol=kraken_pair,
                                     coin_amount=note["entry_amount"],
+                                    fiat_code=fiat,
                                     ledger_name=ledger_name,
                                 )
                                 note["exit_price"] = result["avg_price"]
