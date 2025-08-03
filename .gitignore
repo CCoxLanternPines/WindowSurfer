@@ -38,9 +38,6 @@ Thumbs.db
 !data/ledgers/
 !data/ledgers/*.json
 
-!data/snapshots/
-!data/snapshots/*.json
-
 # ❌ Exclude noisy sim or temp files
 data/tmp/
 data/results/
