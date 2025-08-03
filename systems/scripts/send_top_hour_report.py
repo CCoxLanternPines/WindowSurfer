@@ -36,7 +36,7 @@ def send_top_hour_report(
 ) -> None:
     """Load Kraken snapshot and send a formatted Telegram report."""
     root = find_project_root()
-    snap_path = root / "data" / "tmp" / "kraken_snapshots" / f"{ledger_name}.json"
+    snap_path = root / "data" / "snapshots" / f"{ledger_name}.json"
     if not snap_path.exists():
         addlog(
             f"[WARN] Snapshot for {ledger_name} not found; skipping report",
