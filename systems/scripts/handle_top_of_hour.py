@@ -13,9 +13,11 @@ from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.get_window_data import get_wave_window_data_df
 from systems.scripts.kraken_utils import get_live_price
-from systems.scripts.execution_handler import execute_buy, execute_sell
-from systems.scripts.prime_kraken_snapshot import prime_kraken_snapshot
-from systems.scripts.kraken_auth import load_kraken_keys
+from systems.scripts.execution_handler import (
+    execute_buy,
+    execute_sell,
+    load_or_fetch_snapshot,
+)
 from systems.scripts.ledger import Ledger
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.scripts.send_top_hour_report import send_top_hour_report
@@ -69,12 +71,8 @@ def handle_top_of_hour(
         dry_run = kwargs.get("dry", False)
 
         general_cfg = settings.get("general_settings", {})
-        api_key, api_secret = load_kraken_keys()
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
-            prime_kraken_snapshot(
-                api_key, api_secret, ledger_name, general_cfg.get("verbose", 0)
-            )
             tag = ledger_cfg.get("tag")
             kraken_name = ledger_cfg.get("kraken_name")
             wallet_code = ledger_cfg.get("wallet_code")
@@ -84,18 +82,15 @@ def handle_top_of_hour(
             strategy_summary: dict[str, dict] = {}
             ledger = Ledger.load_ledger(tag=ledger_cfg["tag"])
 
-            snap_path = root / "data" / "tmp" / "kraken_snapshots" / f"{ledger_name}.json"
-            try:
-                with open(snap_path, "r") as f:
-                    snapshot = json.load(f)
-                balance = snapshot.get("balance", {})
-            except Exception:
+            snapshot = load_or_fetch_snapshot(ledger_name)
+            if not snapshot:
                 addlog(
                     "[ERROR] Kraken snapshot missing — cannot proceed in live mode.",
                     verbose_int=1,
                     verbose_state=True,
                 )
                 continue
+            balance = snapshot.get("balance", {})
 
             price = get_live_price(kraken_pair=kraken_name)
 
