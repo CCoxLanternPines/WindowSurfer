@@ -46,6 +46,8 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
     out_dir = root / "data" / "tmp" / "best_knobs"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{tag}.json"
+    print("[DEBUG] Saving to:", out_path.resolve())
+
     if out_path.exists():
         with out_path.open("r", encoding="utf-8") as f:
             best_knobs: Dict[str, Any] = json.load(f)
@@ -140,7 +142,10 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
         )
 
         best_knobs[window_name] = study.best_params
-        with out_path.open("w", encoding="utf-8") as f:
-            json.dump(best_knobs, f, indent=2)
 
-
+        try:
+            with out_path.open("w", encoding="utf-8") as f:
+                json.dump(best_knobs, f, indent=2)
+            addlog(f"[TUNE] ✅ Saved best knobs for {tag} → {out_path}", verbose_int=1, verbose_state=verbose)
+        except Exception as e:
+            addlog(f"[ERROR] Failed to write best_knobs file: {e}", verbose_int=1, verbose_state=verbose)
