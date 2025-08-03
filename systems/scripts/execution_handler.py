@@ -7,10 +7,19 @@ from urllib.parse import urlencode
 
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.utils.addlog import addlog
-from systems.scripts.kraken_utils import ensure_snapshot, get_live_price  # use shared util now
+from systems.scripts.kraken_utils import ensure_snapshot  # use shared util now
 
-KRAKEN_ORDER_TIMEOUT = 6
-SLIPPAGE_STEPS = [0.0, 0.002, 0.004, 0.007, 0.01]
+
+def fetch_price_data(symbol: str) -> dict:
+    resp = requests.get(
+        f"https://api.kraken.com/0/public/Ticker?pair={symbol}", timeout=10
+    )
+    result = resp.json().get("result", {})
+    return next(iter(result.values()), {})
+
+
+def now_utc_timestamp() -> int:
+    return int(time.time())
 
 def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) -> dict:
     url_path = f"/0/private/{endpoint}"
@@ -66,15 +75,18 @@ def buy_order(
 
     balance = snapshot.get("balance", {})
     available_usd = float(balance.get(fiat_symbol, 0.0))
-    
+
     addlog(f"[DEBUG] Balance snapshot: {balance}", verbose_int=1, verbose_state=verbose)
     addlog(f"[DEBUG] Using fiat_symbol = {fiat_symbol}", verbose_int=1, verbose_state=verbose)
-    addlog(f"[DEBUG] available_usd = {available_usd} | trying to spend = {usd_amount}", verbose_int=1, verbose_state=verbose)
+    addlog(
+        f"[DEBUG] available_usd = {available_usd} | trying to spend = {usd_amount}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
 
-    
     if available_usd < usd_amount:
         addlog(
-            f"[ABORT] Not enough {fiat_symbol} to buy: ${available_usd:.2f} available, need ${usd_amount:.2f}",
+            f"[SKIP] Not enough {fiat_symbol} to buy: ${available_usd:.2f} available, need ${usd_amount:.2f}",
             verbose_int=1,
             verbose_state=verbose,
         )
@@ -86,80 +98,42 @@ def buy_order(
         verbose_state=verbose,
     )
 
-    for slippage in SLIPPAGE_STEPS:
-        price_resp = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={pair_code}").json()
-        ticker_result = price_resp.get("result", {})
-        if not ticker_result:
-            addlog(
-                "[ERROR] Invalid ticker response: missing result",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-            continue
-        ticker_key = next(iter(ticker_result))
-        ticker_data = ticker_result.get(ticker_key, {})
-        close = ticker_data.get("c")
-        if not close:
-            addlog(
-                "[ERROR] Invalid ticker response: missing close price",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-            continue
+    price_data = fetch_price_data(pair_code)
+    price = float(price_data.get("c", [0])[0])
+    coin_amount = round(usd_amount / price, 8)
 
-        price = float(close[0])
-        adjusted_price = price * (1 + slippage)
-        coin_amount = round(usd_amount / adjusted_price, 8)
-        usd_equiv = coin_amount * adjusted_price
-
-        addlog(
-            f"\nTrying buy with slippage {slippage*100:.2f}% → ${usd_equiv:.2f}",
-            verbose_int=3,
-            verbose_state=verbose,
+    try:
+        order_resp = _kraken_request(
+            "AddOrder",
+            {
+                "pair": pair_code,
+                "type": "buy",
+                "ordertype": "market",
+                "volume": coin_amount,
+                "trades": True,
+            },
+            api_key,
+            api_secret,
         )
+    except Exception as e:
+        if "EOrder:Insufficient funds" in str(e):
+            addlog("[SKIP] Kraken rejected buy — insufficient funds", verbose_int=1, verbose_state=verbose)
+            return {}
+        raise
 
-        try:
+    txid_list = order_resp.get("result", {}).get("txid")
+    txid = txid_list[0] if txid_list else None
+    if not txid:
+        raise Exception("Buy order failed — no txid returned")
 
-            order_resp = _kraken_request(
-                "AddOrder",
-                {
-                    "pair": pair_code,
-                    "type": "buy",
-                    "ordertype": "market",
-                    "volume": coin_amount,
-                    "trades": True,
-                },
-                api_key,
-                api_secret,
-            )
-        except Exception as e:
-            if "EOrder:Insufficient funds" in str(e):
-                addlog("[SKIP] Kraken rejected buy — insufficient funds", verbose_int=1, verbose_state=verbose)
-                return {}
-            raise
-
-        txid = order_resp["result"]["txid"][0]
-        addlog(f"Order placed: {txid}", verbose_int=1, verbose_state=verbose)
-
-        snapshot = ensure_snapshot(ledger_name)
-        trades = snapshot.get("trades", {}) if snapshot else {}
-        for tid, trade in trades.items():
-            if trade.get("ordertxid") == txid:
-                addlog(
-                    "Trade found in snapshot history", verbose_int=2, verbose_state=verbose
-                )
-                return {
-                    "kraken_txid": txid,
-                    "symbol": pair_code,
-                    "price": float(trade["price"]),
-                    "volume": float(trade["vol"]),
-                    "cost": float(trade["cost"]),
-                    "fee": float(trade["fee"]),
-                    "timestamp": int(trade["time"]),
-                }
-        addlog("Slippage level failed, trying next...", verbose_int=3, verbose_state=verbose)
-
-    raise Exception("Buy order failed — no fill found in snapshot.")
+    return {
+        "txid": txid,
+        "volume": coin_amount,
+        "price": price,
+        "filled_amount": coin_amount,
+        "avg_price": price,
+        "timestamp": now_utc_timestamp(),
+    }
 
 def sell_order(
     pair_code: str, fiat_symbol: str, usd_amount: float, ledger_name: str, verbose: int = 0
