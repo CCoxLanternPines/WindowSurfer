@@ -20,20 +20,43 @@ def run_live(
     window: str | None = None,
     dry: bool = False,
     verbose: int = 0,
+    *,
+    settings_override: dict | None = None,
 ) -> None:
     """Run the live trading engine.
 
     Parameters are currently placeholders for forward compatibility.
     """
-    settings = load_settings()
+    settings = settings_override or load_settings()
+    knobs = settings.get("knobs")
+    if knobs:
+        allowed = {
+            "buy_cooldown",
+            "sell_cooldown",
+            "min_roi",
+            "buy_floor",
+            "sell_ceiling",
+        }
+        for ledger_cfg in settings.get("ledger_settings", {}).values():
+            for window_cfg in ledger_cfg.get("window_settings", {}).values():
+                for key, val in knobs.items():
+                    if key in allowed and key in window_cfg:
+                        window_cfg[key] = val
+
+    if tag:
+        settings["ledger_settings"] = {
+            k: v
+            for k, v in settings.get("ledger_settings", {}).items()
+            if v.get("tag") == tag
+        }
     tick_time = datetime.now(timezone.utc)
 
     if dry:
         for ledger_key, ledger_cfg in settings.get("ledger_settings", {}).items():
-            tag = ledger_cfg.get("tag")
-            fetch_missing_candles(tag, relative_window="48h", verbose=verbose)
+            cfg_tag = ledger_cfg.get("tag")
+            fetch_missing_candles(cfg_tag, relative_window="48h", verbose=verbose)
             addlog(
-                f"[SYNC] {ledger_key} | {tag} candles up to date",
+                f"[SYNC] {ledger_key} | {cfg_tag} candles up to date",
                 verbose_int=1,
                 verbose_state=verbose,
             )

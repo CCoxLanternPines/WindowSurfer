@@ -16,8 +16,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         required=True,
-        choices=["sim", "live", "wallet"],
-        help="Execution mode: sim, live, or wallet",
+        choices=["sim", "live", "wallet", "tune"],
+        help="Execution mode: sim, live, wallet, or tune",
     )
     parser.add_argument(
         "--tag",
@@ -97,8 +97,12 @@ def main(argv: list[str] | None = None) -> None:
             dry=args.dry,
             verbose=args.verbose,
         )
+    elif mode == "tune":
+        from systems.scripts.optuna_tuner import run_tuner
+
+        run_tuner(tag=args.tag.upper(), verbose=args.verbose)
     else:
-        addlog("Error: --mode must be either 'sim', 'live', or 'wallet'")
+        addlog("Error: --mode must be either 'sim', 'live', 'wallet', or 'tune'")
         sys.exit(1)
 
 
