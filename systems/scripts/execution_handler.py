@@ -3,13 +3,11 @@ import requests
 import hashlib
 import hmac
 import base64
-import json
 from urllib.parse import urlencode
 
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.utils.addlog import addlog
-from systems.utils.path import find_project_root
-from systems.scripts.kraken_utils import get_live_price  # use shared util now
+from systems.scripts.kraken_utils import ensure_snapshot, get_live_price  # use shared util now
 
 KRAKEN_ORDER_TIMEOUT = 6
 SLIPPAGE_STEPS = [0.0, 0.002, 0.004, 0.007, 0.01]
@@ -40,29 +38,6 @@ def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) ->
     return result
 
 
-def _load_snapshot(ledger_name: str) -> dict:
-    """Load the cached Kraken snapshot for ``ledger_name``.
-
-    Raises
-    ------
-    RuntimeError
-        If the snapshot is missing or older than the current hour.
-    """
-    root = find_project_root()
-    path = root / "data" / "snapshots" / f"{ledger_name}.json"
-    if not path.exists():
-        raise RuntimeError(
-            "[ERROR] Kraken snapshot missing — cannot proceed in live mode."
-        )
-    with open(path, "r") as f:
-        snapshot = json.load(f)
-    hour_start = int(time.time()) // 3600 * 3600
-    if snapshot.get("timestamp", 0) < hour_start:
-        raise RuntimeError(
-            "[ERROR] Kraken snapshot missing — cannot proceed in live mode."
-        )
-    return snapshot
-
 def get_available_fiat_balance(exchange, currency: str = "USD") -> float:
     try:
         balance = exchange.fetch_free_balance()
@@ -80,7 +55,14 @@ def buy_order(
 ) -> dict:
     api_key, api_secret = load_kraken_keys()
 
-    snapshot = _load_snapshot(ledger_name)
+    snapshot = ensure_snapshot(ledger_name)
+    if not snapshot:
+        addlog(
+            "[ABORT] Kraken snapshot unavailable — cannot place buy order",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return {}
     balance = snapshot.get("balance", {})
     available_usd = float(balance.get(wallet_code, 0.0))
     if available_usd < usd_amount:
@@ -145,7 +127,8 @@ def buy_order(
         txid = order_resp["result"]["txid"][0]
         addlog(f"Order placed: {txid}", verbose_int=1, verbose_state=verbose)
 
-        trades = snapshot.get("trades", {})
+        snapshot = ensure_snapshot(ledger_name)
+        trades = snapshot.get("trades", {}) if snapshot else {}
         for tid, trade in trades.items():
             if trade.get("ordertxid") == txid:
                 addlog(
@@ -168,6 +151,14 @@ def sell_order(
     pair_code: str, fiat_symbol: str, usd_amount: float, ledger_name: str, verbose: int = 0
 ) -> dict:
     api_key, api_secret = load_kraken_keys()
+
+    if not ensure_snapshot(ledger_name):
+        addlog(
+            "[ABORT] Kraken snapshot unavailable — cannot place sell order",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return {}
 
     price_resp = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={pair_code}").json()
     ticker_result = price_resp.get("result", {})
@@ -203,8 +194,8 @@ def sell_order(
     txid = order_resp["result"]["txid"][0]
     addlog(f"Sell Order placed: {txid}", verbose_int=1, verbose_state=verbose)
 
-    snapshot = _load_snapshot(ledger_name)
-    trades = snapshot.get("trades", {})
+    snapshot = ensure_snapshot(ledger_name)
+    trades = snapshot.get("trades", {}) if snapshot else {}
     for tid, trade in trades.items():
         if trade.get("ordertxid") == txid:
             addlog(
