@@ -243,13 +243,29 @@ def execute_buy(
     currently unused as ``buy_order`` pulls pricing from Kraken directly.
     """
 
-    fills = buy_order(symbol, fiat_code, amount_usd, ledger_name, wallet_code, verbose)
-    if not fills:
-        return {}
+    result = buy_order(
+        symbol, fiat_code, amount_usd, ledger_name, wallet_code, verbose
+    )
+    if (
+        not result
+        or result.get("filled_amount", 0) <= 0
+        or result.get("price", 0) <= 0
+        or not result.get("txid")
+        or not result.get("timestamp")
+    ):
+        addlog(
+            f"[SKIP] Trade result invalid — not logging to ledger for {ledger_name}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        send_telegram_message(
+            f"⚠️ Skipped logging invalid trade for {ledger_name}: empty or failed result."
+        )
+        return
     return {
-        "filled_amount": fills.get("volume", 0.0),
-        "avg_price": fills.get("price", 0.0),
-        "timestamp": fills.get("timestamp"),
+        "filled_amount": result.get("filled_amount", 0.0),
+        "avg_price": result.get("price", 0.0),
+        "timestamp": result.get("timestamp"),
     }
 
 
@@ -272,9 +288,25 @@ def execute_sell(
     fiat = fiat_code or "ZUSD"
     sell_price = price if price is not None else get_live_price(symbol)
     usd_amount = coin_amount * sell_price
-    fills = sell_order(symbol, fiat, usd_amount, ledger_name, verbose)
+    result = sell_order(symbol, fiat, usd_amount, ledger_name, verbose)
+    if (
+        not result
+        or result.get("filled_amount", 0) <= 0
+        or result.get("price", 0) <= 0
+        or not result.get("txid")
+        or not result.get("timestamp")
+    ):
+        addlog(
+            f"[SKIP] Trade result invalid — not logging to ledger for {ledger_name}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        send_telegram_message(
+            f"⚠️ Skipped logging invalid trade for {ledger_name}: empty or failed result."
+        )
+        return
     return {
-        "filled_amount": fills.get("volume", 0.0),
-        "avg_price": fills.get("price", 0.0),
-        "timestamp": fills.get("timestamp"),
+        "filled_amount": result.get("filled_amount", 0.0),
+        "avg_price": result.get("price", 0.0),
+        "timestamp": result.get("timestamp"),
     }
