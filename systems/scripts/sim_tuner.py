@@ -6,6 +6,7 @@ import copy
 import csv
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict
 
@@ -47,6 +48,8 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
 
     results_path = root / "data" / "tmp" / "sim_tune_results.csv"
     results_path.parent.mkdir(parents=True, exist_ok=True)
+    trials_dir = root / "data" / "tmp" / "tune_trials"
+    trials_dir.mkdir(parents=True, exist_ok=True)
     best_knobs: Dict[str, Any] = {}
 
     import systems.utils.settings_loader as settings_loader
@@ -63,6 +66,11 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
                     verbose_state=verbose,
                 )
             continue
+
+        safe_tag = re.sub(r"[^a-z0-9_]+", "_", tag.lower())
+        safe_window = re.sub(r"[^a-z0-9_]+", "_", window_name.lower())
+        trial_csv_path = trials_dir / f"{safe_tag}_{safe_window}.csv"
+        trial_fieldnames = ["trial_number", "score", *window_knobs.keys()]
 
         def objective(trial: optuna.trial.Trial) -> float:
             trial_settings = copy.deepcopy(base_settings)
@@ -120,6 +128,19 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
                     verbose_int=1,
                     verbose_state=verbose,
                 )
+            row = {
+                "trial_number": trial.number,
+                "score": score,
+                **{k: trial.params.get(k) for k in window_knobs.keys()},
+            }
+            file_exists = trial_csv_path.exists()
+            with trial_csv_path.open("a", newline="", encoding="utf-8") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=trial_fieldnames)
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerow(row)
+                csvfile.flush()
+                os.fsync(csvfile.fileno())
             return score
 
         if verbose <= 0:
