@@ -71,13 +71,18 @@ def get_available_fiat_balance(exchange, currency: str = "USD") -> float:
     return float(balance.get(currency, 0.0))
 
 def buy_order(
-    pair_code: str, fiat_symbol: str, usd_amount: float, ledger_name: str, verbose: int = 0
+    pair_code: str,
+    fiat_symbol: str,
+    usd_amount: float,
+    ledger_name: str,
+    wallet_code: str,
+    verbose: int = 0,
 ) -> dict:
     api_key, api_secret = load_kraken_keys()
 
     snapshot = _load_snapshot(ledger_name)
     balance = snapshot.get("balance", {})
-    available_usd = float(balance.get(fiat_symbol, 0.0))
+    available_usd = float(balance.get(wallet_code, 0.0))
     if available_usd < usd_amount:
         addlog(
             f"[ABORT] Not enough {fiat_symbol} to buy: ${available_usd:.2f} available, need ${usd_amount:.2f}",
@@ -226,6 +231,7 @@ def execute_buy(
     price: float,
     amount_usd: float,
     ledger_name: str,
+    wallet_code: str,
     verbose: int = 0,
 ) -> dict:
     """Place a real buy order and normalise the result structure.
@@ -234,7 +240,7 @@ def execute_buy(
     currently unused as ``buy_order`` pulls pricing from Kraken directly.
     """
 
-    fills = buy_order(symbol, fiat_code, amount_usd, ledger_name, verbose)
+    fills = buy_order(symbol, fiat_code, amount_usd, ledger_name, wallet_code, verbose)
     if not fills:
         return {}
     return {
