@@ -4,6 +4,7 @@
       "tag": "DOGEUSD",
       "wallet_code": "XXDG",
       "kraken_name": "DOGE/USD",
+      "kraken_pair": "XXDGZUSD",
       "binance_name": "DOGEUSDT",
       "fiat": "ZUSD",
       "window_settings": {
@@ -33,6 +34,7 @@
       "tag": "SOLUSD",
       "wallet_code": "SOL.F",
       "kraken_name": "SOL/USD",
+      "kraken_pair": "SOLUSD",
       "binance_name": "SOLUSDT",
       "fiat": "DAI",
       "window_settings": {
