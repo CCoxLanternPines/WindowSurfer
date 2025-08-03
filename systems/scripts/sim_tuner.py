@@ -6,7 +6,6 @@ import copy
 import csv
 import json
 import os
-from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict
 
@@ -141,9 +140,12 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
             verbose_state=verbose,
         )
 
-        row = OrderedDict([("tag", tag), ("window", window_name), ("score", best_score)])
-        for k, v in best_params.items():
-            row[k] = v
+        row = {
+            "tag": tag,
+            "window": window_name,
+            "score": best_score,
+            **best_params,
+        }
         file_exists = results_path.exists()
         with results_path.open("a", newline="", encoding="utf-8") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=row.keys())
