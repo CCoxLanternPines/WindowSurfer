@@ -9,7 +9,7 @@ from typing import Optional
 from systems.utils.settings_loader import load_settings
 from systems.utils.path import find_project_root
 from systems.utils.addlog import addlog
-from systems.scripts.kraken_utils import get_live_price
+from systems.scripts.kraken_utils import ensure_snapshot, get_live_price
 from systems.scripts.execution_handler import execute_buy, execute_sell
 
 
@@ -28,19 +28,6 @@ def _save_ledger(ledger_name: str, ledger: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         json.dump(ledger, f, indent=2)
-
-
-def _load_snapshot(ledger_name: str) -> dict:
-    root = find_project_root()
-    snap_path = root / "data" / "snapshots" / f"{ledger_name}.json"
-    if not snap_path.exists():
-        raise FileNotFoundError(
-            f"Snapshot for ledger '{ledger_name}' not found at {snap_path}"
-        )
-    with snap_path.open("r", encoding="utf-8") as f:
-        return json.load(f)
-
-
 def _coin_label(tag: str) -> str:
     for suffix in ["USD", "USDT", "USDC", "EUR", "GBP", "DAI"]:
         if tag.endswith(suffix):
@@ -72,7 +59,11 @@ def main(argv: Optional[list[str]] = None) -> None:
         raise SystemExit("[ERROR] --usd must be positive")
 
     # Ensure snapshot exists
-    _load_snapshot(args.ledger)
+    snapshot = ensure_snapshot(args.ledger)
+    if not snapshot:
+        raise SystemExit(
+            f"[ERROR] Snapshot unavailable for ledger '{args.ledger}'"
+        )
 
     tag = ledger_cfg.get("tag")
     kraken_pair = ledger_cfg.get("kraken_name")

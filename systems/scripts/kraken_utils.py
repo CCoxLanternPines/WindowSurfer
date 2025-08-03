@@ -1,12 +1,14 @@
-import requests
-import time
+import base64
 import hashlib
 import hmac
-import base64
+import json
+import requests
+import time
 from urllib.parse import urlencode
 
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.utils.addlog import addlog
+from systems.utils.path import find_project_root
 from systems.utils.price_fetcher import get_price
 
 KRAKEN_API_URL = "https://api.kraken.com"
@@ -89,3 +91,68 @@ def get_kraken_balance(verbose: int = 0) -> dict:
     )
 
     return {k: float(v) for k, v in result.items()}
+
+
+def _load_snapshot(ledger_name: str) -> dict:
+    root = find_project_root()
+    snap_path = root / "data" / "snapshots" / f"{ledger_name}.json"
+    if not snap_path.exists():
+        raise FileNotFoundError(
+            f"Snapshot for ledger '{ledger_name}' not found at {snap_path}"
+        )
+    with snap_path.open("r", encoding="utf-8") as f:
+        snapshot = json.load(f)
+    hour_start = int(time.time()) // 3600 * 3600
+    if snapshot.get("timestamp", 0) < hour_start:
+        raise FileNotFoundError(
+            f"Snapshot for ledger '{ledger_name}' is stale"
+        )
+    return snapshot
+
+
+def fetch_kraken_snapshot(ledger_name: str, verbose: int = 0) -> dict:
+    api_key, api_secret = load_kraken_keys()
+    try:
+        balance_resp = _kraken_request("Balance", {}, api_key, api_secret).get(
+            "result", {}
+        )
+        trades_resp = _kraken_request(
+            "TradesHistory",
+            {"type": "all", "trades": True},
+            api_key,
+            api_secret,
+        ).get("result", {})
+
+        snapshot = {
+            "timestamp": int(time.time()),
+            "balance": balance_resp,
+            "trades": trades_resp.get("trades", trades_resp),
+        }
+
+        root = find_project_root()
+        snap_dir = root / "data" / "snapshots"
+        snap_dir.mkdir(parents=True, exist_ok=True)
+        with (snap_dir / f"{ledger_name}.json").open("w", encoding="utf-8") as f:
+            json.dump(snapshot, f)
+
+        addlog(
+            f"[SNAPSHOT] Cached Kraken balance and trades for {ledger_name}",
+            verbose_int=3,
+            verbose_state=verbose,
+        )
+        return snapshot
+    except Exception as exc:
+        addlog(
+            f"[ERROR] Failed to fetch Kraken snapshot for {ledger_name}: {exc}",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        return {}
+
+
+def ensure_snapshot(ledger_name: str) -> dict:
+    try:
+        return _load_snapshot(ledger_name)
+    except FileNotFoundError:
+        addlog(f"[INFO] No snapshot found for {ledger_name}. Fetching...")
+        return fetch_kraken_snapshot(ledger_name)
