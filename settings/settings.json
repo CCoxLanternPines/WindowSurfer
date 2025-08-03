@@ -11,22 +11,22 @@
         "fish": {
           "window_size": "1d",
           "buy_cooldown": 2,
-          "sell_cooldown": 10,
-          "min_roi": 0.2,
-          "investment_fraction": 0.1,
+          "sell_cooldown": 22,
+          "min_roi": 0.1,
+          "investment_fraction": 0.10,
           "buy_floor": 0.25,
           "sell_ceiling": 0.7,
-          "max_open_notes": 50
+          "max_open_notes": 30
         },
         "whale": {
-          "window_size": "3d",
-          "buy_cooldown": 10,
-          "sell_cooldown": 30,
-          "min_roi": 0.4,
-          "investment_fraction": 0.4,
+          "window_size": "4d",
+          "buy_cooldown": 20,
+          "sell_cooldown": 100,
+          "min_roi": 0.5,
+          "investment_fraction": 0.3,
           "buy_floor": 0.25,
-          "sell_ceiling": 0.7,
-          "max_open_notes": 50
+          "sell_ceiling": 0.9,
+          "max_open_notes": 5
         }
       }
     },
