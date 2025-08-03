@@ -11,6 +11,7 @@ from systems.utils.path import find_project_root
 from systems.utils.addlog import addlog
 from systems.scripts.kraken_utils import ensure_snapshot, get_live_price
 from systems.scripts.execution_handler import execute_buy, execute_sell
+from systems.scripts.ledger import save_ledger
 
 
 def _load_ledger(ledger_name: str) -> dict:
@@ -20,14 +21,6 @@ def _load_ledger(ledger_name: str) -> dict:
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
     return {"trades": []}
-
-
-def _save_ledger(ledger_name: str, ledger: dict) -> None:
-    root = find_project_root()
-    path = root / "data" / "ledgers" / f"{ledger_name}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(ledger, f, indent=2)
 def _coin_label(tag: str) -> str:
     for suffix in ["USD", "USDT", "USDC", "EUR", "GBP", "DAI"]:
         if tag.endswith(suffix):
@@ -103,7 +96,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                     "timestamp": result.get("timestamp"),
                 }
             )
-            _save_ledger(args.ledger, ledger)
+            save_ledger(args.ledger, ledger)
         addlog(
             f"[MANUAL BUY] {args.ledger} | {tag} | ${args.usd:.2f} → {coin_amt:.4f} {coin_str} @ ${price:.4f}",
             verbose_int=1,
@@ -135,7 +128,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                     "timestamp": result.get("timestamp"),
                 }
             )
-            _save_ledger(args.ledger, ledger)
+            save_ledger(args.ledger, ledger)
         else:
             usd_total = args.usd
         addlog(

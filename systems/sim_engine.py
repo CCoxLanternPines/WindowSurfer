@@ -11,7 +11,7 @@ are recorded in a lightweight in-memory ledger.
 from tqdm import tqdm
 
 from systems.scripts.fetch_canles import fetch_candles
-from systems.scripts.ledger import Ledger
+from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.addlog import addlog
 from systems.utils.settings_loader import load_settings
@@ -95,7 +95,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
         verbose_int=3,
         verbose_state=verbose,
     )
-    Ledger.save_ledger(tag, ledger, sim=True, final_tick=final_tick, summary=summary)
+    save_ledger(tag, ledger, sim=True, final_tick=final_tick, summary=summary)
 
     saved_summary = Ledger.load_ledger(tag, sim=True).get_account_summary(final_price)
     if (

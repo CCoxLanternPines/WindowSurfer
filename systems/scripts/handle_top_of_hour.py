@@ -18,7 +18,7 @@ from systems.scripts.execution_handler import (
     execute_sell,
     load_or_fetch_snapshot,
 )
-from systems.scripts.ledger import Ledger
+from systems.scripts.ledger import Ledger, save_ledger
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.path import find_project_root
@@ -299,7 +299,7 @@ def handle_top_of_hour(
                 metadata["last_buy_tick"] = last_buy_tick
                 metadata["last_sell_tick"] = last_sell_tick
             ledger.set_metadata(metadata)
-            Ledger.save_ledger(tag=ledger_cfg["tag"], ledger=ledger)
+            save_ledger(ledger_cfg["tag"], ledger)
 
             usd_balance = float(balance.get(fiat, 0.0))
             coin_balance = float(balance.get(wallet_code, 0.0))
