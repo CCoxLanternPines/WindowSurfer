@@ -140,14 +140,15 @@ def buy_order(
             api_secret,
         )
     except Exception as e:
-        if "EOrder:Insufficient funds" in str(e):
+        err_msg = str(e)
+        if "EOrder:Insufficient funds" in err_msg:
             addlog(
                 "[SKIP] Kraken rejected order — insufficient funds",
                 verbose_int=1,
                 verbose_state=verbose,
             )
             send_telegram_message(
-                f"⚠️ Kraken rejected order for {ledger_name}: insufficient funds."
+                f"❗ Kraken rejected order due to insufficient funds on {ledger_name}."
             )
             return {}
         raise
@@ -197,14 +198,15 @@ def sell_order(
             api_secret,
         )
     except Exception as e:
-        if "EOrder:Insufficient funds" in str(e):
+        err_msg = str(e)
+        if "EOrder:Insufficient funds" in err_msg:
             addlog(
                 "[SKIP] Kraken rejected order — insufficient funds",
                 verbose_int=1,
                 verbose_state=verbose,
             )
             send_telegram_message(
-                f"⚠️ Kraken rejected order for {ledger_name}: insufficient funds."
+                f"❗ Kraken rejected order due to insufficient funds on {ledger_name}."
             )
             return {}
         raise
