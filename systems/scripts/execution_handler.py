@@ -77,7 +77,7 @@ def buy_order(
 
     snapshot = _load_snapshot(ledger_name)
     balance = snapshot.get("balance", {})
-    available_usd = balance.get(fiat_symbol, 0.0)
+    available_usd = float(balance.get(fiat_symbol, 0.0))
     if available_usd < usd_amount:
         addlog(
             f"[ABORT] Not enough {fiat_symbol} to buy: ${available_usd:.2f} available, need ${usd_amount:.2f}",
