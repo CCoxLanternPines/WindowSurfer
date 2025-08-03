@@ -91,11 +91,7 @@ def main(argv: list[str] | None = None) -> None:
     if mode == "sim":
         run_simulation(tag=args.tag.upper(), verbose=args.verbose)
     elif mode == "simtune":
-        if not args.tag:
-            addlog("Error: --tag is required for simtune", verbose_int=1, verbose_state=verbose)
-            sys.exit(1)
         from systems.scripts.sim_tuner import run_sim_tuner
-
         run_sim_tuner(tag=args.tag.upper(), verbose=args.verbose)
     elif mode == "live":
         run_live(
