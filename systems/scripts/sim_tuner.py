@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -156,8 +157,10 @@ def run_sim_tuner(tag: str, verbose: int = 0) -> None:
             )
             with out_path.open("w", encoding="utf-8") as f:
                 json.dump(best_knobs, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
             addlog(
-                f"[TUNE] ✅ Saved best knobs for {tag} → {out_path}",
+                f"[TUNE] ✅ Saved best knobs for {tag} → {out_path.resolve()}",
                 verbose_int=1,
                 verbose_state=verbose,
             )
