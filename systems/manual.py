@@ -83,6 +83,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                 None,
                 symbol=kraken_pair,
                 fiat_code=fiat_code,
+                wallet_code=ledger_cfg["wallet_code"],
                 price=price,
                 amount_usd=args.usd,
                 ledger_name=args.ledger,

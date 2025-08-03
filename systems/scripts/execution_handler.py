@@ -63,8 +63,15 @@ def buy_order(
             verbose_state=verbose,
         )
         return {}
+
     balance = snapshot.get("balance", {})
-    available_usd = float(balance.get(wallet_code, 0.0))
+    available_usd = float(balance.get(fiat_symbol, 0.0))
+    
+    addlog(f"[DEBUG] Balance snapshot: {balance}", verbose_int=1, verbose_state=verbose)
+    addlog(f"[DEBUG] Using fiat_symbol = {fiat_symbol}", verbose_int=1, verbose_state=verbose)
+    addlog(f"[DEBUG] available_usd = {available_usd} | trying to spend = {usd_amount}", verbose_int=1, verbose_state=verbose)
+
+    
     if available_usd < usd_amount:
         addlog(
             f"[ABORT] Not enough {fiat_symbol} to buy: ${available_usd:.2f} available, need ${usd_amount:.2f}",
@@ -111,18 +118,25 @@ def buy_order(
             verbose_state=verbose,
         )
 
-        order_resp = _kraken_request(
-            "AddOrder",
-            {
-                "pair": pair_code,
-                "type": "buy",
-                "ordertype": "market",
-                "volume": coin_amount,
-                "trades": True,
-            },
-            api_key,
-            api_secret,
-        )
+        try:
+
+            order_resp = _kraken_request(
+                "AddOrder",
+                {
+                    "pair": pair_code,
+                    "type": "buy",
+                    "ordertype": "market",
+                    "volume": coin_amount,
+                    "trades": True,
+                },
+                api_key,
+                api_secret,
+            )
+        except Exception as e:
+            if "EOrder:Insufficient funds" in str(e):
+                addlog("[SKIP] Kraken rejected buy — insufficient funds", verbose_int=1, verbose_state=verbose)
+                return {}
+            raise
 
         txid = order_resp["result"]["txid"][0]
         addlog(f"Order placed: {txid}", verbose_int=1, verbose_state=verbose)
