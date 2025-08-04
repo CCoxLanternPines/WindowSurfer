@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-import requests
+from systems.utils.asset_pairs import load_asset_pairs
 
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
@@ -75,28 +75,25 @@ def main(argv: list[str] | None = None) -> None:
     settings = load_settings()
 
     try:
-        resp = requests.get("https://api.kraken.com/0/public/AssetPairs", timeout=10)
-        asset_pairs = resp.json().get("result", {})
+        asset_pairs = load_asset_pairs()
         valid_pairs = {pair_info["altname"].upper() for pair_info in asset_pairs.values()}
     except Exception:
         addlog(
-            "[ERROR] Failed to fetch Kraken AssetPairs",
+            "[ERROR] Failed to load Kraken AssetPairs",
             verbose_int=1,
             verbose_state=True,
         )
         sys.exit(1)
-    invalid = False
+
     for ledger_cfg in settings.get("ledger_settings", {}).values():
         tag = ledger_cfg.get("tag", "")
+        print(f"[DEBUG] Tag: {ledger_cfg['tag']}")
+        print(f"[DEBUG] Total valid pairs: {len(valid_pairs)}")
+        print(f"[DEBUG] First 20 pairs: {list(valid_pairs)[:20]}")
         if tag.upper() not in valid_pairs:
-            addlog(
-                f"[ERROR] Invalid trading pair: {tag}",
-                verbose_int=1,
-                verbose_state=True,
+            raise RuntimeError(
+                f"[ERROR] Invalid trading pair: {ledger_cfg['tag']} — Not found in Kraken altname list"
             )
-            invalid = True
-    if invalid:
-        sys.exit(1)
 
     if mode == "wallet":
         from systems.scripts.kraken_utils import get_kraken_balance

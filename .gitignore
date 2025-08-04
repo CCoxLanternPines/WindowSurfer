@@ -37,6 +37,8 @@ Thumbs.db
 # ✅ Allow core state folders
 !data/ledgers/
 !data/ledgers/*.json
+!data/snapshots/
+!data/snapshots/*.json
 
 # ❌ Exclude noisy sim or temp files
 data/tmp/
