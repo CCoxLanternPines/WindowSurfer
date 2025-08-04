@@ -23,16 +23,17 @@ from systems.utils.addlog import addlog, send_telegram_message
 from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.path import find_project_root
 from systems.utils.top_hour_report import format_top_of_hour_report
+from systems.utils.resolve_symbol import resolve_ledger_settings
 
 
 def handle_top_of_hour(
     *,
     tick: int | datetime,
+    ledger_name: str,
     sim: bool,
     settings: dict | None = None,
     candle: dict | None = None,
     ledger: Ledger | None = None,
-    ledger_config: dict | None = None,
     **kwargs: Any,
 ) -> None:
     """Run buy/sell evaluations for all windows on an hourly boundary.
@@ -45,8 +46,6 @@ def handle_top_of_hour(
         Candle data for this tick.
     ledger:
         Ledger tracking open and closed notes.
-    ledger_config:
-        Ledger-specific configuration.
     sim:
         ``True`` when running in simulation mode. Live logic is not yet
         implemented.
@@ -59,6 +58,16 @@ def handle_top_of_hour(
     if not sim:
         if settings is None:
             return
+
+        ledger_cfg = resolve_ledger_settings(ledger_name, settings)
+        tag = ledger_cfg["tag"]
+        kraken_pair = ledger_cfg["kraken_name"]
+        wallet_code = ledger_cfg["wallet_code"]
+        fiat = ledger_cfg["fiat"]
+        window_settings = ledger_cfg.get("window_settings", {})
+        triggered_strategies = {wn.title(): False for wn in window_settings}
+        strategy_summary: dict[str, dict] = {}
+        ledger = Ledger.load_ledger(tag=tag)
 
         root: Path = find_project_root()
         cooldown_path = root / "data" / "tmp" / "cooldowns.json"
@@ -73,134 +82,122 @@ def handle_top_of_hour(
 
         general_cfg = settings.get("general_settings", {})
 
-        for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
-            tag = ledger_cfg["tag"]
-            kraken_pair = ledger_cfg["kraken_name"]
-            wallet_code = ledger_cfg["wallet_code"]
-            fiat = ledger_cfg["fiat"]
-            window_settings = ledger_cfg.get("window_settings", {})
-            triggered_strategies = {wn.title(): False for wn in window_settings}
-            strategy_summary: dict[str, dict] = {}
-            ledger = Ledger.load_ledger(tag=ledger_cfg["tag"])
+        snapshot = load_or_fetch_snapshot(ledger_name)
+        if not snapshot:
+            addlog(
+                "[ERROR] Kraken snapshot missing — cannot proceed in live mode.",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            return
+        balance = snapshot.get("balance", {})
 
-            snapshot = load_or_fetch_snapshot(ledger_name)
-            if not snapshot:
-                addlog(
-                    "[ERROR] Kraken snapshot missing — cannot proceed in live mode.",
-                    verbose_int=1,
-                    verbose_state=True,
-                )
-                continue
-            balance = snapshot.get("balance", {})
+        price = get_live_price(kraken_pair=kraken_pair)
 
-            price = get_live_price(kraken_pair=kraken_pair)
+        current_ts = int(tick.timestamp()) if isinstance(tick, datetime) else int(tick)
 
-            current_ts = (
-                int(tick.timestamp()) if isinstance(tick, datetime) else int(tick)
+        metadata = ledger.get_metadata()
+        ledger_cooldowns = cooldowns.get(ledger_name, {})
+        last_buy_tick = ledger_cooldowns.get("last_buy_tick", {})
+        last_sell_tick = ledger_cooldowns.get("last_sell_tick", {})
+
+        for window_name, window_cfg in window_settings.items():
+            addlog(
+                f"[EVAL] {ledger_name} | {tag} | {window_name} window → evaluating",
+                verbose_int=3,
+                verbose_state=True,
             )
 
-            metadata = ledger.get_metadata()
-            ledger_cooldowns = cooldowns.get(ledger_name, {})
-            last_buy_tick = ledger_cooldowns.get("last_buy_tick", {})
-            last_sell_tick = ledger_cooldowns.get("last_sell_tick", {})
+            buy_count = 0
+            sell_count = 0
 
-            for window_name, window_cfg in window_settings.items():
-                addlog(
-                    f"[EVAL] {ledger_name} | {tag} | {window_name} window → evaluating",
-                    verbose_int=3,
-                    verbose_state=True,
-                )
+            try:
+                df = pd.read_csv(root / "data" / "raw" / f"{tag}.csv")
+            except Exception:
+                df = None
 
-                buy_count = 0
-                sell_count = 0
+            wave = get_wave_window_data_df(
+                df,
+                window=window_cfg["window_size"],
+                candle_offset=0,
+            )
 
-                try:
-                    df = pd.read_csv(root / "data" / "raw" / f"{tag}.csv")
-                except Exception:
-                    df = None
-
-                wave = get_wave_window_data_df(
-                    df,
-                    window=window_cfg["window_size"],
-                    candle_offset=0,
-                )
-
-                if wave:
-                    position = wave.get("position_in_window", 0)
-                    buy_cd = window_cfg.get("buy_cooldown", 0) * 3600
-                    last_buy = last_buy_tick.get(window_name, float("-inf"))
-                    if position <= window_cfg.get("buy_floor", 0) and (
-                        dry_run or current_ts - last_buy >= buy_cd
-                    ):
-                        open_for_window = [
-                            n
-                            for n in ledger.get_active_notes()
-                            if n.get("window") == window_name
-                        ]
-                        if len(open_for_window) < window_cfg.get("max_open_notes", 0):
-                            available = float(balance.get(fiat, 0.0))
-                            invest = available * window_cfg.get(
-                                "investment_fraction", 0
-                            )
-                            max_usd = general_cfg.get("max_note_usdt", invest)
-                            min_usd = general_cfg.get("minimum_note_size", 0.0)
-                            invest = min(invest, max_usd)
-                            if invest >= min_usd and invest <= available and invest > 0:
-                                result = execute_buy(
-                                    client=client,
-                                    symbol=kraken_pair,
-                                    fiat_code=fiat,
-                                    price=price,
-                                    amount_usd=invest,
-                                    ledger_name=ledger_name,
-                                    wallet_code=wallet_code,
-                                )
-                                if result:
-                                    note = {
-                                        "entry_amount": result["filled_amount"],
-                                        "entry_price": result["avg_price"],
-                                        "entry_ts": result["timestamp"],
-                                        "entry_tick": current_ts,
-                                        "window": window_name,
-                                        "status": "Open",
-                                    }
-                                    configured_mature = wave["floor"] + wave[
-                                        "range"
-                                    ] * window_cfg.get("sell_ceiling", 1)
-                                    configured_roi = (configured_mature - price) / price
-                                    min_roi = window_cfg.get("min_roi", 0)
-                                    target_roi = max(configured_roi, min_roi)
-                                    note["mature_price"] = price * (1 + target_roi)
-                                    ledger.open_note(note)
-                                    if not dry_run:
-                                        last_buy_tick[window_name] = current_ts
-                                    buy_count += 1
-                                    msg = (
-                                        f"[LIVE][BUY] {ledger_name} | {tag} | "
-                                        f"{result['filled_amount']:.4f} {wallet_code} @ "
-                                        f"${result['avg_price']:.3f}"
-                                    )
-                                    addlog(msg)
-                                    send_telegram_message(msg)
-                    else:
-                        reasons = []
-                        if position > window_cfg.get("buy_floor", 0):
-                            reasons.append(
-                                f"position={position:.2f} above floor={window_cfg.get('buy_floor', 0)}"
-                            )
-                        if not dry_run and current_ts - last_buy < buy_cd:
-                            remaining = buy_cd - (current_ts - last_buy)
-                            reasons.append(
-                                f"cooldown active ({remaining // 60}m left)"
-                            )
-                        if not reasons:
-                            reasons.append("unknown gating condition")
-
-                        addlog(
-                            f"[SKIP] {ledger_name} | {tag} | {window_name} → Buy blocked: {', '.join(reasons)}",
-                            verbose_int=3,
-                            verbose_state=True,
+            if wave:
+                position = wave.get("position_in_window", 0)
+                buy_cd = window_cfg.get("buy_cooldown", 0) * 3600
+                last_buy = last_buy_tick.get(window_name, float("-inf"))
+                if position <= window_cfg.get("buy_floor", 0) and (
+                    dry_run or current_ts - last_buy >= buy_cd
+                ):
+                    open_for_window = [
+                        n
+                        for n in ledger.get_active_notes()
+                        if n.get("window") == window_name
+                    ]
+                    if len(open_for_window) < window_cfg.get("max_open_notes", 0):
+                        available = float(balance.get(fiat, 0.0))
+                        invest = available * window_cfg.get(
+                            "investment_fraction", 0
                         )
+                        max_usd = general_cfg.get("max_note_usdt", invest)
+                        min_usd = general_cfg.get("minimum_note_size", 0.0)
+                        invest = min(invest, max_usd)
+                        if invest >= min_usd and invest <= available and invest > 0:
+                            result = execute_buy(
+                                client=client,
+                                symbol=kraken_pair,
+                                fiat_code=fiat,
+                                price=price,
+                                amount_usd=invest,
+                                ledger_name=ledger_name,
+                                wallet_code=wallet_code,
+                            )
+                            if result:
+                                note = {
+                                    "entry_amount": result["filled_amount"],
+                                    "entry_price": result["avg_price"],
+                                    "entry_ts": result["timestamp"],
+                                    "entry_tick": current_ts,
+                                    "window": window_name,
+                                    "status": "Open",
+                                }
+                                configured_mature = wave["floor"] + wave[
+                                    "range"
+                                ] * window_cfg.get("sell_ceiling", 1)
+                                configured_roi = (configured_mature - price) / price
+                                min_roi = window_cfg.get("min_roi", 0)
+                                target_roi = max(configured_roi, min_roi)
+                                note["mature_price"] = price * (1 + target_roi)
+                                ledger.open_note(note)
+                                if not dry_run:
+                                    last_buy_tick[window_name] = current_ts
+                                buy_count += 1
+                                msg = (
+                                    f"[LIVE][BUY] {ledger_name} | {tag} | "
+                                    f"{result['filled_amount']:.4f} {wallet_code} @ "
+                                    f"${result['avg_price']:.3f}"
+                                )
+                                addlog(msg)
+                                send_telegram_message(msg)
+                else:
+                    reasons = []
+                    if position > window_cfg.get("buy_floor", 0):
+                        reasons.append(
+                            f"position={position:.2f} above floor={window_cfg.get('buy_floor', 0)}"
+                        )
+                    if not dry_run and current_ts - last_buy < buy_cd:
+                        remaining = buy_cd - (current_ts - last_buy)
+                        reasons.append(
+                            f"cooldown active ({remaining // 60}m left)"
+                        )
+                    if not reasons:
+                        reasons.append("unknown gating condition")
+
+                    addlog(
+                        f"[SKIP] {ledger_name} | {tag} | {window_name} → Buy blocked: {', '.join(reasons)}",
+                        verbose_int=3,
+                        verbose_state=True,
+                    )
 
                     sell_cd = window_cfg.get("sell_cooldown", 0) * 3600
                     last_sell = last_sell_tick.get(window_name, float("-inf"))
@@ -247,55 +244,55 @@ def handle_top_of_hour(
                                 verbose_int=3,
                                 verbose_state=True,
                             )
-                if buy_count > 0 or sell_count > 0:
-                    triggered_strategies[window_name.title()] = True
+            if buy_count > 0 or sell_count > 0:
+                triggered_strategies[window_name.title()] = True
 
-                summary = ledger.get_account_summary(price)
-                idle_capital = float(balance.get(fiat, 0.0))
-                summary["idle_capital"] = idle_capital
-                summary["total_value"] += idle_capital
-                hour_str = datetime.now().strftime("%I:%M%p")
-                addlog(
-                    f"[SUMMARY] {hour_str} | {ledger_name} | \U0001F4B0 ${summary['total_value']:.2f} | "
-                    f"\U0001F4B5 ${summary['idle_capital']:.2f} | \U0001FA99 ${summary['open_value']:.2f}",
-                    verbose_int=2,
-                    verbose_state=True,
-                )
-                message = (
-                    f"[LIVE] {ledger_name} | {tag} | {window_name} window\n"
-                    f"✅ Buy attempts: {buy_count} | Sells: {sell_count} | "
-                    f"Open Notes: {summary['open_notes']} | Realized Gain: ${summary['realized_gain']:.2f}"
-                )
-                addlog(
-                    message,
-                    verbose_int=1,
-                    verbose_state=True,
-                )
+            summary = ledger.get_account_summary(price)
+            idle_capital = float(balance.get(fiat, 0.0))
+            summary["idle_capital"] = idle_capital
+            summary["total_value"] += idle_capital
+            hour_str = datetime.now().strftime("%I:%M%p")
+            addlog(
+                f"[SUMMARY] {hour_str} | {ledger_name} | \U0001F4B0 ${summary['total_value']:.2f} | "
+                f"\U0001F4B5 ${summary['idle_capital']:.2f} | \U0001FA99 ${summary['open_value']:.2f}",
+                verbose_int=2,
+                verbose_state=True,
+            )
+            message = (
+                f"[LIVE] {ledger_name} | {tag} | {window_name} window\n"
+                f"✅ Buy attempts: {buy_count} | Sells: {sell_count} | "
+                f"Open Notes: {summary['open_notes']} | Realized Gain: ${summary['realized_gain']:.2f}"
+            )
+            addlog(
+                message,
+                verbose_int=1,
+                verbose_state=True,
+            )
 
-                open_notes_w = [
-                    n for n in ledger.get_open_notes() if n.get("window") == window_name
-                ]
-                closed_notes_w = [
-                    n for n in ledger.get_closed_notes() if n.get("window") == window_name
-                ]
-                unrealized = sum(
-                    (price - n.get("entry_price", 0.0)) * n.get("entry_amount", 0.0)
-                    for n in open_notes_w
-                )
-                realized = sum(n.get("gain", 0.0) for n in closed_notes_w)
-                total_gain = unrealized + realized
-                invested = sum(
-                    n.get("entry_price", 0.0) * n.get("entry_amount", 0.0)
-                    for n in open_notes_w + closed_notes_w
-                )
-                roi = (total_gain / invested * 100.0) if invested else 0.0
-                strategy_summary[window_name.title()] = {
-                    "buys": buy_count,
-                    "sells": sell_count,
-                    "open": len(open_notes_w),
-                    "roi": roi,
-                    "total": total_gain,
-                }
+            open_notes_w = [
+                n for n in ledger.get_open_notes() if n.get("window") == window_name
+            ]
+            closed_notes_w = [
+                n for n in ledger.get_closed_notes() if n.get("window") == window_name
+            ]
+            unrealized = sum(
+                (price - n.get("entry_price", 0.0)) * n.get("entry_amount", 0.0)
+                for n in open_notes_w
+            )
+            realized = sum(n.get("gain", 0.0) for n in closed_notes_w)
+            total_gain = unrealized + realized
+            invested = sum(
+                n.get("entry_price", 0.0) * n.get("entry_amount", 0.0)
+                for n in open_notes_w + closed_notes_w
+            )
+            roi = (total_gain / invested * 100.0) if invested else 0.0
+            strategy_summary[window_name.title()] = {
+                "buys": buy_count,
+                "sells": sell_count,
+                "open": len(open_notes_w),
+                "roi": roi,
+                "total": total_gain,
+            }
 
             if not dry_run:
                 metadata["last_buy_tick"] = last_buy_tick
@@ -348,15 +345,15 @@ def handle_top_of_hour(
 
         return
 
-    if candle is None or ledger is None or ledger_config is None:
+    if candle is None or ledger is None:
         return
 
-    # Extract common context
     df = kwargs.get("df")
     offset = kwargs.get("offset")
     state: Dict[str, Any] = kwargs.get("state", {})
     verbose = kwargs.get("verbose", 0)
 
+    ledger_config = resolve_ledger_settings(ledger_name, settings)
     windows = ledger_config.get("window_settings", {})
     if not windows or df is None or offset is None:
         return

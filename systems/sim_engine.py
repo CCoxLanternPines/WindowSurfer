@@ -19,11 +19,11 @@ from systems.utils.resolve_symbol import resolve_ledger_settings
 from systems.utils.path import find_project_root
 
 
-def run_simulation(tag: str, verbose: int = 0) -> None:
-    """Run a historical simulation for ``tag``."""
+def run_simulation(ledger_name: str, verbose: int = 0) -> None:
+    """Run a historical simulation for ``ledger_name``."""
     settings = load_settings()
-    tag = tag.upper()
-    ledger_config = resolve_ledger_settings(tag, settings)
+    ledger_config = resolve_ledger_settings(ledger_name, settings)
+    tag = ledger_config["tag"].upper()
 
     root = find_project_root()
     sim_path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
@@ -37,7 +37,11 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     sim_capital = float(settings.get("simulation_capital", 0))
     ledger = Ledger()
 
-    addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
+    addlog(
+        f"[SIM] {ledger_name} | {tag} Starting simulation",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
 
     df = fetch_candles(tag)
     max_note_usdt = settings.get("general_settings", {}).get("max_note_usdt", sim_capital)
@@ -68,7 +72,8 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
                 tick=tick,
                 candle=candle,
                 ledger=ledger,
-                ledger_config=ledger_config,
+                ledger_name=ledger_name,
+                settings=settings,
                 sim=True,
                 df=df,
                 offset=offset,
@@ -81,7 +86,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
             pbar.update(1)
 
     addlog(
-        f"[SIM] Completed {len(df)} ticks.",
+        f"[SIM] {ledger_name} | {tag} Completed {len(df)} ticks.",
         verbose_int=1,
         verbose_state=verbose,
     )
@@ -91,7 +96,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     summary = ledger.get_account_summary(final_price)
 
     addlog(
-        f"[DEBUG] Final tick: {final_tick}",
+        f"[DEBUG] {ledger_name} | {tag} Final tick: {final_tick}",
         verbose_int=3,
         verbose_state=verbose,
     )
@@ -103,7 +108,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
         or saved_summary["realized_gain"] != summary["realized_gain"]
     ):
         addlog(
-            "[WARN] Summary/ledger mismatch: "
+            f"[WARN] {ledger_name} | {tag} Summary/ledger mismatch: "
             f"closed_notes {summary['closed_notes']} vs {saved_summary['closed_notes']}, "
             f"realized_gain {summary['realized_gain']:.2f} vs {saved_summary['realized_gain']:.2f}",
             verbose_int=1,
@@ -111,34 +116,34 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
         )
 
     addlog(
-        f"Final Price: ${summary['final_price']:.2f}",
+        f"[SIM] {ledger_name} | {tag} Final Price: ${summary['final_price']:.2f}",
         verbose_int=1,
         verbose_state=verbose,
     )
     addlog(
-        f"Total Coin Held: {summary['open_coin_amount']:.6f}",
+        f"[SIM] {ledger_name} | {tag} Total Coin Held: {summary['open_coin_amount']:.6f}",
         verbose_int=1,
         verbose_state=verbose,
     )
     addlog(
-        f"Final Value (USD): ${summary['total_value']:.2f}",
+        f"[SIM] {ledger_name} | {tag} Final Value (USD): ${summary['total_value']:.2f}",
         verbose_int=1,
         verbose_state=verbose,
     )
 
     if verbose:
         addlog(
-            f"Buy cooldown skips: {state['buy_cooldown_skips']}",
+            f"[SIM] {ledger_name} | {tag} Buy cooldown skips: {state['buy_cooldown_skips']}",
             verbose_int=2,
             verbose_state=verbose,
         )
         addlog(
-            f"Sell cooldown skips: {state['sell_cooldown_skips']}",
+            f"[SIM] {ledger_name} | {tag} Sell cooldown skips: {state['sell_cooldown_skips']}",
             verbose_int=2,
             verbose_state=verbose,
         )
     addlog(
-        f"Min ROI gate hits: {state['min_roi_gate_hits']}",
+        f"[SIM] {ledger_name} | {tag} Min ROI gate hits: {state['min_roi_gate_hits']}",
         verbose_int=1,
         verbose_state=verbose,
     )

@@ -35,9 +35,9 @@ sys.path.insert(0, str(find_project_root()))
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Fetch historical candles")
     parser.add_argument(
-        "--tag",
+        "--ledger",
         required=True,
-        help="Symbol tag (e.g. SOLUSD)",
+        help="Ledger name (e.g. Kris_Ledger)",
     )
     parser.add_argument(
         "--time",
@@ -53,14 +53,19 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
-    tag = args.tag.upper()
+    ledger_name = args.ledger
     time_window = args.time if args.time else "48h"
     verbose = args.verbose
 
     settings = load_settings()
-    ledger_cfg = resolve_ledger_settings(tag, settings)
+    ledger_cfg = resolve_ledger_settings(ledger_name, settings)
+    tag = ledger_cfg["tag"].upper()
     kraken_symbol = ledger_cfg["kraken_name"]
     binance_symbol = ledger_cfg["binance_name"]
+    log_prefix = f"[FETCH] {ledger_name} | {tag}"
+
+    def log(message: str, **kwargs) -> None:
+        addlog(f"{log_prefix} {message}", **kwargs)
 
     start_ts, end_ts = parse_relative_time(time_window)
     out_path = get_raw_path(tag)
@@ -101,8 +106,8 @@ def main(argv: list[str] | None = None) -> None:
         else:
             end_ms = original_end_ms
 
-        addlog(
-            f" Fetching from Kraken: {datetime.utcfromtimestamp(start_ms/1000)} to {datetime.utcfromtimestamp(end_ms/1000)}",
+        log(
+            f"Fetching from Kraken: {datetime.utcfromtimestamp(start_ms/1000)} to {datetime.utcfromtimestamp(end_ms/1000)}",
             verbose_int=3,
             verbose_state=verbose,
         )
@@ -110,15 +115,15 @@ def main(argv: list[str] | None = None) -> None:
         try:
             rows = _fetch_kraken(kraken_symbol, start_ms, end_ms)
         except Exception as e:
-            addlog(
-                f" Error fetching from Kraken: {e}",
+            log(
+                f"Error fetching from Kraken: {e}",
                 verbose_int=3,
                 verbose_state=verbose,
             )
             return
 
-        addlog(
-            f" {len(rows)} rows fetched from Kraken",
+        log(
+            f"{len(rows)} rows fetched from Kraken",
             verbose_int=3,
             verbose_state=verbose,
         )
@@ -140,22 +145,22 @@ def main(argv: list[str] | None = None) -> None:
         diff_hours = int((end_ms - start_ms) // 3600000) + 1
 
         if diff_hours <= 720:
-            addlog(
-                f" Fetching from Kraken: {datetime.utcfromtimestamp(start_ms/1000)} to {datetime.utcfromtimestamp(end_ms/1000)}",
+            log(
+                f"Fetching from Kraken: {datetime.utcfromtimestamp(start_ms/1000)} to {datetime.utcfromtimestamp(end_ms/1000)}",
                 verbose_int=3,
                 verbose_state=verbose,
             )
             try:
                 rows = _fetch_kraken(kraken_symbol, start_ms, end_ms)
             except Exception as e:
-                addlog(
-                    f" Error fetching from Kraken: {e}",
+                log(
+                    f"Error fetching from Kraken: {e}",
                     verbose_int=3,
                     verbose_state=verbose,
                 )
                 rows = []
-            addlog(
-                f" {len(rows)} rows fetched from Kraken",
+            log(
+                f"{len(rows)} rows fetched from Kraken",
                 verbose_int=3,
                 verbose_state=verbose,
             )
@@ -168,8 +173,8 @@ def main(argv: list[str] | None = None) -> None:
             # Split the request into two fetches:
             # Kraken gets first 720h, Binance gets the rest
             kraken_end_ms = start_ms + 720 * 3600000
-            addlog(
-                f" Fetching from Kraken: {datetime.utcfromtimestamp(start_ms/1000)} to {datetime.utcfromtimestamp(kraken_end_ms/1000)}",
+            log(
+                f"Fetching from Kraken: {datetime.utcfromtimestamp(start_ms/1000)} to {datetime.utcfromtimestamp(kraken_end_ms/1000)}",
                 verbose_int=3,
                 verbose_state=verbose,
             )
@@ -177,14 +182,14 @@ def main(argv: list[str] | None = None) -> None:
                 kraken_rows = _fetch_kraken(kraken_symbol, start_ms, kraken_end_ms)
                 kraken_limited = True
             except Exception as e:
-                addlog(
-                    f" Error fetching from Kraken: {e}",
+                log(
+                    f"Error fetching from Kraken: {e}",
                     verbose_int=3,
                     verbose_state=verbose,
                 )
                 kraken_rows = []
-            addlog(
-                f" {len(kraken_rows)} rows fetched from Kraken",
+            log(
+                f"{len(kraken_rows)} rows fetched from Kraken",
                 verbose_int=3,
                 verbose_state=verbose,
             )
@@ -195,22 +200,22 @@ def main(argv: list[str] | None = None) -> None:
                 new_frames.append(df_k)
                 added_kraken += len(df_k)
 
-            addlog(
-                f" Fetching from Binance: {datetime.utcfromtimestamp((kraken_end_ms+3600000)/1000)} to {datetime.utcfromtimestamp(end_ms/1000)}",
+            log(
+                f"Fetching from Binance: {datetime.utcfromtimestamp((kraken_end_ms+3600000)/1000)} to {datetime.utcfromtimestamp(end_ms/1000)}",
                 verbose_int=3,
                 verbose_state=verbose,
             )
             try:
                 binance_rows = _fetch_binance(binance_symbol, kraken_end_ms + 3600000, end_ms)
             except Exception as e:
-                addlog(
-                    f" Error fetching from Binance: {e}",
+                log(
+                    f"Error fetching from Binance: {e}",
                     verbose_int=3,
                     verbose_state=verbose,
                 )
                 binance_rows = []
-            addlog(
-                f" {len(binance_rows)} rows fetched from Binance",
+            log(
+                f"{len(binance_rows)} rows fetched from Binance",
                 verbose_int=3,
                 verbose_state=verbose,
             )
@@ -229,55 +234,61 @@ def main(argv: list[str] | None = None) -> None:
     total_rows = _merge_and_save(out_path, existing, new_frames)
 
     range_str = f"{datetime.fromtimestamp(start_ts, timezone.utc).strftime('%Y-%m-%d')} to {datetime.fromtimestamp(end_ts, timezone.utc).strftime('%Y-%m-%d')}"
-    addlog(
+    log(
         f"ℹ  Target range: {range_str}",
         verbose_int=2,
         verbose_state=verbose,
     )
-    addlog(
+    log(
         f"ℹ  Existing rows found: {len(existing_rows)}",
         verbose_int=2,
         verbose_state=verbose,
     )
 
     if added_binance or added_kraken:
-        addlog(f" Raw data updated: {out_path}", verbose_int=2, verbose_state=verbose)
+        log(f"Raw data updated: {out_path}", verbose_int=2, verbose_state=verbose)
         if added_binance:
-            addlog(
-                f" Added {added_binance} candles from Binance",
+            log(
+                f"Added {added_binance} candles from Binance",
                 verbose_int=2,
                 verbose_state=verbose,
             )
         if added_kraken:
-            addlog(
-                f" Added {added_kraken} candles from Kraken",
+            log(
+                f"Added {added_kraken} candles from Kraken",
                 verbose_int=2,
                 verbose_state=verbose,
             )
         if kraken_limited:
-            addlog(
-                " Could not retrieve full range: Kraken limited to 720 candles",
+            log(
+                "Could not retrieve full range: Kraken limited to 720 candles",
                 verbose_int=2,
                 verbose_state=verbose,
             )
     else:
-        addlog(
-            " Raw data already complete. No candles fetched",
+        log(
+            "Raw data already complete. No candles fetched",
             verbose_int=2,
             verbose_state=verbose,
         )
 
 
-def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int = 1) -> None:
-    tag = tag.upper()
-
+def fetch_missing_candles(
+    ledger_name: str, relative_window: str = "48h", verbose: int = 1
+) -> None:
     try:
         settings = load_settings()
-        ledger_cfg = resolve_ledger_settings(tag, settings)
+        ledger_cfg = resolve_ledger_settings(ledger_name, settings)
+        tag = ledger_cfg["tag"].upper()
         kraken_symbol = ledger_cfg["kraken_name"]
         binance_symbol = ledger_cfg["binance_name"]
     except Exception as e:
-        raise RuntimeError(f"[ERROR] Failed to resolve symbol '{tag}': {e}")
+        raise RuntimeError(f"[ERROR] Failed to resolve ledger '{ledger_name}': {e}")
+
+    log_prefix = f"[FETCH] {ledger_name} | {tag}"
+
+    def log(message: str, **kwargs) -> None:
+        addlog(f"{log_prefix} {message}", **kwargs)
 
     start_ts, end_ts = parse_relative_time(relative_window)
     out_path = get_raw_path(tag)
@@ -319,7 +330,7 @@ def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int =
                     new_frames.append(df)
                     added_kraken += len(df)
             except Exception as e:
-                addlog(
+                log(
                     f"[WARN] Kraken fetch error: {e}",
                     verbose_int=2,
                     verbose_state=verbose,
@@ -334,7 +345,7 @@ def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int =
                     new_frames.append(df_k)
                     added_kraken += len(df_k)
             except Exception as e:
-                addlog(
+                log(
                     f"[WARN] Kraken fetch error: {e}",
                     verbose_int=2,
                     verbose_state=verbose,
@@ -348,7 +359,7 @@ def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int =
                     new_frames.append(df_b)
                     added_binance += len(df_b)
             except Exception as e:
-                addlog(
+                log(
                     f"[WARN] Binance fetch error: {e}",
                     verbose_int=2,
                     verbose_state=verbose,
@@ -359,7 +370,7 @@ def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int =
 
     _merge_and_save(out_path, existing, new_frames)
 
-    addlog(
+    log(
         f"[SYNC] Added {added_kraken} candles from Kraken, {added_binance} from Binance",
         verbose_int=2,
         verbose_state=verbose,

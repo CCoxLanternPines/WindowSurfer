@@ -20,11 +20,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Execution mode: sim, live, or wallet",
     )
     parser.add_argument(
-        "--tag",
+        "--ledger",
         required=False,
         help=(
-            "Symbol tag, e.g. DOGEUSD. If omitted, all symbols from config are "
-            "processed every hour"
+            "Ledger name, e.g. Kris_Ledger. If omitted, all ledgers from config are "
+            "processed"
         ),
     )
     parser.add_argument(
@@ -89,10 +89,13 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if mode == "sim":
-        run_simulation(tag=args.tag.upper(), verbose=args.verbose)
+        if not args.ledger:
+            addlog("Error: --ledger is required in simulation mode", verbose_int=1, verbose_state=True)
+            sys.exit(1)
+        run_simulation(ledger_name=args.ledger, verbose=args.verbose)
     elif mode == "live":
         run_live(
-            tag=args.tag.upper() if args.tag else None,
+            ledger_name=args.ledger,
             window=args.window,
             dry=args.dry,
             verbose=args.verbose,
