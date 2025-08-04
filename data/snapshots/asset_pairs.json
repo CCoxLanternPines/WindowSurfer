@@ -1,0 +1,20 @@
+{
+  "XXDGZUSD": {
+    "altname": "DOGEUSD",
+    "wsname": "DOGE/USD",
+    "base": "XXDG",
+    "quote": "ZUSD",
+    "pair_decimals": 5,
+    "lot_decimals": 8,
+    "pair": "DOGEUSD"
+  },
+  "SOLUSDC": {
+    "altname": "SOLUSDC",
+    "wsname": "SOL/USDC",
+    "base": "SOL",
+    "quote": "USDC",
+    "pair_decimals": 1,
+    "lot_decimals": 8,
+    "pair": "SOLUSDC"
+  }
+}
