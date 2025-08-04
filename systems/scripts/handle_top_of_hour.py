@@ -20,7 +20,6 @@ from systems.scripts.execution_handler import (
 )
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.utils.addlog import addlog, send_telegram_message
-from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.path import find_project_root
 from systems.utils.top_hour_report import format_top_of_hour_report
 from systems.utils.resolve_symbol import resolve_ledger_settings
@@ -67,7 +66,6 @@ def handle_top_of_hour(
         fiat = ledger_cfg["fiat_code"]
         window_settings = ledger_cfg.get("window_settings", {})
         triggered_strategies = {wn.title(): False for wn in window_settings}
-        strategy_summary: dict[str, dict] = {}
         ledger = Ledger.load_ledger(ledger_name)
 
         meta = ledger.get_metadata()
@@ -289,31 +287,6 @@ def handle_top_of_hour(
             )
             addlog(message, verbose_int=1, verbose_state=True)
 
-            open_notes_w = [
-                n for n in ledger.get_open_notes() if n.get("window") == window_name
-            ]
-            closed_notes_w = [
-                n for n in ledger.get_closed_notes() if n.get("window") == window_name
-            ]
-            unrealized = sum(
-                (price - n.get("entry_price", 0.0)) * n.get("entry_amount", 0.0)
-                for n in open_notes_w
-            )
-            realized = sum(n.get("gain", 0.0) for n in closed_notes_w)
-            total_gain = unrealized + realized
-            invested = sum(
-                n.get("entry_price", 0.0) * n.get("entry_amount", 0.0)
-                for n in open_notes_w + closed_notes_w
-            )
-            roi = (total_gain / invested * 100.0) if invested else 0.0
-            strategy_summary[window_name.title()] = {
-                "buys": buy_count,
-                "sells": sell_count,
-                "open": len(open_notes_w),
-                "roi": roi,
-                "total": total_gain,
-            }
-
             if not dry_run:
                 metadata["last_buy_tick"] = last_buy_tick
                 metadata["last_sell_tick"] = last_sell_tick
@@ -344,14 +317,6 @@ def handle_top_of_hour(
                 note_counts,
             )
             addlog(report, verbose_int=1, verbose_state=True)
-
-            if telegram:
-                send_top_hour_report(
-                    ledger_name=ledger_name,
-                    tag=tag,
-                    strategy_summary=strategy_summary,
-                    verbose=general_cfg.get("verbose", 0),
-                )
 
             if not dry_run:
                 cooldowns[ledger_name] = {
@@ -395,6 +360,7 @@ def handle_top_of_hour(
         max_note_usdt = kwargs.get("max_note_usdt", sim_capital)
         min_note_usdt = kwargs.get("min_note_usdt", 0.0)
 
+        open_before = len(ledger.get_open_notes())
         sim_capital, buy_skipped = evaluate_buy(
             ledger=ledger,
             name=name,
@@ -409,6 +375,14 @@ def handle_top_of_hour(
             verbose=verbose,
         )
         state["capital"] = sim_capital
+        open_after = len(ledger.get_open_notes())
+        if open_after > open_before and telegram:
+            for note in ledger.get_open_notes()[open_before:open_after]:
+                tele_msg = (
+                    f"[BUY] {ledger_name} | {tag} | "
+                    f"{note['entry_amount']:.4f}@${note['entry_price']:.3f}"
+                )
+                send_telegram_message(tele_msg)
         if buy_skipped:
             state.get("buy_cooldown_skips", {}).setdefault(name, 0)
             state["buy_cooldown_skips"][name] += 1
