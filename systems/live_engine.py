@@ -10,6 +10,7 @@ from typing import Optional
 from tqdm import tqdm
 
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
+from systems.scripts.ledger import Ledger
 from systems.utils.settings_loader import load_settings
 from systems.fetch import fetch_missing_candles
 from systems.utils.addlog import addlog
@@ -26,6 +27,9 @@ def run_live(
     settings = load_settings()
     ledger_cfg = resolve_ledger_settings(ledger_name, settings)
     tag = ledger_cfg.get("tag")
+    wallet_code = ledger_cfg.get("wallet_code")
+    kraken_pair = ledger_cfg.get("kraken_pair")
+    fiat_code = ledger_cfg.get("fiat_code")
     tick_time = datetime.now(timezone.utc)
 
     def _run_top_of_hour(ts: datetime) -> None:
@@ -36,6 +40,16 @@ def run_live(
             sim=False,
             dry=dry,
             verbose=verbose,
+        )
+        ledger = Ledger.load_ledger(ledger_name)
+        open_notes = len(ledger.get_open_notes())
+        realized_gain = sum(
+            n.get("gain", 0.0) for n in ledger.get_closed_notes()
+        )
+        addlog(
+            f"[LIVE] {ledger_name} | {tag} | opened {open_notes} notes | realized {realized_gain:.2f} gain",
+            verbose_int=1,
+            verbose_state=verbose,
         )
 
     if dry:

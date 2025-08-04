@@ -19,6 +19,15 @@ class Ledger:
     # Basic note management -------------------------------------------------
     def open_note(self, note: Dict) -> None:
         """Register a newly opened note."""
+
+        note.setdefault("ledger_name", self.metadata.get("ledger_name"))
+        note.setdefault("tag", self.metadata.get("tag"))
+        note.setdefault("window", note.get("window"))
+
+        resolved = self.metadata.get("resolved")
+        if resolved and isinstance(resolved, dict):
+            note.setdefault("meta", resolved)
+
         self.open_notes.append(note)
 
     def close_note(self, note: Dict) -> None:
