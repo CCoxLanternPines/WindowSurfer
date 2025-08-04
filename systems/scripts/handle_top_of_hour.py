@@ -149,11 +149,9 @@ def handle_top_of_hour(
                                 result = execute_buy(
                                     client=client,
                                     symbol=kraken_pair,
-                                    fiat_code=fiat,
                                     price=price,
                                     amount_usd=invest,
                                     ledger_name=ledger_name,
-                                    wallet_code=wallet_code,
                                 )
                                 if result:
                                     note = {
@@ -218,7 +216,6 @@ def handle_top_of_hour(
                                     client=client,
                                     symbol=kraken_pair,
                                     coin_amount=note["entry_amount"],
-                                    fiat_code=fiat,
                                     ledger_name=ledger_name,
                                 )
                                 note["exit_price"] = result["avg_price"]

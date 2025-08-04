@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.path import find_project_root
+from systems.utils.settings_loader import load_settings
 
 
 def fetch_price_data(symbol: str) -> dict:
@@ -270,11 +271,9 @@ def execute_buy(
     client,
     *,
     symbol: str,
-    fiat_code: str,
     price: float,
     amount_usd: float,
     ledger_name: str,
-    wallet_code: str,
     verbose: int = 0,
 ) -> dict:
     """Place a real buy order and normalise the result structure.
@@ -283,9 +282,13 @@ def execute_buy(
     currently unused as ``buy_order`` pulls pricing from Kraken directly.
     """
 
-    result = buy_order(
-        symbol, fiat_code, amount_usd, ledger_name, wallet_code, verbose
-    )
+    settings = load_settings()
+    ledger_cfg = settings["ledger_settings"][ledger_name]
+    fiat = ledger_cfg["fiat"]
+    wallet_code = ledger_cfg["wallet_code"]
+    pair_code = ledger_cfg["kraken_pair"]
+
+    result = buy_order(pair_code, fiat, amount_usd, ledger_name, wallet_code, verbose)
     if (
         not result
         or result.get("filled_amount", 0) <= 0
@@ -314,21 +317,28 @@ def execute_sell(
     *,
     symbol: str,
     coin_amount: float,
-    fiat_code: str | None = None,
     price: float | None = None,
     ledger_name: str,
     verbose: int = 0,
 ) -> dict:
     """Place a real sell order and normalise the result structure.
 
-    ``fiat_code`` defaults to ``ZUSD`` when not provided. ``price`` is optional
-    and, if absent, the current live price is fetched to estimate USD notional.
+    ``price`` is optional and, if absent, the current live price is fetched to
+    estimate USD notional.
     """
 
-    fiat = fiat_code or "ZUSD"
-    sell_price = price if price is not None else get_live_price(symbol)
+    settings = load_settings()
+    ledger_cfg = settings["ledger_settings"][ledger_name]
+    fiat = ledger_cfg["fiat"]
+    pair_code = ledger_cfg["kraken_pair"]
+
+    sell_price = (
+        price
+        if price is not None
+        else float(fetch_price_data(pair_code).get("c", [0])[0])
+    )
     usd_amount = coin_amount * sell_price
-    result = sell_order(symbol, fiat, usd_amount, ledger_name, verbose)
+    result = sell_order(pair_code, fiat, usd_amount, ledger_name, verbose)
     if (
         not result
         or result.get("filled_amount", 0) <= 0

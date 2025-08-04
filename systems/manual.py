@@ -60,7 +60,6 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     tag = ledger_cfg.get("tag")
     kraken_pair = ledger_cfg.get("kraken_name")
-    fiat_code = ledger_cfg.get("fiat")
 
     price = get_live_price(kraken_pair)
     if price <= 0:
@@ -75,8 +74,6 @@ def main(argv: Optional[list[str]] = None) -> None:
             result = execute_buy(
                 None,
                 symbol=kraken_pair,
-                fiat_code=fiat_code,
-                wallet_code=ledger_cfg["wallet_code"],
                 price=price,
                 amount_usd=args.usd,
                 ledger_name=args.ledger,
@@ -108,7 +105,6 @@ def main(argv: Optional[list[str]] = None) -> None:
                 None,
                 symbol=kraken_pair,
                 coin_amount=coin_amt,
-                fiat_code=fiat_code,
                 price=price,
                 ledger_name=args.ledger,
                 verbose=args.verbose,
