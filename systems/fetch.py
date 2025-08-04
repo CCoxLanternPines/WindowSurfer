@@ -9,6 +9,7 @@ from typing import List
 import sys
 import pandas as pd
 from systems.utils.resolve_symbol import resolve_ledger_settings
+from systems.utils.symbol_mapper import get_symbol_config
 from systems.utils.settings_loader import load_settings
 
 if __package__ is None or __package__ == "":
@@ -59,8 +60,9 @@ def main(argv: list[str] | None = None) -> None:
 
     settings = load_settings()
     ledger_cfg = resolve_ledger_settings(tag, settings)
-    kraken_symbol = ledger_cfg["kraken_name"]
-    binance_symbol = ledger_cfg["binance_name"]
+    symbol_cfg = get_symbol_config(tag)
+    kraken_symbol = symbol_cfg["kraken"]["wsname"]
+    binance_symbol = symbol_cfg["binance"]["symbol"]
 
     start_ts, end_ts = parse_relative_time(time_window)
     out_path = get_raw_path(tag)
@@ -274,10 +276,12 @@ def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int =
     try:
         settings = load_settings()
         ledger_cfg = resolve_ledger_settings(tag, settings)
-        kraken_symbol = ledger_cfg["kraken_name"]
-        binance_symbol = ledger_cfg["binance_name"]
+        symbol_cfg = get_symbol_config(tag)
+        kraken_symbol = symbol_cfg["kraken"]["wsname"]
+        binance_symbol = symbol_cfg["binance"]["symbol"]
     except Exception as e:
         raise RuntimeError(f"[ERROR] Failed to resolve symbol '{tag}': {e}")
+
 
     start_ts, end_ts = parse_relative_time(relative_window)
     out_path = get_raw_path(tag)
