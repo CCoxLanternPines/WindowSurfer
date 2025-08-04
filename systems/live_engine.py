@@ -22,6 +22,7 @@ def run_live(
     window: str | None = None,
     dry: bool = False,
     verbose: int = 0,
+    telegram: bool = False,
 ) -> None:
     """Run the live trading engine for ``ledger_name``."""
     settings = load_settings()
@@ -39,6 +40,7 @@ def run_live(
             settings=settings,
             sim=False,
             dry=dry,
+            telegram=telegram,
             verbose=verbose,
         )
         ledger = Ledger.load_ledger(ledger_name)
@@ -65,6 +67,19 @@ def run_live(
             verbose_state=verbose,
         )
         _run_top_of_hour(tick_time)
+        ledger = Ledger.load_ledger(ledger_name)
+        from systems.scripts import execution_handler
+        snapshot = execution_handler.load_or_fetch_snapshot(ledger_name)
+        balance = snapshot.get("balance", {})
+        capital = float(balance.get(fiat_code, 0.0))
+        open_notes = len(ledger.get_open_notes())
+        closed_notes = len(ledger.get_closed_notes())
+        addlog(
+            f"[DRY] {ledger_name} | {tag} | capital ${capital:.2f} | "
+            f"open {open_notes} | closed {closed_notes}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
         return
 
     while True:
@@ -97,12 +112,18 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("--dry", action="store_true", help="Run once immediately")
     parser.add_argument("--ledger", required=True, help="Ledger name")
     parser.add_argument("--window", required=False, help="Window name (unused)")
+    parser.add_argument("--telegram", action="store_true", help="Enable Telegram alerts")
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = _parse_args(argv)
-    run_live(ledger_name=args.ledger, window=args.window, dry=args.dry)
+    run_live(
+        ledger_name=args.ledger,
+        window=args.window,
+        dry=args.dry,
+        telegram=args.telegram,
+    )
 
 
 if __name__ == "__main__":
