@@ -138,3 +138,32 @@ def get_symbol_config(tag: str) -> dict:
     if "kraken" not in cfg or "binance" not in cfg:
         raise ValueError(f"Incomplete symbol data for '{tag}'")
     return cfg
+
+
+def ensure_all_symbols_loaded(settings: dict) -> None:
+    """Validate that all ledger tags exist in the symbol cache.
+
+    Parameters
+    ----------
+    settings:
+        Settings dictionary containing ``ledger_settings``.
+
+    Raises
+    ------
+    RuntimeError
+        If any tags cannot be resolved after cache refresh.
+    """
+
+    missing: list[str] = []
+    for ledger_cfg in settings.get("ledger_settings", {}).values():
+        tag = ledger_cfg.get("tag")
+        if not tag:
+            continue
+        try:
+            get_symbol_config(tag)
+        except ValueError:
+            missing.append(tag)
+    if missing:
+        raise RuntimeError(
+            f"[SYMBOL ERROR] The following tags are missing from Kraken/Binance: {missing}"
+        )

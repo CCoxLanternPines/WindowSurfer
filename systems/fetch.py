@@ -9,7 +9,7 @@ from typing import List
 import sys
 import pandas as pd
 from systems.utils.resolve_symbol import resolve_ledger_settings
-from systems.utils.symbol_mapper import get_symbol_config
+from systems.utils.symbol_mapper import get_symbol_config, ensure_all_symbols_loaded
 from systems.utils.settings_loader import load_settings
 
 if __package__ is None or __package__ == "":
@@ -59,6 +59,7 @@ def main(argv: list[str] | None = None) -> None:
     verbose = args.verbose
 
     settings = load_settings()
+    ensure_all_symbols_loaded(settings)
     ledger_cfg = resolve_ledger_settings(tag, settings)
     symbol_cfg = get_symbol_config(tag)
     kraken_symbol = symbol_cfg["kraken"]["wsname"]
@@ -275,6 +276,7 @@ def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int =
 
     try:
         settings = load_settings()
+        ensure_all_symbols_loaded(settings)
         ledger_cfg = resolve_ledger_settings(tag, settings)
         symbol_cfg = get_symbol_config(tag)
         kraken_symbol = symbol_cfg["kraken"]["wsname"]

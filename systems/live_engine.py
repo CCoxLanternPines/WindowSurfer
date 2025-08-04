@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.settings_loader import load_settings
+from systems.utils.symbol_mapper import ensure_all_symbols_loaded
 from systems.fetch import fetch_missing_candles
 from systems.utils.addlog import addlog
 
@@ -26,6 +27,7 @@ def run_live(
     Parameters are currently placeholders for forward compatibility.
     """
     settings = load_settings()
+    ensure_all_symbols_loaded(settings)
     tick_time = datetime.now(timezone.utc)
 
     if dry:
