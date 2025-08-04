@@ -7,6 +7,7 @@ import json
 from urllib.parse import urlencode
 
 from systems.scripts.kraken_auth import load_kraken_keys
+from systems.scripts.kraken_utils import get_live_price
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.path import find_project_root
 
@@ -314,21 +315,21 @@ def execute_sell(
     *,
     symbol: str,
     coin_amount: float,
-    fiat_code: str | None = None,
+    fiat_code: str,
     price: float | None = None,
     ledger_name: str,
     verbose: int = 0,
 ) -> dict:
     """Place a real sell order and normalise the result structure.
 
-    ``fiat_code`` defaults to ``ZUSD`` when not provided. ``price`` is optional
-    and, if absent, the current live price is fetched to estimate USD notional.
+    ``fiat_code`` must be provided explicitly. ``price`` is optional and, if
+    absent, the current live price is fetched to estimate USD notional.
     """
-
-    fiat = fiat_code or "ZUSD"
+    if not fiat_code:
+        raise ValueError("fiat_code is required")
     sell_price = price if price is not None else get_live_price(symbol)
     usd_amount = coin_amount * sell_price
-    result = sell_order(symbol, fiat, usd_amount, ledger_name, verbose)
+    result = sell_order(symbol, fiat_code, usd_amount, ledger_name, verbose)
     if (
         not result
         or result.get("filled_amount", 0) <= 0
