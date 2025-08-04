@@ -71,8 +71,17 @@ def main(argv: list[str] | None = None) -> None:
 
     if mode == "wallet":
         from systems.scripts.kraken_utils import get_kraken_balance
+        from systems.utils.resolve_symbol import resolve_ledger_settings
+        from systems.utils.settings_loader import load_settings
 
-        balances = get_kraken_balance(verbose)
+        if args.tag:
+            ledger_cfg = resolve_ledger_settings(args.tag)
+        else:
+            settings = load_settings()
+            ledger_cfg = next(iter(settings.get("ledger_settings", {}).values()))
+
+        fiat_code = ledger_cfg["fiat"]
+        balances = get_kraken_balance(fiat_code, verbose)
 
         if verbose >= 1:
             addlog("[WALLET] Kraken Balance", verbose_int=1, verbose_state=verbose)
@@ -82,7 +91,7 @@ def main(argv: list[str] | None = None) -> None:
                 if val == 0:
                     continue
                 fmt = f"{val:.2f}" if val > 1 else f"{val:.6f}"
-                if asset.upper() in {"ZUSD", "USD", "USDT"}:
+                if asset.upper() == fiat_code.upper():
                     addlog(f"{asset}: ${fmt}", verbose_int=1, verbose_state=verbose)
                 else:
                     addlog(f"{asset}: {fmt}", verbose_int=1, verbose_state=verbose)
