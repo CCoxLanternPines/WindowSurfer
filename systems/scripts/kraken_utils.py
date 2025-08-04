@@ -67,25 +67,29 @@ def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) ->
     return result
 
 
-def get_kraken_balance(verbose: int = 0) -> dict:
+def get_kraken_balance(fiat_code: str, verbose: int = 0) -> dict:
+    """Return Kraken balances converted to ``fiat_code`` for logging."""
     # Import here to avoid circular dependency when execution_handler imports this module
     from systems.scripts.execution_handler import _kraken_request
 
     api_key, api_secret = load_kraken_keys()
     result = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
 
-    usd_balances = {}
+    fiat_code = fiat_code.upper()
+    fiat_code_symbol = fiat_code[1:] if fiat_code.startswith("Z") else fiat_code
+
+    fiat_balances = {}
     for asset, amount in result.items():
         amount = float(amount)
-        if asset.upper() in {"ZUSD", "USD", "USDT"}:
-            usd_balances[asset] = amount
+        if asset.upper() == fiat_code:
+            fiat_balances[asset] = amount
         else:
-            price = get_price(f"{asset}USD")
+            price = get_price(f"{asset}{fiat_code_symbol}")
             if price:
-                usd_balances[asset] = amount * price
+                fiat_balances[asset] = amount * price
 
     addlog(
-        f"[INFO] Kraken balance fetched (USD): {usd_balances}",
+        f"[INFO] Kraken balance fetched ({fiat_code_symbol}): {fiat_balances}",
         verbose_int=3,
         verbose_state=verbose,
     )
