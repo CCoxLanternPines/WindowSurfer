@@ -8,6 +8,8 @@ import sys
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
 from systems.utils.addlog import init_logger, addlog
+from systems.utils.settings_loader import load_settings
+from systems.utils.resolve_symbol import resolve_ledger_settings
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -60,6 +62,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv or sys.argv[1:])
+    if not args.ledger:
+        raise RuntimeError("Missing required --ledger argument.")
+    settings = load_settings()
+    ledger_cfg = resolve_ledger_settings(args.ledger, settings)
+    tag = ledger_cfg["tag"]
+
     init_logger(
         logging_enabled=args.log,
         verbose_level=args.verbose,
@@ -70,14 +78,8 @@ def main(argv: list[str] | None = None) -> None:
     verbose = args.verbose
 
     if mode == "wallet":
-        if not args.ledger:
-            addlog("Error: --ledger is required in wallet mode", verbose_int=1, verbose_state=True)
-            sys.exit(1)
-
         from systems.scripts.kraken_utils import get_kraken_balance
-        from systems.utils.resolve_symbol import resolve_ledger_settings
 
-        ledger_cfg = resolve_ledger_settings(args.ledger)
         wallet_code = ledger_cfg["wallet_code"]
         fiat_code = ledger_cfg["fiat_code"]
 
@@ -90,11 +92,11 @@ def main(argv: list[str] | None = None) -> None:
 
         wallet_amt = float(balances[wallet_code])
         fiat_amt = float(balances[fiat_code])
-        fiat_symbol = ledger_cfg["fiat_code"].replace("Z", "").replace("X", "")
-        coin_symbol = ledger_cfg["tag"].replace(fiat_symbol, "")
+        fiat_symbol = fiat_code.replace("Z", "").replace("X", "")
+        coin_symbol = tag.replace(fiat_symbol, "")
 
         addlog(
-            f"[WALLET] {args.ledger} | {ledger_cfg['tag']}",
+            f"[WALLET] {args.ledger} | {tag}",
             verbose_int=0,
             verbose_state=verbose,
         )
@@ -124,9 +126,6 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if mode == "sim":
-        if not args.ledger:
-            addlog("Error: --ledger is required in simulation mode", verbose_int=1, verbose_state=True)
-            sys.exit(1)
         run_simulation(ledger_name=args.ledger, verbose=args.verbose)
     elif mode == "live":
         run_live(
