@@ -25,10 +25,7 @@ def run_live(
     """Run the live trading engine for ``ledger_name``."""
     settings = load_settings()
     ledger_cfg = resolve_ledger_settings(ledger_name, settings)
-    kraken_pair = ledger_cfg.get("kraken_pair")
-    wallet_code = ledger_cfg.get("wallet_code")
-    fiat_code = ledger_cfg.get("fiat_code")
-    _ = kraken_pair, wallet_code, fiat_code  # Ensure variables are resolved
+    tag = ledger_cfg.get("tag")
     tick_time = datetime.now(timezone.utc)
 
     def _run_top_of_hour(ts: datetime) -> None:
@@ -42,14 +39,17 @@ def run_live(
         )
 
     if dry:
-        tag = ledger_cfg.get("tag")
         fetch_missing_candles(ledger_name, relative_window="48h", verbose=verbose)
         addlog(
             f"[SYNC] {ledger_name} | {tag} candles up to date",
             verbose_int=1,
             verbose_state=verbose,
         )
-        addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
+        addlog(
+            f"[LIVE] {ledger_name} | {tag} Running top of hour",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
         _run_top_of_hour(tick_time)
         return
 
@@ -70,7 +70,11 @@ def run_live(
                 time.sleep(1)
                 pbar.update(1)
 
-        addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
+        addlog(
+            f"[LIVE] {ledger_name} | {tag} Running top of hour",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
         _run_top_of_hour(datetime.now(timezone.utc))
 
 

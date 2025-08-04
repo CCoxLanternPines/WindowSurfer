@@ -23,10 +23,10 @@ def run_simulation(ledger_name: str, verbose: int = 0) -> None:
     """Run a historical simulation for ``ledger_name``."""
     settings = load_settings()
     ledger_config = resolve_ledger_settings(ledger_name, settings)
-    tag = ledger_config["tag"].upper()
+    tag = ledger_config["tag"]
 
     root = find_project_root()
-    sim_path = root / "data" / "tmp" / "simulation" / f"{ledger_name}.json"
+    sim_path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
     if sim_path.exists():
         sim_path.unlink()
 
@@ -110,10 +110,10 @@ def run_simulation(ledger_name: str, verbose: int = 0) -> None:
         verbose_int=3,
         verbose_state=verbose,
     )
-    save_ledger(ledger_name, ledger, sim=True, final_tick=final_tick, summary=summary)
+    save_ledger(tag, ledger, sim=True, final_tick=final_tick, summary=summary)
 
     saved_summary = (
-        Ledger.load_ledger(ledger_name, sim=True).get_account_summary(final_price)
+        Ledger.load_ledger(tag, sim=True).get_account_summary(final_price)
     )
     if (
         saved_summary["closed_notes"] != summary["closed_notes"]
