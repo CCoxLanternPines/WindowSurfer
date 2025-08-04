@@ -23,6 +23,7 @@ from systems.utils.addlog import addlog, send_telegram_message
 from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.path import find_project_root
 from systems.utils.top_hour_report import format_top_of_hour_report
+from systems.utils.resolve_symbol import split_tag
 
 
 def handle_top_of_hour(
@@ -75,9 +76,8 @@ def handle_top_of_hour(
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
             tag = ledger_cfg["tag"]
-            kraken_pair = ledger_cfg["kraken_name"]
+            _, quote = split_tag(tag)
             wallet_code = ledger_cfg["wallet_code"]
-            fiat = ledger_cfg["fiat"]
             window_settings = ledger_cfg.get("window_settings", {})
             triggered_strategies = {wn.title(): False for wn in window_settings}
             strategy_summary: dict[str, dict] = {}
@@ -93,7 +93,7 @@ def handle_top_of_hour(
                 continue
             balance = snapshot.get("balance", {})
 
-            price = get_live_price(kraken_pair=kraken_pair)
+            price = get_live_price(kraken_pair=tag)
 
             current_ts = (
                 int(tick.timestamp()) if isinstance(tick, datetime) else int(tick)
@@ -138,7 +138,7 @@ def handle_top_of_hour(
                             if n.get("window") == window_name
                         ]
                         if len(open_for_window) < window_cfg.get("max_open_notes", 0):
-                            available = float(balance.get(fiat, 0.0))
+                            available = float(balance.get(quote, 0.0))
                             invest = available * window_cfg.get(
                                 "investment_fraction", 0
                             )
@@ -148,8 +148,7 @@ def handle_top_of_hour(
                             if invest >= min_usd and invest <= available and invest > 0:
                                 result = execute_buy(
                                     client=client,
-                                    symbol=kraken_pair,
-                                    fiat_code=fiat,
+                                    symbol=tag,
                                     price=price,
                                     amount_usd=invest,
                                     ledger_name=ledger_name,
@@ -216,9 +215,8 @@ def handle_top_of_hour(
                             ) and price >= note.get("mature_price", float("inf")):
                                 result = execute_sell(
                                     client=client,
-                                    symbol=kraken_pair,
+                                    symbol=tag,
                                     coin_amount=note["entry_amount"],
-                                    fiat_code=fiat,
                                     ledger_name=ledger_name,
                                 )
                                 note["exit_price"] = result["avg_price"]
@@ -251,7 +249,7 @@ def handle_top_of_hour(
                     triggered_strategies[window_name.title()] = True
 
                 summary = ledger.get_account_summary(price)
-                idle_capital = float(balance.get(fiat, 0.0))
+                idle_capital = float(balance.get(quote, 0.0))
                 summary["idle_capital"] = idle_capital
                 summary["total_value"] += idle_capital
                 hour_str = datetime.now().strftime("%I:%M%p")
@@ -303,7 +301,7 @@ def handle_top_of_hour(
             ledger.set_metadata(metadata)
             save_ledger(ledger_cfg["tag"], ledger)
 
-            usd_balance = float(balance.get(fiat, 0.0))
+            usd_balance = float(balance.get(quote, 0.0))
             coin_balance = float(balance.get(wallet_code, 0.0))
             coin_balance_usd = coin_balance * price
             total_liquid_value = usd_balance + coin_balance_usd

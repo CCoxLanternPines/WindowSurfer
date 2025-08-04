@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> None:
 
     settings = load_settings()
     ledger_cfg = resolve_ledger_settings(tag, settings)
-    kraken_symbol = ledger_cfg["kraken_name"]
+    kraken_symbol = ledger_cfg["tag"]
     binance_symbol = ledger_cfg["binance_name"]
 
     start_ts, end_ts = parse_relative_time(time_window)
@@ -274,7 +274,7 @@ def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int =
     try:
         settings = load_settings()
         ledger_cfg = resolve_ledger_settings(tag, settings)
-        kraken_symbol = ledger_cfg["kraken_name"]
+        kraken_symbol = ledger_cfg["tag"]
         binance_symbol = ledger_cfg["binance_name"]
     except Exception as e:
         raise RuntimeError(f"[ERROR] Failed to resolve symbol '{tag}': {e}")

@@ -59,10 +59,8 @@ def main(argv: Optional[list[str]] = None) -> None:
         )
 
     tag = ledger_cfg.get("tag")
-    kraken_pair = ledger_cfg.get("kraken_name")
-    fiat_code = ledger_cfg.get("fiat")
 
-    price = get_live_price(kraken_pair)
+    price = get_live_price(tag)
     if price <= 0:
         raise SystemExit("[ERROR] Live price unavailable (0) — aborting")
 
@@ -74,8 +72,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         if not args.dry:
             result = execute_buy(
                 None,
-                symbol=kraken_pair,
-                fiat_code=fiat_code,
+                symbol=tag,
                 wallet_code=ledger_cfg["wallet_code"],
                 price=price,
                 amount_usd=args.usd,
@@ -89,7 +86,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             ledger.setdefault("trades", []).append(
                 {
                     "action": "buy",
-                    "symbol": kraken_pair,
+                    "symbol": tag,
                     "usd": args.usd,
                     "coin": coin_amt,
                     "price": price,
@@ -106,9 +103,8 @@ def main(argv: Optional[list[str]] = None) -> None:
         if not args.dry:
             result = execute_sell(
                 None,
-                symbol=kraken_pair,
+                symbol=tag,
                 coin_amount=coin_amt,
-                fiat_code=fiat_code,
                 price=price,
                 ledger_name=args.ledger,
                 verbose=args.verbose,
@@ -121,7 +117,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             ledger.setdefault("trades", []).append(
                 {
                     "action": "sell",
-                    "symbol": kraken_pair,
+                    "symbol": tag,
                     "usd": usd_total,
                     "coin": coin_amt,
                     "price": price,
