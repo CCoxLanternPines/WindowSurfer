@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> None:
         raise RuntimeError(f"Ledger '{ledger_name}' not found: {e}")
     tag = ledger_cfg["tag"].upper()
     kraken_symbol = ledger_cfg["kraken_name"]
-    binance_symbol = ledger_cfg["binance_name"]
+    binance_symbol = ledger_cfg["binance_tag"]
     log_prefix = f"[FETCH] {ledger_name} | {tag}"
 
     def log(message: str, **kwargs) -> None:
@@ -284,7 +284,7 @@ def fetch_missing_candles(
         ledger_cfg = resolve_ledger_settings(ledger_name, settings)
         tag = ledger_cfg["tag"].upper()
         kraken_symbol = ledger_cfg["kraken_name"]
-        binance_symbol = ledger_cfg["binance_name"]
+        binance_symbol = ledger_cfg["binance_tag"]
     except Exception as e:
         raise RuntimeError(f"[ERROR] Failed to resolve ledger '{ledger_name}': {e}")
 

@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.path import find_project_root
 from systems.utils.settings_loader import load_settings
+from systems.utils.resolve_symbol import resolve_ledger_settings
 
 
 def _get_latest_price(trades: dict, pair: str) -> float:
@@ -57,9 +58,9 @@ def send_top_hour_report(
         return
 
     settings = load_settings()
-    ledger_cfg = settings.get("ledger_settings", {}).get(ledger_name, {})
+    ledger_cfg = resolve_ledger_settings(ledger_name, settings)
     wallet_code = ledger_cfg.get("wallet_code", "")
-    fiat_code = ledger_cfg.get("fiat", "")
+    fiat_code = ledger_cfg.get("fiat_code", "")
 
     balance = snapshot.get("balance", {})
     trades = snapshot.get("trades", {})

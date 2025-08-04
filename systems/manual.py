@@ -12,6 +12,7 @@ from systems.utils.addlog import addlog
 from systems.scripts.kraken_utils import ensure_snapshot, get_live_price
 from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.scripts.ledger import save_ledger
+from systems.utils.resolve_symbol import resolve_ledger_settings
 
 
 def _load_ledger(ledger_name: str) -> dict:
@@ -44,9 +45,10 @@ def main(argv: Optional[list[str]] = None) -> None:
     args = _parse_args(argv)
 
     settings = load_settings()
-    ledger_cfg = settings.get("ledger_settings", {}).get(args.ledger)
-    if ledger_cfg is None:
-        raise SystemExit(f"[ERROR] Ledger '{args.ledger}' not found in settings")
+    try:
+        ledger_cfg = resolve_ledger_settings(args.ledger, settings)
+    except Exception as e:
+        raise SystemExit(f"[ERROR] Ledger '{args.ledger}' not found in settings: {e}")
 
     if args.usd <= 0:
         raise SystemExit("[ERROR] --usd must be positive")
@@ -59,10 +61,10 @@ def main(argv: Optional[list[str]] = None) -> None:
         )
 
     tag = ledger_cfg.get("tag")
-    kraken_pair = ledger_cfg.get("kraken_name")
-    fiat_code = ledger_cfg.get("fiat")
+    kraken_symbol = ledger_cfg.get("kraken_name")
+    fiat_code = ledger_cfg.get("fiat_code")
 
-    price = get_live_price(kraken_pair)
+    price = get_live_price(kraken_symbol)
     if price <= 0:
         raise SystemExit("[ERROR] Live price unavailable (0) — aborting")
 
@@ -74,7 +76,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         if not args.dry:
             result = execute_buy(
                 None,
-                symbol=kraken_pair,
+                symbol=kraken_symbol,
                 fiat_code=fiat_code,
                 wallet_code=ledger_cfg["wallet_code"],
                 price=price,
@@ -89,7 +91,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             ledger.setdefault("trades", []).append(
                 {
                     "action": "buy",
-                    "symbol": kraken_pair,
+                    "symbol": kraken_symbol,
                     "usd": args.usd,
                     "coin": coin_amt,
                     "price": price,
@@ -106,7 +108,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         if not args.dry:
             result = execute_sell(
                 None,
-                symbol=kraken_pair,
+                symbol=kraken_symbol,
                 coin_amount=coin_amt,
                 fiat_code=fiat_code,
                 price=price,
@@ -121,7 +123,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             ledger.setdefault("trades", []).append(
                 {
                     "action": "sell",
-                    "symbol": kraken_pair,
+                    "symbol": kraken_symbol,
                     "usd": usd_total,
                     "coin": coin_amt,
                     "price": price,

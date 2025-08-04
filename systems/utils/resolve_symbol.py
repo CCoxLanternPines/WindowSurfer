@@ -16,12 +16,47 @@ BINANCE_FILE = SNAPSHOT_DIR / "binance_symbols.json"
 
 
 def resolve_ledger_settings(ledger_name: str, settings: dict | None = None) -> dict:
-    """Return ledger configuration for ``ledger_name``."""
+    """Return resolved ledger configuration for ``ledger_name``.
+
+    The base configuration contains only ``tag``, ``fiat`` and
+    ``window_settings``. All exchange-specific metadata is resolved at runtime
+    using cached symbol snapshots. A ``RuntimeError`` is raised if any required
+    metadata field is missing.
+    """
     cfg = settings or SETTINGS
     try:
-        return cfg.get("ledger_settings", {})[ledger_name]
-    except KeyError:
-        raise ValueError(f"No ledger found for name: {ledger_name}") from None
+        base_cfg = cfg.get("ledger_settings", {})[ledger_name]
+    except KeyError as exc:
+        raise ValueError(f"No ledger found for name: {ledger_name}") from exc
+
+    tag = base_cfg.get("tag")
+    fiat = base_cfg.get("fiat")
+    if not tag or not fiat:
+        raise ValueError(f"Ledger '{ledger_name}' missing 'tag' or 'fiat'")
+
+    meta = resolve_symbol_metadata(tag)
+    required = [
+        "kraken_tag",
+        "kraken_pair",
+        "kraken_name",
+        "wallet_code",
+        "fiat_code",
+        "binance_tag",
+    ]
+    missing = [field for field in required if not meta.get(field)]
+    if missing:
+        raise RuntimeError(
+            f"Snapshot metadata for tag '{tag}' missing fields: {', '.join(missing)}"
+        )
+
+    resolved = {
+        "tag": tag,
+        "fiat": fiat,
+        **{field: meta[field] for field in required},
+        "window_settings": base_cfg.get("window_settings", {}),
+    }
+
+    return resolved
 
 
 def resolve_symbol_metadata(tag: str) -> dict:
@@ -51,11 +86,7 @@ def resolve_symbol_metadata(tag: str) -> dict:
 def resolve_symbol(ledger_name: str) -> dict:
     """Resolve exchange-specific pair names for ``ledger_name``."""
     ledger = resolve_ledger_settings(ledger_name)
-    tag = ledger.get("tag")
-    if not tag:
-        raise ValueError(f"Ledger '{ledger_name}' missing required 'tag'")
-    meta = resolve_symbol_metadata(tag)
     return {
-        "kraken": meta.get("kraken_name"),
-        "binance": meta.get("binance_tag"),
+        "kraken": ledger.get("kraken_name"),
+        "binance": ledger.get("binance_tag"),
     }
