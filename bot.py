@@ -10,6 +10,8 @@ from pathlib import Path
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
 from systems.utils.addlog import init_logger, addlog
+from systems.utils.settings_loader import load_settings
+from systems.utils.symbol_mapper import ensure_all_symbols_loaded
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -115,6 +117,9 @@ def main(argv: list[str] | None = None) -> None:
                 else:
                     addlog(f"{asset}: {fmt}", verbose_int=1, verbose_state=verbose)
         return
+
+    settings = load_settings()
+    ensure_all_symbols_loaded(settings)
 
     if mode == "sim":
         run_simulation(tag=args.tag.upper(), verbose=args.verbose)

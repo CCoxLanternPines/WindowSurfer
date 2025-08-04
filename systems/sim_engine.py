@@ -15,6 +15,7 @@ from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.addlog import addlog
 from systems.utils.settings_loader import load_settings
+from systems.utils.symbol_mapper import ensure_all_symbols_loaded
 from systems.utils.resolve_symbol import resolve_ledger_settings
 from systems.utils.path import find_project_root
 
@@ -22,6 +23,7 @@ from systems.utils.path import find_project_root
 def run_simulation(tag: str, verbose: int = 0) -> None:
     """Run a historical simulation for ``tag``."""
     settings = load_settings()
+    ensure_all_symbols_loaded(settings)
     tag = tag.upper()
     ledger_config = resolve_ledger_settings(tag, settings)
 
