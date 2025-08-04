@@ -8,7 +8,7 @@
       "sell_ceiling": [0.5, 1.0]
     }
   },
-  "SOLUSD": {
+  "SOLDaI": {
     "bunny": {
       "buy_cooldown": [1, 200],
       "sell_cooldown": [1, 200],

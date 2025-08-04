@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--tag",
         required=True,
-        help="Symbol tag (e.g. SOLUSD)",
+        help="Symbol tag (e.g. SOLDaI)",
     )
     parser.add_argument(
         "--time",

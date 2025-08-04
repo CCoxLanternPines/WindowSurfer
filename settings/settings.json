@@ -21,11 +21,11 @@
       }
     },
     "Travis_Ledger": {
-      "tag": "SOLUSD",
+      "tag": "SOLDaI",
       "wallet_code": "SOL.F",
-      "kraken_name": "SOL/USD",
-      "kraken_pair": "SOLUSD",
-      "binance_name": "SOLUSDT",
+      "kraken_name": "SOL/DAI",
+      "kraken_pair": "SOLDAI",
+      "binance_name": "SOLDAI",
       "fiat": "DAI",
       "window_settings": {
         "bunny": {
