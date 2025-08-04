@@ -61,7 +61,7 @@ def handle_top_of_hour(
 
         ledger_cfg = resolve_ledger_settings(ledger_name, settings)
         tag = ledger_cfg["tag"]
-        kraken_pair = ledger_cfg["kraken_name"]
+        kraken_pair = ledger_cfg["kraken_pair"]
         wallet_code = ledger_cfg["wallet_code"]
         fiat = ledger_cfg["fiat_code"]
         window_settings = ledger_cfg.get("window_settings", {})
