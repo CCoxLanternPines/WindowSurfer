@@ -31,7 +31,7 @@ krakenex, ccxt and pyyaml) and run ``bot.py`` with arguments:
 
 ```bash
 python bot.py --mode sim --window 1m --verbose 2  # uses default tag DOGEUSD
-python bot.py --mode live --tag SOLUSD --window 3mo --verbose 1 --telegram
+python bot.py --mode live --tag SOLDaI --window 3mo --verbose 1 --telegram
 python bot.py --mode wallet -v
 ```
 
