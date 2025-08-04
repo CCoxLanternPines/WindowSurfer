@@ -76,7 +76,8 @@ def main(argv: list[str] | None = None) -> None:
 
     try:
         resp = requests.get("https://api.kraken.com/0/public/AssetPairs", timeout=10)
-        kraken_pairs = set(resp.json().get("result", {}).keys())
+        asset_pairs = resp.json().get("result", {})
+        valid_pairs = {pair_info["altname"].upper() for pair_info in asset_pairs.values()}
     except Exception:
         addlog(
             "[ERROR] Failed to fetch Kraken AssetPairs",
@@ -85,9 +86,9 @@ def main(argv: list[str] | None = None) -> None:
         )
         sys.exit(1)
     invalid = False
-    for cfg in settings.get("ledger_settings", {}).values():
-        tag = cfg.get("tag", "")
-        if tag not in kraken_pairs:
+    for ledger_cfg in settings.get("ledger_settings", {}).values():
+        tag = ledger_cfg.get("tag", "")
+        if tag.upper() not in valid_pairs:
             addlog(
                 f"[ERROR] Invalid trading pair: {tag}",
                 verbose_int=1,
