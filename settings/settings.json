@@ -6,7 +6,6 @@
       "kraken_name": "DOGE/USD",
       "kraken_pair": "XXDGZUSD",
       "binance_name": "DOGEUSDT",
-      "fiat": "ZUSD",
       "window_settings": {
         "dog": {
           "window_size": "7d",
@@ -21,12 +20,11 @@
       }
     },
     "Travis_Ledger": {
-      "tag": "SOLDaI",
+      "tag": "SOLUSDC",
       "wallet_code": "SOL.F",
-      "kraken_name": "SOL/DAI",
-      "kraken_pair": "SOLDAI",
-      "binance_name": "SOLDAI",
-      "fiat": "DAI",
+      "kraken_name": "SOL/USDC",
+      "kraken_pair": "SOLUSDC",
+      "binance_name": "SOLUSDC",
       "window_settings": {
         "bunny": {
           "window_size": "7d",

@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import argparse
 import sys
+import requests
 
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
 from systems.utils.addlog import init_logger, addlog
+from systems.utils.settings_loader import load_settings
+from systems.utils.resolve_symbol import resolve_ledger_settings, split_tag
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -69,19 +72,41 @@ def main(argv: list[str] | None = None) -> None:
     mode = args.mode.lower()
     verbose = args.verbose
 
+    settings = load_settings()
+
+    try:
+        resp = requests.get("https://api.kraken.com/0/public/AssetPairs", timeout=10)
+        kraken_pairs = set(resp.json().get("result", {}).keys())
+    except Exception:
+        addlog(
+            "[ERROR] Failed to fetch Kraken AssetPairs",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        sys.exit(1)
+    invalid = False
+    for cfg in settings.get("ledger_settings", {}).values():
+        tag = cfg.get("tag", "")
+        if tag not in kraken_pairs:
+            addlog(
+                f"[ERROR] Invalid trading pair: {tag}",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            invalid = True
+    if invalid:
+        sys.exit(1)
+
     if mode == "wallet":
         from systems.scripts.kraken_utils import get_kraken_balance
-        from systems.utils.resolve_symbol import resolve_ledger_settings
-        from systems.utils.settings_loader import load_settings
 
         if args.tag:
-            ledger_cfg = resolve_ledger_settings(args.tag)
+            ledger_cfg = resolve_ledger_settings(args.tag, settings)
         else:
-            settings = load_settings()
             ledger_cfg = next(iter(settings.get("ledger_settings", {}).values()))
 
-        fiat_code = ledger_cfg["fiat"]
-        balances = get_kraken_balance(fiat_code, verbose)
+        _, quote_asset = split_tag(ledger_cfg["tag"])
+        balances = get_kraken_balance(quote_asset, verbose)
 
         if verbose >= 1:
             addlog("[WALLET] Kraken Balance", verbose_int=1, verbose_state=verbose)
@@ -91,7 +116,7 @@ def main(argv: list[str] | None = None) -> None:
                 if val == 0:
                     continue
                 fmt = f"{val:.2f}" if val > 1 else f"{val:.6f}"
-                if asset.upper() == fiat_code.upper():
+                if asset.upper() == quote_asset.upper():
                     addlog(f"{asset}: ${fmt}", verbose_int=1, verbose_state=verbose)
                 else:
                     addlog(f"{asset}: {fmt}", verbose_int=1, verbose_state=verbose)

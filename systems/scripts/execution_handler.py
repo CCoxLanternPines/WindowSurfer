@@ -10,6 +10,7 @@ from systems.scripts.kraken_auth import load_kraken_keys
 from systems.scripts.kraken_utils import get_live_price
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.path import find_project_root
+from systems.utils.resolve_symbol import split_tag
 
 
 def fetch_price_data(symbol: str) -> dict:
@@ -96,19 +97,8 @@ def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) ->
         raise Exception(f"Kraken API error: {result['error']}")
     return result
 
-
-def get_available_fiat_balance(exchange, currency: str) -> float:
-    if not currency:
-        raise ValueError("currency is required")
-    try:
-        balance = exchange.fetch_free_balance()
-    except Exception:
-        return 0.0
-    return float(balance.get(currency, 0.0))
-
 def buy_order(
     pair_code: str,
-    fiat_symbol: str,
     usd_amount: float,
     ledger_name: str,
     wallet_code: str,
@@ -118,6 +108,7 @@ def buy_order(
 
     snapshot = _get_snapshot(ledger_name, api_key, api_secret)
     balance = snapshot.get("balance", {})
+    _, fiat_symbol = split_tag(pair_code)
     available_usd = float(balance.get(fiat_symbol, 0.0))
 
     addlog(f"[DEBUG] Balance snapshot: {balance}", verbose_int=1, verbose_state=verbose)
@@ -211,7 +202,7 @@ def buy_order(
     }
 
 def sell_order(
-    pair_code: str, fiat_symbol: str, usd_amount: float, ledger_name: str, verbose: int = 0
+    pair_code: str, usd_amount: float, ledger_name: str, verbose: int = 0
 ) -> dict:
     api_key, api_secret = load_kraken_keys()
 
@@ -273,7 +264,6 @@ def execute_buy(
     client,
     *,
     symbol: str,
-    fiat_code: str,
     price: float,
     amount_usd: float,
     ledger_name: str,
@@ -286,9 +276,7 @@ def execute_buy(
     currently unused as ``buy_order`` pulls pricing from Kraken directly.
     """
 
-    result = buy_order(
-        symbol, fiat_code, amount_usd, ledger_name, wallet_code, verbose
-    )
+    result = buy_order(symbol, amount_usd, ledger_name, wallet_code, verbose)
     if (
         not result
         or result.get("filled_amount", 0) <= 0
@@ -317,21 +305,18 @@ def execute_sell(
     *,
     symbol: str,
     coin_amount: float,
-    fiat_code: str,
     price: float | None = None,
     ledger_name: str,
     verbose: int = 0,
 ) -> dict:
     """Place a real sell order and normalise the result structure.
 
-    ``fiat_code`` must be provided explicitly. ``price`` is optional and, if
-    absent, the current live price is fetched to estimate USD notional.
+    ``price`` is optional and, if absent, the current live price is fetched to
+    estimate USD notional.
     """
-    if not fiat_code:
-        raise ValueError("fiat_code is required")
     sell_price = price if price is not None else get_live_price(symbol)
     usd_amount = coin_amount * sell_price
-    result = sell_order(symbol, fiat_code, usd_amount, ledger_name, verbose)
+    result = sell_order(symbol, usd_amount, ledger_name, verbose)
     if (
         not result
         or result.get("filled_amount", 0) <= 0
