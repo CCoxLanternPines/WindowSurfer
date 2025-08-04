@@ -79,13 +79,13 @@ class Ledger:
 
     # Persistence -----------------------------------------------------------
     @staticmethod
-    def load_ledger(tag: str, *, sim: bool = False) -> "Ledger":
-        """Load a ledger for ``tag`` depending on mode."""
+    def load_ledger(ledger_name: str, *, sim: bool = False) -> "Ledger":
+        """Load a ledger for ``ledger_name`` depending on mode."""
         root = find_project_root()
         ledger = Ledger()
 
         if sim:
-            path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
+            path = root / "data" / "tmp" / "simulation" / f"{ledger_name}.json"
             if path.exists():
                 with path.open("r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -94,7 +94,7 @@ class Ledger:
                 ledger.metadata = data.get("metadata", {})
             return ledger
 
-        path = root / "data" / "ledgers" / f"{tag}.json"
+        path = root / "data" / "ledgers" / f"{ledger_name}.json"
         if path.exists():
             with path.open("r", encoding="utf-8") as f:
                 data = json.load(f)

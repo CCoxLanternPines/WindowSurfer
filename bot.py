@@ -10,7 +10,7 @@ from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
 from systems.utils.addlog import init_logger, addlog
 from systems.utils.settings_loader import load_settings
-from systems.utils.resolve_symbol import resolve_ledger_settings, split_tag
+from systems.utils.resolve_symbol import split_tag
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -23,11 +23,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Execution mode: sim, simtune, live, or wallet",
     )
     parser.add_argument(
-        "--tag",
+        "--ledger",
         required=False,
         help=(
-            "Symbol tag, e.g. DOGEUSD. If omitted, all symbols from config are "
-            "processed every hour"
+            "Ledger name from settings, e.g. Travis_Ledger. If omitted, all "
+            "ledgers from config are processed"
         ),
     )
     parser.add_argument(
@@ -98,8 +98,8 @@ def main(argv: list[str] | None = None) -> None:
     if mode == "wallet":
         from systems.scripts.kraken_utils import get_kraken_balance
 
-        if args.tag:
-            ledger_cfg = resolve_ledger_settings(args.tag, settings)
+        if args.ledger:
+            ledger_cfg = settings["ledger_settings"][args.ledger]
         else:
             ledger_cfg = next(iter(settings.get("ledger_settings", {}).values()))
 
@@ -121,16 +121,17 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if mode == "sim":
-        run_simulation(tag=args.tag.upper(), verbose=args.verbose)
+        ledger_name = args.ledger or next(iter(settings["ledger_settings"]))
+        run_simulation(ledger=ledger_name, verbose=args.verbose)
     elif mode == "simtune":
-        if not args.window:
-            addlog("Error: --window is required for simtune mode")
+        if not args.window or not args.ledger:
+            addlog("Error: --window and --ledger are required for simtune mode")
             sys.exit(1)
         from systems.scripts.sim_tuner import run_sim_tuner
-        run_sim_tuner(tag=args.tag.upper(), window=args.window.lower(), verbose=args.verbose)
+        run_sim_tuner(ledger=args.ledger, window=args.window.lower(), verbose=args.verbose)
     elif mode == "live":
         run_live(
-            tag=args.tag.upper() if args.tag else None,
+            ledger=args.ledger,
             window=args.window,
             dry=args.dry,
             verbose=args.verbose,

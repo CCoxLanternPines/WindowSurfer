@@ -15,18 +15,17 @@ from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.addlog import addlog
 from systems.utils.settings_loader import load_settings
-from systems.utils.resolve_symbol import resolve_ledger_settings
 from systems.utils.path import find_project_root
 
 
-def run_simulation(tag: str, verbose: int = 0) -> None:
-    """Run a historical simulation for ``tag``."""
+def run_simulation(ledger: str, verbose: int = 0) -> None:
+    """Run a historical simulation for the given ``ledger``."""
     settings = load_settings()
-    tag = tag.upper()
-    ledger_config = resolve_ledger_settings(tag, settings)
+    ledger_config = settings["ledger_settings"][ledger]
+    tag = ledger_config["tag"].upper()
 
     root = find_project_root()
-    sim_path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
+    sim_path = root / "data" / "tmp" / "simulation" / f"{ledger}.json"
     if sim_path.exists():
         sim_path.unlink()
 
@@ -35,9 +34,9 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
         raise ValueError("No windows defined for ledger")
 
     sim_capital = float(settings.get("simulation_capital", 0))
-    ledger = Ledger()
+    ledger_obj = Ledger()
 
-    addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
+    addlog(f"[SIM] Starting simulation for {ledger}", verbose_int=1, verbose_state=verbose)
 
     df = fetch_candles(tag)
     max_note_usdt = settings.get("general_settings", {}).get("max_note_usdt", sim_capital)
@@ -67,8 +66,9 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
             handle_top_of_hour(
                 tick=tick,
                 candle=candle,
-                ledger=ledger,
+                ledger=ledger_obj,
                 ledger_config=ledger_config,
+                ledger_name=ledger,
                 sim=True,
                 df=df,
                 offset=offset,
@@ -88,16 +88,18 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
 
     final_tick = len(df) - 1 if total else -1
     final_price = float(df.iloc[-1]["close"])
-    summary = ledger.get_account_summary(final_price)
+    summary = ledger_obj.get_account_summary(final_price)
 
     addlog(
         f"[DEBUG] Final tick: {final_tick}",
         verbose_int=3,
         verbose_state=verbose,
     )
-    save_ledger(tag, ledger, sim=True, final_tick=final_tick, summary=summary)
+    save_ledger(ledger, ledger_obj, sim=True, final_tick=final_tick, summary=summary)
 
-    saved_summary = Ledger.load_ledger(tag, sim=True).get_account_summary(final_price)
+    saved_summary = (
+        Ledger.load_ledger(ledger, sim=True).get_account_summary(final_price)
+    )
     if (
         saved_summary["closed_notes"] != summary["closed_notes"]
         or saved_summary["realized_gain"] != summary["realized_gain"]

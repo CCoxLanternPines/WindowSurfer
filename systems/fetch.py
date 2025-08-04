@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import List
 import sys
 import pandas as pd
-from systems.utils.resolve_symbol import resolve_ledger_settings
 from systems.utils.settings_loader import load_settings
 
 if __package__ is None or __package__ == "":
@@ -35,9 +34,9 @@ sys.path.insert(0, str(find_project_root()))
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Fetch historical candles")
     parser.add_argument(
-        "--tag",
+        "--ledger",
         required=True,
-        help="Symbol tag (e.g. SOLDaI)",
+        help="Ledger name from settings",
     )
     parser.add_argument(
         "--time",
@@ -53,12 +52,13 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
-    tag = args.tag.upper()
+    ledger = args.ledger
     time_window = args.time if args.time else "48h"
     verbose = args.verbose
 
     settings = load_settings()
-    ledger_cfg = resolve_ledger_settings(tag, settings)
+    ledger_cfg = settings["ledger_settings"][ledger]
+    tag = ledger_cfg["tag"]
     kraken_symbol = ledger_cfg["tag"]
     binance_symbol = ledger_cfg["binance_name"]
 
@@ -273,7 +273,11 @@ def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int =
 
     try:
         settings = load_settings()
-        ledger_cfg = resolve_ledger_settings(tag, settings)
+        ledger_cfg = next(
+            cfg
+            for cfg in settings.get("ledger_settings", {}).values()
+            if cfg.get("tag", "").upper() == tag
+        )
         kraken_symbol = ledger_cfg["tag"]
         binance_symbol = ledger_cfg["binance_name"]
     except Exception as e:

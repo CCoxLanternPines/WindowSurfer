@@ -22,15 +22,16 @@ def _load_json(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
-def run_sim_tuner(tag: str, window: str, verbose: int = 0) -> None:
-    """Run Optuna tuning on a single window for ``tag`` and ``window``."""
-    tag = tag.upper()
+def run_sim_tuner(ledger: str, window: str, verbose: int = 0) -> None:
+    """Run Optuna tuning on a single window for ``ledger`` and ``window``."""
     window = window.lower()
     root = find_project_root()
     settings_path = root / "settings" / "settings.json"
     knobs_path = root / "settings" / "knobs.json"
 
     base_settings = _load_json(settings_path)
+    ledger_cfg = base_settings["ledger_settings"][ledger]
+    tag = ledger_cfg["tag"].upper()
     knobs_cfg = _load_json(knobs_path).get(tag)
     if knobs_cfg is None:
         raise ValueError(f"No knob configuration found for tag: {tag}")
@@ -39,13 +40,7 @@ def run_sim_tuner(tag: str, window: str, verbose: int = 0) -> None:
     if not window_knobs:
         raise ValueError(f"No knob ranges found for window: {window}")
 
-    ledger_key = None
-    for name, cfg in base_settings.get("ledger_settings", {}).items():
-        if cfg.get("tag", "").upper() == tag:
-            ledger_key = name
-            break
-    if ledger_key is None:
-        raise ValueError(f"Tag {tag} not present in settings")
+    ledger_key = ledger
 
     init_capital = float(base_settings.get("simulation_capital", 0))
 
@@ -89,14 +84,14 @@ def run_sim_tuner(tag: str, window: str, verbose: int = 0) -> None:
         settings_loader.load_settings = lambda: trial_settings
         sim_engine.load_settings = lambda: trial_settings
         try:
-            run_simulation(tag, verbose)
+            run_simulation(ledger, verbose)
         finally:
             settings_loader.load_settings = original_loader
             sim_engine.load_settings = original_sim_loader
 
-        ledger = Ledger.load_ledger(tag, sim=True)
+        ledger_obj = Ledger.load_ledger(ledger, sim=True)
         final_price = float(fetch_candles(tag).iloc[-1]["close"])
-        summary = ledger.get_account_summary(final_price)
+        summary = ledger_obj.get_account_summary(final_price)
         open_value = summary.get("open_value", 0.0)
         realized_gain = summary.get("realized_gain", 0.0)
         open_cost = sum(
@@ -145,6 +140,7 @@ def run_sim_tuner(tag: str, window: str, verbose: int = 0) -> None:
     )
 
     row = {
+        "ledger": ledger,
         "tag": tag,
         "window": window,
         "score": best_score,

@@ -34,6 +34,7 @@ def handle_top_of_hour(
     candle: dict | None = None,
     ledger: Ledger | None = None,
     ledger_config: dict | None = None,
+    ledger_name: str | None = None,
     **kwargs: Any,
 ) -> None:
     """Run buy/sell evaluations for all windows on an hourly boundary.
@@ -74,14 +75,19 @@ def handle_top_of_hour(
 
         general_cfg = settings.get("general_settings", {})
 
-        for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
+        if ledger_name:
+            ledgers_to_process = {ledger_name: settings["ledger_settings"][ledger_name]}
+        else:
+            ledgers_to_process = settings.get("ledger_settings", {})
+
+        for ledger_name, ledger_cfg in ledgers_to_process.items():
             tag = ledger_cfg["tag"]
             _, quote = split_tag(tag)
             wallet_code = ledger_cfg["wallet_code"]
             window_settings = ledger_cfg.get("window_settings", {})
             triggered_strategies = {wn.title(): False for wn in window_settings}
             strategy_summary: dict[str, dict] = {}
-            ledger = Ledger.load_ledger(tag=ledger_cfg["tag"])
+            ledger = Ledger.load_ledger(ledger_name)
 
             snapshot = load_or_fetch_snapshot(ledger_name)
             if not snapshot:

@@ -16,7 +16,7 @@ from systems.utils.addlog import addlog
 
 
 def run_live(
-    tag: str | None = None,
+    ledger: str | None = None,
     window: str | None = None,
     dry: bool = False,
     verbose: int = 0,
@@ -29,20 +29,31 @@ def run_live(
     tick_time = datetime.now(timezone.utc)
 
     if dry:
-        for ledger_key, ledger_cfg in settings.get("ledger_settings", {}).items():
+        if ledger:
+            ledger_cfg = settings["ledger_settings"][ledger]
             tag = ledger_cfg.get("tag")
             fetch_missing_candles(tag, relative_window="48h", verbose=verbose)
             addlog(
-                f"[SYNC] {ledger_key} | {tag} candles up to date",
+                f"[SYNC] {ledger} | {tag} candles up to date",
                 verbose_int=1,
                 verbose_state=verbose,
             )
+        else:
+            for ledger_key, ledger_cfg in settings.get("ledger_settings", {}).items():
+                tag = ledger_cfg.get("tag")
+                fetch_missing_candles(tag, relative_window="48h", verbose=verbose)
+                addlog(
+                    f"[SYNC] {ledger_key} | {tag} candles up to date",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
         addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
         handle_top_of_hour(
             tick=tick_time,
             settings=settings,
             sim=False,
             dry=dry,
+            ledger_name=ledger,
             verbose=verbose,
         )
         return
@@ -70,6 +81,7 @@ def run_live(
             settings=settings,
             sim=False,
             dry=dry,
+            ledger_name=ledger,
             verbose=verbose,
         )
 
@@ -77,14 +89,14 @@ def run_live(
 def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Live trading engine")
     parser.add_argument("--dry", action="store_true", help="Run once immediately")
-    parser.add_argument("--tag", required=False, help="Symbol tag (unused)")
+    parser.add_argument("--ledger", required=False, help="Ledger name (unused)")
     parser.add_argument("--window", required=False, help="Window name (unused)")
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = _parse_args(argv)
-    run_live(tag=args.tag, window=args.window, dry=args.dry)
+    run_live(ledger=args.ledger, window=args.window, dry=args.dry)
 
 
 if __name__ == "__main__":
