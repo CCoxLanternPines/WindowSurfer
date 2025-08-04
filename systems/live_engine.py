@@ -27,7 +27,7 @@ def run_live(
     ledger_cfg = resolve_ledger_settings(ledger_name, settings)
     kraken_pair = ledger_cfg.get("kraken_pair")
     wallet_code = ledger_cfg.get("wallet_code")
-    fiat_code = ledger_cfg.get("fiat")
+    fiat_code = ledger_cfg.get("fiat_code")
     _ = kraken_pair, wallet_code, fiat_code  # Ensure variables are resolved
     tick_time = datetime.now(timezone.utc)
 

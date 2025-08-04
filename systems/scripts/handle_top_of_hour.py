@@ -63,7 +63,7 @@ def handle_top_of_hour(
         tag = ledger_cfg["tag"]
         kraken_pair = ledger_cfg["kraken_name"]
         wallet_code = ledger_cfg["wallet_code"]
-        fiat = ledger_cfg["fiat"]
+        fiat = ledger_cfg["fiat_code"]
         window_settings = ledger_cfg.get("window_settings", {})
         triggered_strategies = {wn.title(): False for wn in window_settings}
         strategy_summary: dict[str, dict] = {}
