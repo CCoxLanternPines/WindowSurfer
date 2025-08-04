@@ -314,18 +314,18 @@ def execute_sell(
     *,
     symbol: str,
     coin_amount: float,
-    fiat_code: str | None = None,
+    fiat_code: str,
     price: float | None = None,
     ledger_name: str,
     verbose: int = 0,
 ) -> dict:
     """Place a real sell order and normalise the result structure.
 
-    ``fiat_code`` defaults to ``ZUSD`` when not provided. ``price`` is optional
-    and, if absent, the current live price is fetched to estimate USD notional.
+    ``fiat_code`` must be provided explicitly. ``price`` is optional and, if
+    absent, the current live price is fetched to estimate USD notional.
     """
 
-    fiat = fiat_code or "ZUSD"
+    fiat = fiat_code
     sell_price = price if price is not None else get_live_price(symbol)
     usd_amount = coin_amount * sell_price
     result = sell_order(symbol, fiat, usd_amount, ledger_name, verbose)
