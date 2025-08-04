@@ -26,7 +26,7 @@ def run_simulation(ledger_name: str, verbose: int = 0) -> None:
     tag = ledger_config["tag"].upper()
 
     root = find_project_root()
-    sim_path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
+    sim_path = root / "data" / "tmp" / "simulation" / f"{ledger_name}.json"
     if sim_path.exists():
         sim_path.unlink()
 
@@ -44,6 +44,10 @@ def run_simulation(ledger_name: str, verbose: int = 0) -> None:
     )
 
     df = fetch_candles(tag)
+    if "symbol" in df.columns:
+        symbols = {s.upper() for s in df["symbol"].unique()}
+        if symbols != {tag}:
+            raise RuntimeError(f"Fetched data symbols {symbols} do not match tag {tag}")
     max_note_usdt = settings.get("general_settings", {}).get("max_note_usdt", sim_capital)
     min_note_usdt = settings.get("general_settings", {}).get("minimum_note_size", 0)
 
@@ -83,6 +87,12 @@ def run_simulation(ledger_name: str, verbose: int = 0) -> None:
                 verbose=verbose,
             )
 
+            for note in ledger.get_open_notes() + ledger.get_closed_notes():
+                if note.get("window") not in windows:
+                    raise RuntimeError(
+                        f"Note for unknown window '{note.get('window')}' detected"
+                    )
+
             pbar.update(1)
 
     addlog(
@@ -100,9 +110,11 @@ def run_simulation(ledger_name: str, verbose: int = 0) -> None:
         verbose_int=3,
         verbose_state=verbose,
     )
-    save_ledger(tag, ledger, sim=True, final_tick=final_tick, summary=summary)
+    save_ledger(ledger_name, ledger, sim=True, final_tick=final_tick, summary=summary)
 
-    saved_summary = Ledger.load_ledger(tag, sim=True).get_account_summary(final_price)
+    saved_summary = (
+        Ledger.load_ledger(ledger_name, sim=True).get_account_summary(final_price)
+    )
     if (
         saved_summary["closed_notes"] != summary["closed_notes"]
         or saved_summary["realized_gain"] != summary["realized_gain"]

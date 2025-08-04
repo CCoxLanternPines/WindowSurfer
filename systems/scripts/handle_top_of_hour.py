@@ -67,7 +67,7 @@ def handle_top_of_hour(
         window_settings = ledger_cfg.get("window_settings", {})
         triggered_strategies = {wn.title(): False for wn in window_settings}
         strategy_summary: dict[str, dict] = {}
-        ledger = Ledger.load_ledger(tag=tag)
+        ledger = Ledger.load_ledger(ledger_name)
 
         root: Path = find_project_root()
         cooldown_path = root / "data" / "tmp" / "cooldowns.json"
@@ -298,7 +298,7 @@ def handle_top_of_hour(
                 metadata["last_buy_tick"] = last_buy_tick
                 metadata["last_sell_tick"] = last_sell_tick
             ledger.set_metadata(metadata)
-            save_ledger(ledger_cfg["tag"], ledger)
+            save_ledger(ledger_name, ledger)
 
             usd_balance = float(balance.get(fiat, 0.0))
             coin_balance = float(balance.get(wallet_code, 0.0))
