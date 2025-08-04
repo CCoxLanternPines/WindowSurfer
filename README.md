@@ -30,15 +30,15 @@ Install dependencies from ``requirements.txt`` (pandas, tqdm, requests,
 krakenex, ccxt and pyyaml) and run ``bot.py`` with arguments:
 
 ```bash
-python bot.py --mode sim --window 1m --verbose 2  # uses default tag DOGEUSD
-python bot.py --mode live --tag SOLUSD --window 3mo --verbose 1 --telegram
+python bot.py --mode sim --ledger Kris_Ledger --window 1m --verbose 2
+python bot.py --mode live --ledger Travis_Ledger --window 3mo --verbose 1 --telegram
 python bot.py --mode wallet -v
 ```
 
 CLI arguments:
 
 - ``--mode`` – ``sim``, ``live`` or ``wallet``.
-- ``--tag`` – trading pair symbol, e.g. ``DOGEUSD`` (default: ``DOGEUSD``).
+- ``--ledger`` – ledger name, e.g. ``Kris_Ledger``.
 - ``--window`` – time window for tunnel metrics such as ``1m`` or ``3mo``.
 - ``--verbose`` – verbosity level (0=silent, 1=standard, 2=debug).
 - ``--log`` – write all output to ``data/tmp/log.txt``.
@@ -76,7 +76,7 @@ Results are stored in ``ledgersimulation.json`` under ``data/tmp``. Each note re
   them into ``data/raw/<TAG>.csv``. Example:
 
   ```bash
-  python -m systems.fetch --tag DOGEUSD --time 30d
+  python -m systems.fetch --ledger Kris_Ledger --time 30d
   ```
 
 - ``settings/settings.json`` – adjust strategy cooldowns, investment size and

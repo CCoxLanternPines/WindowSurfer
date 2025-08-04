@@ -13,38 +13,44 @@ from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.settings_loader import load_settings
 from systems.fetch import fetch_missing_candles
 from systems.utils.addlog import addlog
+from systems.utils.resolve_symbol import resolve_ledger_settings
 
 
 def run_live(
-    tag: str | None = None,
+    ledger_name: str | None = None,
     window: str | None = None,
     dry: bool = False,
     verbose: int = 0,
 ) -> None:
-    """Run the live trading engine.
-
-    Parameters are currently placeholders for forward compatibility.
-    """
+    """Run the live trading engine."""
     settings = load_settings()
     tick_time = datetime.now(timezone.utc)
 
+    def _run_top_of_hour(ts: datetime) -> None:
+        names = [ledger_name] if ledger_name else list(settings.get("ledger_settings", {}))
+        for name in names:
+            handle_top_of_hour(
+                tick=ts,
+                ledger_name=name,
+                settings=settings,
+                sim=False,
+                dry=dry,
+                verbose=verbose,
+            )
+
     if dry:
-        for ledger_key, ledger_cfg in settings.get("ledger_settings", {}).items():
+        names = [ledger_name] if ledger_name else list(settings.get("ledger_settings", {}))
+        for name in names:
+            ledger_cfg = resolve_ledger_settings(name, settings)
             tag = ledger_cfg.get("tag")
-            fetch_missing_candles(tag, relative_window="48h", verbose=verbose)
+            fetch_missing_candles(name, relative_window="48h", verbose=verbose)
             addlog(
-                f"[SYNC] {ledger_key} | {tag} candles up to date",
+                f"[SYNC] {name} | {tag} candles up to date",
                 verbose_int=1,
                 verbose_state=verbose,
             )
         addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
-        handle_top_of_hour(
-            tick=tick_time,
-            settings=settings,
-            sim=False,
-            dry=dry,
-            verbose=verbose,
-        )
+        _run_top_of_hour(tick_time)
         return
 
     while True:
@@ -65,26 +71,20 @@ def run_live(
                 pbar.update(1)
 
         addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
-        handle_top_of_hour(
-            tick=datetime.now(timezone.utc),
-            settings=settings,
-            sim=False,
-            dry=dry,
-            verbose=verbose,
-        )
+        _run_top_of_hour(datetime.now(timezone.utc))
 
 
 def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Live trading engine")
     parser.add_argument("--dry", action="store_true", help="Run once immediately")
-    parser.add_argument("--tag", required=False, help="Symbol tag (unused)")
+    parser.add_argument("--ledger", required=False, help="Ledger name (optional)")
     parser.add_argument("--window", required=False, help="Window name (unused)")
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = _parse_args(argv)
-    run_live(tag=args.tag, window=args.window, dry=args.dry)
+    run_live(ledger_name=args.ledger, window=args.window, dry=args.dry)
 
 
 if __name__ == "__main__":
