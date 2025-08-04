@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+from pathlib import Path
 
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
@@ -15,7 +17,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="WindowSurfer bot entrypoint")
     parser.add_argument(
         "--mode",
-        required=True,
+        required=False,
         choices=["sim", "simtune", "live", "wallet"],
         help="Execution mode: sim, simtune, live, or wallet",
     )
@@ -54,6 +56,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Enable Telegram alerts",
     )
+    parser.add_argument(
+        "--clear_ledgers",
+        action="store_true",
+        help="Deletes all JSON files under data/ledgers after confirmation",
+    )
 
     return parser.parse_args(argv)
 
@@ -65,6 +72,27 @@ def main(argv: list[str] | None = None) -> None:
         verbose_level=args.verbose,
         telegram_enabled=args.telegram,
     )
+
+    if args.clear_ledgers:
+        prompt = input(
+            "Are you sure you want to delete all ledger files in /data/ledgers? (y/n): "
+        )
+        if prompt.lower() != "y":
+            print("Cancelled.")
+            return
+        ledger_dir = Path("data/ledgers")
+        for file in ledger_dir.glob("*.json"):
+            os.remove(file)
+        print("✅ All ledger files deleted.")
+        return
+
+    if not args.mode:
+        addlog(
+            "Error: --mode must be either 'sim', 'simtune', 'live', or 'wallet'",
+            verbose_int=1,
+            verbose_state=args.verbose,
+        )
+        sys.exit(1)
 
     mode = args.mode.lower()
     verbose = args.verbose
