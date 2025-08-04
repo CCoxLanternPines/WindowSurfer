@@ -9,7 +9,6 @@ from urllib.parse import urlencode
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.utils.addlog import addlog
 from systems.utils.path import find_project_root
-from systems.utils.price_fetcher import get_price
 
 KRAKEN_API_URL = "https://api.kraken.com"
 
@@ -68,24 +67,13 @@ def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) ->
 
 
 def get_kraken_balance(verbose: int = 0) -> dict:
-    # Import here to avoid circular dependency when execution_handler imports this module
-    from systems.scripts.execution_handler import _kraken_request
+    """Return raw asset balances from Kraken."""
 
     api_key, api_secret = load_kraken_keys()
     result = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
 
-    usd_balances = {}
-    for asset, amount in result.items():
-        amount = float(amount)
-        if asset.upper() in {"ZUSD", "USD", "USDT"}:
-            usd_balances[asset] = amount
-        else:
-            price = get_price(f"{asset}USD")
-            if price:
-                usd_balances[asset] = amount * price
-
     addlog(
-        f"[INFO] Kraken balance fetched (USD): {usd_balances}",
+        f"[INFO] Kraken balance fetched: {result}",
         verbose_int=3,
         verbose_state=verbose,
     )

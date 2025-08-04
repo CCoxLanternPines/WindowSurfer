@@ -70,9 +70,44 @@ def main(argv: list[str] | None = None) -> None:
     verbose = args.verbose
 
     if mode == "wallet":
+        if not args.ledger:
+            addlog("Error: --ledger is required in wallet mode", verbose_int=1, verbose_state=True)
+            sys.exit(1)
+
         from systems.scripts.kraken_utils import get_kraken_balance
+        from systems.utils.resolve_symbol import resolve_ledger_settings
+
+        ledger_cfg = resolve_ledger_settings(args.ledger)
+        wallet_code = ledger_cfg["wallet_code"]
+        fiat_code = ledger_cfg["fiat_code"]
 
         balances = get_kraken_balance(verbose)
+        if wallet_code not in balances or fiat_code not in balances:
+            missing = [c for c in (wallet_code, fiat_code) if c not in balances]
+            raise RuntimeError(
+                f"Kraken balance missing expected codes for {args.ledger}: {', '.join(missing)}"
+            )
+
+        wallet_amt = float(balances[wallet_code])
+        fiat_amt = float(balances[fiat_code])
+        fiat_symbol = ledger_cfg["fiat_code"].replace("Z", "").replace("X", "")
+        coin_symbol = ledger_cfg["tag"].replace(fiat_symbol, "")
+
+        addlog(
+            f"[WALLET] {args.ledger} | {ledger_cfg['tag']}",
+            verbose_int=0,
+            verbose_state=verbose,
+        )
+        addlog(
+            f"{wallet_code}: {wallet_amt:.4f} {coin_symbol}",
+            verbose_int=0,
+            verbose_state=verbose,
+        )
+        addlog(
+            f"{fiat_code}: ${fiat_amt:.2f}",
+            verbose_int=0,
+            verbose_state=verbose,
+        )
 
         if verbose >= 1:
             addlog("[WALLET] Kraken Balance", verbose_int=1, verbose_state=verbose)
