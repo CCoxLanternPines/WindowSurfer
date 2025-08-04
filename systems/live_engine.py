@@ -118,6 +118,11 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = _parse_args(argv)
+    if not args.ledger:
+        raise RuntimeError("Missing required --ledger argument.")
+    settings = load_settings()
+    ledger_cfg = resolve_ledger_settings(args.ledger, settings)
+    tag = ledger_cfg["tag"]
     run_live(
         ledger_name=args.ledger,
         window=args.window,
