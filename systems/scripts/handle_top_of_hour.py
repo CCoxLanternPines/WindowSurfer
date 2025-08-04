@@ -55,6 +55,7 @@ def handle_top_of_hour(
         dictionary containing capital and cooldown counters.
     """
 
+    telegram = kwargs.get("telegram", False)
     if not sim:
         if settings is None:
             return
@@ -68,6 +69,20 @@ def handle_top_of_hour(
         triggered_strategies = {wn.title(): False for wn in window_settings}
         strategy_summary: dict[str, dict] = {}
         ledger = Ledger.load_ledger(ledger_name)
+
+        meta = ledger.get_metadata()
+        meta.update(
+            {
+                "ledger_name": ledger_name,
+                "tag": tag,
+                "resolved": {
+                    "wallet_code": wallet_code,
+                    "kraken_pair": kraken_pair,
+                    "fiat_code": fiat,
+                },
+            }
+        )
+        ledger.set_metadata(meta)
 
         root: Path = find_project_root()
         cooldown_path = root / "data" / "tmp" / "cooldowns.json"
@@ -172,13 +187,18 @@ def handle_top_of_hour(
                                 if not dry_run:
                                     last_buy_tick[window_name] = current_ts
                                 buy_count += 1
-                                msg = (
+                                log_msg = (
                                     f"[LIVE][BUY] {ledger_name} | {tag} | "
                                     f"{result['filled_amount']:.4f} {wallet_code} @ "
                                     f"${result['avg_price']:.3f}"
                                 )
-                                addlog(msg)
-                                send_telegram_message(msg)
+                                addlog(log_msg)
+                                if telegram:
+                                    tele_msg = (
+                                        f"[BUY] {ledger_name} | {tag} | "
+                                        f"{result['filled_amount']:.4f}@${result['avg_price']:.3f}"
+                                    )
+                                    send_telegram_message(tele_msg)
                 else:
                     reasons = []
                     if position > window_cfg.get("buy_floor", 0):
@@ -235,8 +255,11 @@ def handle_top_of_hour(
                                 addlog(
                                     f"[LIVE][SELL] {ledger_name} | {tag} | Gain: ${gain:.2f} ({note['gain_pct']:.2%})"
                                 )
-                    else:
-                        if not dry_run:
+                                if telegram:
+                                    tele_msg = (
+                                        f"[SELL] {ledger_name} | {tag} | +{note['gain_pct']*100:.2f}%"
+                                    )
+                                    send_telegram_message(tele_msg)
                             remaining = sell_cd - (current_ts - last_sell)
 
                             addlog(
@@ -259,15 +282,12 @@ def handle_top_of_hour(
                 verbose_state=True,
             )
             message = (
-                f"[LIVE] {ledger_name} | {tag} | {window_name} window\n"
-                f"✅ Buy attempts: {buy_count} | Sells: {sell_count} | "
-                f"Open Notes: {summary['open_notes']} | Realized Gain: ${summary['realized_gain']:.2f}"
+                f"[TOP] {ledger_name} | {tag} | {window_name}\n"
+                f"✅ Buys: {buy_count} | Sells: {sell_count} | "
+                f"Open: {summary['open_notes']} | Gain: ${summary['realized_gain']:.2f} | "
+                f"Capital: ${summary['idle_capital']:.2f}"
             )
-            addlog(
-                message,
-                verbose_int=1,
-                verbose_state=True,
-            )
+            addlog(message, verbose_int=1, verbose_state=True)
 
             open_notes_w = [
                 n for n in ledger.get_open_notes() if n.get("window") == window_name
@@ -325,12 +345,13 @@ def handle_top_of_hour(
             )
             addlog(report, verbose_int=1, verbose_state=True)
 
-            send_top_hour_report(
-                ledger_name=ledger_name,
-                tag=tag,
-                strategy_summary=strategy_summary,
-                verbose=general_cfg.get("verbose", 0),
-            )
+            if telegram:
+                send_top_hour_report(
+                    ledger_name=ledger_name,
+                    tag=tag,
+                    strategy_summary=strategy_summary,
+                    verbose=general_cfg.get("verbose", 0),
+                )
 
             if not dry_run:
                 cooldowns[ledger_name] = {
@@ -354,6 +375,7 @@ def handle_top_of_hour(
     verbose = kwargs.get("verbose", 0)
 
     ledger_config = resolve_ledger_settings(ledger_name, settings)
+    tag = ledger_config["tag"]
     windows = ledger_config.get("window_settings", {})
     if not windows or df is None or offset is None:
         return
@@ -417,7 +439,11 @@ def handle_top_of_hour(
                     f"Gain: +${note['gain']:.2f} ({note['gain_pct']:.2%})"
                 )
                 addlog(msg, verbose_int=2, verbose_state=verbose)
-                send_telegram_message(msg)
+                if telegram:
+                    tele_msg = (
+                        f"[SELL] {ledger_name} | {tag} | +{note['gain_pct']*100:.2f}%"
+                    )
+                    send_telegram_message(tele_msg)
 
     if sim:
         # Simulation-specific behaviour already covered through state mutation.

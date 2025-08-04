@@ -19,14 +19,14 @@ from systems.utils.resolve_symbol import resolve_ledger_settings
 from systems.utils.path import find_project_root
 
 
-def run_simulation(ledger_name: str, verbose: int = 0) -> None:
+def run_simulation(ledger_name: str, verbose: int = 0, telegram: bool = False) -> None:
     """Run a historical simulation for ``ledger_name``."""
     settings = load_settings()
     ledger_config = resolve_ledger_settings(ledger_name, settings)
     tag = ledger_config["tag"]
 
     root = find_project_root()
-    sim_path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
+    sim_path = root / "data" / "tmp" / "simulation" / f"{ledger_name}.json"
     if sim_path.exists():
         sim_path.unlink()
 
@@ -36,9 +36,10 @@ def run_simulation(ledger_name: str, verbose: int = 0) -> None:
 
     sim_capital = float(settings.get("simulation_capital", 0))
     ledger = Ledger()
+    ledger.set_metadata({"ledger_name": ledger_name, "tag": tag})
 
     addlog(
-        f"[SIM] {ledger_name} | {tag} Starting simulation",
+        f"[SIM] {ledger_name} | {tag} started with {sim_capital} USDT",
         verbose_int=1,
         verbose_state=verbose,
     )
@@ -85,6 +86,7 @@ def run_simulation(ledger_name: str, verbose: int = 0) -> None:
                 max_note_usdt=max_note_usdt,
                 min_note_usdt=min_note_usdt,
                 verbose=verbose,
+                telegram=telegram,
             )
 
             for note in ledger.get_open_notes() + ledger.get_closed_notes():
@@ -110,10 +112,10 @@ def run_simulation(ledger_name: str, verbose: int = 0) -> None:
         verbose_int=3,
         verbose_state=verbose,
     )
-    save_ledger(tag, ledger, sim=True, final_tick=final_tick, summary=summary)
+    save_ledger(ledger_name, ledger, sim=True, final_tick=final_tick, summary=summary)
 
     saved_summary = (
-        Ledger.load_ledger(tag, sim=True).get_account_summary(final_price)
+        Ledger.load_ledger(ledger_name, sim=True).get_account_summary(final_price)
     )
     if (
         saved_summary["closed_notes"] != summary["closed_notes"]
@@ -138,22 +140,20 @@ def run_simulation(ledger_name: str, verbose: int = 0) -> None:
         verbose_state=verbose,
     )
     addlog(
-        f"[SIM] {ledger_name} | {tag} Final Value (USD): ${summary['total_value']:.2f}",
+        f"[SIM] {ledger_name} | {tag} Realized Gain: ${summary['realized_gain']:.2f}",
         verbose_int=1,
         verbose_state=verbose,
     )
 
-    if verbose:
+    for name in windows:
+        b_skips = state["buy_cooldown_skips"].get(name, 0)
+        s_skips = state["sell_cooldown_skips"].get(name, 0)
         addlog(
-            f"[SIM] {ledger_name} | {tag} Buy cooldown skips: {state['buy_cooldown_skips']}",
-            verbose_int=2,
+            f"[SIM] {ledger_name} | {tag} {name} cooldown skips — buy: {b_skips}, sell: {s_skips}",
+            verbose_int=1,
             verbose_state=verbose,
         )
-        addlog(
-            f"[SIM] {ledger_name} | {tag} Sell cooldown skips: {state['sell_cooldown_skips']}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
+
     addlog(
         f"[SIM] {ledger_name} | {tag} Min ROI gate hits: {state['min_roi_gate_hits']}",
         verbose_int=1,
