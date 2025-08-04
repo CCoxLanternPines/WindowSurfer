@@ -36,6 +36,7 @@ def run_simulation(ledger_name: str, verbose: int = 0) -> None:
 
     sim_capital = float(settings.get("simulation_capital", 0))
     ledger = Ledger()
+    ledger.set_metadata({"ledger_name": ledger_name, "tag": tag})
 
     addlog(
         f"[SIM] {ledger_name} | {tag} Starting simulation",

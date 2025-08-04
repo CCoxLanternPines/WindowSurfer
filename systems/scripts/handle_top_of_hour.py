@@ -69,6 +69,20 @@ def handle_top_of_hour(
         strategy_summary: dict[str, dict] = {}
         ledger = Ledger.load_ledger(ledger_name)
 
+        meta = ledger.get_metadata()
+        meta.update(
+            {
+                "ledger_name": ledger_name,
+                "tag": tag,
+                "resolved": {
+                    "wallet_code": wallet_code,
+                    "kraken_pair": kraken_pair,
+                    "fiat_code": fiat,
+                },
+            }
+        )
+        ledger.set_metadata(meta)
+
         root: Path = find_project_root()
         cooldown_path = root / "data" / "tmp" / "cooldowns.json"
         if cooldown_path.exists():
