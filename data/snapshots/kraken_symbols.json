@@ -1,0 +1,16 @@
+{
+  "DOGEUSD": {
+    "kraken_tag": "DOGEUSD",
+    "kraken_pair": "XXDGZUSD",
+    "kraken_name": "DOGE/USD",
+    "wallet_code": "XXDG",
+    "fiat_code": "ZUSD"
+  },
+  "SOLUSD": {
+    "kraken_tag": "SOLUSD",
+    "kraken_pair": "SOLUSD",
+    "kraken_name": "SOL/USD",
+    "wallet_code": "SOL",
+    "fiat_code": "ZUSD"
+  }
+}

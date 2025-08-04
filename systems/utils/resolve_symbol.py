@@ -12,7 +12,12 @@ SETTINGS = load_settings()
 
 SNAPSHOT_DIR = Path("data/snapshots")
 KRAKEN_FILE = SNAPSHOT_DIR / "kraken_symbols.json"
-BINANCE_FILE = SNAPSHOT_DIR / "binance_symbols.json"
+
+# Static fallback mapping for Binance symbols if not specified in settings
+BINANCE_FALLBACKS = {
+    "DOGEUSD": "DOGEUSDT",
+    "SOLUSD": "SOLUSDT",
+}
 
 
 def resolve_ledger_settings(ledger_name: str, settings: dict | None = None) -> dict:
@@ -41,7 +46,6 @@ def resolve_ledger_settings(ledger_name: str, settings: dict | None = None) -> d
         "kraken_name",
         "wallet_code",
         "fiat_code",
-        "binance_tag",
     ]
     missing = [field for field in required if not meta.get(field)]
     if missing:
@@ -49,10 +53,13 @@ def resolve_ledger_settings(ledger_name: str, settings: dict | None = None) -> d
             f"Snapshot metadata for tag '{tag}' missing fields: {', '.join(missing)}"
         )
 
+    binance_name = base_cfg.get("binance_name") or BINANCE_FALLBACKS.get(tag)
+
     resolved = {
         "tag": tag,
         "fiat": fiat,
         **{field: meta[field] for field in required},
+        "binance_name": binance_name,
         "window_settings": base_cfg.get("window_settings", {}),
     }
 
@@ -60,25 +67,15 @@ def resolve_ledger_settings(ledger_name: str, settings: dict | None = None) -> d
 
 
 def resolve_symbol_metadata(tag: str) -> dict:
-    """Return cached symbol metadata for ``tag`` from both exchanges."""
+    """Return cached Kraken symbol metadata for ``tag``."""
     try:
         kraken_map = json.loads(KRAKEN_FILE.read_text())
     except FileNotFoundError:
         kraken_map = {}
 
-    try:
-        binance_map = json.loads(BINANCE_FILE.read_text())
-    except FileNotFoundError:
-        binance_map = {}
-
-    meta: dict[str, str] = {}
-    if tag in kraken_map:
-        meta.update(kraken_map[tag])
-    if tag in binance_map:
-        meta.update(binance_map[tag])
-
+    meta = kraken_map.get(tag)
     if not meta:
-        raise ValueError(f"No symbol metadata found for tag: {tag}")
+        raise ValueError(f"No Kraken symbol metadata found for tag: {tag}")
 
     return meta
 
@@ -88,5 +85,5 @@ def resolve_symbol(ledger_name: str) -> dict:
     ledger = resolve_ledger_settings(ledger_name)
     return {
         "kraken": ledger.get("kraken_name"),
-        "binance": ledger.get("binance_tag"),
+        "binance": ledger.get("binance_name"),
     }

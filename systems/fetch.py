@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> None:
         raise RuntimeError(f"Ledger '{ledger_name}' not found: {e}")
     tag = ledger_cfg["tag"]
     kraken_symbol = ledger_cfg["kraken_name"]
-    binance_symbol = ledger_cfg["binance_tag"]
+    binance_symbol = ledger_cfg.get("binance_name")
     log_prefix = f"[FETCH] {ledger_name} | {tag}"
 
     def log(message: str, **kwargs) -> None:
@@ -94,50 +94,6 @@ def main(argv: list[str] | None = None) -> None:
     kraken_limited = False
 
 
-    def fetch_and_store(gap):
-        nonlocal added_kraken, kraken_limited
-        if not gap or gap[0] > gap[1]:
-            return
-
-        start_ms = int(gap[0] * 1000)
-        original_end_ms = int(gap[1] * 1000)
-        diff_hours = int((original_end_ms - start_ms) // 3600000) + 1
-
-        if diff_hours > 720:
-            kraken_limited = True
-            end_ms = start_ms + 720 * 3600000  # truncate to 720h max
-        else:
-            end_ms = original_end_ms
-
-        log(
-            f"Fetching from Kraken: {datetime.utcfromtimestamp(start_ms/1000)} to {datetime.utcfromtimestamp(end_ms/1000)}",
-            verbose_int=3,
-            verbose_state=verbose,
-        )
-
-        try:
-            rows = _fetch_kraken(kraken_symbol, start_ms, end_ms)
-        except Exception as e:
-            log(
-                f"Error fetching from Kraken: {e}",
-                verbose_int=3,
-                verbose_state=verbose,
-            )
-            return
-
-        log(
-            f"{len(rows)} rows fetched from Kraken",
-            verbose_int=3,
-            verbose_state=verbose,
-        )
-
-        df = pd.DataFrame(rows, columns=COLUMNS)
-        if not df.empty:
-            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True).astype("int64") // 1_000_000_000
-            new_frames.append(df)
-            added_kraken += len(df)
-
-    
     def fetch_and_store_combined(gap):
         nonlocal added_kraken, added_binance, kraken_limited
         if not gap or gap[0] > gap[1]:
@@ -147,7 +103,7 @@ def main(argv: list[str] | None = None) -> None:
         end_ms = int(gap[1] * 1000)
         diff_hours = int((end_ms - start_ms) // 3600000) + 1
 
-        if diff_hours <= 720:
+        if diff_hours <= 120:
             log(
                 f"Fetching from Kraken: {datetime.utcfromtimestamp(start_ms/1000)} to {datetime.utcfromtimestamp(end_ms/1000)}",
                 verbose_int=3,
@@ -174,8 +130,8 @@ def main(argv: list[str] | None = None) -> None:
                 added_kraken += len(df)
         else:
             # Split the request into two fetches:
-            # Kraken gets first 720h, Binance gets the rest
-            kraken_end_ms = start_ms + 720 * 3600000
+            # Kraken gets first 120h, Binance gets the rest
+            kraken_end_ms = start_ms + 120 * 3600000
             log(
                 f"Fetching from Kraken: {datetime.utcfromtimestamp(start_ms/1000)} to {datetime.utcfromtimestamp(kraken_end_ms/1000)}",
                 verbose_int=3,
@@ -264,7 +220,7 @@ def main(argv: list[str] | None = None) -> None:
             )
         if kraken_limited:
             log(
-                "Could not retrieve full range: Kraken limited to 720 candles",
+                "Could not retrieve full range: Kraken limited to 120 candles",
                 verbose_int=2,
                 verbose_state=verbose,
             )
@@ -284,7 +240,7 @@ def fetch_missing_candles(
         ledger_cfg = resolve_ledger_settings(ledger_name, settings)
         tag = ledger_cfg["tag"]
         kraken_symbol = ledger_cfg["kraken_name"]
-        binance_symbol = ledger_cfg["binance_tag"]
+        binance_symbol = ledger_cfg.get("binance_name")
     except Exception as e:
         raise RuntimeError(f"[ERROR] Failed to resolve ledger '{ledger_name}': {e}")
 
@@ -324,7 +280,7 @@ def fetch_missing_candles(
         end_ms = int(gap[1] * 1000)
         diff_hours = int((end_ms - start_ms) // 3600000) + 1
 
-        if diff_hours <= 720:
+        if diff_hours <= 120:
             try:
                 rows = _fetch_kraken(kraken_symbol, start_ms, end_ms)
                 if rows:
@@ -339,7 +295,7 @@ def fetch_missing_candles(
                     verbose_state=verbose,
                 )
         else:
-            kraken_end_ms = start_ms + 720 * 3600000
+            kraken_end_ms = start_ms + 120 * 3600000
             try:
                 rows = _fetch_kraken(kraken_symbol, start_ms, kraken_end_ms)
                 if rows:

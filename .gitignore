@@ -38,6 +38,11 @@ Thumbs.db
 !data/ledgers/
 !data/ledgers/*.json
 
+# ✅ Allow Kraken symbol snapshots
+!data/snapshots/
+data/snapshots/*
+!data/snapshots/kraken_symbols.json
+
 # ❌ Exclude noisy sim or temp files
 data/tmp/
 data/results/
