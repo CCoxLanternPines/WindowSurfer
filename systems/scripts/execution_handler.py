@@ -97,7 +97,9 @@ def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) ->
     return result
 
 
-def get_available_fiat_balance(exchange, currency: str = "USD") -> float:
+def get_available_fiat_balance(exchange, currency: str) -> float:
+    if not currency:
+        raise ValueError("currency is required")
     try:
         balance = exchange.fetch_free_balance()
     except Exception:
