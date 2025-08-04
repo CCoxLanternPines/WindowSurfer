@@ -23,6 +23,7 @@ from systems.utils.addlog import addlog, send_telegram_message
 from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.path import find_project_root
 from systems.utils.top_hour_report import format_top_of_hour_report
+from systems.utils.symbol_mapper import get_symbol_config
 
 
 def handle_top_of_hour(
@@ -75,13 +76,13 @@ def handle_top_of_hour(
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
             tag = ledger_cfg["tag"]
-            kraken_pair = ledger_cfg["kraken_name"]
-            wallet_code = ledger_cfg["wallet_code"]
-            fiat = ledger_cfg["fiat"]
+            symbol_cfg = get_symbol_config(tag)
+            kraken_pair = symbol_cfg["kraken"]["wsname"]
+            wallet_code = symbol_cfg["kraken"]["wallet_code"]
+            fiat = ledger_cfg.get("fiat", symbol_cfg["kraken"]["fiat"])
             window_settings = ledger_cfg.get("window_settings", {})
-            triggered_strategies = {wn.title(): False for wn in window_settings}
             strategy_summary: dict[str, dict] = {}
-            ledger = Ledger.load_ledger(tag=ledger_cfg["tag"])
+            ledger = Ledger.load_ledger(tag=tag)
 
             snapshot = load_or_fetch_snapshot(ledger_name)
             if not snapshot:

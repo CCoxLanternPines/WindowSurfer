@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.path import find_project_root
 from systems.utils.settings_loader import load_settings
+from systems.utils.symbol_mapper import get_symbol_config
 
 
 def _get_latest_price(trades: dict, pair: str) -> float:
@@ -58,15 +59,16 @@ def send_top_hour_report(
 
     settings = load_settings()
     ledger_cfg = settings.get("ledger_settings", {}).get(ledger_name, {})
-    wallet_code = ledger_cfg.get("wallet_code", "")
-    fiat_code = ledger_cfg.get("fiat", "")
+    symbol_cfg = get_symbol_config(tag)
+    wallet_code = symbol_cfg["kraken"]["wallet_code"]
+    fiat_code = ledger_cfg.get("fiat", symbol_cfg["kraken"]["fiat"])
 
     balance = snapshot.get("balance", {})
     trades = snapshot.get("trades", {})
 
     usd_balance = float(balance.get(fiat_code, 0.0))
     coin_balance = float(balance.get(wallet_code, 0.0))
-    pair_code = ledger_cfg.get("kraken_name", "").replace("/", "")
+    pair_code = symbol_cfg["kraken"]["wsname"].replace("/", "")
     price = _get_latest_price(trades, pair_code)
     coin_value = coin_balance * price
     total_value = usd_balance + coin_value

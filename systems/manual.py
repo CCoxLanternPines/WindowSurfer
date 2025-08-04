@@ -12,6 +12,7 @@ from systems.utils.addlog import addlog
 from systems.scripts.kraken_utils import ensure_snapshot, get_live_price
 from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.scripts.ledger import save_ledger
+from systems.utils.symbol_mapper import get_symbol_config
 
 
 def _load_ledger(ledger_name: str) -> dict:
@@ -59,7 +60,8 @@ def main(argv: Optional[list[str]] = None) -> None:
         )
 
     tag = ledger_cfg.get("tag")
-    kraken_pair = ledger_cfg.get("kraken_name")
+    symbol_cfg = get_symbol_config(tag)
+    kraken_pair = symbol_cfg["kraken"]["wsname"]
 
     price = get_live_price(kraken_pair)
     if price <= 0:

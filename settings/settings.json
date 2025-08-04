@@ -2,10 +2,6 @@
   "ledger_settings": {
     "Kris_Ledger": {
       "tag": "DOGEUSD",
-      "wallet_code": "XXDG",
-      "kraken_name": "DOGE/USD",
-      "kraken_pair": "XXDGZUSD",
-      "binance_name": "DOGEUSDT",
       "fiat": "ZUSD",
       "window_settings": {
         "dog": {
@@ -22,21 +18,17 @@
     },
     "Travis_Ledger": {
       "tag": "SOLUSD",
-      "wallet_code": "SOL.F",
-      "kraken_name": "SOL/USD",
-      "kraken_pair": "SOLUSD",
-      "binance_name": "SOLUSDT",
       "fiat": "DAI",
       "window_settings": {
         "bunny": {
           "window_size": "7d",
           "buy_cooldown": 2,
-            "sell_cooldown": 148,
-            "min_roi": 0.543280801644922,
-            "investment_fraction": 0.1,
-            "buy_floor": 0.490153492110162,
-            "sell_ceiling": 0.642255110294084,
-            "max_open_notes": 100
+          "sell_cooldown": 148,
+          "min_roi": 0.543280801644922,
+          "investment_fraction": 0.1,
+          "buy_floor": 0.490153492110162,
+          "sell_ceiling": 0.642255110294084,
+          "max_open_notes": 100
         }
       }
     }
@@ -47,4 +39,3 @@
   },
   "simulation_capital": 1000
 }
-

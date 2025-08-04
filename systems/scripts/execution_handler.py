@@ -5,6 +5,7 @@ import hmac
 import base64
 import json
 from urllib.parse import urlencode
+from systems.utils.symbol_mapper import get_symbol_config
 
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.utils.addlog import addlog, send_telegram_message
@@ -284,9 +285,10 @@ def execute_buy(
 
     settings = load_settings()
     ledger_cfg = settings["ledger_settings"][ledger_name]
-    fiat = ledger_cfg["fiat"]
-    wallet_code = ledger_cfg["wallet_code"]
-    pair_code = ledger_cfg["kraken_pair"]
+    symbol_cfg = get_symbol_config(ledger_cfg["tag"])
+    fiat = ledger_cfg.get("fiat", symbol_cfg["kraken"]["fiat"])
+    wallet_code = symbol_cfg["kraken"]["wallet_code"]
+    pair_code = symbol_cfg["kraken"]["pair_code"]
 
     result = buy_order(pair_code, fiat, amount_usd, ledger_name, wallet_code, verbose)
     if (
@@ -329,8 +331,9 @@ def execute_sell(
 
     settings = load_settings()
     ledger_cfg = settings["ledger_settings"][ledger_name]
-    fiat = ledger_cfg["fiat"]
-    pair_code = ledger_cfg["kraken_pair"]
+    symbol_cfg = get_symbol_config(ledger_cfg["tag"])
+    fiat = ledger_cfg.get("fiat", symbol_cfg["kraken"]["fiat"])
+    pair_code = symbol_cfg["kraken"]["pair_code"]
 
     sell_price = (
         price

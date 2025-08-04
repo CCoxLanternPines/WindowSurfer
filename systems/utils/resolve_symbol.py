@@ -1,7 +1,7 @@
 """Helpers for resolving symbol and ledger configuration."""
 
 from systems.utils.settings_loader import load_settings
-
+from systems.utils.symbol_mapper import get_symbol_config
 
 SETTINGS = load_settings()
 
@@ -18,8 +18,8 @@ def resolve_ledger_settings(tag: str, settings: dict | None = None) -> dict:
 
 def resolve_symbol(tag: str) -> dict:
     """Resolve exchange-specific pair names for ``tag``."""
-    ledger = resolve_ledger_settings(tag)
+    cfg = get_symbol_config(tag)
     return {
-        "kraken": ledger["kraken_name"],
-        "binance": ledger["binance_name"],
+        "kraken": cfg["kraken"]["wsname"],
+        "binance": cfg["binance"]["symbol"],
     }
