@@ -15,11 +15,21 @@ from typing import Dict
 
 import requests
 
+from systems.utils.loggers import logger
 from systems.utils.path import find_project_root
 
 CACHE_MAX_AGE = timedelta(hours=24)
 KRAKEN_URL = "https://api.kraken.com/0/public/AssetPairs"
 BINANCE_URL = "https://api.binance.com/api/v3/exchangeInfo"
+
+
+alias_map = {
+    "DOGE": "XDG",
+    "XBT": "BTC",
+    "USDT": "USDT",  # sanity
+}
+
+_reverse_alias_map = {v: k for k, v in alias_map.items()}
 
 
 def _cache_path() -> Path:
@@ -122,6 +132,12 @@ def _load_cache() -> Dict[str, dict]:
     return cache
 
 
+def _save_cache(cache: Dict[str, dict]) -> None:
+    path = _cache_path()
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(cache, f, indent=2)
+
+
 def get_symbol_config(tag: str) -> dict:
     """Return combined Kraken and Binance config for ``tag``.
 
@@ -130,14 +146,69 @@ def get_symbol_config(tag: str) -> dict:
     tag:
         Symbol tag such as ``"SOLUSD"``.
     """
+
     tag = tag.upper()
     cache = _load_cache()
-    cfg = cache.get(tag)
-    if not cfg:
-        raise ValueError(f"Symbol '{tag}' not found in cache")
-    if "kraken" not in cfg or "binance" not in cfg:
-        raise ValueError(f"Incomplete symbol data for '{tag}'")
-    return cfg
+
+    if tag in cache:
+        return cache[tag]
+
+    search_tag = tag
+    for src, dst in alias_map.items():
+        if search_tag.startswith(src):
+            search_tag = dst + search_tag[len(src) :]
+            break
+
+    if search_tag in cache:
+        cache[tag] = cache[search_tag]
+        _save_cache(cache)
+        logger.info(
+            "[ALIAS MATCH] Resolved tag '%s' → Kraken altname '%s' → pair '%s'",
+            tag,
+            search_tag,
+            cache[search_tag]["kraken"]["pair_code"],
+        )
+        return cache[tag]
+
+    kraken_asset_pairs = requests.get(KRAKEN_URL, timeout=10).json().get(
+        "result", {}
+    )
+    binance_pairs = _fetch_binance_pairs()
+
+    for pair_key, data in kraken_asset_pairs.items():
+        altname = data.get("altname", "").upper()
+        wsname = data.get("wsname", "").replace("/", "").upper()
+        base = data.get("base", "").replace("X", "").replace("Z", "").upper()
+        quote = data.get("quote", "").replace("X", "").replace("Z", "").upper()
+        concat = f"{base}{quote}"
+
+        if search_tag in (altname, wsname, concat):
+            base_ws, quote_ws = (data.get("wsname") or "").split("/")
+            base_norm = _reverse_alias_map.get(base_ws.upper(), base_ws.upper())
+            quote_norm = _reverse_alias_map.get(quote_ws.upper(), quote_ws.upper())
+            target_quote = "USDT" if quote_norm == "USD" else quote_norm
+            binfo = binance_pairs.get(f"{base_norm}{target_quote}")
+            if not binfo:
+                continue
+            kcfg = {
+                "altname": altname,
+                "pair_code": pair_key,
+                "wsname": data.get("wsname"),
+                "wallet_code": data.get("base"),
+                "fiat": data.get("quote"),
+            }
+            cfg = {"kraken": kcfg, "binance": binfo}
+            cache[tag] = cfg
+            _save_cache(cache)
+            logger.info(
+                "[ALIAS MATCH] Resolved tag '%s' → Kraken altname '%s' → pair '%s'",
+                tag,
+                altname,
+                pair_key,
+            )
+            return cfg
+
+    raise ValueError(f"Symbol '{tag}' not found in cache")
 
 
 def ensure_all_symbols_loaded(settings: dict) -> None:
