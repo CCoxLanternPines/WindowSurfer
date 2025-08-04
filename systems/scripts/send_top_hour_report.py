@@ -72,8 +72,10 @@ def send_top_hour_report(
     total_value = usd_balance + coin_value
 
     # Determine display names
-    coin_symbol = tag.replace("USD", "")
     fiat_symbol = fiat_code.replace("Z", "").replace("X", "")
+    coin_symbol = (
+        tag[: -len(fiat_symbol)] if fiat_symbol and tag.endswith(fiat_symbol) else tag
+    )
 
     ct_now = datetime.now(ZoneInfo("America/Chicago")).strftime("%I:%M%p")
     lines = [f"🕒 {ct_now} CT | Ledger: {ledger_name}", ""]
