@@ -2,15 +2,13 @@ from __future__ import annotations
 
 """Generate and send a top-of-hour report from cached Kraken snapshots."""
 
-import json
 from datetime import datetime
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from systems.utils.addlog import addlog, send_telegram_message
-from systems.utils.path import find_project_root
-from systems.utils.settings_loader import load_settings
+from systems.utils.config import load_settings
 from systems.utils.resolve_symbol import split_tag
+from systems.utils.snapshot import load_snapshot
 
 
 def _get_latest_price(trades: dict, pair: str) -> float:
@@ -36,22 +34,10 @@ def send_top_hour_report(
     verbose: int = 0,
 ) -> None:
     """Load Kraken snapshot and send a formatted Telegram report."""
-    root = find_project_root()
-    snap_path = root / "data" / "snapshots" / f"{ledger_name}.json"
-    if not snap_path.exists():
+    snapshot = load_snapshot(ledger_name)
+    if not snapshot:
         addlog(
             f"[WARN] Snapshot for {ledger_name} not found; skipping report",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-        return
-
-    try:
-        with snap_path.open("r", encoding="utf-8") as f:
-            snapshot = json.load(f)
-    except Exception:
-        addlog(
-            f"[WARN] Failed to load snapshot for {ledger_name}",
             verbose_int=1,
             verbose_state=verbose,
         )

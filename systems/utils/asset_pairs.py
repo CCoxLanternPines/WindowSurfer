@@ -5,9 +5,9 @@ from typing import Dict, Any
 
 import requests
 
-from .path import find_project_root
+from .config import resolve_path
 
-CACHE_FILE = find_project_root() / "data" / "snapshots" / "asset_pairs.json"
+CACHE_FILE = resolve_path("data/snapshots/asset_pairs.json")
 
 
 def load_asset_pairs() -> Dict[str, Any]:

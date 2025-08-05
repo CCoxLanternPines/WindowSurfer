@@ -1,6 +1,6 @@
 """Helpers for resolving symbol and ledger configuration."""
 
-from systems.utils.settings_loader import load_settings
+from systems.utils.config import load_settings
 
 
 SETTINGS = load_settings()

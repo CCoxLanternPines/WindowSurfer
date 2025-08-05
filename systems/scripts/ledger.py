@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Dict, List
 
-from systems.utils.path import find_project_root
+from systems.utils.config import resolve_path
 
 
 class Ledger:
@@ -81,7 +81,7 @@ class Ledger:
     @staticmethod
     def load_ledger(tag: str, *, sim: bool = False) -> "Ledger":
         """Load a ledger for ``tag`` depending on mode."""
-        root = find_project_root()
+        root = resolve_path("")
         ledger = Ledger()
 
         if sim:
@@ -114,7 +114,7 @@ def save_ledger(
 ) -> None:
     """Persist ``ledger`` data to the canonical ledger directory."""
 
-    root = find_project_root()
+    root = resolve_path("")
 
     if sim:
         out_dir = root / "data" / "tmp" / "simulation"
