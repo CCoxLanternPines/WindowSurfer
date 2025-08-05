@@ -17,6 +17,7 @@
           "maturity_multiplier": 1.0,
           "buy_multiplier_scale": 1.0,
           "cooldown_multiplier_scale": 1.0,
+          "sell_cooldown": 0,
           "dead_zone_pct": 0.0,
           "max_open_notes": 100
         }
