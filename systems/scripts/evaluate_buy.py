@@ -6,6 +6,7 @@ from typing import Dict, Tuple
 
 from systems.scripts.ledger import Ledger
 from systems.utils.addlog import addlog
+from systems.scripts.window_position_tools import get_trade_params
 
 
 def evaluate_buy(
@@ -27,13 +28,15 @@ def evaluate_buy(
     Returns updated capital and whether the attempt was skipped due to cooldown.
     """
     position = wave["position_in_window"]
-    buy_cooldown = cfg.get("buy_cooldown", 0)
+    trade_params = get_trade_params(price, wave["ceiling"], wave["floor"], cfg)
+    buy_cooldown = int(cfg.get("buy_cooldown", 0) * trade_params["cooldown_multiplier"])
     if tick - last_buy_tick.get(name, float("-inf")) < buy_cooldown:
         return sim_capital, True
     if position <= cfg.get("buy_floor", 0):
         open_for_window = [n for n in ledger.get_active_notes() if n["window"] == name]
         if len(open_for_window) < cfg.get("max_open_notes", 0):
             invest = sim_capital * cfg.get("investment_fraction", 0)
+            invest *= trade_params["buy_multiplier"]
             invest = min(invest, max_note_usdt)
             if invest >= min_note_usdt and invest <= sim_capital:
                 amount = invest / price
