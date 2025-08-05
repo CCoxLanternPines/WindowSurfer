@@ -14,7 +14,8 @@
           "investment_fraction": 0.1,
           "maturity_multiplier": 5,
           "buy_multiplier_scale": 5,
-          "cooldown_multiplier_scale": 1.0,
+          "buy_cooldown_multiplier_scale": 1.0,
+          "sell_cooldown_multiplier_scale": 1.0,
           "dead_zone_pct": 0.0,
           "max_open_notes": 100
         }
@@ -34,7 +35,8 @@
           "investment_fraction": 0.1,
           "maturity_multiplier": 1.0,
           "buy_multiplier_scale": 1.0,
-          "cooldown_multiplier_scale": 1.0,
+          "buy_cooldown_multiplier_scale": 1.0,
+          "sell_cooldown_multiplier_scale": 1.0,
           "dead_zone_pct": 0.0,
           "max_open_notes": 100
         }

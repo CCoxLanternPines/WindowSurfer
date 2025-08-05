@@ -18,9 +18,9 @@ def get_trade_params(current_price, window_high, window_low, config, entry_price
     Returns
     -------
     dict
-        Dictionary containing ``pos_pct``, ``in_dead_zone``, buy and cooldown
-        multipliers, and ``maturity_roi`` (``None`` if ``entry_price`` is not
-        provided).
+        Dictionary containing ``pos_pct``, ``in_dead_zone``, buy multipliers,
+        buy/sell cooldown multipliers, and ``maturity_roi`` (``None`` if
+        ``entry_price`` is not provided).
     """
 
     window_range = window_high - window_low
@@ -34,9 +34,16 @@ def get_trade_params(current_price, window_high, window_low, config, entry_price
     in_dead_zone = abs(pos_pct) <= dead_zone_half if dead_zone_pct > 0 else False
 
     buy_scale = config.get("buy_multiplier_scale", 1.0)
-    cooldown_scale = config.get("cooldown_multiplier_scale", 1.0)
     buy_multiplier = 1.0 + (abs(pos_pct) * (buy_scale - 1.0))
-    cooldown_multiplier = 1.0 + (abs(pos_pct) * (cooldown_scale - 1.0))
+
+    buy_cd_multiplier = 1.0 + (
+        abs(pos_pct)
+        * (config.get("buy_cooldown_multiplier_scale", 1.0) - 1.0)
+    )
+    sell_cd_multiplier = 1.0 + (
+        abs(pos_pct)
+        * (config.get("sell_cooldown_multiplier_scale", 1.0) - 1.0)
+    )
 
     maturity_roi = None
     if entry_price is not None and window_range != 0:
@@ -49,6 +56,7 @@ def get_trade_params(current_price, window_high, window_low, config, entry_price
         "pos_pct": pos_pct,
         "in_dead_zone": in_dead_zone,
         "buy_multiplier": buy_multiplier,
-        "cooldown_multiplier": cooldown_multiplier,
+        "buy_cooldown_multiplier": buy_cd_multiplier,
+        "sell_cooldown_multiplier": sell_cd_multiplier,
         "maturity_roi": maturity_roi,
     }
