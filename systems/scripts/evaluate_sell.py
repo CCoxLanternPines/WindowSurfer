@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import Dict, List, Tuple
 
 from systems.scripts.ledger import Ledger
-from systems.scripts.window_position_tools import get_trade_params
-from systems.utils.addlog import addlog
+from systems.utils.trade_eval import evaluate_trade
 
 
 def evaluate_sell(
@@ -22,66 +21,23 @@ def evaluate_sell(
     base_sell_cooldown: int,
     last_sell_tick: Dict[str, int],
 ) -> Tuple[float, List[Dict], int]:
-    """Close notes that have reached their target price.
+    """Close notes that have reached their target price."""
 
-    Returns updated capital, the list of notes closed at this tick, and the
-    number of notes that failed the minimum ROI requirement.
-    """
-    trade = get_trade_params(price, wave["ceiling"], wave["floor"], cfg)
-    if trade["in_dead_zone"]:
-        return sim_capital, [], 0
+    strategy_cfg = {
+        "name": name,
+        "cfg": cfg,
+        "wave": wave,
+        "sim_capital": sim_capital,
+        "base_sell_cooldown": base_sell_cooldown,
+    }
 
-    to_close: List[Dict] = []
-    roi_skipped = 0
-    notes = [n for n in ledger.get_active_notes() if n["window"] == name]
-    notes.sort(
-        key=lambda n: (price - n["entry_price"]) / n["entry_price"],
-        reverse=True,
+    updated_capital, closed, roi_skipped = evaluate_trade(
+        "sell",
+        price,
+        ledger,
+        strategy_cfg,
+        last_sell_tick,
+        tick,
+        verbose,
     )
-    for note in notes:
-        gain_pct = (price - note["entry_price"]) / note["entry_price"]
-        trade_note = get_trade_params(
-            price, wave["ceiling"], wave["floor"], cfg, entry_price=note["entry_price"]
-        )
-        maturity_roi = trade_note["maturity_roi"]
-        if maturity_roi is not None:
-            addlog(
-                f"[DEBUG][SELL] gain_pct={gain_pct:.2%} maturity_roi={maturity_roi:.2%}",
-                verbose_int=3,
-                verbose_state=verbose,
-            )
-        else:
-            addlog(
-                f"[DEBUG][SELL] gain_pct={gain_pct:.2%} maturity_roi=None",
-                verbose_int=3,
-                verbose_state=verbose,
-            )
-        if (
-            maturity_roi is None
-            or maturity_roi <= 0
-            or gain_pct < 0
-            or gain_pct < maturity_roi
-        ):
-            roi_skipped += 1
-            continue
-        adjusted_sell_cd = int(
-            base_sell_cooldown / trade_note["sell_cooldown_multiplier"]
-        )
-        if tick - last_sell_tick.get(name, float("-inf")) < adjusted_sell_cd:
-            continue
-        gain = (price - note["entry_price"]) * note["entry_amount"]
-        note["exit_tick"] = tick
-        note["exit_price"] = price
-        note["exit_ts"] = tick
-        note["gain"] = gain
-        base = note["entry_price"] * note["entry_amount"] or 1
-        note["gain_pct"] = gain / base
-        note["status"] = "Closed"
-        to_close.append(note)
-        last_sell_tick[name] = tick
-    closed: List[Dict] = []
-    for note in to_close:
-        ledger.close_note(note)
-        sim_capital += note["entry_amount"] * price
-        closed.append(note)
-    return sim_capital, closed, roi_skipped
+    return updated_capital, closed, roi_skipped

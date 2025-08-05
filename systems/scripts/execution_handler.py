@@ -60,52 +60,58 @@ def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) ->
         raise Exception(f"Kraken API error: {result['error']}")
     return result
 
-def buy_order(
+def place_order(
+    order_type: str,
     pair_code: str,
-    usd_amount: float,
+    fiat_symbol: str,
+    amount: float,
     ledger_name: str,
     wallet_code: str,
     verbose: int = 0,
 ) -> dict:
     api_key, api_secret = load_kraken_keys()
-
     snapshot = _get_snapshot(ledger_name, api_key, api_secret)
     balance = snapshot.get("balance", {})
-    _, fiat_symbol = split_tag(pair_code)
-    available_usd = float(balance.get(fiat_symbol, 0.0))
 
-    addlog(f"[DEBUG] Balance snapshot: {balance}", verbose_int=1, verbose_state=verbose)
-    addlog(f"[DEBUG] Using fiat_symbol = {fiat_symbol}", verbose_int=1, verbose_state=verbose)
-    addlog(
-        f"[DEBUG] available_usd = {available_usd} | trying to spend = {usd_amount}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
+    price_data = fetch_price_data(pair_code)
+    price = float(price_data.get("c", [0])[0])
+    coin_amount = round(amount / price, 8)
+    usd_amount = coin_amount * price
 
-    if available_usd < usd_amount:
+    if order_type.lower() == "buy":
+        available_usd = float(balance.get(fiat_symbol, 0.0))
+        addlog(f"[DEBUG] Balance snapshot: {balance}", verbose_int=1, verbose_state=verbose)
+        addlog(f"[DEBUG] Using fiat_symbol = {fiat_symbol}", verbose_int=1, verbose_state=verbose)
         addlog(
-            f"[SKIP] Insufficient {fiat_symbol}",
+            f"[DEBUG] available_usd = {available_usd} | trying to spend = {amount}",
             verbose_int=1,
             verbose_state=verbose,
         )
-        return {}
-
-    addlog(
-        f"[BUY ATTEMPT] {fiat_symbol} available: ${available_usd:.2f}, attempting to buy ${usd_amount:.2f}",
-        verbose_int=3,
-        verbose_state=verbose,
-    )
-
-    price_data = fetch_price_data(pair_code)
-    price = float(price_data.get("c", [0])[0])
-    coin_amount = round(usd_amount / price, 8)
+        if available_usd < amount:
+            addlog(
+                f"[SKIP] Insufficient {fiat_symbol}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            return {}
+        addlog(
+            f"[BUY ATTEMPT] {fiat_symbol} available: ${available_usd:.2f}, attempting to buy ${amount:.2f}",
+            verbose_int=3,
+            verbose_state=verbose,
+        )
+    else:
+        addlog(
+            f"[SELL ATTEMPT] Attempting to sell ${usd_amount:.2f} worth of {pair_code}",
+            verbose_int=3,
+            verbose_state=verbose,
+        )
 
     try:
         order_resp = _kraken_request(
             "AddOrder",
             {
                 "pair": pair_code,
-                "type": "buy",
+                "type": order_type,
                 "ordertype": "market",
                 "volume": coin_amount,
                 "trades": True,
@@ -122,7 +128,7 @@ def buy_order(
                 verbose_state=verbose,
             )
             send_telegram_message(
-                f"❗ Kraken rejected order due to insufficient funds on {ledger_name}."
+                f"❗ Kraken rejected order due to insufficient funds on {ledger_name}.",
             )
             return {}
         raise
@@ -130,30 +136,30 @@ def buy_order(
     txid_list = order_resp.get("result", {}).get("txid")
     txid = txid_list[0] if txid_list else None
     if not txid:
-        raise Exception("Buy order failed — no txid returned")
+        raise Exception(f"{order_type.capitalize()} order failed — no txid returned")
 
-    # Verify deduction from the expected fiat wallet
-    post_balance = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
-    new_fiat_balance = float(post_balance.get(fiat_symbol, 0.0))
-    spent = available_usd - new_fiat_balance
-    if spent < usd_amount * 0.8:  # fiat wallet unchanged or wrong wallet used
-        for code, prev_amt in balance.items():
-            if code == fiat_symbol:
-                continue
-            drop = float(prev_amt) - float(post_balance.get(code, 0.0))
-            if drop > usd_amount * 0.8:
+    if order_type.lower() == "buy":
+        post_balance = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
+        new_fiat_balance = float(post_balance.get(fiat_symbol, 0.0))
+        spent = float(balance.get(fiat_symbol, 0.0)) - new_fiat_balance
+        if spent < amount * 0.8:
+            for code, prev_amt in balance.items():
+                if code == fiat_symbol:
+                    continue
+                drop = float(prev_amt) - float(post_balance.get(code, 0.0))
+                if drop > amount * 0.8:
+                    addlog(
+                        f"[ERROR] Fiat mismatch: {code} decreased instead of {fiat_symbol}",
+                        verbose_int=1,
+                        verbose_state=verbose,
+                    )
+                    break
+            else:
                 addlog(
-                    f"[ERROR] Fiat mismatch: {code} decreased instead of {fiat_symbol}",
+                    f"[ERROR] Fiat mismatch: {fiat_symbol} balance unchanged after buy",
                     verbose_int=1,
                     verbose_state=verbose,
                 )
-                break
-        else:
-            addlog(
-                f"[ERROR] Fiat mismatch: {fiat_symbol} balance unchanged after buy",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
 
     return {
         "txid": txid,
@@ -163,65 +169,6 @@ def buy_order(
         "avg_price": price,
         "timestamp": now_utc_timestamp(),
     }
-
-def sell_order(
-    pair_code: str, usd_amount: float, ledger_name: str, verbose: int = 0
-) -> dict:
-    api_key, api_secret = load_kraken_keys()
-
-    snapshot = _get_snapshot(ledger_name, api_key, api_secret)
-
-    price_data = fetch_price_data(pair_code)
-    price = float(price_data.get("c", [0])[0])
-    coin_amount = round(usd_amount / price, 8)
-    usd_amount = coin_amount * price
-    addlog(
-        f"[SELL ATTEMPT] Attempting to sell ${usd_amount:.2f} worth of {pair_code}",
-        verbose_int=3,
-        verbose_state=verbose,
-    )
-
-    try:
-        order_resp = _kraken_request(
-            "AddOrder",
-            {
-                "pair": pair_code,
-                "type": "sell",
-                "ordertype": "market",
-                "volume": coin_amount,
-                "trades": True,
-            },
-            api_key,
-            api_secret,
-        )
-    except Exception as e:
-        err_msg = str(e)
-        if "EOrder:Insufficient funds" in err_msg:
-            addlog(
-                "[SKIP] Kraken rejected order — insufficient funds",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-            send_telegram_message(
-                f"❗ Kraken rejected order due to insufficient funds on {ledger_name}."
-            )
-            return {}
-        raise
-
-    txid_list = order_resp.get("result", {}).get("txid")
-    txid = txid_list[0] if txid_list else None
-    if not txid:
-        raise Exception("Sell order failed — no txid returned")
-
-    return {
-        "txid": txid,
-        "volume": coin_amount,
-        "price": price,
-        "filled_amount": coin_amount,
-        "avg_price": price,
-        "timestamp": now_utc_timestamp(),
-    }
-
 
 def execute_buy(
     client,
@@ -236,10 +183,19 @@ def execute_buy(
     """Place a real buy order and normalise the result structure.
 
     Parameters are kept for API compatibility; ``client`` and ``price`` are
-    currently unused as ``buy_order`` pulls pricing from Kraken directly.
+    currently unused as ``place_order`` pulls pricing from Kraken directly.
     """
 
-    result = buy_order(symbol, amount_usd, ledger_name, wallet_code, verbose)
+    _, fiat_symbol = split_tag(symbol)
+    result = place_order(
+        "buy",
+        symbol,
+        fiat_symbol,
+        amount_usd,
+        ledger_name,
+        wallet_code,
+        verbose,
+    )
     if (
         not result
         or result.get("filled_amount", 0) <= 0
@@ -279,7 +235,16 @@ def execute_sell(
     """
     sell_price = price if price is not None else get_live_price(symbol)
     usd_amount = coin_amount * sell_price
-    result = sell_order(symbol, usd_amount, ledger_name, verbose)
+    _, fiat_symbol = split_tag(symbol)
+    result = place_order(
+        "sell",
+        symbol,
+        fiat_symbol,
+        usd_amount,
+        ledger_name,
+        "",
+        verbose,
+    )
     if (
         not result
         or result.get("filled_amount", 0) <= 0
