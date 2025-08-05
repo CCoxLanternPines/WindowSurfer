@@ -133,7 +133,11 @@ def run_sim_tuner(tag: str, window: str, verbose: int = 0) -> None:
         optuna.logging.set_verbosity(optuna.logging.INFO)
 
     study = optuna.create_study(direction="maximize")
-    study.optimize(objective, n_trials=50)
+    print("[TUNER] Running indefinitely. Press CTRL+C to stop.")
+    try:
+        study.optimize(objective, n_trials=None)
+    except KeyboardInterrupt:
+        print("[TUNER] Interrupted by user. Saving progress...")
 
     best_score = study.best_value
     best_params = study.best_params
