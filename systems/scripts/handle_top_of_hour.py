@@ -74,6 +74,7 @@ def handle_top_of_hour(
         client = kwargs.get("client")
 
         general_cfg = settings.get("general_settings", {})
+        verbose = general_cfg.get("verbose", 0)
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
             tag = ledger_cfg["tag"]
@@ -133,6 +134,15 @@ def handle_top_of_hour(
                         window_low=wave["floor"],
                         config=window_cfg,
                     )
+                    if verbose >= 3:
+                        addlog(
+                            f"[DEBUG][LIVE BUY] Window={window_name} price={price:.6f} pos_pct={trade['pos_pct']:.2f} "
+                            f"ceiling={wave['ceiling']:.6f} floor={wave['floor']:.6f} "
+                            f"buy_mult={trade['buy_multiplier']:.2f} "
+                            f"buy_cd_mult={trade['buy_cooldown_multiplier']:.2f}",
+                            verbose_int=3,
+                            verbose_state=verbose,
+                        )
                     if trade["in_dead_zone"]:
                         addlog(
                             f"[SKIP] {ledger_name} | {tag} | {window_name} → In dead zone",

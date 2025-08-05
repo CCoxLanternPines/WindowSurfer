@@ -33,6 +33,15 @@ def evaluate_buy(
         window_low=wave["floor"],
         config=cfg,
     )
+    if verbose >= 3:
+        addlog(
+            f"[DEBUG][BUY] Window={name} price={price:.6f} pos_pct={trade_params['pos_pct']:.2f} "
+            f"ceiling={wave['ceiling']:.6f} floor={wave['floor']:.6f} "
+            f"buy_mult={trade_params['buy_multiplier']:.2f} "
+            f"buy_cd_mult={trade_params['buy_cooldown_multiplier']:.2f}",
+            verbose_int=3,
+            verbose_state=verbose,
+        )
     if trade_params["in_dead_zone"]:
         return sim_capital, False
 
