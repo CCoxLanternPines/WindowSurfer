@@ -2,19 +2,19 @@
   "DOGEUSD": {
     "dog": {
       "buy_cooldown": [1, 200],
-      "sell_cooldown": [1, 200],
       "min_roi": [0.1, 1.0],
       "buy_floor": [0.1, 0.5],
-      "sell_ceiling": [0.5, 1.0]
+      "sell_ceiling": [0.5, 1.0],
+      "maturity_multiplier": [0.5, 1.5]
     }
   },
   "SOLDaI": {
     "bunny": {
       "buy_cooldown": [1, 200],
-      "sell_cooldown": [1, 200],
       "min_roi": [0.1, 1.0],
       "buy_floor": [0.1, 0.5],
-      "sell_ceiling": [0.5, 1.0]
+      "sell_ceiling": [0.5, 1.0],
+      "maturity_multiplier": [0.5, 1.5]
     }
   }
 }
