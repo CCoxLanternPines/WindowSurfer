@@ -19,6 +19,7 @@ def evaluate_sell(
     cfg: Dict,
     sim_capital: float,
     verbose: int,
+    last_sell_tick: Dict[str, int],
 ) -> Tuple[float, List[Dict], int]:
     """Close notes that have reached their target price.
 
@@ -29,11 +30,15 @@ def evaluate_sell(
     if trade["in_dead_zone"]:
         return sim_capital, [], 0
 
+    base_sell_cooldown = cfg.get("sell_cooldown", 0)
     to_close: List[Dict] = []
     roi_skipped = 0
-    for note in ledger.get_active_notes():
-        if note["window"] != name:
-            continue
+    notes = [n for n in ledger.get_active_notes() if n["window"] == name]
+    notes.sort(
+        key=lambda n: (price - n["entry_price"]) / n["entry_price"],
+        reverse=True,
+    )
+    for note in notes:
         gain_pct = (price - note["entry_price"]) / note["entry_price"]
         trade_note = get_trade_params(
             price, wave["ceiling"], wave["floor"], cfg, entry_price=note["entry_price"]
@@ -51,8 +56,18 @@ def evaluate_sell(
                 verbose_int=3,
                 verbose_state=verbose,
             )
-        if maturity_roi is None or maturity_roi <= 0 or gain_pct < maturity_roi:
+        if (
+            maturity_roi is None
+            or maturity_roi <= 0
+            or gain_pct < 0
+            or gain_pct < maturity_roi
+        ):
             roi_skipped += 1
+            continue
+        adjusted_sell_cooldown = int(
+            base_sell_cooldown * trade_note["cooldown_multiplier"]
+        )
+        if tick - last_sell_tick.get(name, float("-inf")) < adjusted_sell_cooldown:
             continue
         gain = (price - note["entry_price"]) * note["entry_amount"]
         note["exit_tick"] = tick
@@ -63,6 +78,7 @@ def evaluate_sell(
         note["gain_pct"] = gain / base
         note["status"] = "Closed"
         to_close.append(note)
+        last_sell_tick[name] = tick
     closed: List[Dict] = []
     for note in to_close:
         ledger.close_note(note)
