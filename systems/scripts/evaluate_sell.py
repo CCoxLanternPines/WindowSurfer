@@ -45,9 +45,15 @@ def evaluate_sell(
                 verbose_int=3,
                 verbose_state=verbose,
             )
-            if gain_pct < maturity_roi:
-                roi_skipped += 1
-                continue
+        else:
+            addlog(
+                f"[DEBUG][SELL] gain_pct={gain_pct:.2%} maturity_roi=None",
+                verbose_int=3,
+                verbose_state=verbose,
+            )
+        if maturity_roi is None or maturity_roi <= 0 or gain_pct < maturity_roi:
+            roi_skipped += 1
+            continue
         gain = (price - note["entry_price"]) * note["entry_amount"]
         note["exit_tick"] = tick
         note["exit_price"] = price
