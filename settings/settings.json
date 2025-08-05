@@ -42,7 +42,7 @@
         }
       }
     },
-    "Goat ledger": {
+    "Goat Ledger": {
       "tag": "SOLUSD",
       "wallet_code": "SOL.F",
       "kraken_name": "SOL/USD",
@@ -50,16 +50,16 @@
       "binance_name": "SOLUSD",
       "window_settings": {
         "goat": {
-          "window_size": "7d",
-          "buy_cooldown": 2,
-          "sell_cooldown": 0,
-          "investment_fraction": 0.1,
-          "maturity_multiplier": 1.0,
-          "buy_multiplier_scale": 1.0,
-          "buy_cooldown_multiplier_scale": 1.0,
-          "sell_cooldown_multiplier_scale": 1.0,
-          "dead_zone_pct": 0.0,
-          "max_open_notes": 100
+          "window_size": "3d",
+          "buy_cooldown": 19,
+          "sell_cooldown": 13,
+          "investment_fraction": 0.12,
+          "maturity_multiplier": 0.94,
+          "buy_multiplier_scale": 4.60,
+          "buy_cooldown_multiplier_scale": 1.90,
+          "sell_cooldown_multiplier_scale": 1.82,
+          "dead_zone_pct": 0.04,
+          "max_open_notes": 56
         }
       }
     }
