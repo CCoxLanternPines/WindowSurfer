@@ -24,6 +24,7 @@ from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.path import find_project_root
 from systems.utils.top_hour_report import format_top_of_hour_report
 from systems.utils.resolve_symbol import split_tag
+from systems.scripts.window_position_tools import get_trade_params
 
 
 def handle_top_of_hour(
@@ -102,7 +103,6 @@ def handle_top_of_hour(
             metadata = ledger.get_metadata()
             ledger_cooldowns = cooldowns.get(ledger_name, {})
             last_buy_tick = ledger_cooldowns.get("last_buy_tick", {})
-            last_sell_tick = ledger_cooldowns.get("last_sell_tick", {})
 
             for window_name, window_cfg in window_settings.items():
                 addlog(
@@ -163,13 +163,6 @@ def handle_top_of_hour(
                                         "window": window_name,
                                         "status": "Open",
                                     }
-                                    configured_mature = wave["floor"] + wave[
-                                        "range"
-                                    ] * window_cfg.get("sell_ceiling", 1)
-                                    configured_roi = (configured_mature - price) / price
-                                    min_roi = window_cfg.get("min_roi", 0)
-                                    target_roi = max(configured_roi, min_roi)
-                                    note["mature_price"] = price * (1 + target_roi)
                                     ledger.open_note(note)
                                     if not dry_run:
                                         last_buy_tick[window_name] = current_ts
@@ -201,50 +194,45 @@ def handle_top_of_hour(
                             verbose_state=True,
                         )
 
-                    sell_cd = window_cfg.get("sell_cooldown", 0) * 3600
-                    last_sell = last_sell_tick.get(window_name, float("-inf"))
-                    if dry_run or current_ts - last_sell >= sell_cd:
-                        for note in list(ledger.get_active_notes()):
-                            if note.get("window") != window_name:
-                                continue
-                            actual_roi = (price - note["entry_price"]) / note[
-                                "entry_price"
-                            ]
-                            if actual_roi >= window_cfg.get(
-                                "min_roi", 0
-                            ) and price >= note.get("mature_price", float("inf")):
-                                result = execute_sell(
-                                    client=client,
-                                    symbol=tag,
-                                    coin_amount=note["entry_amount"],
-                                    ledger_name=ledger_name,
-                                )
-                                note["exit_price"] = result["avg_price"]
-                                note["exit_ts"] = result["timestamp"]
-                                note["exit_tick"] = current_ts
-                                gain = (
-                                    note["exit_price"] - note["entry_price"]
-                                ) * note["entry_amount"]
-                                note["gain"] = gain
-                                base = note["entry_price"] * note["entry_amount"] or 1
-                                note["gain_pct"] = gain / base
-                                note["status"] = "Closed"
-                                ledger.close_note(note)
-                                if not dry_run:
-                                    last_sell_tick[window_name] = current_ts
-                                sell_count += 1
-                                addlog(
-                                    f"[LIVE][SELL] {ledger_name} | {tag} | Gain: ${gain:.2f} ({note['gain_pct']:.2%})"
-                                )
-                    else:
-                        if not dry_run:
-                            remaining = sell_cd - (current_ts - last_sell)
 
-                            addlog(
-                                f"[SKIP] {ledger_name} | {tag} | {window_name} → Sell blocked: cooldown active ({remaining // 60}m left)",
-                                verbose_int=3,
-                                verbose_state=True,
-                            )
+                    for note in list(ledger.get_active_notes()):
+                        if note.get("window") != window_name:
+                            continue
+                        gain_pct = (price - note["entry_price"]) / note["entry_price"]
+                        trade = get_trade_params(
+                            current_price=price,
+                            window_high=wave["ceiling"],
+                            window_low=wave["floor"],
+                            config=window_cfg,
+                            entry_price=note["entry_price"],
+                        )
+                        maturity_roi = trade["maturity_roi"]
+                        addlog(
+                            f"[DEBUG][LIVE SELL] gain_pct={gain_pct:.2%} maturity_roi={maturity_roi:.2%}",
+                            verbose_int=3,
+                            verbose_state=True,
+                        )
+                        if maturity_roi is None or gain_pct < maturity_roi:
+                            continue
+                        result = execute_sell(
+                            client=client,
+                            symbol=tag,
+                            coin_amount=note["entry_amount"],
+                            ledger_name=ledger_name,
+                        )
+                        note["exit_price"] = result["avg_price"]
+                        note["exit_ts"] = result["timestamp"]
+                        note["exit_tick"] = current_ts
+                        gain = (note["exit_price"] - note["entry_price"]) * note["entry_amount"]
+                        note["gain"] = gain
+                        base = note["entry_price"] * note["entry_amount"] or 1
+                        note["gain_pct"] = gain / base
+                        note["status"] = "Closed"
+                        ledger.close_note(note)
+                        sell_count += 1
+                        addlog(
+                            f"[LIVE][SELL] {ledger_name} | {tag} | Gain: ${gain:.2f} ({note['gain_pct']:.2%})",
+                        )
                 if buy_count > 0 or sell_count > 0:
                     triggered_strategies[window_name.title()] = True
 
@@ -297,7 +285,6 @@ def handle_top_of_hour(
 
             if not dry_run:
                 metadata["last_buy_tick"] = last_buy_tick
-                metadata["last_sell_tick"] = last_sell_tick
             ledger.set_metadata(metadata)
             save_ledger(ledger_cfg["tag"], ledger)
 
@@ -336,7 +323,6 @@ def handle_top_of_hour(
             if not dry_run:
                 cooldowns[ledger_name] = {
                     "last_buy_tick": last_buy_tick,
-                    "last_sell_tick": last_sell_tick,
                 }
 
         if not dry_run:
