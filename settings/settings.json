@@ -15,7 +15,9 @@
           "investment_fraction": 0.1,
           "buy_floor": 0.251297141853029,
           "sell_ceiling": 0.539091086750003,
-          "max_open_notes": 100
+          "max_open_notes": 100,
+          "buy_multiplier_scale": 1.0,
+          "cooldown_multiplier_scale": 1.0
         }
       }
     },
@@ -34,7 +36,9 @@
             "investment_fraction": 0.1,
             "buy_floor": 0.490153492110162,
             "sell_ceiling": 0.642255110294084,
-            "max_open_notes": 100
+            "max_open_notes": 100,
+            "buy_multiplier_scale": 1.0,
+            "cooldown_multiplier_scale": 1.0
         }
       }
     }
