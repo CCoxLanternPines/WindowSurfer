@@ -16,5 +16,14 @@
     "pair_decimals": 1,
     "lot_decimals": 8,
     "pair": "SOLUSDC"
+  },
+  "SOLUSD": {
+    "altname": "SOLUSD",
+    "wsname": "SOL/USD",
+    "base": "SOL",
+    "quote": "ZUSD",
+    "pair_decimals": 1,
+    "lot_decimals": 8,
+    "pair": "SOLUSD"
   }
 }
