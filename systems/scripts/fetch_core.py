@@ -58,3 +58,54 @@ def get_raw_path(tag: str, ext: str = "csv") -> Path:
     """Return the full path to the raw-data file for a given tag."""
     root = find_project_root()
     return root / "data" / "raw" / f"{tag}.{ext}"
+
+
+def compute_missing_ranges(
+    candles_df: pd.DataFrame, start_ts: int, end_ts: int, interval_ms: int
+) -> List[tuple[int, int]]:
+    """Return a list of (start, end) tuples for missing candle ranges."""
+    interval_s = interval_ms // 1000
+    if candles_df.empty:
+        return [(start_ts, end_ts)]
+
+    windowed = candles_df[
+        (candles_df["timestamp"] >= start_ts)
+        & (candles_df["timestamp"] <= end_ts)
+    ]["timestamp"].sort_values()
+
+    ranges: List[tuple[int, int]] = []
+    current = start_ts
+    for ts in windowed:
+        if ts > current:
+            ranges.append((current, min(ts - interval_s, end_ts)))
+        current = ts + interval_s
+        if current > end_ts:
+            break
+
+    if current <= end_ts:
+        ranges.append((current, end_ts))
+
+    return ranges
+
+
+def fetch_range(
+    exchange_name: str, tag: str, start_ts: int, end_ts: int
+) -> pd.DataFrame:
+    """Fetch candles for ``tag`` on ``exchange_name`` within [start_ts, end_ts]."""
+    start_ms = int(start_ts * 1000)
+    end_ms = int(end_ts * 1000)
+
+    if exchange_name.lower() == "kraken":
+        rows = _fetch_kraken(tag, start_ms, end_ms)
+    elif exchange_name.lower() == "binance":
+        rows = _fetch_binance(tag, start_ms, end_ms)
+    else:
+        raise ValueError(f"Unknown exchange '{exchange_name}'")
+
+    df = pd.DataFrame(rows, columns=COLUMNS)
+    if not df.empty:
+        df["timestamp"] = (
+            pd.to_datetime(df["timestamp"], unit="ms", utc=True).astype("int64")
+            // 1_000_000_000
+        )
+    return df

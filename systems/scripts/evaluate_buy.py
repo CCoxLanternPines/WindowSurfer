@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import Dict, Tuple
 
 from systems.scripts.ledger import Ledger
-from systems.utils.addlog import addlog
-from systems.scripts.window_position_tools import get_trade_params
+from systems.utils.trade_eval import evaluate_trade
 
 
 def evaluate_buy(
@@ -23,56 +22,24 @@ def evaluate_buy(
     min_note_usdt: float,
     verbose: int,
 ) -> Tuple[float, bool]:
-    """Attempt to open a new note if buy conditions are met.
+    """Attempt to open a new note if buy conditions are met."""
 
-    Returns updated capital and whether the attempt was skipped due to cooldown.
-    """
-    trade_params = get_trade_params(
-        current_price=price,
-        window_high=wave["ceiling"],
-        window_low=wave["floor"],
-        config=cfg,
+    strategy_cfg = {
+        "name": name,
+        "cfg": cfg,
+        "wave": wave,
+        "sim_capital": sim_capital,
+        "max_note_usdt": max_note_usdt,
+        "min_note_usdt": min_note_usdt,
+    }
+
+    updated_capital, skipped = evaluate_trade(
+        "buy",
+        price,
+        ledger,
+        strategy_cfg,
+        last_buy_tick,
+        tick,
+        verbose,
     )
-    if verbose >= 3:
-        addlog(
-            f"[DEBUG][BUY] Window={name} price={price:.6f} pos_pct={trade_params['pos_pct']:.2f} "
-            f"ceiling={wave['ceiling']:.6f} floor={wave['floor']:.6f} "
-            f"buy_mult={trade_params['buy_multiplier']:.2f} "
-            f"buy_cd_mult={trade_params['buy_cooldown_multiplier']:.2f}",
-            verbose_int=3,
-            verbose_state=verbose,
-        )
-    if trade_params["in_dead_zone"]:
-        return sim_capital, False
-
-    base_buy_cooldown = cfg.get("buy_cooldown", 0)
-    adjusted_cooldown_ticks = int(
-        base_buy_cooldown / trade_params["buy_cooldown_multiplier"]
-    )
-    if tick - last_buy_tick.get(name, float("-inf")) < adjusted_cooldown_ticks:
-        return sim_capital, True
-
-    open_for_window = [n for n in ledger.get_active_notes() if n["window"] == name]
-    if len(open_for_window) < cfg.get("max_open_notes", 0):
-        base_note_count = sim_capital * cfg.get("investment_fraction", 0)
-        adjusted_note_count = base_note_count * trade_params["buy_multiplier"]
-        invest = min(adjusted_note_count, max_note_usdt)
-        if invest >= min_note_usdt and invest <= sim_capital:
-            amount = invest / price
-            note = {
-                "window": name,
-                "entry_tick": tick,
-                "buy_tick": tick,
-                "entry_price": price,
-                "entry_amount": amount,
-                "status": "Open",
-            }
-            ledger.open_note(note)
-            sim_capital -= invest
-            last_buy_tick[name] = tick
-            addlog(
-                f"[BUY] {name} tick {tick} price={price:.6f}",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-    return sim_capital, False
+    return updated_capital, skipped
