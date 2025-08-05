@@ -8,16 +8,13 @@
       "binance_name": "DOGEUSDT",
       "window_settings": {
         "dog": {
-          "window_size": "7d",
-          "buy_cooldown": 108,
-          "min_roi": 0.625321491513477,
+          "window_size": "1w",
+          "buy_cooldown": 100,
+          "sell_cooldown": 100,
           "investment_fraction": 0.1,
-          "buy_floor": 0.251297141853029,
-          "sell_ceiling": 0.539091086750003,
-          "maturity_multiplier": 1.0,
-          "buy_multiplier_scale": 1.0,
+          "maturity_multiplier": 5,
+          "buy_multiplier_scale": 5,
           "cooldown_multiplier_scale": 1.0,
-          "sell_cooldown": 0,
           "dead_zone_pct": 0.0,
           "max_open_notes": 100
         }
@@ -30,3 +27,23 @@
       "kraken_pair": "SOLUSDC",
       "binance_name": "SOLUSDC",
       "window_settings": {
+        "bunny": {
+          "window_size": "7d",
+          "buy_cooldown": 2,
+          "sell_cooldown": 0,
+          "investment_fraction": 0.1,
+          "maturity_multiplier": 1.0,
+          "buy_multiplier_scale": 1.0,
+          "cooldown_multiplier_scale": 1.0,
+          "dead_zone_pct": 0.0,
+          "max_open_notes": 100
+        }
+      }
+    }
+  },
+  "general_settings": {
+    "max_note_usdt": 1000.0,
+    "minimum_note_size": 10
+  },
+  "simulation_capital": 1000
+}
