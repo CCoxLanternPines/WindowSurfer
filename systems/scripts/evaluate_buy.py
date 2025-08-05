@@ -38,7 +38,7 @@ def evaluate_buy(
 
     base_buy_cooldown = cfg.get("buy_cooldown", 0)
     adjusted_cooldown_ticks = int(
-        base_buy_cooldown * trade_params["cooldown_multiplier"]
+        base_buy_cooldown / trade_params["buy_cooldown_multiplier"]
     )
     if tick - last_buy_tick.get(name, float("-inf")) < adjusted_cooldown_ticks:
         return sim_capital, True

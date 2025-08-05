@@ -142,7 +142,10 @@ def handle_top_of_hour(
                         continue
 
                     buy_cd_base = window_cfg.get("buy_cooldown", 0) * 3600
-                    buy_cd = buy_cd_base * trade["cooldown_multiplier"]
+                    buy_cd = int(
+                        buy_cd_base
+                        / trade["buy_cooldown_multiplier"]
+                    )
                     last_buy = last_buy_tick.get(window_name, float("-inf"))
                     if dry_run or current_ts - last_buy >= buy_cd:
                         open_for_window = [
@@ -242,7 +245,10 @@ def handle_top_of_hour(
                             or gain_pct < maturity_roi
                         ):
                             continue
-                        sell_cd = int(sell_cd_base * trade_note["cooldown_multiplier"])
+                        sell_cd = int(
+                            sell_cd_base
+                            / trade_note["sell_cooldown_multiplier"]
+                        )
                         if not dry_run and (
                             current_ts - last_sell_tick.get(window_name, float("-inf"))
                             < sell_cd
@@ -426,6 +432,7 @@ def handle_top_of_hour(
             cfg=cfg,
             sim_capital=sim_capital,
             verbose=verbose,
+            base_sell_cooldown=cfg.get("sell_cooldown", 0),
             last_sell_tick=last_sell_tick,
         )
         state["capital"] = sim_capital
