@@ -140,12 +140,10 @@ def handle_top_of_hour(
                         )
                         continue
 
-                    position = trade["pos_pct"]
-                    buy_cd = window_cfg.get("buy_cooldown", 0) * 3600
+                    buy_cd_base = window_cfg.get("buy_cooldown", 0) * 3600
+                    buy_cd = buy_cd_base * trade["cooldown_multiplier"]
                     last_buy = last_buy_tick.get(window_name, float("-inf"))
-                    if position <= window_cfg.get("buy_floor", 0) and (
-                        dry_run or current_ts - last_buy >= buy_cd
-                    ):
+                    if dry_run or current_ts - last_buy >= buy_cd:
                         open_for_window = [
                             n
                             for n in ledger.get_active_notes()
@@ -153,12 +151,13 @@ def handle_top_of_hour(
                         ]
                         if len(open_for_window) < window_cfg.get("max_open_notes", 0):
                             available = float(balance.get(quote, 0.0))
-                            invest = available * window_cfg.get(
+                            base_invest = available * window_cfg.get(
                                 "investment_fraction", 0
                             )
-                            max_usd = general_cfg.get("max_note_usdt", invest)
+                            adjusted_invest = base_invest * trade["buy_multiplier"]
+                            max_usd = general_cfg.get("max_note_usdt", adjusted_invest)
                             min_usd = general_cfg.get("minimum_note_size", 0.0)
-                            invest = min(invest, max_usd)
+                            invest = min(adjusted_invest, max_usd)
                             if invest >= min_usd and invest <= available and invest > 0:
                                 result = execute_buy(
                                     client=client,
@@ -190,10 +189,6 @@ def handle_top_of_hour(
                                     send_telegram_message(msg)
                     else:
                         reasons = []
-                        if position > window_cfg.get("buy_floor", 0):
-                            reasons.append(
-                                f"position={position:.2f} above floor={window_cfg.get('buy_floor', 0)}"
-                            )
                         if not dry_run and current_ts - last_buy < buy_cd:
                             remaining = buy_cd - (current_ts - last_buy)
                             reasons.append(
@@ -221,12 +216,19 @@ def handle_top_of_hour(
                             entry_price=note["entry_price"],
                         )
                         maturity_roi = trade_note["maturity_roi"]
-                        addlog(
-                            f"[DEBUG][LIVE SELL] gain_pct={gain_pct:.2%} maturity_roi={maturity_roi:.2%}",
-                            verbose_int=3,
-                            verbose_state=True,
-                        )
-                        if maturity_roi is None or gain_pct < maturity_roi:
+                        if maturity_roi is not None:
+                            addlog(
+                                f"[DEBUG][LIVE SELL] gain_pct={gain_pct:.2%} maturity_roi={maturity_roi:.2%}",
+                                verbose_int=3,
+                                verbose_state=True,
+                            )
+                        else:
+                            addlog(
+                                f"[DEBUG][LIVE SELL] gain_pct={gain_pct:.2%} maturity_roi=None",
+                                verbose_int=3,
+                                verbose_state=True,
+                            )
+                        if maturity_roi is None or maturity_roi <= 0 or gain_pct < maturity_roi:
                             continue
                         result = execute_sell(
                             client=client,
