@@ -2,60 +2,22 @@
 
 from __future__ import annotations
 
-import argparse
 import sys
 from systems.utils.asset_pairs import load_asset_pairs
 
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
 from systems.utils.addlog import init_logger, addlog
-from systems.utils.settings_loader import load_settings
 from systems.utils.resolve_symbol import split_tag
-from systems.utils.config import load_ledger_config
-
-
-def parse_args(argv: list[str]) -> argparse.Namespace:
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="WindowSurfer bot entrypoint")
-    parser.add_argument(
-        "--mode",
-        required=True,
-        choices=["sim", "simtune", "live", "wallet"],
-        help="Execution mode: sim, simtune, live, or wallet",
-    )
-    parser.add_argument(
-        "--ledger",
-        required=False,
-        help="Ledger name defined in settings.json",
-    )
-    parser.add_argument(
-        "--dry",
-        action="store_true",
-        help="Run live mode once immediately and exit",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="count",
-        default=0,
-        help="Increase verbosity level (use -v or -vv)",
-    )
-    parser.add_argument(
-        "--log",
-        action="store_true",
-        help="Enable log file output",
-    )
-    parser.add_argument(
-        "--telegram",
-        action="store_true",
-        help="Enable Telegram alerts",
-    )
-
-    return parser.parse_args(argv)
+from systems.utils.config import load_settings, load_ledger_config
+from systems.utils.cli import build_parser
 
 
 def main(argv: list[str] | None = None) -> None:
-    args = parse_args(argv or sys.argv[1:])
+    parser = build_parser()
+    args = parser.parse_args(argv or sys.argv[1:])
+    if not args.mode:
+        parser.error("--mode is required")
     init_logger(
         logging_enabled=args.log,
         verbose_level=args.verbose,

@@ -21,7 +21,7 @@ from systems.scripts.execution_handler import (
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.scripts.send_top_hour_report import send_top_hour_report
-from systems.utils.path import find_project_root
+from systems.utils.config import resolve_path
 from systems.utils.top_hour_report import format_top_of_hour_report
 from systems.utils.resolve_symbol import split_tag
 from systems.scripts.window_position_tools import get_trade_params
@@ -62,7 +62,7 @@ def handle_top_of_hour(
         if settings is None:
             return
 
-        root: Path = find_project_root()
+        root: Path = resolve_path("")
         cooldown_path = root / "data" / "tmp" / "cooldowns.json"
         if cooldown_path.exists():
             with open(cooldown_path, "r") as f:

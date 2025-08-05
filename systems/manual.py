@@ -2,21 +2,19 @@ from __future__ import annotations
 
 """Command-line tool to place manual Kraken buy/sell test orders."""
 
-import argparse
 import json
 from typing import Optional
 
-from systems.utils.settings_loader import load_settings
-from systems.utils.path import find_project_root
+from systems.utils.config import load_settings, resolve_path
 from systems.utils.addlog import addlog
 from systems.scripts.kraken_utils import ensure_snapshot, get_live_price
+from systems.utils.cli import build_parser
 from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.scripts.ledger import save_ledger
 
 
 def _load_ledger(ledger_name: str) -> dict:
-    root = find_project_root()
-    path = root / "data" / "ledgers" / f"{ledger_name}.json"
+    path = resolve_path(f"data/ledgers/{ledger_name}.json")
     if path.exists():
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
@@ -28,16 +26,16 @@ def _coin_label(tag: str) -> str:
     return tag
 
 
-def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Manual Kraken test trades")
+def _parse_args(argv: Optional[list[str]] = None):
+    parser = build_parser()
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--buy", action="store_true", help="Execute a buy")
     action.add_argument("--sell", action="store_true", help="Execute a sell")
-    parser.add_argument("--ledger", required=True, help="Ledger name from settings")
     parser.add_argument("--usd", required=True, type=float, help="USD amount")
-    parser.add_argument("--dry", action="store_true", help="Simulate without execution")
-    parser.add_argument("--verbose", type=int, default=1, help="Verbosity level")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if not args.ledger:
+        parser.error("--ledger is required")
+    return args
 
 
 def main(argv: Optional[list[str]] = None) -> None:

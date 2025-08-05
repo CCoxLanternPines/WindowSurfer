@@ -6,7 +6,7 @@ from typing import List
 import pandas as pd
 import ccxt
 
-from systems.utils.path import find_project_root
+from systems.utils.config import resolve_path
 
 COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
 
@@ -56,5 +56,4 @@ def _merge_and_save(path: Path, existing: pd.DataFrame, new_frames: List[pd.Data
 
 def get_raw_path(tag: str, ext: str = "csv") -> Path:
     """Return the full path to the raw-data file for a given tag."""
-    root = find_project_root()
-    return root / "data" / "raw" / f"{tag}.{ext}"
+    return resolve_path(f"data/raw/{tag}.{ext}")
