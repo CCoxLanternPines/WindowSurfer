@@ -103,6 +103,7 @@ def handle_top_of_hour(
             metadata = ledger.get_metadata()
             ledger_cooldowns = cooldowns.get(ledger_name, {})
             last_buy_tick = ledger_cooldowns.get("last_buy_tick", {})
+            last_sell_tick = ledger_cooldowns.get("last_sell_tick", {})
 
             for window_name, window_cfg in window_settings.items():
                 addlog(
@@ -204,9 +205,15 @@ def handle_top_of_hour(
                         )
 
 
-                    for note in list(ledger.get_active_notes()):
-                        if note.get("window") != window_name:
-                            continue
+                    notes = [
+                        n for n in ledger.get_active_notes() if n.get("window") == window_name
+                    ]
+                    notes.sort(
+                        key=lambda n: (price - n["entry_price"]) / n["entry_price"],
+                        reverse=True,
+                    )
+                    sell_cd_base = window_cfg.get("sell_cooldown", 0) * 3600
+                    for note in notes:
                         gain_pct = (price - note["entry_price"]) / note["entry_price"]
                         trade_note = get_trade_params(
                             current_price=price,
@@ -228,7 +235,18 @@ def handle_top_of_hour(
                                 verbose_int=3,
                                 verbose_state=True,
                             )
-                        if maturity_roi is None or maturity_roi <= 0 or gain_pct < maturity_roi:
+                        if (
+                            maturity_roi is None
+                            or maturity_roi <= 0
+                            or gain_pct < 0
+                            or gain_pct < maturity_roi
+                        ):
+                            continue
+                        sell_cd = int(sell_cd_base * trade_note["cooldown_multiplier"])
+                        if not dry_run and (
+                            current_ts - last_sell_tick.get(window_name, float("-inf"))
+                            < sell_cd
+                        ):
                             continue
                         result = execute_sell(
                             client=client,
@@ -245,6 +263,8 @@ def handle_top_of_hour(
                         note["gain_pct"] = gain / base
                         note["status"] = "Closed"
                         ledger.close_note(note)
+                        if not dry_run:
+                            last_sell_tick[window_name] = current_ts
                         sell_count += 1
                         addlog(
                             f"[LIVE][SELL] {ledger_name} | {tag} | Gain: ${gain:.2f} ({note['gain_pct']:.2%})",
@@ -301,6 +321,7 @@ def handle_top_of_hour(
 
             if not dry_run:
                 metadata["last_buy_tick"] = last_buy_tick
+                metadata["last_sell_tick"] = last_sell_tick
             ledger.set_metadata(metadata)
             save_ledger(ledger_cfg["tag"], ledger)
 
@@ -339,6 +360,7 @@ def handle_top_of_hour(
             if not dry_run:
                 cooldowns[ledger_name] = {
                     "last_buy_tick": last_buy_tick,
+                    "last_sell_tick": last_sell_tick,
                 }
 
         if not dry_run:
@@ -394,6 +416,7 @@ def handle_top_of_hour(
             state.get("buy_cooldown_skips", {}).setdefault(name, 0)
             state["buy_cooldown_skips"][name] += 1
 
+        last_sell_tick = state.setdefault("last_sell_tick", {})
         sim_capital, closed, roi_skipped = evaluate_sell(
             ledger=ledger,
             name=name,
@@ -403,6 +426,7 @@ def handle_top_of_hour(
             cfg=cfg,
             sim_capital=sim_capital,
             verbose=verbose,
+            last_sell_tick=last_sell_tick,
         )
         state["capital"] = sim_capital
         state["min_roi_gate_hits"] = state.get("min_roi_gate_hits", 0) + roi_skipped
