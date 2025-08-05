@@ -25,16 +25,20 @@ def evaluate_sell(
     Returns updated capital, the list of notes closed at this tick, and the
     number of notes that failed the minimum ROI requirement.
     """
+    trade = get_trade_params(price, wave["ceiling"], wave["floor"], cfg)
+    if trade["in_dead_zone"]:
+        return sim_capital, [], 0
+
     to_close: List[Dict] = []
     roi_skipped = 0
     for note in ledger.get_active_notes():
         if note["window"] != name:
             continue
         gain_pct = (price - note["entry_price"]) / note["entry_price"]
-        trade = get_trade_params(
+        trade_note = get_trade_params(
             price, wave["ceiling"], wave["floor"], cfg, entry_price=note["entry_price"]
         )
-        maturity_roi = trade["maturity_roi"]
+        maturity_roi = trade_note["maturity_roi"]
         if maturity_roi is not None:
             addlog(
                 f"[DEBUG][SELL] gain_pct={gain_pct:.2%} maturity_roi={maturity_roi:.2%}",

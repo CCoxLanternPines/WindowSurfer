@@ -126,7 +126,21 @@ def handle_top_of_hour(
                 )
 
                 if wave:
-                    position = wave.get("position_in_window", 0)
+                    trade = get_trade_params(
+                        current_price=price,
+                        window_high=wave["ceiling"],
+                        window_low=wave["floor"],
+                        config=window_cfg,
+                    )
+                    if trade["in_dead_zone"]:
+                        addlog(
+                            f"[SKIP] {ledger_name} | {tag} | {window_name} → In dead zone",
+                            verbose_int=3,
+                            verbose_state=True,
+                        )
+                        continue
+
+                    position = trade["pos_pct"]
                     buy_cd = window_cfg.get("buy_cooldown", 0) * 3600
                     last_buy = last_buy_tick.get(window_name, float("-inf"))
                     if position <= window_cfg.get("buy_floor", 0) and (
@@ -199,14 +213,14 @@ def handle_top_of_hour(
                         if note.get("window") != window_name:
                             continue
                         gain_pct = (price - note["entry_price"]) / note["entry_price"]
-                        trade = get_trade_params(
+                        trade_note = get_trade_params(
                             current_price=price,
                             window_high=wave["ceiling"],
                             window_low=wave["floor"],
                             config=window_cfg,
                             entry_price=note["entry_price"],
                         )
-                        maturity_roi = trade["maturity_roi"]
+                        maturity_roi = trade_note["maturity_roi"]
                         addlog(
                             f"[DEBUG][LIVE SELL] gain_pct={gain_pct:.2%} maturity_roi={maturity_roi:.2%}",
                             verbose_int=3,

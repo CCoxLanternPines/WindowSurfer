@@ -27,13 +27,16 @@ def evaluate_buy(
 
     Returns updated capital and whether the attempt was skipped due to cooldown.
     """
-    position = wave["position_in_window"]
     trade_params = get_trade_params(
         current_price=price,
         window_high=wave["ceiling"],
         window_low=wave["floor"],
         config=cfg,
     )
+    if trade_params["in_dead_zone"]:
+        return sim_capital, False
+
+    position = trade_params["pos_pct"]
     base_buy_cooldown = cfg.get("buy_cooldown", 0)
     adjusted_cooldown_ticks = int(
         base_buy_cooldown * trade_params["cooldown_multiplier"]
