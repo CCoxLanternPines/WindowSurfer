@@ -5,7 +5,7 @@ from collections import deque
 from pathlib import Path
 from typing import Dict, Any
 
-from systems.utils.path import find_project_root
+from systems.utils.config import resolve_path
 from systems.utils.addlog import addlog
 
 
@@ -42,7 +42,7 @@ def get_candle_data_json(tag: str, row_offset: int = 0) -> dict | None:
     except Exception:  # pragma: no cover - pandas may not be installed
         pd = None  # type: ignore
 
-    root = find_project_root()
+    root = resolve_path("")
     path: Path = root / "data" / "raw" / f"{tag.upper()}.csv"
 
     if pd is None:
@@ -102,7 +102,7 @@ def get_candle_data(tag: str, row_offset: int = 0, verbose: int = 0) -> Dict[str
         verbose_state=verbose,
     )
 
-    root = find_project_root()
+    root = resolve_path("")
     path: Path = root / "data" / "raw" / f"{tag.upper()}.csv"
 
     if not path.exists():

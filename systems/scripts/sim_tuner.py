@@ -9,8 +9,7 @@ from systems.sim_engine import run_simulation
 from systems.scripts.fetch_canles import fetch_candles
 from systems.scripts.ledger import Ledger
 from systems.utils.addlog import addlog
-from systems.utils.config import load_ledger_config
-from systems.utils.path import find_project_root
+from systems.utils.config import load_ledger_config, resolve_path
 
 
 def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
@@ -22,7 +21,7 @@ def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
     if not window_settings:
         raise ValueError("No windows defined for ledger")
 
-    root = find_project_root()
+    root = resolve_path("")
     final_price = float(fetch_candles(tag).iloc[-1]["close"])
 
     for window_name, window_cfg in window_settings.items():

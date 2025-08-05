@@ -2,20 +2,18 @@ from __future__ import annotations
 
 """Time-aware historical data fetcher."""
 
-import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 import sys
 import pandas as pd
-from systems.utils.resolve_symbol import resolve_ledger_settings
-from systems.utils.settings_loader import load_settings
+from systems.utils.config import load_ledger_config, resolve_path
+from systems.utils.cli import build_parser
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from systems.utils.time import parse_relative_time
-from systems.utils.path import find_project_root
 
 from tqdm import tqdm
 from systems.utils.addlog import addlog
@@ -29,36 +27,25 @@ from systems.scripts.fetch_core import (
 )
 
 # **Inject** the project root so “utils” is importable:
-sys.path.insert(0, str(find_project_root()))
+sys.path.insert(0, str(resolve_path("")))
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Fetch historical candles")
-    parser.add_argument(
-        "--tag",
-        required=True,
-        help="Symbol tag (e.g. SOLDaI)",
-    )
+    parser = build_parser()
     parser.add_argument(
         "--time",
         required=False,
         help="Time window (e.g. 120h)",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="count",
-        default=1,
-        help="Increase verbosity level",
-    )
     args = parser.parse_args(argv)
+    if not args.ledger:
+        parser.error("--ledger is required")
 
-    tag = args.tag.upper()
     time_window = args.time if args.time else "48h"
     verbose = args.verbose
 
-    settings = load_settings()
-    ledger_cfg = resolve_ledger_settings(tag, settings)
+    ledger_cfg = load_ledger_config(args.ledger)
+    tag = ledger_cfg["tag"].upper()
     kraken_symbol = ledger_cfg["tag"]
     binance_symbol = ledger_cfg["binance_name"]
 
@@ -151,16 +138,13 @@ def main(argv: list[str] | None = None) -> None:
         )
 
 
-def fetch_missing_candles(tag: str, relative_window: str = "48h", verbose: int = 1) -> None:
-    tag = tag.upper()
-
-    try:
-        settings = load_settings()
-        ledger_cfg = resolve_ledger_settings(tag, settings)
-        kraken_symbol = ledger_cfg["tag"]
-        binance_symbol = ledger_cfg["binance_name"]
-    except Exception as e:
-        raise RuntimeError(f"[ERROR] Failed to resolve symbol '{tag}': {e}")
+def fetch_missing_candles(
+    ledger: str, relative_window: str = "48h", verbose: int = 1
+) -> None:
+    ledger_cfg = load_ledger_config(ledger)
+    tag = ledger_cfg["tag"].upper()
+    kraken_symbol = ledger_cfg["tag"]
+    binance_symbol = ledger_cfg["binance_name"]
 
     start_ts, end_ts = parse_relative_time(relative_window)
     out_path = get_raw_path(tag)

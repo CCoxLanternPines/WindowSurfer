@@ -2,7 +2,6 @@ from __future__ import annotations
 
 """Live trading entry engine."""
 
-import argparse
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -10,9 +9,10 @@ from typing import Optional
 from tqdm import tqdm
 
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
-from systems.utils.settings_loader import load_settings
+from systems.utils.config import load_settings
 from systems.fetch import fetch_missing_candles
 from systems.utils.addlog import addlog
+from systems.utils.cli import build_parser
 
 
 def run_live(*, dry: bool = False, verbose: int = 0) -> None:
@@ -23,7 +23,7 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
     if dry:
         for ledger_key, ledger_cfg in settings.get("ledger_settings", {}).items():
             tag = ledger_cfg.get("tag")
-            fetch_missing_candles(tag, relative_window="48h", verbose=verbose)
+            fetch_missing_candles(ledger_key, relative_window="48h", verbose=verbose)
             addlog(
                 f"[SYNC] {ledger_key} | {tag} candles up to date",
                 verbose_int=1,
@@ -66,9 +66,8 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
         )
 
 
-def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Live trading engine")
-    parser.add_argument("--dry", action="store_true", help="Run once immediately")
+def _parse_args(argv: Optional[list[str]] = None):
+    parser = build_parser()
     return parser.parse_args(argv)
 
 

@@ -17,9 +17,7 @@ from systems.scripts.fetch_canles import fetch_candles
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.addlog import addlog
-from systems.utils.settings_loader import load_settings
-from systems.utils.path import find_project_root
-from systems.utils.config import load_ledger_config
+from systems.utils.config import load_settings, load_ledger_config, resolve_path
 
 
 def run_simulation(
@@ -53,7 +51,7 @@ def run_simulation(
 
     tag = ledger_config.get("tag", "").upper()
 
-    root = find_project_root()
+    root = resolve_path("")
     sim_path = Path(output_path) if output_path else root / "data" / "tmp" / f"simulation_{ledger}.json"
     if sim_path.exists():
         sim_path.unlink()
