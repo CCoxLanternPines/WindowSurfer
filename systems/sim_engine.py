@@ -44,17 +44,13 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     min_note_usdt = settings.get("general_settings", {}).get("minimum_note_size", 0)
 
     last_buy_tick = {name: float("-inf") for name in windows}
-    last_sell_tick = {name: float("-inf") for name in windows}
     buy_cooldown_skips = {name: 0 for name in windows}
-    sell_cooldown_skips = {name: 0 for name in windows}
     min_roi_gate_hits = 0
 
     state = {
         "capital": sim_capital,
         "last_buy_tick": last_buy_tick,
-        "last_sell_tick": last_sell_tick,
         "buy_cooldown_skips": buy_cooldown_skips,
-        "sell_cooldown_skips": sell_cooldown_skips,
         "min_roi_gate_hits": min_roi_gate_hits,
     }
 
@@ -129,11 +125,6 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
     if verbose:
         addlog(
             f"Buy cooldown skips: {state['buy_cooldown_skips']}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        addlog(
-            f"Sell cooldown skips: {state['sell_cooldown_skips']}",
             verbose_int=2,
             verbose_state=verbose,
         )
