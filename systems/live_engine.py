@@ -15,16 +15,8 @@ from systems.fetch import fetch_missing_candles
 from systems.utils.addlog import addlog
 
 
-def run_live(
-    tag: str | None = None,
-    window: str | None = None,
-    dry: bool = False,
-    verbose: int = 0,
-) -> None:
-    """Run the live trading engine.
-
-    Parameters are currently placeholders for forward compatibility.
-    """
+def run_live(*, dry: bool = False, verbose: int = 0) -> None:
+    """Run the live trading engine."""
     settings = load_settings()
     tick_time = datetime.now(timezone.utc)
 
@@ -77,14 +69,12 @@ def run_live(
 def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Live trading engine")
     parser.add_argument("--dry", action="store_true", help="Run once immediately")
-    parser.add_argument("--tag", required=False, help="Symbol tag (unused)")
-    parser.add_argument("--window", required=False, help="Window name (unused)")
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = _parse_args(argv)
-    run_live(tag=args.tag, window=args.window, dry=args.dry)
+    run_live(dry=args.dry)
 
 
 if __name__ == "__main__":

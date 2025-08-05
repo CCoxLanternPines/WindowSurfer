@@ -8,6 +8,9 @@ range. Configuration is loaded from ``settings/settings.json`` and all trades
 are recorded in a lightweight in-memory ledger.
 """
 
+from pathlib import Path
+import shutil
+
 from tqdm import tqdm
 
 from systems.scripts.fetch_canles import fetch_candles
@@ -15,18 +18,43 @@ from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.addlog import addlog
 from systems.utils.settings_loader import load_settings
-from systems.utils.resolve_symbol import resolve_ledger_settings
 from systems.utils.path import find_project_root
+from systems.utils.config import load_ledger_config
 
 
-def run_simulation(tag: str, verbose: int = 0) -> None:
-    """Run a historical simulation for ``tag``."""
+def run_simulation(
+    *,
+    ledger: str,
+    verbose: int = 0,
+    window_names: list[str] | None = None,
+    output_path: str | None = None,
+) -> None:
+    """Run a historical simulation for ``ledger``.
+
+    Parameters
+    ----------
+    ledger:
+        Name of the ledger defined in ``settings.json``.
+    window_names:
+        Optional subset of window names to simulate. If ``None``, all windows
+        for the ledger are used.
+    output_path:
+        Optional path to write the resulting ledger JSON. Defaults to
+        ``data/tmp/simulation_<ledger>.json``.
+    """
+
     settings = load_settings()
-    tag = tag.upper()
-    ledger_config = resolve_ledger_settings(tag, settings)
+    ledger_config = load_ledger_config(ledger)
+    if window_names is not None:
+        windows_cfg = ledger_config.get("window_settings", {})
+        ledger_config["window_settings"] = {
+            name: cfg for name, cfg in windows_cfg.items() if name in window_names
+        }
+
+    tag = ledger_config.get("tag", "").upper()
 
     root = find_project_root()
-    sim_path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
+    sim_path = Path(output_path) if output_path else root / "data" / "tmp" / f"simulation_{ledger}.json"
     if sim_path.exists():
         sim_path.unlink()
 
@@ -35,7 +63,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
         raise ValueError("No windows defined for ledger")
 
     sim_capital = float(settings.get("simulation_capital", 0))
-    ledger = Ledger()
+    ledger_obj = Ledger()
 
     addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
 
@@ -63,7 +91,7 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
             handle_top_of_hour(
                 tick=tick,
                 candle=candle,
-                ledger=ledger,
+                ledger=ledger_obj,
                 ledger_config=ledger_config,
                 sim=True,
                 df=df,
@@ -84,16 +112,22 @@ def run_simulation(tag: str, verbose: int = 0) -> None:
 
     final_tick = len(df) - 1 if total else -1
     final_price = float(df.iloc[-1]["close"])
-    summary = ledger.get_account_summary(final_price)
+    summary = ledger_obj.get_account_summary(final_price)
 
     addlog(
         f"[DEBUG] Final tick: {final_tick}",
         verbose_int=3,
         verbose_state=verbose,
     )
-    save_ledger(tag, ledger, sim=True, final_tick=final_tick, summary=summary)
+    save_ledger(ledger, ledger_obj, sim=True, final_tick=final_tick, summary=summary)
 
-    saved_summary = Ledger.load_ledger(tag, sim=True).get_account_summary(final_price)
+    # Copy output to requested path
+    default_path = root / "data" / "tmp" / "simulation" / f"{ledger}.json"
+    if default_path.exists() and default_path != sim_path:
+        sim_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(default_path, sim_path)
+
+    saved_summary = Ledger.load_ledger(ledger, sim=True).get_account_summary(final_price)
     if (
         saved_summary["closed_notes"] != summary["closed_notes"]
         or saved_summary["realized_gain"] != summary["realized_gain"]

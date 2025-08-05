@@ -10,7 +10,8 @@ from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
 from systems.utils.addlog import init_logger, addlog
 from systems.utils.settings_loader import load_settings
-from systems.utils.resolve_symbol import resolve_ledger_settings, split_tag
+from systems.utils.resolve_symbol import split_tag
+from systems.utils.config import load_ledger_config
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -23,17 +24,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Execution mode: sim, simtune, live, or wallet",
     )
     parser.add_argument(
-        "--tag",
+        "--ledger",
         required=False,
-        help=(
-            "Symbol tag, e.g. DOGEUSD. If omitted, all symbols from config are "
-            "processed every hour"
-        ),
-    )
-    parser.add_argument(
-        "--window",
-        required=False,
-        help="Window name (forward-compatible)",
+        help="Ledger name defined in settings.json",
     )
     parser.add_argument(
         "--dry",
@@ -87,9 +80,6 @@ def main(argv: list[str] | None = None) -> None:
 
     for ledger_cfg in settings.get("ledger_settings", {}).values():
         tag = ledger_cfg.get("tag", "")
-        print(f"[DEBUG] Tag: {ledger_cfg['tag']}")
-        print(f"[DEBUG] Total valid pairs: {len(valid_pairs)}")
-        print(f"[DEBUG] First 20 pairs: {list(valid_pairs)[:20]}")
         if tag.upper() not in valid_pairs:
             raise RuntimeError(
                 f"[ERROR] Invalid trading pair: {ledger_cfg['tag']} — Not found in Kraken altname list"
@@ -98,8 +88,8 @@ def main(argv: list[str] | None = None) -> None:
     if mode == "wallet":
         from systems.scripts.kraken_utils import get_kraken_balance
 
-        if args.tag:
-            ledger_cfg = resolve_ledger_settings(args.tag, settings)
+        if args.ledger:
+            ledger_cfg = load_ledger_config(args.ledger)
         else:
             ledger_cfg = next(iter(settings.get("ledger_settings", {}).values()))
 
@@ -121,17 +111,18 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if mode == "sim":
-        run_simulation(tag=args.tag.upper(), verbose=args.verbose)
+        if not args.ledger:
+            addlog("Error: --ledger is required for sim mode")
+            sys.exit(1)
+        run_simulation(ledger=args.ledger, verbose=args.verbose)
     elif mode == "simtune":
-        if not args.window:
-            addlog("Error: --window is required for simtune mode")
+        if not args.ledger:
+            addlog("Error: --ledger is required for simtune mode")
             sys.exit(1)
         from systems.scripts.sim_tuner import run_sim_tuner
-        run_sim_tuner(tag=args.tag.upper(), window=args.window.lower(), verbose=args.verbose)
+        run_sim_tuner(ledger=args.ledger, verbose=args.verbose)
     elif mode == "live":
         run_live(
-            tag=args.tag.upper() if args.tag else None,
-            window=args.window,
             dry=args.dry,
             verbose=args.verbose,
         )
