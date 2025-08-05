@@ -392,17 +392,12 @@ def handle_top_of_hour(
             state.get("buy_cooldown_skips", {}).setdefault(name, 0)
             state["buy_cooldown_skips"][name] += 1
 
-        last_sell_tick = state.get("last_sell_tick", {})
-        if tick - last_sell_tick.get(name, float("-inf")) < cfg.get("sell_cooldown", 0):
-            state.get("sell_cooldown_skips", {}).setdefault(name, 0)
-            state["sell_cooldown_skips"][name] += 1
-            continue
-
         sim_capital, closed, roi_skipped = evaluate_sell(
             ledger=ledger,
             name=name,
             tick=tick,
             price=price,
+            wave=wave,
             cfg=cfg,
             sim_capital=sim_capital,
             verbose=verbose,
@@ -411,7 +406,6 @@ def handle_top_of_hour(
         state["min_roi_gate_hits"] = state.get("min_roi_gate_hits", 0) + roi_skipped
 
         if closed:
-            last_sell_tick[name] = tick
             for note in closed:
                 msg = (
                     f"[SELL] Tick {tick} | Window: {note['window']} | "
