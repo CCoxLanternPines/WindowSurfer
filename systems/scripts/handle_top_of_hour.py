@@ -341,9 +341,16 @@ def handle_top_of_hour(
             ledger.set_metadata(metadata)
             save_ledger(ledger_cfg["tag"], ledger)
 
+            # USD fiat balance from Kraken
             usd_balance = float(balance.get(quote, 0.0))
-            coin_balance = float(balance.get(wallet_code, 0.0))
-            coin_balance_usd = coin_balance * price
+
+            # Crypto balance from local ledger, not Kraken
+            open_notes_all = ledger.get_open_notes()
+            coin_total_amount = sum(
+                note.get("entry_amount", 0.0) for note in open_notes_all
+            )
+            coin_balance_usd = coin_total_amount * price
+
             total_liquid_value = usd_balance + coin_balance_usd
             note_counts = {}
             for win in window_settings.keys():
