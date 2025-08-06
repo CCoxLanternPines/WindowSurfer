@@ -194,10 +194,15 @@ def handle_top_of_hour(
                                     if not dry_run:
                                         last_buy_tick[window_name] = current_ts
                                     buy_count += 1
+                                    total_cost = (
+                                        result["filled_amount"]
+                                        * result["avg_price"]
+                                    )
                                     msg = (
                                         f"[LIVE][BUY] {ledger_name} | {tag} | "
                                         f"{result['filled_amount']:.4f} {wallet_code} @ "
-                                        f"${result['avg_price']:.3f}"
+                                        f"${result['avg_price']:.3f} = "
+                                        f"${total_cost:.2f}"
                                     )
                                     addlog(msg)
                                     send_telegram_message(msg)
