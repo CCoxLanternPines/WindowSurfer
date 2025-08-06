@@ -8,16 +8,16 @@
       "binance_name": "DOGEUSDT",
       "window_settings": {
         "dog": {
-          "window_size": "1d",
-          "buy_cooldown": 26,
-          "sell_cooldown": 10,
-          "investment_fraction": 0.205094071997749,
-          "maturity_multiplier": 1.81512455659377,
-          "buy_multiplier_scale": 3.42891647763399,
-          "buy_cooldown_multiplier_scale": 1.83051603230968,
-          "sell_cooldown_multiplier_scale": 1.86976014770587,
-          "dead_zone_pct": 0.0424764270512718,
-          "max_open_notes": 87
+          "window_size": "3d",
+          "buy_cooldown": 43,
+          "sell_cooldown": 20,
+          "investment_fraction": 0.205, 
+          "maturity_multiplier": 1.39866605023941,
+          "buy_multiplier_scale": 3.429, 
+          "buy_cooldown_multiplier_scale": 1.52471040278895,
+          "sell_cooldown_multiplier_scale": 1.88205425645754,
+          "dead_zone_pct": 0.0408961171109311,
+          "max_open_notes": 54
         }
       }
     },
