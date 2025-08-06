@@ -10,7 +10,7 @@
       "max_open_notes": [10, 100]
     }
   },
-  "SOLDAI": {
+  "SOLUSDC": {
     "bunny": {
       "buy_cooldown": [1, 48],
       "sell_cooldown": [0, 48],
