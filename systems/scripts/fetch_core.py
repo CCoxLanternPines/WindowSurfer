@@ -6,9 +6,13 @@ from typing import List
 import pandas as pd
 import ccxt
 
-from systems.utils.config import resolve_path
-
 COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
+
+
+def find_project_root() -> Path:
+    """Return the absolute path to the repository root."""
+
+    return Path(__file__).resolve().parents[2]
 
 
 def _fetch_kraken(symbol: str, start_ms: int, end_ms: int) -> List[List]:
