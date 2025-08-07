@@ -341,18 +341,21 @@ def handle_top_of_hour(
             ledger.set_metadata(metadata)
             save_ledger(ledger_cfg["tag"], ledger)
 
+            # USD fiat balance from Kraken
             usd_balance = float(balance.get(quote, 0.0))
-            coin_balance = float(balance.get(wallet_code, 0.0))
-            coin_balance_usd = coin_balance * price
+
+            # Crypto balance from local ledger, not Kraken
+            open_notes = ledger.get_open_notes()
+            closed_notes = ledger.get_closed_notes()
+            coin_balance_usd = (
+                sum(n.get("entry_amount", 0.0) for n in open_notes) * price
+            )
+
             total_liquid_value = usd_balance + coin_balance_usd
-            note_counts = {}
+            note_counts: dict[str, tuple[int, int]] = {}
             for win in window_settings.keys():
-                open_n = sum(
-                    1 for n in ledger.get_open_notes() if n.get("window") == win
-                )
-                closed_n = sum(
-                    1 for n in ledger.get_closed_notes() if n.get("window") == win
-                )
+                open_n = sum(1 for n in open_notes if n.get("window") == win)
+                closed_n = sum(1 for n in closed_notes if n.get("window") == win)
                 note_counts[win.title()] = (open_n, closed_n)
             report = format_top_of_hour_report(
                 tag,
