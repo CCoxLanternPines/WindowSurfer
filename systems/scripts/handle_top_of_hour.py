@@ -356,15 +356,12 @@ def handle_top_of_hour(
             )
             coin_balance_usd = coin_total_amount * price
 
+
             total_liquid_value = usd_balance + coin_balance_usd
-            note_counts = {}
+            note_counts: dict[str, tuple[int, int]] = {}
             for win in window_settings.keys():
-                open_n = sum(
-                    1 for n in ledger.get_open_notes() if n.get("window") == win
-                )
-                closed_n = sum(
-                    1 for n in ledger.get_closed_notes() if n.get("window") == win
-                )
+                open_n = sum(1 for n in open_notes if n.get("window") == win)
+                closed_n = sum(1 for n in closed_notes if n.get("window") == win)
                 note_counts[win.title()] = (open_n, closed_n)
             report = format_top_of_hour_report(
                 tag,
