@@ -8,16 +8,16 @@
       "binance_name": "DOGEUSDT",
       "window_settings": {
         "dog": {
-          "window_size": "1w",
-          "buy_cooldown": 100,
-          "sell_cooldown": 100,
-          "investment_fraction": 0.1,
-          "maturity_multiplier": 5,
-          "buy_multiplier_scale": 5,
-          "buy_cooldown_multiplier_scale": 1.0,
-          "sell_cooldown_multiplier_scale": 1.0,
-          "dead_zone_pct": 0.0,
-          "max_open_notes": 100
+          "window_size": "3d",
+          "buy_cooldown": 11,
+          "sell_cooldown": 5,
+          "investment_fraction": 0.205,
+          "maturity_multiplier": 0.853105598271046,
+          "buy_multiplier_scale": 3.429,
+          "buy_cooldown_multiplier_scale": 0.902421258277746,
+          "sell_cooldown_multiplier_scale": 1.56339541767712,
+          "dead_zone_pct": 0.0225026538433316,
+          "max_open_notes": 71
         }
       }
     },
@@ -30,15 +30,15 @@
       "window_settings": {
         "bunny": {
           "window_size": "7d",
-          "buy_cooldown": 2,
+          "buy_cooldown": 3,
           "sell_cooldown": 0,
-          "investment_fraction": 0.1,
-          "maturity_multiplier": 1.0,
-          "buy_multiplier_scale": 1.0,
-          "buy_cooldown_multiplier_scale": 1.0,
-          "sell_cooldown_multiplier_scale": 1.0,
-          "dead_zone_pct": 0.0,
-          "max_open_notes": 100
+          "investment_fraction": 0.12,
+          "maturity_multiplier": 4.66765213004084,
+          "buy_multiplier_scale": 4.60,
+          "buy_cooldown_multiplier_scale": 1.95196594757427,
+          "sell_cooldown_multiplier_scale": 1.78927890073705,
+          "dead_zone_pct": 0.010929080263379,
+          "max_open_notes": 93
         }
       }
     },
@@ -50,16 +50,16 @@
       "binance_name": "SOLUSD",
       "window_settings": {
         "goat": {
-          "window_size": "3d",
-          "buy_cooldown": 19,
-          "sell_cooldown": 13,
+          "window_size": "7d",
+          "buy_cooldown": 3,
+          "sell_cooldown": 0,
           "investment_fraction": 0.12,
-          "maturity_multiplier": 0.94,
+          "maturity_multiplier": 4.66765213004084,
           "buy_multiplier_scale": 4.60,
-          "buy_cooldown_multiplier_scale": 1.90,
-          "sell_cooldown_multiplier_scale": 1.82,
-          "dead_zone_pct": 0.04,
-          "max_open_notes": 56
+          "buy_cooldown_multiplier_scale": 1.95196594757427,
+          "sell_cooldown_multiplier_scale": 1.78927890073705,
+          "dead_zone_pct": 0.010929080263379,
+          "max_open_notes": 93
         }
       }
     }
