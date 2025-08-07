@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Execute trading logic at the top of each hour."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
@@ -363,7 +363,7 @@ def handle_top_of_hour(
                 note_counts[win.title()] = (open_n, closed_n)
             report = format_top_of_hour_report(
                 tag,
-                datetime.utcnow(),
+                datetime.now(timezone.utc),
                 usd_balance,
                 coin_balance_usd,
                 wallet_code,
@@ -372,13 +372,15 @@ def handle_top_of_hour(
                 note_counts,
             )
             addlog(report, verbose_int=1, verbose_state=True)
-
-            send_top_hour_report(
-                ledger_name=ledger_name,
-                tag=tag,
-                strategy_summary=strategy_summary,
-                verbose=general_cfg.get("verbose", 0),
-            )
+            # Send top-of-hour portfolio report only at 12AM UTC
+            now_utc = datetime.now(timezone.utc)
+            if now_utc.hour == 0:
+                send_top_hour_report(
+                    ledger_name=ledger_name,
+                    tag=tag,
+                    strategy_summary=strategy_summary,
+                    verbose=general_cfg.get("verbose", 0),
+                )
 
             if not dry_run:
                 cooldowns[ledger_name] = {
