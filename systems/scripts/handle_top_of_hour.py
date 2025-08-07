@@ -194,10 +194,15 @@ def handle_top_of_hour(
                                     if not dry_run:
                                         last_buy_tick[window_name] = current_ts
                                     buy_count += 1
+                                    total_cost = (
+                                        result["filled_amount"]
+                                        * result["avg_price"]
+                                    )
                                     msg = (
                                         f"[LIVE][BUY] {ledger_name} | {tag} | "
                                         f"{result['filled_amount']:.4f} {wallet_code} @ "
-                                        f"${result['avg_price']:.3f}"
+                                        f"${result['avg_price']:.3f} = "
+                                        f"${total_cost:.2f}"
                                     )
                                     addlog(msg)
                                     send_telegram_message(msg)
@@ -345,11 +350,12 @@ def handle_top_of_hour(
             usd_balance = float(balance.get(quote, 0.0))
 
             # Crypto balance from local ledger, not Kraken
-            open_notes = ledger.get_open_notes()
-            closed_notes = ledger.get_closed_notes()
-            coin_balance_usd = (
-                sum(n.get("entry_amount", 0.0) for n in open_notes) * price
+            open_notes_all = ledger.get_open_notes()
+            coin_total_amount = sum(
+                note.get("entry_amount", 0.0) for note in open_notes_all
             )
+            coin_balance_usd = coin_total_amount * price
+
 
             total_liquid_value = usd_balance + coin_balance_usd
             note_counts: dict[str, tuple[int, int]] = {}
@@ -368,13 +374,15 @@ def handle_top_of_hour(
                 note_counts,
             )
             addlog(report, verbose_int=1, verbose_state=True)
-
-            send_top_hour_report(
-                ledger_name=ledger_name,
-                tag=tag,
-                strategy_summary=strategy_summary,
-                verbose=general_cfg.get("verbose", 0),
-            )
+            # Always send in dry mode, else only at midnight UTC
+            now_utc = datetime.utcnow()
+            if dry_run or now_utc.hour == 0:
+                send_top_hour_report(
+                    ledger_name=ledger_name,
+                    tag=tag,
+                    strategy_summary=strategy_summary,
+                    verbose=general_cfg.get("verbose", 0),
+                )
 
             if not dry_run:
                 cooldowns[ledger_name] = {
