@@ -9,15 +9,15 @@
       "window_settings": {
         "dog": {
           "window_size": "3d",
-          "buy_cooldown": 43,
-          "sell_cooldown": 20,
-          "investment_fraction": 0.205, 
-          "maturity_multiplier": 1.39866605023941,
-          "buy_multiplier_scale": 3.429, 
-          "buy_cooldown_multiplier_scale": 1.52471040278895,
-          "sell_cooldown_multiplier_scale": 1.88205425645754,
-          "dead_zone_pct": 0.0408961171109311,
-          "max_open_notes": 54
+          "buy_cooldown": 11,
+          "sell_cooldown": 5,
+          "investment_fraction": 0.205, // from earlier best trial
+          "maturity_multiplier": 0.853105598271046,
+          "buy_multiplier_scale": 3.429, // from earlier trial
+          "buy_cooldown_multiplier_scale": 0.902421258277746,
+          "sell_cooldown_multiplier_scale": 1.56339541767712,
+          "dead_zone_pct": 0.0225026538433316,
+          "max_open_notes": 71
         }
       }
     },
@@ -30,15 +30,15 @@
       "window_settings": {
         "bunny": {
           "window_size": "7d",
-          "buy_cooldown": 2,
+          "buy_cooldown": 3,
           "sell_cooldown": 0,
-          "investment_fraction": 0.1,
-          "maturity_multiplier": 1.0,
-          "buy_multiplier_scale": 1.0,
-          "buy_cooldown_multiplier_scale": 1.0,
-          "sell_cooldown_multiplier_scale": 1.0,
-          "dead_zone_pct": 0.0,
-          "max_open_notes": 100
+          "investment_fraction": 0.12, // existing value
+          "maturity_multiplier": 4.66765213004084,
+          "buy_multiplier_scale": 4.60, // keep existing unless tuned
+          "buy_cooldown_multiplier_scale": 1.95196594757427,
+          "sell_cooldown_multiplier_scale": 1.78927890073705,
+          "dead_zone_pct": 0.010929080263379,
+          "max_open_notes": 93
         }
       }
     },
@@ -51,15 +51,15 @@
       "window_settings": {
         "goat": {
           "window_size": "7d",
-          "buy_cooldown": 2,
+          "buy_cooldown": 3,
           "sell_cooldown": 0,
-          "investment_fraction": 0.1,
-          "maturity_multiplier": 1.0,
-          "buy_multiplier_scale": 1.0,
-          "buy_cooldown_multiplier_scale": 1.0,
-          "sell_cooldown_multiplier_scale": 1.0,
-          "dead_zone_pct": 0.0,
-          "max_open_notes": 100
+          "investment_fraction": 0.12, // existing value
+          "maturity_multiplier": 4.66765213004084,
+          "buy_multiplier_scale": 4.60, // keep existing unless tuned
+          "buy_cooldown_multiplier_scale": 1.95196594757427,
+          "sell_cooldown_multiplier_scale": 1.78927890073705,
+          "dead_zone_pct": 0.010929080263379,
+          "max_open_notes": 93
         }
       }
     }
