@@ -372,9 +372,10 @@ def handle_top_of_hour(
                 note_counts,
             )
             addlog(report, verbose_int=1, verbose_state=True)
-            # Send top-of-hour portfolio report only at 12AM UTC
+
             now_utc = datetime.utcnow()
-            if now_utc.hour == 0:
+            # Always send in dry mode, else only at midnight UTC
+            if dry_run or now_utc.hour == 0:
                 send_top_hour_report(
                     ledger_name=ledger_name,
                     tag=tag,
