@@ -15,10 +15,10 @@ def find_project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _fetch_kraken(symbol: str, start_ms: int, end_ms: int) -> List[List]:
+def _fetch_kraken(kraken_pair: str, start_ms: int, end_ms: int) -> List[List]:
     exchange = ccxt.kraken({"enableRateLimit": True})
     limit = min(720, int((end_ms - start_ms) // 3600000) + 1)
-    ohlcv = exchange.fetch_ohlcv(symbol, timeframe="1h", since=start_ms, limit=limit)
+    ohlcv = exchange.fetch_ohlcv(kraken_pair, timeframe="1h", since=start_ms, limit=limit)
     return [row for row in ohlcv if row and start_ms <= row[0] <= end_ms]
 
 
@@ -94,16 +94,16 @@ def compute_missing_ranges(
 
 
 def fetch_range(
-    exchange_name: str, tag: str, start_ts: int, end_ts: int
+    exchange_name: str, symbol: str, start_ts: int, end_ts: int
 ) -> pd.DataFrame:
-    """Fetch candles for ``tag`` on ``exchange_name`` within [start_ts, end_ts]."""
+    """Fetch candles for ``symbol`` on ``exchange_name`` within [start_ts, end_ts]."""
     start_ms = int(start_ts * 1000)
     end_ms = int(end_ts * 1000)
 
     if exchange_name.lower() == "kraken":
-        rows = _fetch_kraken(tag, start_ms, end_ms)
+        rows = _fetch_kraken(symbol, start_ms, end_ms)
     elif exchange_name.lower() == "binance":
-        rows = _fetch_binance(tag, start_ms, end_ms)
+        rows = _fetch_binance(symbol, start_ms, end_ms)
     else:
         raise ValueError(f"Unknown exchange '{exchange_name}'")
 

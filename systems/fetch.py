@@ -46,7 +46,14 @@ def main(argv: list[str] | None = None) -> None:
 
     ledger_cfg = load_ledger_config(args.ledger)
     tag = ledger_cfg["tag"].upper()
-    kraken_symbol = ledger_cfg["tag"]
+    kraken_symbol = ledger_cfg.get("kraken_pair")
+    if not kraken_symbol:
+        addlog(
+            f"[WARN] Missing kraken_pair for {args.ledger}, falling back to tag",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        kraken_symbol = ledger_cfg["tag"]
     binance_symbol = ledger_cfg["binance_name"]
 
     start_ts, end_ts = parse_relative_time(time_window)
@@ -139,11 +146,22 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def fetch_missing_candles(
-    ledger: str, relative_window: str = "48h", verbose: int = 1
+    ledger: str,
+    *,
+    kraken_pair: str | None = None,
+    relative_window: str = "48h",
+    verbose: int = 1,
 ) -> None:
     ledger_cfg = load_ledger_config(ledger)
     tag = ledger_cfg["tag"].upper()
-    kraken_symbol = ledger_cfg["tag"]
+    kraken_symbol = kraken_pair or ledger_cfg.get("kraken_pair")
+    if not kraken_symbol:
+        addlog(
+            f"[WARN] Missing kraken_pair for {ledger}, falling back to tag",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        kraken_symbol = ledger_cfg["tag"]
     binance_symbol = ledger_cfg["binance_name"]
 
     start_ts, end_ts = parse_relative_time(relative_window)
