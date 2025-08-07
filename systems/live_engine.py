@@ -23,7 +23,12 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
     if dry:
         for ledger_key, ledger_cfg in settings.get("ledger_settings", {}).items():
             tag = ledger_cfg.get("tag")
-            fetch_missing_candles(ledger_key, relative_window="48h", verbose=verbose)
+            fetch_missing_candles(
+                ledger_key,
+                kraken_pair=ledger_cfg.get("kraken_pair"),
+                relative_window="48h",
+                verbose=verbose,
+            )
             addlog(
                 f"[SYNC] {ledger_key} | {tag} candles up to date",
                 verbose_int=1,
