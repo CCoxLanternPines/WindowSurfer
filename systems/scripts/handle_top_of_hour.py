@@ -437,6 +437,7 @@ def handle_top_of_hour(
             wave=wave,
             tick=tick,
             price=price,
+            symbol=ledger_config.get("tag", ""),
             sim_capital=sim_capital,
             last_buy_tick=state.get("last_buy_tick", {}),
             max_note_usdt=max_note_usdt,

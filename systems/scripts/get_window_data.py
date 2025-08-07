@@ -58,3 +58,39 @@ def get_wave_window_data_df(df, window: str, candle_offset: int = 0) -> dict | N
         "position_in_window": round(position, 4),
         "trend_direction_delta_window": trend_direction_delta_window
     }
+
+
+def get_window_data(*, wave: dict, price: float) -> dict:
+    """Return averaged tunnel metrics for logging purposes.
+
+    Parameters
+    ----------
+    wave:
+        Dictionary containing at least ``floor`` and ``ceiling`` keys.
+    price:
+        Current asset price.
+
+    Returns
+    -------
+    dict
+        Mapping with ``current_tunnel_position_avg``, ``loudness_avg``,
+        ``slope_direction_avg`` and ``highest_spike_avg``.
+    """
+
+    floor = wave.get("floor", 0.0)
+    ceiling = wave.get("ceiling", 0.0)
+    range_val = ceiling - floor
+
+    position = ((price - floor) / range_val * 2 - 1) if range_val else 0.0
+    loudness = (range_val / price) if price else 0.0
+    slope = wave.get("trend_direction_delta_window", 0.0)
+    highest_spike = (
+        max(abs(price - floor), abs(ceiling - price)) / price if price else 0.0
+    )
+
+    return {
+        "current_tunnel_position_avg": round(position, 2),
+        "loudness_avg": round(loudness, 2),
+        "slope_direction_avg": round(slope, 2),
+        "highest_spike_avg": round(highest_spike, 2),
+    }
