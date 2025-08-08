@@ -111,6 +111,10 @@ def evaluate_trade(
                 entry_price=note["entry_price"],
             )
             maturity_roi = trade_note["maturity_roi"]
+            if note.get("maturity_price") is not None:
+                maturity_roi = (
+                    note["maturity_price"] - note["entry_price"]
+                ) / note["entry_price"]
             if maturity_roi is not None:
                 addlog(
                     f"[DEBUG][SELL] gain_pct={gain_pct:.2%} maturity_roi={maturity_roi:.2%}",
