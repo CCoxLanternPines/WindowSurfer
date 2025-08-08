@@ -15,10 +15,11 @@ def find_project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _fetch_kraken(kraken_pair: str, start_ms: int, end_ms: int) -> List[List]:
+def _fetch_kraken(symbol: str, start_ms: int, end_ms: int) -> List[List]:
+    """Fetch Kraken candles for a fully-resolved symbol."""
     exchange = ccxt.kraken({"enableRateLimit": True})
     limit = min(720, int((end_ms - start_ms) // 3600000) + 1)
-    ohlcv = exchange.fetch_ohlcv(kraken_pair, timeframe="1h", since=start_ms, limit=limit)
+    ohlcv = exchange.fetch_ohlcv(symbol, timeframe="1h", since=start_ms, limit=limit)
     return [row for row in ohlcv if row and start_ms <= row[0] <= end_ms]
 
 
