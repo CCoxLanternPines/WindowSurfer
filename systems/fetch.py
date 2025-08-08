@@ -14,7 +14,7 @@ from systems.utils.symbols import (
     resolve_tag,
     raw_path,
 )
-from systems.utils.resolve_symbol import resolve_ledger_settings
+from systems.utils.symbol_validation import validate_exchange_symbols
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -50,28 +50,43 @@ def main(argv: list[str] | None = None) -> None:
     time_window = args.time if args.time else "48h"
     verbose = args.verbose
 
+    settings = load_settings()
     if args.tag:
         tag = args.tag.upper()
-        ledger_cfg = resolve_ledger_settings(tag)
+        ledger_name = None
+        for name, cfg in settings["ledger_settings"].items():
+            if cfg.get("tag", "").upper() == tag:
+                ledger_name = name
+                ledger_cfg = cfg
+                break
+        if ledger_name is None:
+            parser.error(f"No ledger found for tag {tag}")
         addlog(
             f"[INFO] CLI tag provided; resolved ledger {ledger_cfg.get('asset', tag)}",
             verbose_int=1,
             verbose_state=True,
         )
     else:
-        settings = load_settings()
-        ledger_cfg = settings["ledger_settings"][args.ledger]
-        tag = ledger_cfg.get("tag", args.ledger).upper()
+        ledger_name = args.ledger
+        ledger_cfg = settings["ledger_settings"][ledger_name]
+        tag = ledger_cfg.get("tag", ledger_name).upper()
 
-    asset = resolve_asset(ledger_cfg)
     kraken_symbol = ledger_cfg.get("kraken_name")
+    binance_symbol = ledger_cfg.get("binance_name")
+
+    if not validate_exchange_symbols(settings, ledger_name, tag):
+        return
+
+    # refresh symbols after potential fixes
+    kraken_symbol = ledger_cfg.get("kraken_name")
+    binance_symbol = ledger_cfg.get("binance_name")
+    asset = resolve_asset(ledger_cfg)
     if not kraken_symbol:
         addlog(
             f"[WARN] Missing kraken_name for {asset} ({tag})",
             verbose_int=1,
             verbose_state=True,
         )
-    binance_symbol = ledger_cfg.get("binance_name")
     if not binance_symbol:
         addlog(
             f"[WARN] Missing binance_name for {asset} ({tag})",
@@ -180,6 +195,9 @@ def fetch_missing_candles(
 ) -> None:
     ledger_cfg = load_ledger_config(ledger)
     tag = resolve_tag(ledger_cfg)
+    settings = load_settings()
+    if not validate_exchange_symbols(settings, ledger, tag):
+        return
     asset = resolve_asset(ledger_cfg)
     kraken_symbol = kraken_pair or ledger_cfg.get("kraken_name")
     if not kraken_symbol:
