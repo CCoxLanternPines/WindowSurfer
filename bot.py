@@ -15,6 +15,12 @@ from systems.utils.cli import build_parser
 
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
+    parser.add_argument(
+        "--sim-logic",
+        choices=["sim", "live"],
+        default="sim",
+        help="Simulation logic: sim (classic) or live",
+    )
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
         parser.error("--mode is required")
@@ -76,7 +82,11 @@ def main(argv: list[str] | None = None) -> None:
         if not args.ledger:
             addlog("Error: --ledger is required for sim mode")
             sys.exit(1)
-        run_simulation(ledger=args.ledger, verbose=args.verbose)
+        run_simulation(
+            ledger=args.ledger,
+            verbose=args.verbose,
+            sim_logic=args.sim_logic,
+        )
     elif mode == "simtune":
         if not args.ledger:
             addlog("Error: --ledger is required for simtune mode")
