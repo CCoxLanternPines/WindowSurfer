@@ -76,7 +76,11 @@ def main(argv: list[str] | None = None) -> None:
         if not args.ledger:
             addlog("Error: --ledger is required for sim mode")
             sys.exit(1)
-        run_simulation(ledger=args.ledger, verbose=args.verbose)
+        run_simulation(
+            ledger=args.ledger,
+            verbose=args.verbose,
+            sim_logic=getattr(args, "sim_logic", "sim"),
+        )
     elif mode == "simtune":
         if not args.ledger:
             addlog("Error: --ledger is required for simtune mode")

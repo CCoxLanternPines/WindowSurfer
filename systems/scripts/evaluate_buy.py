@@ -1,13 +1,68 @@
 from __future__ import annotations
 
-"""Buy helper for the simulation engine."""
+"""Buy helper for simulation and live signal computation."""
 
-from typing import Dict, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, Tuple
 
 from systems.scripts.ledger import Ledger
 from systems.scripts.get_window_data import get_window_data
+from systems.scripts.window_position_tools import get_trade_params
 from systems.utils.addlog import addlog
-from systems.utils.trade_eval import evaluate_trade
+
+
+@dataclass
+class BuySignal:
+    """Container representing a buy decision."""
+
+    name: str
+    price: float
+    amount: float
+    invest_usdt: float
+
+
+def compute_buy_signals(
+    *,
+    ledger: Ledger,
+    name: str,
+    cfg: Dict,
+    wave: Dict,
+    tick: int,
+    price: float,
+    sim_capital: float,
+    last_buy_tick: Dict[str, int],
+    max_note_usdt: float,
+    min_note_usdt: float,
+) -> Tuple[List[BuySignal], bool]:
+    """Return buy signals for the given window and price."""
+
+    trade = get_trade_params(
+        current_price=price,
+        window_high=wave["ceiling"],
+        window_low=wave["floor"],
+        config=cfg,
+    )
+    if trade["in_dead_zone"]:
+        return [], False
+
+    base_cd = cfg.get("buy_cooldown", 0)
+    adjusted_cd = int(base_cd / trade["buy_cooldown_multiplier"])
+    if tick - last_buy_tick.get(name, float("-inf")) < adjusted_cd:
+        return [], True
+
+    open_for_window = [n for n in ledger.get_active_notes() if n.get("window") == name]
+    if len(open_for_window) >= cfg.get("max_open_notes", 0):
+        return [], False
+
+    base_invest = sim_capital * cfg.get("investment_fraction", 0)
+    adjusted_invest = base_invest * trade["buy_multiplier"]
+    invest = min(adjusted_invest, max_note_usdt)
+    if invest < min_note_usdt or invest > sim_capital:
+        return [], False
+
+    amount = invest / price if price else 0.0
+    signal = BuySignal(name=name, price=price, amount=amount, invest_usdt=invest)
+    return [signal], False
 
 
 def evaluate_buy(
@@ -42,22 +97,35 @@ def evaluate_buy(
             verbose_state=verbose,
         )
 
-    strategy_cfg = {
-        "name": name,
-        "cfg": cfg,
-        "wave": wave,
-        "sim_capital": sim_capital,
-        "max_note_usdt": max_note_usdt,
-        "min_note_usdt": min_note_usdt,
-    }
-
-    updated_capital, skipped = evaluate_trade(
-        "buy",
-        price,
-        ledger,
-        strategy_cfg,
-        last_buy_tick,
-        tick,
-        verbose,
+    signals, skipped = compute_buy_signals(
+        ledger=ledger,
+        name=name,
+        cfg=cfg,
+        wave=wave,
+        tick=tick,
+        price=price,
+        sim_capital=sim_capital,
+        last_buy_tick=last_buy_tick,
+        max_note_usdt=max_note_usdt,
+        min_note_usdt=min_note_usdt,
     )
-    return updated_capital, skipped
+
+    for signal in signals:
+        note = {
+            "window": signal.name,
+            "entry_tick": tick,
+            "buy_tick": tick,
+            "entry_price": signal.price,
+            "entry_amount": signal.amount,
+            "status": "Open",
+        }
+        ledger.open_note(note)
+        sim_capital -= signal.invest_usdt
+        last_buy_tick[name] = tick
+        addlog(
+            f"[BUY] {name} tick {tick} price={price:.6f}",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+
+    return sim_capital, skipped

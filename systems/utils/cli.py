@@ -19,6 +19,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run live mode once immediately and exit",
     )
     parser.add_argument(
+        "--sim-logic",
+        choices=["sim", "live"],
+        default="sim",
+        help="Simulation logic: 'sim' for classic or 'live' for live-parity",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="count",
