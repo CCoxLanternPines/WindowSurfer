@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, csv
+import argparse, csv, json
 from pathlib import Path
 from typing import List, Tuple
 
@@ -14,6 +14,11 @@ STEP = 15
 # --- Top/Bottom score knobs ---
 ALPHA_WICK = 0.12     # how strongly wicks skew PosNow toward 0/1
 SMOOTH_EMA = 0.25     # 0 disables smoothing; else EMA factor in (0,1]
+MOMENTUM_BARS = 8     # lookback for micro-slope (last N closes)
+MOMENTUM_EPS = 0.0015
+DEAD_ZONE_PCT = None  # override percentage; else derive from settings
+DEAD_ZONE_MIN = 0.44  # fallback dead-zone bounds when pct not provided
+DEAD_ZONE_MAX = 0.56
 
 
 def load_candles(tag: str) -> List[Candle]:
@@ -56,6 +61,32 @@ def run(tag: str) -> None:
         print("Not enough data to simulate.")
         return
 
+    dz_pct = DEAD_ZONE_PCT
+    if dz_pct is None:
+        settings_path = Path("settings/settings.json")
+        if settings_path.exists():
+            try:
+                settings = json.loads(settings_path.read_text())
+                ledgers = settings.get("ledger_settings", {})
+                ledger_iter = ledgers.values() if isinstance(ledgers, dict) else ledgers
+                for ledger in ledger_iter:
+                    if ledger.get("tag") == tag:
+                        windows = ledger.get("window_settings", {})
+                        for cfg in windows.values():
+                            dz = cfg.get("dead_zone_pct")
+                            if dz is not None:
+                                dz_pct = dz
+                                break
+                        break
+            except Exception:
+                pass
+    if dz_pct is not None:
+        dead_zone_min = 0.5 - dz_pct / 2
+        dead_zone_max = 0.5 + dz_pct / 2
+    else:
+        dead_zone_min = DEAD_ZONE_MIN
+        dead_zone_max = DEAD_ZONE_MAX
+
     init_snapshot_log()
     prev_tb = 0.5
 
@@ -68,6 +99,12 @@ def run(tag: str) -> None:
         low_w = min(lows)
         high_w = max(highs)
         denom = max(1e-9, high_w - low_w)
+
+        slope = (
+            (closes[-1] - closes[-MOMENTUM_BARS]) / denom
+            if len(closes) > MOMENTUM_BARS
+            else 0.0
+        )
 
         pos_now = 0.5 if high_w == low_w else (closes[-1] - low_w) / denom
         pos_now = clip(pos_now, 0.0, 1.0)
@@ -90,16 +127,29 @@ def run(tag: str) -> None:
         # Symmetric wick skew: more upper wick ⇒ push toward top (↑),
         # more lower wick ⇒ push toward bottom (↓)
         wick_skew = ALPHA_WICK * (uw_ratio - lw_ratio)
-        topbottom = clip(topbottom_raw + wick_skew, 0.0, 1.0)
+        topbottom_base = clip(topbottom_raw + wick_skew, 0.0, 1.0)
+
+        if dead_zone_min <= topbottom_base <= dead_zone_max:
+            dead_zone_blend = 0.5 + 0.5 * (topbottom_base - 0.5)
+            topbottom_filt = dead_zone_blend
+        else:
+            topbottom_filt = topbottom_base
+
+        if topbottom_filt < dead_zone_min:
+            if slope < -MOMENTUM_EPS:
+                topbottom_filt = 0.75 * topbottom_filt + 0.25 * 0.5
+        elif topbottom_filt > dead_zone_max:
+            if slope > MOMENTUM_EPS:
+                topbottom_filt = 0.75 * topbottom_filt + 0.25 * 0.5
 
         # Optional EMA smoothing across snapshots
         if i == WINDOW:
-            topbottom_smooth = topbottom
+            topbottom_smooth = topbottom_filt
         else:
             topbottom_smooth = (
-                (1 - SMOOTH_EMA) * prev_tb + SMOOTH_EMA * topbottom
+                (1 - SMOOTH_EMA) * prev_tb + SMOOTH_EMA * topbottom_filt
                 if SMOOTH_EMA > 0
-                else topbottom
+                else topbottom_filt
             )
         prev_tb = topbottom_smooth
 
