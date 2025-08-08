@@ -112,19 +112,17 @@ def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
                 config_mod.load_ledger_config = original_load_ledger
                 if original_sim_loader:
                     sim_engine.load_settings = original_sim_loader
-
             ledger_obj = Ledger.load_ledger(asset, sim=True)
-            final_price = float(fetch_candles(asset=asset).iloc[-1]["close"])
-            summary = ledger_obj.get_account_summary(final_price)
-            open_value = summary.get("open_value", 0.0)
-            realized_gain = summary.get("realized_gain", 0.0)
-            open_cost = sum(
-                n.get("entry_price", 0.0) * n.get("entry_amount", 0.0)
-                for n in ledger_obj.get_open_notes()
-            )
-            idle_capital = init_capital + realized_gain - open_cost
-            penalty = 0.01
-            score = realized_gain - penalty * (idle_capital + open_value)
+            candle_data = fetch_candles(asset=asset)
+            closed_notes = ledger_obj.get_closed_notes()
+            total_ticks = len(candle_data)
+            if not closed_notes:
+                score = 0.0
+            else:
+                total_gain_pct = sum(n.get("gain_pct", 0.0) for n in closed_notes)
+                avg_gain_pct = total_gain_pct / len(closed_notes)
+                note_frequency = len(closed_notes) / total_ticks
+                score = avg_gain_pct * note_frequency
             if verbose:
                 addlog(
                     f"[TUNE][{window_name}] Trial {trial.number} score={score:.4f}",
