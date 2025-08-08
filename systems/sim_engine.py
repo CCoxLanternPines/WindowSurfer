@@ -9,7 +9,7 @@ LOG_PATH = Path("data/tmp/snapshots.log")
 
 # Window and step sizes
 WINDOW = 132
-STEP = 24
+STEP = 15
 
 # --- Top/Bottom score knobs ---
 ALPHA_WICK = 0.12     # how strongly wicks skew PosNow toward 0/1
@@ -105,10 +105,7 @@ def run(tag: str) -> None:
 
         ts = last_ts
         line = (
-            f"[SNAPSHOT] {ts} | AvgPos:{avg_pos:.2f} | PosNow:{pos_now:.2f} | "
-            f"TopBottom:{topbottom_smooth:.2f} | Skew:{wick_skew:+.02f} "
-            f"| Wicks(uw={uw_ratio:.2f}, lw={lw_ratio:.2f})"
-        )
+             f"TopBottom:{topbottom_smooth:.2f}"        )
         log_snapshot(line)
 
 
