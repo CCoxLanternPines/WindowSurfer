@@ -18,7 +18,9 @@
           "buy_cooldown_multiplier_scale": 0.902421258277746,
           "sell_cooldown_multiplier_scale": 1.56339541767712,
           "dead_zone_pct": 0.0225026538433316,
-          "max_open_notes": 71
+          "max_open_notes": 71,
+          "use_baked_targets": false,
+          "required_min_roi": 0.0
         }
       }
     },
@@ -40,7 +42,9 @@
           "buy_cooldown_multiplier_scale": 1.95196594757427,
           "sell_cooldown_multiplier_scale": 1.78927890073705,
           "dead_zone_pct": 0.010929080263379,
-          "max_open_notes": 93
+          "max_open_notes": 93,
+          "use_baked_targets": false,
+          "required_min_roi": 0.0
         }
       }
     },
@@ -62,7 +66,9 @@
           "buy_cooldown_multiplier_scale": 1.95196594757427,
           "sell_cooldown_multiplier_scale": 1.78927890073705,
           "dead_zone_pct": 0.010929080263379,
-          "max_open_notes": 93
+          "max_open_notes": 93,
+          "use_baked_targets": false,
+          "required_min_roi": 0.0
         }
       }
     }

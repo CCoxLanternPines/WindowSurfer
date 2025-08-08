@@ -9,7 +9,12 @@ from systems.utils.config import resolve_path
 
 
 class Ledger:
-    """Track raw trade state and compute summary metrics on demand."""
+    """Track raw trade state and compute summary metrics on demand.
+
+    Notes can contain arbitrary metadata. Additional fields, such as a baked
+    ``maturity_price`` target, are preserved across ``save_ledger`` and
+    ``load_ledger`` calls.
+    """
 
     def __init__(self) -> None:
         self.open_notes: List[Dict] = []

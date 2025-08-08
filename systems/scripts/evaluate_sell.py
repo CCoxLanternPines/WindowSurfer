@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-"""Sell helper for the simulation engine."""
+"""Sell helper for the simulation engine.
+
+Supports notes with baked ``maturity_price`` targets. When present on a note,
+``evaluate_trade`` will only trigger a sale once the market price meets or
+exceeds the baked target; otherwise the standard dynamic target logic applies.
+"""
 
 from typing import Dict, List, Tuple
 
