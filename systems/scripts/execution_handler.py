@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import time
 import requests
 import hashlib
@@ -171,20 +173,56 @@ def place_order(
     }
 
 def execute_buy(
-    client,
+    client=None,
     *,
     symbol: str,
     price: float,
     amount_usd: float,
     ledger_name: str,
-    wallet_code: str,
+    wallet_code: str = "",
+    ledger=None,
+    tick: int | None = None,
+    strategy: str | None = None,
+    cooldowns: dict | None = None,
+    settings: dict | None = None,
+    state: dict | None = None,
+    sim: bool = False,
     verbose: int = 0,
-) -> dict:
-    """Place a real buy order and normalise the result structure.
+) -> dict | None:
+    """Execute a buy either in live or simulation mode."""
 
-    Parameters are kept for API compatibility; ``client`` and ``price`` are
-    currently unused as ``place_order`` pulls pricing from Kraken directly.
-    """
+    if sim:
+        if ledger is None or state is None or cooldowns is None or settings is None:
+            return None
+        amount_coin = amount_usd / price if price else 0.0
+        metadata = ledger.get_metadata()
+        note_id = metadata.get("last_id", 0) + 1
+        metadata["last_id"] = note_id
+        ledger.set_metadata(metadata)
+        note = {
+            "id": note_id,
+            "strategy": strategy,
+            "window": strategy,
+            "asset": metadata.get("asset"),
+            "tag": metadata.get("tag"),
+            "entry_amount": amount_coin,
+            "entry_price": price,
+            "opened_at_ts": tick,
+            "status": "open",
+            "closed": False,
+            "last_action_tick": tick,
+        }
+        ledger.append_open(note)
+        state["capital"] = state.get("capital", 0.0) - amount_usd
+        if cooldowns.get(strategy) is not None:
+            cooldowns[strategy]["buy"] = settings.get("buy_cooldown", 0)
+        addlog(
+            f"[SIM][BUY] {ledger_name} | {metadata.get('asset')} ({metadata.get('tag')}) | "
+            f"{amount_coin:.4f} @ ${price:.3f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return note
 
     _, fiat_symbol = split_tag(symbol)
     result = place_order(
@@ -211,7 +249,7 @@ def execute_buy(
         send_telegram_message(
             f"⚠️ Skipped logging invalid trade for {ledger_name}: empty or failed result."
         )
-        return
+        return None
     return {
         "filled_amount": result.get("filled_amount", 0.0),
         "avg_price": result.get("price", 0.0),
@@ -220,19 +258,57 @@ def execute_buy(
 
 
 def execute_sell(
-    client,
+    client=None,
     *,
     symbol: str,
     coin_amount: float,
     price: float | None = None,
     ledger_name: str,
+    ledger=None,
+    tick: int | None = None,
+    note: dict | None = None,
+    cooldowns: dict | None = None,
+    settings: dict | None = None,
+    state: dict | None = None,
+    sim: bool = False,
     verbose: int = 0,
-) -> dict:
-    """Place a real sell order and normalise the result structure.
+) -> dict | None:
+    """Execute a sell either in live or simulation mode."""
 
-    ``price`` is optional and, if absent, the current live price is fetched to
-    estimate USD notional.
-    """
+    if sim:
+        if ledger is None or note is None or cooldowns is None or settings is None or state is None:
+            return None
+        if note.get("status") != "open" or note.get("closed"):
+            addlog(
+                "[SKIP] Already closed.",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            return None
+        gain = (price - note["entry_price"]) * note["entry_amount"]
+        base = note["entry_price"] * note["entry_amount"] or 1
+        gain_pct = gain / base
+        close_payload = {
+            "exit_price": price,
+            "closed_at_ts": tick,
+            "status": "closed",
+            "gain": gain,
+            "gain_pct": gain_pct,
+            "closed": True,
+            "last_action_tick": tick,
+        }
+        ledger.close_note(note["id"], close_payload)
+        state["capital"] = state.get("capital", 0.0) + note["entry_amount"] * price
+        if cooldowns.get(note.get("strategy")) is not None:
+            cooldowns[note["strategy"]]["sell"] = settings.get("sell_cooldown", 0)
+        addlog(
+            f"[SIM][SELL] {ledger_name} | {note.get('asset')} ({note.get('tag')}) | note={note['id']} | "
+            f"+${gain:.2f} ({gain_pct:.2%})",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return close_payload
+
     sell_price = price if price is not None else get_live_price(symbol)
     usd_amount = coin_amount * sell_price
     _, fiat_symbol = split_tag(symbol)
@@ -260,7 +336,7 @@ def execute_sell(
         send_telegram_message(
             f"⚠️ Skipped logging invalid trade for {ledger_name}: empty or failed result."
         )
-        return
+        return None
     return {
         "filled_amount": result.get("filled_amount", 0.0),
         "avg_price": result.get("price", 0.0),

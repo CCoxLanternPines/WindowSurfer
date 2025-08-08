@@ -17,16 +17,44 @@ class Ledger:
         self.metadata: Dict = {}
 
     # Basic note management -------------------------------------------------
-    def open_note(self, note: Dict) -> None:
-        """Register a newly opened note."""
+    def append_open(self, note: Dict) -> None:
+        """Register a newly opened note.
+
+        Notes are stored as raw dictionaries and are expected to contain an
+        ``id`` field that uniquely identifies them.  This mirrors the live
+        ledger interface so that simulation and live code paths can operate on
+        the same structures.
+        """
         self.open_notes.append(note)
 
-    def close_note(self, note: Dict) -> None:
-        """Move ``note`` from open to closed."""
+    # Backwards compatibility ------------------------------------------------
+    def open_note(self, note: Dict) -> None:  # pragma: no cover - legacy alias
+        """Legacy alias for :meth:`append_open`."""
+        self.append_open(note)
+
+    def close_note(self, note_or_id, close_payload: Dict | None = None) -> bool:
+        """Close a note by id or by direct reference.
+
+        ``close_payload`` is merged into the note before archiving.  This
+        function accepts either a note ``dict`` (legacy behaviour) or an id.
+        It returns ``True`` when a note was successfully closed.
+        """
+
+        if isinstance(note_or_id, dict):
+            note = note_or_id
+        else:
+            note = next(
+                (n for n in self.open_notes if n.get("id") == note_or_id), None
+            )
+            if note is None:
+                return False
         if note not in self.open_notes:
-            return
+            return False
         self.open_notes.remove(note)
+        if close_payload:
+            note.update(close_payload)
         self.closed_notes.append(note)
+        return True
 
     def set_metadata(self, metadata: Dict) -> None:
         self.metadata = metadata

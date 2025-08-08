@@ -15,7 +15,10 @@ from tqdm import tqdm
 
 from systems.scripts.fetch_candles import fetch_candles
 from systems.scripts.ledger import Ledger, save_ledger
-from systems.scripts.handle_top_of_hour import handle_top_of_hour
+from systems.scripts.get_window_data import get_wave_window_data_df
+from systems.scripts.evaluate_buy import evaluate_buy
+from systems.scripts.evaluate_sell import evaluate_sell
+from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
 from systems.utils.symbols import resolve_asset, resolve_tag
@@ -76,36 +79,89 @@ def run_simulation(
     max_note_usdt = settings.get("general_settings", {}).get("max_note_usdt", sim_capital)
     min_note_usdt = settings.get("general_settings", {}).get("minimum_note_size", 0)
 
-    last_buy_tick = {name: float("-inf") for name in windows}
-    buy_cooldown_skips = {name: 0 for name in windows}
-    min_roi_gate_hits = 0
-
-    state = {
-        "capital": sim_capital,
-        "last_buy_tick": last_buy_tick,
-        "buy_cooldown_skips": buy_cooldown_skips,
-        "min_roi_gate_hits": min_roi_gate_hits,
-    }
+    state = {"capital": sim_capital}
+    cooldowns = {name: {"buy": 0, "sell": 0} for name in windows}
+    state["cooldowns"] = cooldowns
+    metadata = {"asset": asset, "tag": tag, "last_id": 0}
+    ledger_obj.set_metadata(metadata)
 
     total = len(df)
     with tqdm(total=total, desc="📉 Sim Progress", dynamic_ncols=True) as pbar:
         for tick in range(total):
             offset = total - tick - 1
             candle = df.iloc[tick].to_dict()
+            price = float(candle.get("close", 0.0))
 
-            handle_top_of_hour(
-                tick=tick,
-                candle=candle,
-                ledger=ledger_obj,
-                ledger_config=ledger_config,
-                sim=True,
-                df=df,
-                offset=offset,
-                state=state,
-                max_note_usdt=max_note_usdt,
-                min_note_usdt=min_note_usdt,
-                verbose=verbose,
-            )
+            for cd in cooldowns.values():
+                if cd["buy"] > 0:
+                    cd["buy"] -= 1
+                if cd["sell"] > 0:
+                    cd["sell"] -= 1
+
+            for name, cfg in windows.items():
+                wave = get_wave_window_data_df(
+                    df,
+                    window=cfg["window_size"],
+                    candle_offset=offset,
+                )
+                if not wave:
+                    continue
+
+                buy_signal = evaluate_buy(
+                    state=state,
+                    ledger=ledger_obj,
+                    strategy=name,
+                    cfg=cfg,
+                    wave=wave,
+                    tick=tick,
+                    price=price,
+                    cooldowns=cooldowns,
+                    max_note_usdt=max_note_usdt,
+                    min_note_usdt=min_note_usdt,
+                    verbose=verbose,
+                )
+                if buy_signal:
+                    execute_buy(
+                        symbol=tag,
+                        price=buy_signal["price"],
+                        amount_usd=buy_signal["amount_usd"],
+                        ledger_name=ledger,
+                        ledger=ledger_obj,
+                        tick=tick,
+                        strategy=name,
+                        cooldowns=cooldowns,
+                        settings=cfg,
+                        state=state,
+                        sim=True,
+                        verbose=verbose,
+                    )
+
+                sell_signals = evaluate_sell(
+                    state=state,
+                    ledger=ledger_obj,
+                    strategy=name,
+                    cfg=cfg,
+                    wave=wave,
+                    tick=tick,
+                    price=price,
+                    cooldowns=cooldowns,
+                    verbose=verbose,
+                )
+                for sig in sell_signals:
+                    execute_sell(
+                        symbol=tag,
+                        coin_amount=sig["note"]["entry_amount"],
+                        price=sig["price"],
+                        ledger_name=ledger,
+                        ledger=ledger_obj,
+                        tick=tick,
+                        note=sig["note"],
+                        cooldowns=cooldowns,
+                        settings=cfg,
+                        state=state,
+                        sim=True,
+                        verbose=verbose,
+                    )
 
             pbar.update(1)
 
@@ -160,15 +216,5 @@ def run_simulation(
         verbose_state=verbose,
     )
 
-    if verbose:
-        addlog(
-            f"Buy cooldown skips: {state['buy_cooldown_skips']}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-    addlog(
-        f"Min ROI gate hits: {state['min_roi_gate_hits']}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
+    # Simulation summary logged above; no extra counters in new pipeline.
 

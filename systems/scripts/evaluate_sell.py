@@ -1,55 +1,71 @@
 from __future__ import annotations
 
-"""Sell helper for the simulation engine."""
+"""Sell signal evaluation used by simulation and live paths."""
 
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from systems.scripts.ledger import Ledger
-from systems.utils.trade_eval import evaluate_trade
+from systems.scripts.window_position_tools import get_trade_params
 from systems.utils.addlog import addlog
 
 
 def evaluate_sell(
     *,
+    state: Dict,
     ledger: Ledger,
-    name: str,
+    strategy: str,
+    cfg: Dict,
+    wave: Dict,
     tick: int,
     price: float,
-    wave: Dict,
-    cfg: Dict,
-    sim_capital: float,
+    cooldowns: Dict[str, Dict[str, int]],
     verbose: int,
-    base_sell_cooldown: int,
-    last_sell_tick: Dict[str, int],
-) -> Tuple[float, List[Dict], int]:
-    """Close notes that have reached their target price."""
+) -> List[Dict]:
+    """Return a list of sell signals for ``strategy``."""
 
-    metadata = ledger.get_metadata()
-    asset = metadata.get("asset", "")
-    tag = metadata.get("tag", "")
+    cd = cooldowns.get(strategy, {}).get("sell", 0)
+    if cd > 0:
+        return []
 
-    if verbose >= 3:
-        addlog(
-            f"[DEBUG][SELL] {asset} ({tag}) | {name}",
-            verbose_int=3,
-            verbose_state=verbose,
-        )
-
-    strategy_cfg = {
-        "name": name,
-        "cfg": cfg,
-        "wave": wave,
-        "sim_capital": sim_capital,
-        "base_sell_cooldown": base_sell_cooldown,
-    }
-
-    updated_capital, closed, roi_skipped = evaluate_trade(
-        "sell",
-        price,
-        ledger,
-        strategy_cfg,
-        last_sell_tick,
-        tick,
-        verbose,
+    notes = [
+        n
+        for n in ledger.get_open_notes()
+        if n.get("strategy") == strategy and n.get("status") == "open" and not n.get("closed") and n.get("last_action_tick") != tick
+    ]
+    notes.sort(
+        key=lambda n: (price - n["entry_price"]) / n["entry_price"],
+        reverse=True,
     )
-    return updated_capital, closed, roi_skipped
+
+    signals: List[Dict] = []
+    for note in notes:
+        gain_pct = (price - note["entry_price"]) / note["entry_price"]
+        trade_note = get_trade_params(
+            current_price=price,
+            window_high=wave["ceiling"],
+            window_low=wave["floor"],
+            config=cfg,
+            entry_price=note["entry_price"],
+        )
+        maturity_roi = trade_note["maturity_roi"]
+        if maturity_roi is not None:
+            addlog(
+                f"[DEBUG][SELL] gain_pct={gain_pct:.2%} maturity_roi={maturity_roi:.2%}",
+                verbose_int=3,
+                verbose_state=verbose,
+            )
+        else:
+            addlog(
+                f"[DEBUG][SELL] gain_pct={gain_pct:.2%} maturity_roi=None",
+                verbose_int=3,
+                verbose_state=verbose,
+            )
+        if (
+            maturity_roi is None
+            or maturity_roi <= 0
+            or gain_pct < 0
+            or gain_pct < maturity_roi
+        ):
+            continue
+        signals.append({"note": note, "price": price})
+    return signals
