@@ -2,6 +2,7 @@
   "ledger_settings": {
     "Kris_Ledger": {
       "tag": "DOGEUSD",
+      "asset": "DOGE",
       "wallet_code": "XXDG",
       "kraken_name": "DOGE/USD",
       "kraken_pair": "XXDGZUSD",
@@ -23,6 +24,7 @@
     },
     "Travis_Ledger": {
       "tag": "SOLUSDC",
+      "asset": "SOL",
       "wallet_code": "SOL.F",
       "kraken_name": "SOL/USDC",
       "kraken_pair": "SOLUSDC",
@@ -44,6 +46,7 @@
     },
     "Goat Ledger": {
       "tag": "SOLUSD",
+      "asset": "SOL",
       "wallet_code": "SOL.F",
       "kraken_name": "SOL/USD",
       "kraken_pair": "SOLUSD",

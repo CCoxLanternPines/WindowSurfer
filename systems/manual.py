@@ -11,10 +11,11 @@ from systems.scripts.kraken_utils import ensure_snapshot, get_live_price
 from systems.utils.cli import build_parser
 from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.scripts.ledger import save_ledger
+from systems.utils.symbols import resolve_asset, resolve_tag, live_ledger_path
 
 
-def _load_ledger(ledger_name: str) -> dict:
-    path = resolve_path(f"data/ledgers/{ledger_name}.json")
+def _load_ledger(asset: str) -> dict:
+    path = live_ledger_path(asset)
     if path.exists():
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
@@ -56,7 +57,8 @@ def main(argv: Optional[list[str]] = None) -> None:
             f"[ERROR] Snapshot unavailable for ledger '{args.ledger}'"
         )
 
-    tag = ledger_cfg.get("tag")
+    asset = resolve_asset(ledger_cfg)
+    tag = resolve_tag(ledger_cfg)
 
     price = get_live_price(tag)
     if price <= 0:
@@ -64,7 +66,7 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     coin_amt = args.usd / price
     coin_str = _coin_label(tag)
-    ledger = _load_ledger(args.ledger)
+    ledger = _load_ledger(asset)
 
     if args.buy:
         if not args.dry:
@@ -91,7 +93,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                     "timestamp": result.get("timestamp"),
                 }
             )
-            save_ledger(args.ledger, ledger)
+            save_ledger(asset, ledger)
         addlog(
             f"[MANUAL BUY] {args.ledger} | {tag} | ${args.usd:.2f} → {coin_amt:.4f} {coin_str} @ ${price:.4f}",
             verbose_int=1,
@@ -122,7 +124,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                     "timestamp": result.get("timestamp"),
                 }
             )
-            save_ledger(args.ledger, ledger)
+            save_ledger(asset, ledger)
         else:
             usd_total = args.usd
         addlog(

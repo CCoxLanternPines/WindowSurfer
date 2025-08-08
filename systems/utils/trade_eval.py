@@ -70,7 +70,10 @@ def evaluate_trade(
             invest = min(adjusted_note_count, max_note_usdt)
             if invest >= min_note_usdt and invest <= sim_capital:
                 amount = invest / current_price
+                metadata = ledger.get_metadata()
                 note = {
+                    "asset": metadata.get("asset"),
+                    "tag": metadata.get("tag"),
                     "window": name,
                     "entry_tick": tick,
                     "buy_tick": tick,

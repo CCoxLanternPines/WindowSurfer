@@ -13,11 +13,12 @@ import shutil
 
 from tqdm import tqdm
 
-from systems.scripts.fetch_canles import fetch_candles
+from systems.scripts.fetch_candles import fetch_candles
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
+from systems.utils.symbols import resolve_asset, resolve_tag
 
 
 def run_simulation(
@@ -49,10 +50,12 @@ def run_simulation(
             name: cfg for name, cfg in windows_cfg.items() if name in window_names
         }
 
-    tag = ledger_config.get("tag", "").upper()
+    tag = resolve_tag(ledger_config)
+    asset = resolve_asset(ledger_config)
 
     root = resolve_path("")
-    sim_path = Path(output_path) if output_path else root / "data" / "tmp" / f"simulation_{ledger}.json"
+    default_sim_path = root / "data" / "tmp" / "simulation" / f"{asset}.json"
+    sim_path = Path(output_path) if output_path else default_sim_path
     if sim_path.exists():
         sim_path.unlink()
 
@@ -63,9 +66,13 @@ def run_simulation(
     sim_capital = float(settings.get("simulation_capital", 0))
     ledger_obj = Ledger()
 
-    addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
+    addlog(
+        f"[SIM] Starting simulation for {asset} ({tag})",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
 
-    df = fetch_candles(tag)
+    df = fetch_candles(asset=asset)
     max_note_usdt = settings.get("general_settings", {}).get("max_note_usdt", sim_capital)
     min_note_usdt = settings.get("general_settings", {}).get("minimum_note_size", 0)
 
@@ -117,15 +124,14 @@ def run_simulation(
         verbose_int=3,
         verbose_state=verbose,
     )
-    save_ledger(ledger, ledger_obj, sim=True, final_tick=final_tick, summary=summary)
+    save_ledger(asset, ledger_obj, sim=True, final_tick=final_tick, summary=summary)
 
     # Copy output to requested path
-    default_path = root / "data" / "tmp" / "simulation" / f"{ledger}.json"
-    if default_path.exists() and default_path != sim_path:
+    if default_sim_path.exists() and default_sim_path != sim_path:
         sim_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(default_path, sim_path)
+        shutil.copyfile(default_sim_path, sim_path)
 
-    saved_summary = Ledger.load_ledger(ledger, sim=True).get_account_summary(final_price)
+    saved_summary = Ledger.load_ledger(asset, sim=True).get_account_summary(final_price)
     if (
         saved_summary["closed_notes"] != summary["closed_notes"]
         or saved_summary["realized_gain"] != summary["realized_gain"]
