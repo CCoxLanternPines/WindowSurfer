@@ -11,6 +11,7 @@ from tqdm import tqdm
 from systems.scripts.handle_top_of_hour import handle_top_of_hour
 from systems.utils.config import load_settings
 from systems.fetch import fetch_missing_candles
+from systems.utils.symbols import resolve_asset, resolve_tag
 from systems.utils.addlog import addlog
 from systems.utils.cli import build_parser
 
@@ -22,7 +23,8 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
 
     if dry:
         for ledger_key, ledger_cfg in settings.get("ledger_settings", {}).items():
-            tag = ledger_cfg.get("tag")
+            tag = resolve_tag(ledger_cfg)
+            asset = resolve_asset(ledger_cfg)
             fetch_missing_candles(
                 ledger_key,
                 kraken_pair=ledger_cfg.get("kraken_pair"),
@@ -30,7 +32,7 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
                 verbose=verbose,
             )
             addlog(
-                f"[SYNC] {ledger_key} | {tag} candles up to date",
+                f"[SYNC] {ledger_key} | {asset} ({tag}) candles up to date",
                 verbose_int=1,
                 verbose_state=verbose,
             )

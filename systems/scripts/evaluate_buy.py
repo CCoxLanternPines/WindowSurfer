@@ -29,10 +29,12 @@ def evaluate_buy(
 
     if verbose >= 3:
         summary = get_window_data(wave=wave, price=price)
-        tag = symbol or ledger.get_metadata().get("tag", "")
+        metadata = ledger.get_metadata()
+        asset = metadata.get("asset", "")
+        tag = symbol or metadata.get("tag", "")
         addlog(
             (
-                f"[DEBUG] {tag} | {name} | "
+                f"[DEBUG] {asset} ({tag}) | {name} | "
                 f"Position: {summary['current_tunnel_position_avg']:.2f} | "
                 f"Loudness: {summary['loudness_avg']:.2f} | "
                 f"Slope: {summary['slope_direction_avg']:.2f} | "

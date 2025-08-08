@@ -48,7 +48,7 @@ Press ``ESC`` during a simulation to abort early. The current ledger state is sa
 to ``data/tmp/ledgersimulation.json`` and a summary is printed.
 
 ## Simulation Features
-The simulator reads raw candle data from ``data/raw/<TAG>.csv`` and computes tunnel metrics for each step. For every candle tick it:
+The simulator reads raw candle data from ``data/raw/<ASSET>.csv`` and computes tunnel metrics for each step. For every candle tick it:
 
 1. Evaluates buy strategies with cooldown tracking.
 2. Records new notes in the ledger when a strategy triggers.
@@ -73,7 +73,7 @@ Results are stored in ``ledgersimulation.json`` under ``data/tmp``. Each note re
 ## Additional Scripts and Configuration
 
 - ``systems/fetch.py`` – fetch historical candles from Kraken/Binance and merge
-  them into ``data/raw/<TAG>.csv``. Example:
+  them into ``data/raw/<ASSET>.csv``. Example:
 
   ```bash
   python -m systems.fetch --tag DOGEUSD --time 30d

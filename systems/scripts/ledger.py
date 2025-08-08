@@ -79,13 +79,15 @@ class Ledger:
 
     # Persistence -----------------------------------------------------------
     @staticmethod
-    def load_ledger(tag: str, *, sim: bool = False) -> "Ledger":
-        """Load a ledger for ``tag`` depending on mode."""
+    def load_ledger(asset: str, *, sim: bool = False) -> "Ledger":
+        """Load a ledger for ``asset`` depending on mode."""
         root = resolve_path("")
         ledger = Ledger()
 
+        asset = asset.upper()
+
         if sim:
-            path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
+            path = root / "data" / "tmp" / "simulation" / f"{asset}.json"
             if path.exists():
                 with path.open("r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -94,7 +96,7 @@ class Ledger:
                 ledger.metadata = data.get("metadata", {})
             return ledger
 
-        path = root / "data" / "ledgers" / f"{tag}.json"
+        path = root / "data" / "ledgers" / f"{asset}.json"
         if path.exists():
             with path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -105,7 +107,7 @@ class Ledger:
 
 
 def save_ledger(
-    ledger_name: str,
+    asset: str,
     ledger: "Ledger" | dict,
     *,
     sim: bool = False,
@@ -115,15 +117,16 @@ def save_ledger(
     """Persist ``ledger`` data to the canonical ledger directory."""
 
     root = resolve_path("")
+    asset = asset.upper()
 
     if sim:
         out_dir = root / "data" / "tmp" / "simulation"
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{ledger_name}.json"
+        out_path = out_dir / f"{asset}.json"
     else:
         out_dir = root / "data" / "ledgers"
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{ledger_name}.json"
+        out_path = out_dir / f"{asset}.json"
 
     if isinstance(ledger, Ledger):
         ledger_data = {

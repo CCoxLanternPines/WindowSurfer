@@ -24,6 +24,7 @@ from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.config import resolve_path
 from systems.utils.top_hour_report import format_top_of_hour_report
 from systems.utils.resolve_symbol import split_tag
+from systems.utils.symbols import resolve_asset, resolve_exchange_pairs, resolve_tag, raw_path
 from systems.scripts.window_position_tools import get_trade_params
 
 
@@ -77,13 +78,15 @@ def handle_top_of_hour(
         verbose = general_cfg.get("verbose", 0)
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
-            tag = ledger_cfg["tag"]
+            tag = resolve_tag(ledger_cfg)
+            asset = resolve_asset(ledger_cfg)
+            pairs = resolve_exchange_pairs(ledger_cfg)
             _, quote = split_tag(tag)
             wallet_code = ledger_cfg["wallet_code"]
             window_settings = ledger_cfg.get("window_settings", {})
             triggered_strategies = {wn.title(): False for wn in window_settings}
             strategy_summary: dict[str, dict] = {}
-            ledger = Ledger.load_ledger(tag=ledger_cfg["tag"])
+            ledger = Ledger.load_ledger(asset)
 
             snapshot = load_or_fetch_snapshot(ledger_name)
             if not snapshot:
@@ -95,20 +98,22 @@ def handle_top_of_hour(
                 continue
             balance = snapshot.get("balance", {})
 
-            price = get_live_price(kraken_pair=tag)
+            price = get_live_price(kraken_pair=pairs.get("kraken_pair") or tag)
 
             current_ts = (
                 int(tick.timestamp()) if isinstance(tick, datetime) else int(tick)
             )
 
             metadata = ledger.get_metadata()
+            metadata["asset"] = asset
+            metadata["tag"] = tag
             ledger_cooldowns = cooldowns.get(ledger_name, {})
             last_buy_tick = ledger_cooldowns.get("last_buy_tick", {})
             last_sell_tick = ledger_cooldowns.get("last_sell_tick", {})
 
             for window_name, window_cfg in window_settings.items():
                 addlog(
-                    f"[EVAL] {ledger_name} | {tag} | {window_name} window → evaluating",
+                    f"[EVAL] {ledger_name} | {asset} ({tag}) | {window_name} window → evaluating",
                     verbose_int=3,
                     verbose_state=True,
                 )
@@ -117,7 +122,7 @@ def handle_top_of_hour(
                 sell_count = 0
 
                 try:
-                    df = pd.read_csv(root / "data" / "raw" / f"{tag}.csv")
+                    df = pd.read_csv(raw_path(asset))
                 except Exception:
                     df = None
 
@@ -344,7 +349,7 @@ def handle_top_of_hour(
                 metadata["last_buy_tick"] = last_buy_tick
                 metadata["last_sell_tick"] = last_sell_tick
             ledger.set_metadata(metadata)
-            save_ledger(ledger_cfg["tag"], ledger)
+            save_ledger(asset, ledger)
 
             # USD fiat balance from Kraken
             usd_balance = float(balance.get(quote, 0.0))

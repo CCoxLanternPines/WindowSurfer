@@ -6,6 +6,7 @@ from typing import Dict, List, Tuple
 
 from systems.scripts.ledger import Ledger
 from systems.utils.trade_eval import evaluate_trade
+from systems.utils.addlog import addlog
 
 
 def evaluate_sell(
@@ -22,6 +23,17 @@ def evaluate_sell(
     last_sell_tick: Dict[str, int],
 ) -> Tuple[float, List[Dict], int]:
     """Close notes that have reached their target price."""
+
+    metadata = ledger.get_metadata()
+    asset = metadata.get("asset", "")
+    tag = metadata.get("tag", "")
+
+    if verbose >= 3:
+        addlog(
+            f"[DEBUG][SELL] {asset} ({tag}) | {name}",
+            verbose_int=3,
+            verbose_state=verbose,
+        )
 
     strategy_cfg = {
         "name": name,

@@ -9,6 +9,13 @@ import sys
 import pandas as pd
 from systems.utils.config import load_ledger_config, resolve_path
 from systems.utils.cli import build_parser
+from systems.utils.symbols import (
+    resolve_asset,
+    resolve_exchange_pairs,
+    resolve_tag,
+    raw_path,
+)
+from systems.utils.resolve_symbol import resolve_ledger_settings
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -20,7 +27,6 @@ from systems.utils.addlog import addlog
 from systems.scripts.fetch_core import (
     _load_existing,
     _merge_and_save,
-    get_raw_path,
     COLUMNS,
     compute_missing_ranges,
     fetch_range,
@@ -37,27 +43,39 @@ def main(argv: list[str] | None = None) -> None:
         required=False,
         help="Time window (e.g. 120h)",
     )
+    parser.add_argument("--tag", help="Trading pair tag", required=False)
     args = parser.parse_args(argv)
-    if not args.ledger:
-        parser.error("--ledger is required")
+    if not args.ledger and not args.tag:
+        parser.error("--ledger or --tag is required")
 
     time_window = args.time if args.time else "48h"
     verbose = args.verbose
 
-    ledger_cfg = load_ledger_config(args.ledger)
-    tag = ledger_cfg["tag"].upper()
-    kraken_symbol = ledger_cfg.get("kraken_pair")
-    if not kraken_symbol:
+    if args.tag:
+        tag = args.tag.upper()
+        ledger_cfg = resolve_ledger_settings(tag)
         addlog(
-            f"[WARN] Missing kraken_pair for {args.ledger}, falling back to tag",
+            f"[INFO] CLI tag provided; resolved ledger {ledger_cfg.get('asset', tag)}",
             verbose_int=1,
             verbose_state=True,
         )
-        kraken_symbol = ledger_cfg["tag"]
-    binance_symbol = ledger_cfg["binance_name"]
+    else:
+        ledger_cfg = load_ledger_config(args.ledger)
+        tag = resolve_tag(ledger_cfg)
+
+    asset = resolve_asset(ledger_cfg)
+    pairs = resolve_exchange_pairs(ledger_cfg)
+    kraken_symbol = pairs.get("kraken_pair") or tag
+    if pairs.get("kraken_pair") is None:
+        addlog(
+            f"[WARN] Missing kraken_pair for {asset} ({tag})",
+            verbose_int=1,
+            verbose_state=True,
+        )
+    binance_symbol = pairs.get("binance_pair")
 
     start_ts, end_ts = parse_relative_time(time_window)
-    out_path = get_raw_path(tag)
+    out_path = raw_path(asset)
     existing = _load_existing(out_path)
     gaps = compute_missing_ranges(existing, start_ts, end_ts, 3_600_000)
 
@@ -153,19 +171,20 @@ def fetch_missing_candles(
     verbose: int = 1,
 ) -> None:
     ledger_cfg = load_ledger_config(ledger)
-    tag = ledger_cfg["tag"].upper()
-    kraken_symbol = kraken_pair or ledger_cfg.get("kraken_pair")
-    if not kraken_symbol:
+    tag = resolve_tag(ledger_cfg)
+    asset = resolve_asset(ledger_cfg)
+    pairs = resolve_exchange_pairs(ledger_cfg)
+    kraken_symbol = kraken_pair or pairs.get("kraken_pair") or tag
+    if pairs.get("kraken_pair") is None and kraken_pair is None:
         addlog(
-            f"[WARN] Missing kraken_pair for {ledger}, falling back to tag",
+            f"[WARN] Missing kraken_pair for {asset} ({tag})",
             verbose_int=1,
             verbose_state=True,
         )
-        kraken_symbol = ledger_cfg["tag"]
-    binance_symbol = ledger_cfg["binance_name"]
+    binance_symbol = pairs.get("binance_pair")
 
     start_ts, end_ts = parse_relative_time(relative_window)
-    out_path = get_raw_path(tag)
+    out_path = raw_path(asset)
     existing = _load_existing(out_path)
     gaps = compute_missing_ranges(existing, start_ts, end_ts, 3_600_000)
 

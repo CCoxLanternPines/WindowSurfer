@@ -12,7 +12,7 @@ from typing import Any, Dict
 import optuna
 
 from systems.sim_engine import run_simulation
-from systems.scripts.fetch_canles import fetch_candles
+from systems.scripts.fetch_candles import fetch_candles
 from systems.scripts.ledger import Ledger
 from systems.utils.addlog import addlog
 from systems.utils.config import (
@@ -20,13 +20,15 @@ from systems.utils.config import (
     load_settings,
     resolve_path,
 )
+from systems.utils.symbols import resolve_asset, resolve_tag, resolve_knobs
 
 
 def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
     """Run sequential Optuna tuning on each window for ``ledger``."""
 
     ledger_cfg = load_ledger_config(ledger)
-    tag = ledger_cfg.get("tag", "").upper()
+    tag = resolve_tag(ledger_cfg)
+    asset = resolve_asset(ledger_cfg)
     window_settings = ledger_cfg.get("window_settings", {})
     if not window_settings:
         raise ValueError("No windows defined for ledger")
@@ -35,7 +37,8 @@ def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
     settings = load_settings(reload=True)
     knobs_path = root / "settings" / "knobs.json"
     with knobs_path.open("r", encoding="utf-8") as f:
-        knobs_cfg = json.load(f).get(tag)
+        knobs_data = json.load(f)
+    knobs_cfg = resolve_knobs(ledger_cfg, knobs_data)
     if knobs_cfg is None:
         raise ValueError(f"No knob configuration found for tag: {tag}")
 
@@ -110,8 +113,8 @@ def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
                 if original_sim_loader:
                     sim_engine.load_settings = original_sim_loader
 
-            ledger_obj = Ledger.load_ledger(ledger, sim=True)
-            final_price = float(fetch_candles(tag).iloc[-1]["close"])
+            ledger_obj = Ledger.load_ledger(asset, sim=True)
+            final_price = float(fetch_candles(asset=asset).iloc[-1]["close"])
             summary = ledger_obj.get_account_summary(final_price)
             open_value = summary.get("open_value", 0.0)
             realized_gain = summary.get("realized_gain", 0.0)
