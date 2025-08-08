@@ -1,0 +1,130 @@
+{
+  "open_notes": [
+    {
+      "entry_amount": 0.10171308,
+      "entry_price": 172.82,
+      "entry_ts": 1754563205,
+      "entry_tick": 1754563192,
+      "window": "goat",
+      "status": "Open"
+    },
+    {
+      "entry_amount": 0.77177346,
+      "entry_price": 173.28,
+      "entry_ts": 1754564404,
+      "entry_tick": 1754564400,
+      "window": "goat",
+      "status": "Open"
+    },
+    {
+      "entry_amount": 5.86338317,
+      "entry_price": 170.55,
+      "entry_ts": 1754582405,
+      "entry_tick": 1754582401,
+      "window": "goat",
+      "status": "Open"
+    },
+    {
+      "entry_amount": 0.9351625,
+      "entry_price": 169.86,
+      "entry_ts": 1754593206,
+      "entry_tick": 1754593202,
+      "window": "goat",
+      "status": "Open"
+    },
+    {
+      "entry_amount": 1.56704738,
+      "entry_price": 173.59,
+      "entry_ts": 1754604005,
+      "entry_tick": 1754604001,
+      "window": "goat",
+      "status": "Open"
+    },
+    {
+      "entry_amount": 1.38577185,
+      "entry_price": 174.34,
+      "entry_ts": 1754614806,
+      "entry_tick": 1754614802,
+      "window": "goat",
+      "status": "Open"
+    },
+    {
+      "entry_amount": 1.03013006,
+      "entry_price": 174.76,
+      "entry_ts": 1754625604,
+      "entry_tick": 1754625601,
+      "window": "goat",
+      "status": "Open"
+    },
+    {
+      "entry_amount": 0.85449626,
+      "entry_price": 175.11,
+      "entry_ts": 1754636405,
+      "entry_tick": 1754636401,
+      "window": "goat",
+      "status": "Open"
+    }
+  ],
+  "closed_notes": [
+    {
+      "entry_amount": 2.76584949,
+      "entry_price": 164.07,
+      "entry_ts": 1754438407,
+      "entry_tick": 1754438402,
+      "window": "goat",
+      "status": "Closed",
+      "exit_price": 172.89,
+      "exit_ts": 1754563206,
+      "exit_tick": 1754563192,
+      "gain": 24.39479250179998,
+      "gain_pct": 0.05375754251234225
+    },
+    {
+      "entry_amount": 0.61071414,
+      "entry_price": 167.88,
+      "entry_ts": 1754517603,
+      "entry_tick": 1754517600,
+      "window": "goat",
+      "status": "Closed",
+      "exit_price": 170.38,
+      "exit_ts": 1754578805,
+      "exit_tick": 1754578801,
+      "gain": 1.52678535,
+      "gain_pct": 0.014891589230402668
+    },
+    {
+      "entry_amount": 4.79350592,
+      "entry_price": 167.98,
+      "entry_ts": 1754492406,
+      "entry_tick": 1754492401,
+      "window": "goat",
+      "status": "Closed",
+      "exit_price": 170.38,
+      "exit_ts": 1754578805,
+      "exit_tick": 1754578801,
+      "gain": 11.504414208000028,
+      "gain_pct": 0.014287415168472472
+    },
+    {
+      "entry_amount": 0.27157149,
+      "entry_price": 168.14,
+      "entry_ts": 1754524807,
+      "entry_tick": 1754524801,
+      "window": "goat",
+      "status": "Closed",
+      "exit_price": 170.38,
+      "exit_ts": 1754578806,
+      "exit_tick": 1754578801,
+      "gain": 0.6083201376000025,
+      "gain_pct": 0.01332223147377191
+    }
+  ],
+  "metadata": {
+    "last_buy_tick": {
+      "goat": 1754636401
+    },
+    "last_sell_tick": {
+      "goat": 1754578801
+    }
+  }
+}

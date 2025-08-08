@@ -1,0 +1,43 @@
+{
+  "open_notes": [
+    {
+      "entry_amount": 2257.64670065,
+      "entry_price": 0.2055285,
+      "entry_ts": 1754521202,
+      "entry_tick": 1754521201,
+      "window": "dog",
+      "status": "Open"
+    },
+    {
+      "entry_amount": 1579.19561397,
+      "entry_price": 0.2119982,
+      "entry_ts": 1754563200,
+      "entry_tick": 1754563192,
+      "window": "dog",
+      "status": "Open"
+    },
+    {
+      "entry_amount": 335.27001123,
+      "entry_price": 0.2144339,
+      "entry_ts": 1754568002,
+      "entry_tick": 1754568000,
+      "window": "dog",
+      "status": "Open"
+    },
+    {
+      "entry_amount": 566.21002271,
+      "entry_price": 0.2213265,
+      "entry_ts": 1754618402,
+      "entry_tick": 1754618401,
+      "window": "dog",
+      "status": "Open"
+    }
+  ],
+  "closed_notes": [],
+  "metadata": {
+    "last_buy_tick": {
+      "dog": 1754618401
+    },
+    "last_sell_tick": {}
+  }
+}
