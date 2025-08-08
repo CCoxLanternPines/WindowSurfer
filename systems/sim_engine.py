@@ -216,5 +216,14 @@ def run_simulation(
         verbose_state=verbose,
     )
 
+    capital = settings.get("simulation_capital", 0.0)
+    addlog(
+        f"[SUMMARY] Simulated Capital: ${capital:.2f} | "
+        f"Realized Gain: ${summary['realized_gain']:.2f} | "
+        f"Final Value: ${capital + summary['realized_gain']:.2f}",
+        verbose_int=0,
+        verbose_state=0,
+    )
+
     # Simulation summary logged above; no extra counters in new pipeline.
 
