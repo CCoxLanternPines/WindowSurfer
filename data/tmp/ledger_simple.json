@@ -1,0 +1,1383 @@
+{
+  "fiat_available": 0.0,
+  "open_notes": [
+    {
+      "id": 7,
+      "entry_ts": 1638871200,
+      "entry_price": 202.12,
+      "coin_amount": 0.0681237139329583,
+      "remaining": 0.0681237139329583,
+      "fills": []
+    },
+    {
+      "id": 2,
+      "entry_ts": 1638007200,
+      "entry_price": 198.0,
+      "coin_amount": 0.07499999999999998,
+      "remaining": 0.07499999999999998,
+      "fills": []
+    },
+    {
+      "id": 1,
+      "entry_ts": 1637974800,
+      "entry_price": 194.14,
+      "coin_amount": 0.051509220150406924,
+      "remaining": 0.051509220150406924,
+      "fills": []
+    },
+    {
+      "id": 8,
+      "entry_ts": 1638990000,
+      "entry_price": 193.02,
+      "coin_amount": 0.07026540039492064,
+      "remaining": 0.07026540039492064,
+      "fills": []
+    },
+    {
+      "id": 9,
+      "entry_ts": 1639033200,
+      "entry_price": 190.85,
+      "coin_amount": 0.06999836610146279,
+      "remaining": 0.06999836610146279,
+      "fills": []
+    },
+    {
+      "id": 5,
+      "entry_ts": 1638730800,
+      "entry_price": 190.2,
+      "coin_amount": 0.07461474043769717,
+      "remaining": 0.07461474043769717,
+      "fills": []
+    },
+    {
+      "id": 3,
+      "entry_ts": 1638082800,
+      "entry_price": 189.82,
+      "coin_amount": 0.07705852913286272,
+      "remaining": 0.07705852913286272,
+      "fills": []
+    },
+    {
+      "id": 4,
+      "entry_ts": 1638115200,
+      "entry_price": 187.36,
+      "coin_amount": 0.07689923809777967,
+      "remaining": 0.07689923809777967,
+      "fills": []
+    },
+    {
+      "id": 6,
+      "entry_ts": 1638774000,
+      "entry_price": 184.99,
+      "coin_amount": 0.07556542395146358,
+      "remaining": 0.07556542395146358,
+      "fills": []
+    },
+    {
+      "id": 10,
+      "entry_ts": 1639087200,
+      "entry_price": 183.35,
+      "coin_amount": 0.07176875019311268,
+      "remaining": 0.07176875019311268,
+      "fills": []
+    },
+    {
+      "id": 26,
+      "entry_ts": 1639620000,
+      "entry_price": 177.68,
+      "coin_amount": 0.05815103381377842,
+      "remaining": 0.05815103381377842,
+      "fills": []
+    },
+    {
+      "id": 11,
+      "entry_ts": 1639119600,
+      "entry_price": 176.16,
+      "coin_amount": 0.0735775337346083,
+      "remaining": 0.0735775337346083,
+      "fills": []
+    },
+    {
+      "id": 27,
+      "entry_ts": 1639782000,
+      "entry_price": 175.51,
+      "coin_amount": 0.05798696115726551,
+      "remaining": 0.05798696115726551,
+      "fills": []
+    },
+    {
+      "id": 18,
+      "entry_ts": 1639346400,
+      "entry_price": 174.13,
+      "coin_amount": 0.06696263602586594,
+      "remaining": 0.06696263602586594,
+      "fills": []
+    },
+    {
+      "id": 30,
+      "entry_ts": 1640970000,
+      "entry_price": 172.66,
+      "coin_amount": 0.07472703535113388,
+      "remaining": 0.07472703535113388,
+      "fills": []
+    },
+    {
+      "id": 14,
+      "entry_ts": 1639216800,
+      "entry_price": 171.78,
+      "coin_amount": 0.07210885859740379,
+      "remaining": 0.07210885859740379,
+      "fills": []
+    },
+    {
+      "id": 28,
+      "entry_ts": 1640052000,
+      "entry_price": 171.4,
+      "coin_amount": 0.058486768841429365,
+      "remaining": 0.058486768841429365,
+      "fills": []
+    },
+    {
+      "id": 17,
+      "entry_ts": 1639314000,
+      "entry_price": 171.32,
+      "coin_amount": 0.06909742217303466,
+      "remaining": 0.06909742217303466,
+      "fills": []
+    },
+    {
+      "id": 29,
+      "entry_ts": 1640840400,
+      "entry_price": 171.21,
+      "coin_amount": 0.07689786575339974,
+      "remaining": 0.07689786575339974,
+      "fills": []
+    },
+    {
+      "id": 12,
+      "entry_ts": 1639152000,
+      "entry_price": 171.17,
+      "coin_amount": 0.07458665109276318,
+      "remaining": 0.07458665109276318,
+      "fills": []
+    },
+    {
+      "id": 31,
+      "entry_ts": 1641358800,
+      "entry_price": 169.0,
+      "coin_amount": 0.07481847648078252,
+      "remaining": 0.07481847648078252,
+      "fills": []
+    },
+    {
+      "id": 16,
+      "entry_ts": 1639281600,
+      "entry_price": 168.41,
+      "coin_amount": 0.0713618014453143,
+      "remaining": 0.0713618014453143,
+      "fills": []
+    },
+    {
+      "id": 13,
+      "entry_ts": 1639184400,
+      "entry_price": 168.17,
+      "coin_amount": 0.07477845104082206,
+      "remaining": 0.07477845104082206,
+      "fills": []
+    },
+    {
+      "id": 15,
+      "entry_ts": 1639249200,
+      "entry_price": 167.98,
+      "coin_amount": 0.0726339852001077,
+      "remaining": 0.0726339852001077,
+      "fills": []
+    },
+    {
+      "id": 19,
+      "entry_ts": 1639382400,
+      "entry_price": 165.9,
+      "coin_amount": 0.06923026373728919,
+      "remaining": 0.06923026373728919,
+      "fills": []
+    },
+    {
+      "id": 32,
+      "entry_ts": 1641402000,
+      "entry_price": 163.56,
+      "coin_amount": 0.07576079771794571,
+      "remaining": 0.07576079771794571,
+      "fills": []
+    },
+    {
+      "id": 24,
+      "entry_ts": 1639544400,
+      "entry_price": 162.3,
+      "coin_amount": 0.06561528277114136,
+      "remaining": 0.06561528277114136,
+      "fills": []
+    },
+    {
+      "id": 25,
+      "entry_ts": 1639576800,
+      "entry_price": 160.87,
+      "coin_amount": 0.06520556963914899,
+      "remaining": 0.06520556963914899,
+      "fills": []
+    },
+    {
+      "id": 22,
+      "entry_ts": 1639479600,
+      "entry_price": 158.09,
+      "coin_amount": 0.06942991988869922,
+      "remaining": 0.06942991988869922,
+      "fills": []
+    },
+    {
+      "id": 23,
+      "entry_ts": 1639512000,
+      "entry_price": 157.97,
+      "coin_amount": 0.06844042156533767,
+      "remaining": 0.06844042156533767,
+      "fills": []
+    },
+    {
+      "id": 20,
+      "entry_ts": 1639414800,
+      "entry_price": 157.62,
+      "coin_amount": 0.07177402133425981,
+      "remaining": 0.07177402133425981,
+      "fills": []
+    },
+    {
+      "id": 21,
+      "entry_ts": 1639447200,
+      "entry_price": 154.59,
+      "coin_amount": 0.07208309673371784,
+      "remaining": 0.07208309673371784,
+      "fills": []
+    },
+    {
+      "id": 45,
+      "entry_ts": 1642017600,
+      "entry_price": 151.85,
+      "coin_amount": 0.07764489760174627,
+      "remaining": 0.07764489760174627,
+      "fills": []
+    },
+    {
+      "id": 34,
+      "entry_ts": 1641499200,
+      "entry_price": 151.68,
+      "coin_amount": 0.07845948843741568,
+      "remaining": 0.07845948843741568,
+      "fills": []
+    },
+    {
+      "id": 33,
+      "entry_ts": 1641456000,
+      "entry_price": 149.69,
+      "coin_amount": 0.08112504077261176,
+      "remaining": 0.08112504077261176,
+      "fills": []
+    },
+    {
+      "id": 47,
+      "entry_ts": 1642287600,
+      "entry_price": 147.64,
+      "coin_amount": 0.07591592929996564,
+      "remaining": 0.07591592929996564,
+      "fills": []
+    },
+    {
+      "id": 46,
+      "entry_ts": 1642147200,
+      "entry_price": 146.2,
+      "coin_amount": 0.07862939985160426,
+      "remaining": 0.07862939985160426,
+      "fills": []
+    },
+    {
+      "id": 37,
+      "entry_ts": 1641628800,
+      "entry_price": 145.73,
+      "coin_amount": 0.07686047327373742,
+      "remaining": 0.07686047327373742,
+      "fills": []
+    },
+    {
+      "id": 40,
+      "entry_ts": 1641769200,
+      "entry_price": 140.82,
+      "coin_amount": 0.07486277239796128,
+      "remaining": 0.07010832793716036,
+      "fills": [
+        {
+          "note_id": 40,
+          "amount": 0.004754444460800925,
+          "sell_price": 141.62,
+          "sell_ts": 1648904400
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "entry_ts": 1641963600,
+      "entry_price": 140.29,
+      "coin_amount": 0.08619784074252909,
+      "remaining": 0.08619784074252909,
+      "fills": []
+    },
+    {
+      "id": 48,
+      "entry_ts": 1642471200,
+      "entry_price": 140.17,
+      "coin_amount": 0.07796263185275562,
+      "remaining": 0.07796263185275562,
+      "fills": []
+    },
+    {
+      "id": 52,
+      "entry_ts": 1642698000,
+      "entry_price": 140.16,
+      "coin_amount": 0.08455069560272381,
+      "remaining": 0.08455069560272381,
+      "fills": []
+    },
+    {
+      "id": 36,
+      "entry_ts": 1641585600,
+      "entry_price": 139.72,
+      "coin_amount": 0.08180264881206839,
+      "remaining": 0.08180264881206839,
+      "fills": []
+    },
+    {
+      "id": 35,
+      "entry_ts": 1641542400,
+      "entry_price": 139.59,
+      "coin_amount": 0.08354982808269551,
+      "remaining": 0.08354982808269551,
+      "fills": []
+    },
+    {
+      "id": 41,
+      "entry_ts": 1641812400,
+      "entry_price": 139.44,
+      "coin_amount": 0.07409159564615095,
+      "remaining": 0.07409159564615095,
+      "fills": []
+    },
+    {
+      "id": 39,
+      "entry_ts": 1641715200,
+      "entry_price": 139.31,
+      "coin_amount": 0.0772185919896817,
+      "remaining": 0.0772185919896817,
+      "fills": []
+    },
+    {
+      "id": 38,
+      "entry_ts": 1641672000,
+      "entry_price": 137.64,
+      "coin_amount": 0.07975050301349987,
+      "remaining": 0.0698650350106198,
+      "fills": [
+        {
+          "note_id": 38,
+          "amount": 0.004870383234931051,
+          "sell_price": 138.94,
+          "sell_ts": 1648915200
+        },
+        {
+          "note_id": 38,
+          "amount": 0.0050150847679490155,
+          "sell_price": 139.03,
+          "sell_ts": 1648980000
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "entry_ts": 1641909600,
+      "entry_price": 136.48,
+      "coin_amount": 0.09087605643557733,
+      "remaining": 0.04597579986268484,
+      "fills": [
+        {
+          "note_id": 43,
+          "amount": 0.004754609475794922,
+          "sell_price": 137.44,
+          "sell_ts": 1648839600
+        },
+        {
+          "note_id": 43,
+          "amount": 0.00480882253778297,
+          "sell_price": 136.57,
+          "sell_ts": 1648850400
+        },
+        {
+          "note_id": 43,
+          "amount": 0.004830744334735749,
+          "sell_price": 136.63,
+          "sell_ts": 1648861200
+        },
+        {
+          "note_id": 43,
+          "amount": 0.00487786350039846,
+          "sell_price": 137.35,
+          "sell_ts": 1648893600
+        },
+        {
+          "note_id": 43,
+          "amount": 0.005042561797078167,
+          "sell_price": 136.9,
+          "sell_ts": 1648958400
+        },
+        {
+          "note_id": 43,
+          "amount": 0.0050434598980088775,
+          "sell_price": 137.56,
+          "sell_ts": 1648969200
+        },
+        {
+          "note_id": 43,
+          "amount": 0.005098468214962104,
+          "sell_price": 137.44,
+          "sell_ts": 1648990800
+        },
+        {
+          "note_id": 43,
+          "amount": 0.005170813580535048,
+          "sell_price": 137.56,
+          "sell_ts": 1649023200
+        },
+        {
+          "note_id": 43,
+          "amount": 0.005272913233596195,
+          "sell_price": 136.93,
+          "sell_ts": 1649055600
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "entry_ts": 1642525200,
+      "entry_price": 136.35,
+      "coin_amount": 0.07814317238086349,
+      "remaining": 0.07814317238086349,
+      "fills": []
+    },
+    {
+      "id": 42,
+      "entry_ts": 1641855600,
+      "entry_price": 135.86,
+      "coin_amount": 0.07452307857324672,
+      "remaining": 0.06951774625636568,
+      "fills": [
+        {
+          "note_id": 42,
+          "amount": 0.005005332316881038,
+          "sell_price": 135.87,
+          "sell_ts": 1648926000
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "entry_ts": 1642633200,
+      "entry_price": 135.25,
+      "coin_amount": 0.07488901840957879,
+      "remaining": 0.05417627451536699,
+      "fills": [
+        {
+          "note_id": 51,
+          "amount": 0.004908632243976556,
+          "sell_price": 135.81,
+          "sell_ts": 1648882800
+        },
+        {
+          "note_id": 51,
+          "amount": 0.005231416398224718,
+          "sell_price": 135.29,
+          "sell_ts": 1649012400
+        },
+        {
+          "note_id": 51,
+          "amount": 0.005267120554959425,
+          "sell_price": 135.72,
+          "sell_ts": 1649034000
+        },
+        {
+          "note_id": 51,
+          "amount": 0.005305574697051095,
+          "sell_price": 135.41,
+          "sell_ts": 1649044800
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "entry_ts": 1642579200,
+      "entry_price": 133.5,
+      "coin_amount": 0.07781611247398852,
+      "remaining": 0.05716988553976293,
+      "fills": [
+        {
+          "note_id": 50,
+          "amount": 0.004908426235364955,
+          "sell_price": 135.14,
+          "sell_ts": 1648872000
+        },
+        {
+          "note_id": 50,
+          "amount": 0.005091819074753036,
+          "sell_price": 134.23,
+          "sell_ts": 1648936800
+        },
+        {
+          "note_id": 50,
+          "amount": 0.005232851380752812,
+          "sell_price": 134.58,
+          "sell_ts": 1649001600
+        },
+        {
+          "note_id": 50,
+          "amount": 0.005413130243354783,
+          "sell_price": 134.05,
+          "sell_ts": 1649066400
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "entry_ts": 1642762800,
+      "entry_price": 122.19,
+      "coin_amount": 0.09407567502093,
+      "remaining": 0.01209549723810323,
+      "fills": [
+        {
+          "note_id": 53,
+          "amount": 0.004845835812937996,
+          "sell_price": 123.89,
+          "sell_ts": 1648656000
+        },
+        {
+          "note_id": 53,
+          "amount": 0.004932024596848505,
+          "sell_price": 123.56,
+          "sell_ts": 1648688400
+        },
+        {
+          "note_id": 53,
+          "amount": 0.004992782315075008,
+          "sell_price": 123.28,
+          "sell_ts": 1648710000
+        },
+        {
+          "note_id": 53,
+          "amount": 0.0048938904653596455,
+          "sell_price": 126.4,
+          "sell_ts": 1648720800
+        },
+        {
+          "note_id": 53,
+          "amount": 0.004971854555306834,
+          "sell_price": 125.04,
+          "sell_ts": 1648731600
+        },
+        {
+          "note_id": 53,
+          "amount": 0.005092420711252298,
+          "sell_price": 122.69,
+          "sell_ts": 1648742400
+        },
+        {
+          "note_id": 53,
+          "amount": 0.005106644783253595,
+          "sell_price": 122.96,
+          "sell_ts": 1648753200
+        },
+        {
+          "note_id": 53,
+          "amount": 0.005052058344100605,
+          "sell_price": 124.91,
+          "sell_ts": 1648764000
+        },
+        {
+          "note_id": 53,
+          "amount": 0.005065763580112206,
+          "sell_price": 126.45,
+          "sell_ts": 1648796400
+        },
+        {
+          "note_id": 53,
+          "amount": 0.005122283845709058,
+          "sell_price": 125.68,
+          "sell_ts": 1648807200
+        },
+        {
+          "note_id": 53,
+          "amount": 0.005038058533696917,
+          "sell_price": 128.42,
+          "sell_ts": 1648818000
+        },
+        {
+          "note_id": 53,
+          "amount": 0.004887420432064377,
+          "sell_price": 133.04,
+          "sell_ts": 1648828800
+        },
+        {
+          "note_id": 53,
+          "amount": 0.0051576231324231905,
+          "sell_price": 133.18,
+          "sell_ts": 1648947600
+        },
+        {
+          "note_id": 53,
+          "amount": 0.005613133156306321,
+          "sell_price": 129.92,
+          "sell_ts": 1649088000
+        },
+        {
+          "note_id": 53,
+          "amount": 0.005632960963535883,
+          "sell_price": 130.11,
+          "sell_ts": 1649098800
+        },
+        {
+          "note_id": 53,
+          "amount": 0.005575422554844311,
+          "sell_price": 132.11,
+          "sell_ts": 1649109600
+        }
+      ]
+    },
+    {
+      "id": 67,
+      "entry_ts": 1644246000,
+      "entry_price": 121.3,
+      "coin_amount": 0.08586174185211046,
+      "remaining": 0.08064020496094947,
+      "fills": [
+        {
+          "note_id": 67,
+          "amount": 0.0052215368911609945,
+          "sell_price": 121.46,
+          "sell_ts": 1648774800
+        }
+      ]
+    },
+    {
+      "id": 79,
+      "entry_ts": 1650776400,
+      "entry_price": 101.52,
+      "coin_amount": 0.10423911248117428,
+      "remaining": 0.10423911248117428,
+      "fills": []
+    },
+    {
+      "id": 65,
+      "entry_ts": 1643673600,
+      "entry_price": 100.42,
+      "coin_amount": 0.1005571952333938,
+      "remaining": 0.06293465961315273,
+      "fills": [
+        {
+          "note_id": 65,
+          "amount": 0.005113097778096102,
+          "sell_price": 103.65,
+          "sell_ts": 1648213200
+        },
+        {
+          "note_id": 65,
+          "amount": 0.005244928090823824,
+          "sell_price": 101.55,
+          "sell_ts": 1648353600
+        },
+        {
+          "note_id": 65,
+          "amount": 0.005237115349391206,
+          "sell_price": 102.21,
+          "sell_ts": 1648364400
+        },
+        {
+          "note_id": 65,
+          "amount": 0.005336395076486276,
+          "sell_price": 100.81,
+          "sell_ts": 1648375200
+        },
+        {
+          "note_id": 65,
+          "amount": 0.005263538279442786,
+          "sell_price": 103.23,
+          "sell_ts": 1648407600
+        },
+        {
+          "note_id": 65,
+          "amount": 0.0011002297172161453,
+          "sell_price": 120.12,
+          "sell_ts": 1648677600
+        },
+        {
+          "note_id": 65,
+          "amount": 0.005066159020452762,
+          "sell_price": 120.89,
+          "sell_ts": 1648699200
+        },
+        {
+          "note_id": 65,
+          "amount": 0.005261072308331956,
+          "sell_price": 121.15,
+          "sell_ts": 1648785600
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "entry_ts": 1642957200,
+      "entry_price": 98.51,
+      "coin_amount": 0.10649957918309019,
+      "remaining": 0.10111460111935629,
+      "fills": [
+        {
+          "note_id": 56,
+          "amount": 0.005384978063733907,
+          "sell_price": 100.4,
+          "sell_ts": 1648386000
+        }
+      ]
+    },
+    {
+      "id": 80,
+      "entry_ts": 1651068000,
+      "entry_price": 97.6,
+      "coin_amount": 0.10563629286787507,
+      "remaining": 0.10563629286787507,
+      "fills": []
+    },
+    {
+      "id": 66,
+      "entry_ts": 1643911200,
+      "entry_price": 97.52,
+      "coin_amount": 0.11183131489914275,
+      "remaining": 0.11183131489914275,
+      "fills": []
+    },
+    {
+      "id": 68,
+      "entry_ts": 1644710400,
+      "entry_price": 96.88,
+      "coin_amount": 0.11407414635243203,
+      "remaining": 0.11407414635243203,
+      "fills": []
+    },
+    {
+      "id": 81,
+      "entry_ts": 1651240800,
+      "entry_price": 96.22,
+      "coin_amount": 0.10572265802105464,
+      "remaining": 0.10572265802105464,
+      "fills": []
+    },
+    {
+      "id": 69,
+      "entry_ts": 1644861600,
+      "entry_price": 95.03,
+      "coin_amount": 0.11048014451954578,
+      "remaining": 0.11048014451954578,
+      "fills": []
+    },
+    {
+      "id": 72,
+      "entry_ts": 1645423200,
+      "entry_price": 94.72,
+      "coin_amount": 0.11284225124697406,
+      "remaining": 0.11284225124697406,
+      "fills": []
+    },
+    {
+      "id": 55,
+      "entry_ts": 1642892400,
+      "entry_price": 94.54,
+      "coin_amount": 0.11440391287303486,
+      "remaining": 0.11440391287303486,
+      "fills": []
+    },
+    {
+      "id": 59,
+      "entry_ts": 1643176800,
+      "entry_price": 94.11,
+      "coin_amount": 0.11808915334586599,
+      "remaining": 0.11808915334586599,
+      "fills": []
+    },
+    {
+      "id": 70,
+      "entry_ts": 1645131600,
+      "entry_price": 94.1,
+      "coin_amount": 0.1165927725792624,
+      "remaining": 0.1165927725792624,
+      "fills": []
+    },
+    {
+      "id": 63,
+      "entry_ts": 1643500800,
+      "entry_price": 93.55,
+      "coin_amount": 0.11712432756242724,
+      "remaining": 0.11712432756242724,
+      "fills": []
+    },
+    {
+      "id": 62,
+      "entry_ts": 1643414400,
+      "entry_price": 92.78,
+      "coin_amount": 0.12301704798386266,
+      "remaining": 0.12301704798386266,
+      "fills": []
+    },
+    {
+      "id": 58,
+      "entry_ts": 1643101200,
+      "entry_price": 92.46,
+      "coin_amount": 0.12455597907488293,
+      "remaining": 0.12455597907488293,
+      "fills": []
+    },
+    {
+      "id": 61,
+      "entry_ts": 1643328000,
+      "entry_price": 91.24,
+      "coin_amount": 0.11342665699697582,
+      "remaining": 0.11342665699697582,
+      "fills": []
+    },
+    {
+      "id": 64,
+      "entry_ts": 1643587200,
+      "entry_price": 90.71,
+      "coin_amount": 0.11595966938293974,
+      "remaining": 0.11595966938293974,
+      "fills": []
+    },
+    {
+      "id": 71,
+      "entry_ts": 1645272000,
+      "entry_price": 89.49,
+      "coin_amount": 0.11585600631606459,
+      "remaining": 0.11585600631606459,
+      "fills": []
+    },
+    {
+      "id": 82,
+      "entry_ts": 1651435200,
+      "entry_price": 89.14,
+      "coin_amount": 0.11811393706757221,
+      "remaining": 0.11811393706757221,
+      "fills": []
+    },
+    {
+      "id": 74,
+      "entry_ts": 1645725600,
+      "entry_price": 86.91,
+      "coin_amount": 0.11772304713707743,
+      "remaining": 0.11772304713707743,
+      "fills": []
+    },
+    {
+      "id": 60,
+      "entry_ts": 1643252400,
+      "entry_price": 86.75,
+      "coin_amount": 0.12362423358652641,
+      "remaining": 0.12362423358652641,
+      "fills": []
+    },
+    {
+      "id": 83,
+      "entry_ts": 1651640400,
+      "entry_price": 85.96,
+      "coin_amount": 0.11765214705484232,
+      "remaining": 0.11765214705484232,
+      "fills": []
+    },
+    {
+      "id": 78,
+      "entry_ts": 1647457200,
+      "entry_price": 85.81,
+      "coin_amount": 0.1221649481744603,
+      "remaining": 0.1221649481744603,
+      "fills": []
+    },
+    {
+      "id": 75,
+      "entry_ts": 1646658000,
+      "entry_price": 85.56,
+      "coin_amount": 0.12040839379408573,
+      "remaining": 0.12040839379408573,
+      "fills": []
+    },
+    {
+      "id": 73,
+      "entry_ts": 1645563600,
+      "entry_price": 85.29,
+      "coin_amount": 0.1177994249715861,
+      "remaining": 0.1177994249715861,
+      "fills": []
+    },
+    {
+      "id": 76,
+      "entry_ts": 1646949600,
+      "entry_price": 83.41,
+      "coin_amount": 0.12307096041383925,
+      "remaining": 0.12307096041383925,
+      "fills": []
+    },
+    {
+      "id": 57,
+      "entry_ts": 1643025600,
+      "entry_price": 81.89,
+      "coin_amount": 0.124270794223549,
+      "remaining": 0.124270794223549,
+      "fills": []
+    },
+    {
+      "id": 84,
+      "entry_ts": 1651878000,
+      "entry_price": 81.68,
+      "coin_amount": 0.12384965690799458,
+      "remaining": 0.12384965690799458,
+      "fills": []
+    },
+    {
+      "id": 77,
+      "entry_ts": 1647252000,
+      "entry_price": 81.58,
+      "coin_amount": 0.12415392854470153,
+      "remaining": 0.12415392854470153,
+      "fills": []
+    },
+    {
+      "id": 85,
+      "entry_ts": 1652137200,
+      "entry_price": 62.16,
+      "coin_amount": 0.16646177199373544,
+      "remaining": 0.16646177199373544,
+      "fills": []
+    },
+    {
+      "id": 86,
+      "entry_ts": 1652439600,
+      "entry_price": 53.18,
+      "coin_amount": 0.19262487983563903,
+      "remaining": 0.19262487983563903,
+      "fills": []
+    },
+    {
+      "id": 87,
+      "entry_ts": 1653012000,
+      "entry_price": 52.41,
+      "coin_amount": 0.1941156682040563,
+      "remaining": 0.1941156682040563,
+      "fills": []
+    },
+    {
+      "id": 89,
+      "entry_ts": 1654074000,
+      "entry_price": 45.24,
+      "coin_amount": 0.2248108627584213,
+      "remaining": 0.1965871138043471,
+      "fills": [
+        {
+          "note_id": 89,
+          "amount": 0.001698444539083731,
+          "sell_price": 45.34,
+          "sell_ts": 1658224800
+        },
+        {
+          "note_id": 89,
+          "amount": 0.001646649208065248,
+          "sell_price": 47.0,
+          "sell_ts": 1658235600
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0016726768890959567,
+          "sell_price": 46.5,
+          "sell_ts": 1658246400
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0017210121690813913,
+          "sell_price": 45.42,
+          "sell_ts": 1658257200
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0017353482346647929,
+          "sell_price": 45.27,
+          "sell_ts": 1658268000
+        },
+        {
+          "note_id": 89,
+          "amount": 0.001751197764499504,
+          "sell_price": 45.31,
+          "sell_ts": 1658289600
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0017710988306261877,
+          "sell_price": 45.25,
+          "sell_ts": 1658311200
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0017584485347121954,
+          "sell_price": 46.96,
+          "sell_ts": 1660384800
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0017889550960559417,
+          "sell_price": 46.39,
+          "sell_ts": 1660395600
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0018056846728851548,
+          "sell_price": 46.19,
+          "sell_ts": 1660406400
+        },
+        {
+          "note_id": 89,
+          "amount": 0.001810401682845964,
+          "sell_price": 46.3,
+          "sell_ts": 1660417200
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0018112385703149213,
+          "sell_price": 46.51,
+          "sell_ts": 1660428000
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0018125007372056029,
+          "sell_price": 46.71,
+          "sell_ts": 1660438800
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0018130240567238035,
+          "sell_price": 46.93,
+          "sell_ts": 1660449600
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0017911739647456706,
+          "sell_price": 47.74,
+          "sell_ts": 1660460400
+        },
+        {
+          "note_id": 89,
+          "amount": 0.0018358940034681286,
+          "sell_price": 46.81,
+          "sell_ts": 1660471200
+        }
+      ]
+    },
+    {
+      "id": 88,
+      "entry_ts": 1653573600,
+      "entry_price": 45.12,
+      "coin_amount": 0.22740625133194245,
+      "remaining": 0.22740625133194245,
+      "fills": []
+    },
+    {
+      "id": 90,
+      "entry_ts": 1654711200,
+      "entry_price": 38.96,
+      "coin_amount": 0.26075828897560704,
+      "remaining": 0.22961495369062163,
+      "fills": [
+        {
+          "note_id": 90,
+          "amount": 0.0017643143465891165,
+          "sell_price": 41.94,
+          "sell_ts": 1658138400
+        },
+        {
+          "note_id": 90,
+          "amount": 0.0017756762276606322,
+          "sell_price": 41.88,
+          "sell_ts": 1658149200
+        },
+        {
+          "note_id": 90,
+          "amount": 0.0017824265923324452,
+          "sell_price": 41.93,
+          "sell_ts": 1658160000
+        },
+        {
+          "note_id": 90,
+          "amount": 0.0018758949238656822,
+          "sell_price": 40.04,
+          "sell_ts": 1658170800
+        },
+        {
+          "note_id": 90,
+          "amount": 0.0018406824412421318,
+          "sell_price": 41.01,
+          "sell_ts": 1658181600
+        },
+        {
+          "note_id": 90,
+          "amount": 0.001755700505668052,
+          "sell_price": 43.21,
+          "sell_ts": 1658192400
+        },
+        {
+          "note_id": 90,
+          "amount": 0.0017616251835528211,
+          "sell_price": 43.28,
+          "sell_ts": 1658203200
+        },
+        {
+          "note_id": 90,
+          "amount": 0.00176228964199372,
+          "sell_price": 43.48,
+          "sell_ts": 1658214000
+        },
+        {
+          "note_id": 90,
+          "amount": 0.001762715129631426,
+          "sell_price": 44.79,
+          "sell_ts": 1658278800
+        },
+        {
+          "note_id": 90,
+          "amount": 0.001795620458523303,
+          "sell_price": 44.41,
+          "sell_ts": 1658300400
+        },
+        {
+          "note_id": 90,
+          "amount": 0.0017854784570220392,
+          "sell_price": 45.11,
+          "sell_ts": 1658322000
+        },
+        {
+          "note_id": 90,
+          "amount": 0.0018447048282189036,
+          "sell_price": 43.88,
+          "sell_ts": 1658332800
+        },
+        {
+          "note_id": 90,
+          "amount": 0.0018826747535653026,
+          "sell_price": 43.21,
+          "sell_ts": 1658343600
+        },
+        {
+          "note_id": 90,
+          "amount": 0.00192687079854029,
+          "sell_price": 42.43,
+          "sell_ts": 1658354400
+        },
+        {
+          "note_id": 90,
+          "amount": 0.0019827681858584664,
+          "sell_price": 41.44,
+          "sell_ts": 1658365200
+        },
+        {
+          "note_id": 90,
+          "amount": 0.0019188600154155706,
+          "sell_price": 45.01,
+          "sell_ts": 1660492800
+        },
+        {
+          "note_id": 90,
+          "amount": 0.00192503279530548,
+          "sell_price": 45.09,
+          "sell_ts": 1660503600
+        }
+      ]
+    },
+    {
+      "id": 91,
+      "entry_ts": 1655748000,
+      "entry_price": 34.52,
+      "coin_amount": 0.29181099931700755,
+      "remaining": 0.2897416777780632,
+      "fills": [
+        {
+          "note_id": 91,
+          "amount": 0.0010656442913978123,
+          "sell_price": 34.9,
+          "sell_ts": 1667649600
+        },
+        {
+          "note_id": 91,
+          "amount": 0.0010036772475465242,
+          "sell_price": 37.24,
+          "sell_ts": 1667660400
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "entry_ts": 1662224400,
+      "entry_price": 31.16,
+      "coin_amount": 0.3211985982942367,
+      "remaining": 0.3211985982942367,
+      "fills": []
+    },
+    {
+      "id": 93,
+      "entry_ts": 1668776400,
+      "entry_price": 13.58,
+      "coin_amount": 0.5532227599723966,
+      "remaining": 0.5532227599723966,
+      "fills": []
+    }
+  ],
+  "closed_notes": [
+    {
+      "id": 54,
+      "entry_ts": 1642827600,
+      "entry_price": 104.29,
+      "coin_amount": 0.1069158455161877,
+      "remaining": 0.0,
+      "fills": [
+        {
+          "note_id": 54,
+          "amount": 0.00517849058198021,
+          "sell_price": 105.45,
+          "sell_ts": 1648418400
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005173962393034433,
+          "sell_price": 106.07,
+          "sell_ts": 1648429200
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005064238380169939,
+          "sell_price": 108.91,
+          "sell_ts": 1648450800
+        },
+        {
+          "note_id": 54,
+          "amount": 0.0050304377256940695,
+          "sell_price": 110.19,
+          "sell_ts": 1648461600
+        },
+        {
+          "note_id": 54,
+          "amount": 0.00497833291026989,
+          "sell_price": 111.9,
+          "sell_ts": 1648472400
+        },
+        {
+          "note_id": 54,
+          "amount": 0.0050583739602683125,
+          "sell_price": 110.68,
+          "sell_ts": 1648483200
+        },
+        {
+          "note_id": 54,
+          "amount": 0.0050517160537987904,
+          "sell_price": 111.38,
+          "sell_ts": 1648494000
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005163197906706262,
+          "sell_price": 109.52,
+          "sell_ts": 1648504800
+        },
+        {
+          "note_id": 54,
+          "amount": 0.0051800273622840416,
+          "sell_price": 109.71,
+          "sell_ts": 1648515600
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005135248210085984,
+          "sell_price": 111.22,
+          "sell_ts": 1648526400
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005221961585292867,
+          "sell_price": 109.92,
+          "sell_ts": 1648537200
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005178348362142449,
+          "sell_price": 111.4,
+          "sell_ts": 1648548000
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005081980606419901,
+          "sell_price": 114.08,
+          "sell_ts": 1648558800
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005115012811151647,
+          "sell_price": 113.91,
+          "sell_ts": 1648580400
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005285353956718796,
+          "sell_price": 110.79,
+          "sell_ts": 1648591200
+        },
+        {
+          "note_id": 54,
+          "amount": 0.00533925046896389,
+          "sell_price": 110.22,
+          "sell_ts": 1648612800
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005265153099106613,
+          "sell_price": 112.33,
+          "sell_ts": 1648623600
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005323229633358044,
+          "sell_price": 111.66,
+          "sell_ts": 1648634400
+        },
+        {
+          "note_id": 54,
+          "amount": 0.005163933090984292,
+          "sell_price": 115.68,
+          "sell_ts": 1648645200
+        },
+        {
+          "note_id": 54,
+          "amount": 0.004979798216071416,
+          "sell_price": 121.16,
+          "sell_ts": 1648666800
+        },
+        {
+          "note_id": 54,
+          "amount": 0.003947798201685859,
+          "sell_price": 120.12,
+          "sell_ts": 1648677600
+        }
+      ]
+    }
+  ]
+}
