@@ -10,7 +10,6 @@ from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.utils.config import load_ledgers, resolve_ledger_cfg
 from systems.utils.pairs import resolve_by_tag, raw_path
-from systems.utils.time import parse_cutoff
     
 # ts, open, high, low, close
 Candle = Tuple[int, float, float, float, float]
@@ -91,30 +90,32 @@ def run(tag: str, base: str) -> None:
         f"weights(div={W_DIVERGENCE:.2f}, wick={W_WICK:.2f}, depth={W_DEPTH:.2f})"
     )
 
-    ODDS_LOOKBACK = snapback_lookback
-
     sim = (cfg.get("sim_settings") or {})
     fiat_start = float(sim.get("fiat_start", 0.0))
-    min_order_usd = float(sim.get("min_order_usd", 0.0))
-    allow_partial = bool(sim.get("allow_partial_buys", True))
 
     candles = load_candles(tag)
-    
+    if len(candles) < 2:
+        print("Not enough data to simulate.")
+        return
 
-
-    window_str = str(cfg.get("window_size", "3d"))
-    window_td = parse_cutoff(window_str)
-
-    # get candle interval from first two candles (ms → seconds if needed)
     dt = candles[1][0] - candles[0][0]
     candle_seconds = int(dt / 1000) if dt > 10_000 else int(dt)
 
-    WINDOW = max(1, int(window_td.total_seconds() // candle_seconds))
+    win_str = str(cfg.get("window_size", "3d")).strip().lower()
+    unit_map = {"m": 60, "h": 3600, "d": 86400, "w": 604800}
+    try:
+        win_secs = int(win_str[:-1]) * unit_map[win_str[-1]]
+    except Exception:
+        win_secs = 3 * 86400  # safe fallback: 3d
+    WINDOW = max(1, win_secs // max(1, candle_seconds))
+
     STEP = int(cfg.get("skip_candles", skip_candles))
 
-    print(f"[SIM] window_size={window_str} → WINDOW={WINDOW} | STEP={STEP}")
+    BASE_UNIT = investment_size
+    ODDS_LOOKBACK = snapback_lookback
 
-    
+    print(f"[SIM] window_size={win_str} → WINDOW={WINDOW} | STEP={STEP}")
+
     if len(candles) < WINDOW:
         print("Not enough data to simulate.")
         return
@@ -125,10 +126,12 @@ def run(tag: str, base: str) -> None:
     ledger = LedgerManager(
         base,
         fiat_start=fiat_start,
-        min_order_usd=min_order_usd,
-        allow_partial_buys=allow_partial,
     )
 
+    # --- Min order handling (bucket USD) ---
+    MIN_ORDER_USD = float(sim.get("min_order_usd", 0.0))
+    ALLOW_PARTIAL = bool(sim.get("allow_partial_buys", True))
+    buy_bucket_usd = 0.0
 
     for i in range(WINDOW, len(candles), STEP):
         window = candles[i - WINDOW : i]
@@ -191,14 +194,6 @@ def run(tag: str, base: str) -> None:
         raw = (W_DIVERGENCE * divergence) + (W_WICK * wick_balance) + (W_DEPTH * depth)
         snapback_up = clip(0.5 + 0.5 * raw, 0.0, 1.0)
 
-        # Directional ramps (your request):
-        # SellVar: 0.5 -> 0, 0.3 -> 1
-        sell_var = (0.5 - snapback_up) / 0.2
-        sell_var = clip(sell_var, 0.0, 1.0)
-        # BuyVar: 0.5 -> 0, 0.7 -> 1
-        buy_var = (snapback_up - 0.5) / 0.2
-        buy_var = clip(buy_var, 0.0, 1.0)
-
         # EMA smoothing for TopBottom
         if i == WINDOW:
             topbottom_smooth = topbottom_filt
@@ -206,7 +201,6 @@ def run(tag: str, base: str) -> None:
             topbottom_smooth = (1 - SMOOTH_EMA) * prev_tb + SMOOTH_EMA * topbottom_filt if SMOOTH_EMA > 0 else topbottom_filt
         prev_tb = topbottom_smooth
 
-        # Directional ramps (your request):
         # SellVar: 0.5 -> 0, 0.3 -> 1
         sell_var = (0.5 - snapback_up) / 0.2
         sell_var = clip(sell_var, 0.0, 1.0)
@@ -214,7 +208,6 @@ def run(tag: str, base: str) -> None:
         buy_var = (snapback_up - 0.5) / 0.2
         buy_var = clip(buy_var, 0.0, 1.0)
 
-        # keep your existing sell_var / buy_var block here
 
         # 75/25 weighting: TopBottom dominates, Var tops it off
         should_sell = 0.75 * topbottom_smooth + 0.25 * sell_var
@@ -285,12 +278,25 @@ def run(tag: str, base: str) -> None:
         action = None
         if sell_amt > 0:
             if capped_sell > 0:
-                ledger.sell(capped_sell, ctx["price"], ctx["ts"], allow_loss=allow_loss)
+                ledger.sell(capped_sell, price, ts, allow_loss=allow_loss)
                 action = f"SELLx{capped_sell:.2f}"
-            # else: skip silently; keep logs clean
         elif buy_amt > 0:
-            ledger.buy(buy_amt, ctx["price"], ctx["ts"])
-            action = f"BUYx{buy_amt:.2f}"
+            buy_usd = buy_amt * price
+            if MIN_ORDER_USD <= 0:
+                ledger.buy(buy_amt, price, ts)
+                action = f"BUYx{buy_amt:.2f}"
+            else:
+                if not ALLOW_PARTIAL:
+                    if buy_usd >= MIN_ORDER_USD:
+                        ledger.buy(buy_amt, price, ts)
+                        action = f"BUYx{buy_amt:.2f}"
+                else:
+                    buy_bucket_usd += buy_usd
+                    if buy_bucket_usd >= MIN_ORDER_USD:
+                        agg_coin = buy_bucket_usd / price
+                        ledger.buy(agg_coin, price, ts)
+                        action = f"BUYx{agg_coin:.2f}"
+                        buy_bucket_usd = 0.0
 
         # Single clean print
         suffix = ""
