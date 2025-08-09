@@ -1,72 +1,9 @@
 {
-  "ledger_settings": {
-    "Kris_Ledger": {
-      "tag": "DOGEUSD",
-      "wallet_code": "XXDG",
-      "kraken_name": "DOGE/USD",
-      "kraken_pair": "XXDGZUSD",
-      "binance_name": "DOGEUSDT",
-      "window_settings": {
-        "dog": {
-          "window_size": "3d",
-          "buy_cooldown": 11,
-          "sell_cooldown": 5,
-          "investment_fraction": 0.02,
-          "maturity_multiplier": 0.853105598271046,
-          "buy_multiplier_scale": 3.429,
-          "buy_cooldown_multiplier_scale": 0.902421258277746,
-          "sell_cooldown_multiplier_scale": 1.56339541767712,
-          "dead_zone_pct": 0.0225026538433316,
-          "max_open_notes": 71
-        }
-      }
-    },
-    "Travis_Ledger": {
-      "tag": "SOLUSDC",
-      "wallet_code": "SOL.F",
-      "kraken_name": "SOL/USDC",
-      "kraken_pair": "SOLUSDC",
-      "binance_name": "SOLUSDC",
-      "window_settings": {
-        "bunny": {
-          "window_size": "7d",
-          "buy_cooldown": 3,
-          "sell_cooldown": 0,
-          "investment_fraction": 0.07,
-          "maturity_multiplier": 4.66765213004084,
-          "buy_multiplier_scale": 4.60,
-          "buy_cooldown_multiplier_scale": 1.95196594757427,
-          "sell_cooldown_multiplier_scale": 1.78927890073705,
-          "dead_zone_pct": 0.010929080263379,
-          "max_open_notes": 93
-        }
-      }
-    },
-    "Goat Ledger": {
-      "tag": "SOLUSD",
-      "wallet_code": "SOL.F",
-      "kraken_name": "SOL/USD",
-      "kraken_pair": "SOLUSD",
-      "binance_name": "SOLUSD",
-      "window_settings": {
-        "goat": {
-          "window_size": "7d",
-          "buy_cooldown": 3,
-          "sell_cooldown": 0,
-          "investment_fraction": 0.08,
-          "maturity_multiplier": 4.66765213004084,
-          "buy_multiplier_scale": 4.60,
-          "buy_cooldown_multiplier_scale": 1.95196594757427,
-          "sell_cooldown_multiplier_scale": 1.78927890073705,
-          "dead_zone_pct": 0.010929080263379,
-          "max_open_notes": 93
-        }
-      }
-    }
-  },
-  "general_settings": {
-    "max_note_usdt": 1000.0,
-    "minimum_note_size": 10
-  },
-  "simulation_capital": 1000
+  "simulation_capital": 1000,
+  "phase0_settings": {
+    "tag": "DOGEUSD",
+    "buy_interval": 5,
+    "buy_fraction": 0.01,
+    "maturity_gain": 0.02
+  }
 }

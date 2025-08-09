@@ -1,150 +1,36 @@
+"""In-memory ledger for Phase 0 simulation."""
+
 from __future__ import annotations
 
-"""Simple in-memory ledger for simulations and live trading."""
-
-import json
-from typing import Dict, List
-
-from systems.utils.config import resolve_path
+from typing import List, Dict
 
 
 class Ledger:
-    """Track raw trade state and compute summary metrics on demand."""
+    """Tracks open and closed notes."""
 
-    def __init__(self) -> None:
-        self.open_notes: List[Dict] = []
-        self.closed_notes: List[Dict] = []
-        self.metadata: Dict = {}
+    def __init__(self, maturity_gain: float) -> None:
+        self.maturity_gain = maturity_gain
+        self.open_notes: List[Dict[str, float]] = []
+        self.closed_notes: List[Dict[str, float]] = []
 
-    # Basic note management -------------------------------------------------
-    def open_note(self, note: Dict) -> None:
-        """Register a newly opened note."""
-        self.open_notes.append(note)
-
-    def close_note(self, note: Dict) -> None:
-        """Move ``note`` from open to closed."""
-        if note not in self.open_notes:
-            return
-        self.open_notes.remove(note)
-        self.closed_notes.append(note)
-
-    def set_metadata(self, metadata: Dict) -> None:
-        self.metadata = metadata
-
-    def get_metadata(self) -> Dict:
-        return dict(self.metadata)
-
-    # Accessors -------------------------------------------------------------
-    def get_open_notes(self) -> List[Dict]:
-        return list(self.open_notes)
-
-    def get_active_notes(self) -> List[Dict]:
-        return self.get_open_notes()
-
-    def get_closed_notes(self) -> List[Dict]:
-        return list(self.closed_notes)
-
-    def get_total_liquid_value(self, final_price: float) -> float:
-        """Return all value assuming open notes liquidate at ``final_price``."""
-        open_value = sum(
-            n.get("entry_amount", 0) for n in self.get_open_notes()
-        ) * final_price
-        realised = sum(
-            n.get("entry_amount", 0)
-            * (n.get("exit_price", 0) - n.get("entry_price", 0))
-            for n in self.get_closed_notes()
+    def buy(self, price: float, amount: float, step: int) -> None:
+        self.open_notes.append(
+            {"entry_price": price, "amount": amount, "entry_step": step}
         )
-        return open_value + realised
 
-    # Summary ---------------------------------------------------------------
-    def get_account_summary(self, final_price: float) -> dict:
-        open_amount = sum(n.get("entry_amount", 0) for n in self.get_open_notes())
-        open_value = open_amount * final_price
-        realised = sum(
-            n.get("entry_amount", 0)
-            * (n.get("exit_price", 0) - n.get("entry_price", 0))
-            for n in self.get_closed_notes()
-        )
-        total_value = open_value + realised
-
-        return {
-            "final_price": round(final_price, 8),
-            "open_coin_amount": round(open_amount, 8),
-            "open_value": round(open_value, 2),
-            "realized_gain": round(realised, 2),
-            "total_value": round(total_value, 2),
-            "closed_notes": len(self.get_closed_notes()),
-            "open_notes": len(self.get_open_notes()),
-        }
-
-    # Persistence -----------------------------------------------------------
-    @staticmethod
-    def load_ledger(tag: str, *, sim: bool = False) -> "Ledger":
-        """Load a ledger for ``tag`` depending on mode."""
-        root = resolve_path("")
-        ledger = Ledger()
-
-        if sim:
-            path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
-            if path.exists():
-                with path.open("r", encoding="utf-8") as f:
-                    data = json.load(f)
-                ledger.open_notes = data.get("open_notes", [])
-                ledger.closed_notes = data.get("closed_notes", [])
-                ledger.metadata = data.get("metadata", {})
-            return ledger
-
-        path = root / "data" / "ledgers" / f"{tag}.json"
-        if path.exists():
-            with path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-            ledger.open_notes = data.get("open_notes", [])
-            ledger.closed_notes = data.get("closed_notes", [])
-            ledger.metadata = data.get("metadata", {})
-        return ledger
-
-
-def save_ledger(
-    ledger_name: str,
-    ledger: "Ledger" | dict,
-    *,
-    sim: bool = False,
-    final_tick: int | None = None,
-    summary: dict | None = None,
-) -> None:
-    """Persist ``ledger`` data to the canonical ledger directory."""
-
-    root = resolve_path("")
-
-    if sim:
-        out_dir = root / "data" / "tmp" / "simulation"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{ledger_name}.json"
-    else:
-        out_dir = root / "data" / "ledgers"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{ledger_name}.json"
-
-    if isinstance(ledger, Ledger):
-        ledger_data = {
-            "open_notes": ledger.get_open_notes(),
-            "closed_notes": ledger.get_closed_notes(),
-        }
-
-        if final_tick is not None:
-            ledger_data["final_tick"] = final_tick
-
-        if summary:
-            ledger_data["closed_notes_count"] = summary.get("closed_notes")
-            ledger_data["open_notes_count"] = summary.get("open_notes")
-            ledger_data["realized_gain"] = summary.get("realized_gain")
-            ledger_data["final_value"] = summary.get("total_value")
-
-        metadata = ledger.get_metadata()
-        if metadata:
-            ledger_data["metadata"] = metadata
-    else:
-        ledger_data = ledger
-
-    with out_path.open("w", encoding="utf-8") as f:
-        json.dump(ledger_data, f, indent=2)
+    def check_sells(self, current_price: float, step: int) -> float:
+        """Check open notes for maturity and sell."""
+        still_open: List[Dict[str, float]] = []
+        proceeds = 0.0
+        for note in self.open_notes:
+            gain = (current_price - note["entry_price"]) / note["entry_price"]
+            if gain >= self.maturity_gain:
+                note.update(
+                    {"exit_price": current_price, "exit_step": step, "gain": gain}
+                )
+                self.closed_notes.append(note)
+                proceeds += note["amount"] * current_price
+            else:
+                still_open.append(note)
+        self.open_notes = still_open
+        return proceeds
