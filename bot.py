@@ -10,7 +10,7 @@ from typing import List
 import pandas as pd
 
 from systems.block_planner import parse_duration, plan_blocks
-from systems.data_loader import load_candles
+from systems.data_loader import load_or_fetch
 
 
 logger = logging.getLogger("bot")
@@ -23,6 +23,9 @@ def main(argv: List[str] | None = None) -> None:
     parser.add_argument("--train", required=True, help="Training window (e.g. 3m)")
     parser.add_argument("--test", required=True, help="Testing window (e.g. 1m)")
     parser.add_argument("--step", required=True, help="Step size between blocks")
+    parser.add_argument("--fetch-all", action="store_true", help="Fetch full history from Binance")
+    parser.add_argument("--start", help="Range start for Kraken fetch")
+    parser.add_argument("--end", help="Range end for Kraken fetch")
     parser.add_argument("-v", action="count", default=0, dest="verbosity")
     args = parser.parse_args(argv)
 
@@ -32,7 +35,13 @@ def main(argv: List[str] | None = None) -> None:
         logger.error("Unsupported mode: %s", args.mode)
         return
 
-    df = load_candles(args.tag)
+    df = load_or_fetch(args.tag, fetch_all=args.fetch_all, start=args.start, end=args.end)
+    if df.empty:
+        logger.warning("No candles loaded")
+        return
+    first = pd.to_datetime(df.loc[0, "timestamp"], unit="s", utc=True)
+    last = pd.to_datetime(df.loc[len(df) - 1, "timestamp"], unit="s", utc=True)
+    logger.info("Loaded %d candles from %s to %s", len(df), first, last)
 
     train_len = parse_duration(args.train)
     test_len = parse_duration(args.test)

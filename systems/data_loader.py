@@ -1,55 +1,133 @@
 from __future__ import annotations
 
+import json
+import logging
 from pathlib import Path
 from typing import Optional
 
+import ccxt
 import pandas as pd
 
 
-CACHE_DIR = Path("data/raw")
+logger = logging.getLogger(__name__)
+
+CACHE_DIR = Path("data/historical")
 
 
-def load_candles(tag: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
-    """Load cached 1h candles for *tag*.
+def _load_settings() -> dict:
+    path = Path("settings.json")
+    if path.exists():
+        with path.open() as fh:
+            return json.load(fh)
+    return {}
 
-    Parameters
-    ----------
-    tag : str
-        Symbol or asset identifier. A CSV named ``<tag>.csv`` is expected
-        in the cache directory.
-    start_date, end_date : str | None, optional
-        ISO8601 timestamp strings (any ``pandas.Timestamp`` compatible format).
-        When provided, the resulting frame is filtered to the inclusive
-        range ``[start_date, end_date]``.
 
-    Returns
-    -------
-    pd.DataFrame
-        Dataframe with columns ``timestamp, open, high, low, close, volume``
-        sorted in ascending timestamp order with duplicate timestamps removed.
+def _resolve_symbol(tag: str, exchange: str) -> str:
+    settings = _load_settings()
+    return settings.get(tag, {}).get(f"{exchange}_name", tag)
+
+
+def clean_candles(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean and standardize candle DataFrame.
+
+    Ensures ascending order, unique timestamps and exactly 1h spacing.
+    Missing candles are forward filled with NaNs.
     """
+    if df.empty:
+        return df
 
-    path = CACHE_DIR / f"{tag}.csv"
-    if not path.exists():
-        raise FileNotFoundError(f"No cached data for tag '{tag}' at {path}")
+    # sort and deduplicate
+    df = df.sort_values("timestamp").drop_duplicates("timestamp", keep="last")
 
-    df = pd.read_csv(path, usecols=["timestamp", "open", "high", "low", "close", "volume"])
+    # convert timestamp to UTC datetime
+    unit = "ms" if df["timestamp"].max() > 10**10 else "s"
+    df["timestamp"] = pd.to_datetime(df["timestamp"], unit=unit, utc=True)
 
-    # Sort and deduplicate timestamps
-    df = df.sort_values("timestamp").drop_duplicates("timestamp", keep="last").reset_index(drop=True)
+    # create continuous 1h range and reindex
+    full_range = pd.date_range(df["timestamp"].min(), df["timestamp"].max(), freq="1H")
+    df = df.set_index("timestamp").reindex(full_range)
+    df.index.name = "timestamp"
+    df = df.reset_index()
 
-    # Ensure strictly 1h interval candles
-    if not df.empty:
-        gaps = df["timestamp"].diff().dropna()
-        if not (gaps == 3600).all():
-            raise ValueError("Non 1h candle intervals detected in cached data")
+    # verify spacing
+    diffs = df["timestamp"].diff().dropna()
+    if not (diffs == pd.Timedelta(hours=1)).all():
+        raise ValueError("Non 1h candle intervals detected after cleaning")
 
-    # Optional time filtering
-    if start_date is not None:
-        start_ts = int(pd.Timestamp(start_date, tz="UTC").timestamp())
-        df = df[df["timestamp"] >= start_ts]
-    if end_date is not None:
-        end_ts = int(pd.Timestamp(end_date, tz="UTC").timestamp())
-        df = df[df["timestamp"] <= end_ts]
+    # convert back to seconds
+    df["timestamp"] = (df["timestamp"].view("int64") // 10**9).astype(int)
+    return df[["timestamp", "open", "high", "low", "close", "volume"]]
 
-    return df.reset_index(drop=True)
+
+def fetch_all_history_binance(symbol: str) -> pd.DataFrame:
+    """Fetch complete 1h history for ``symbol`` from Binance."""
+    exchange = ccxt.binance()
+    timeframe = "1h"
+    limit = 1000
+    since = 0
+    all_ohlcv = []
+
+    while True:
+        ohlcv = exchange.fetch_ohlcv(symbol, timeframe=timeframe, since=since, limit=limit)
+        if not ohlcv:
+            break
+        all_ohlcv.extend(ohlcv)
+        since = ohlcv[-1][0] + 3600 * 1000
+        if len(ohlcv) < limit:
+            break
+
+    df = pd.DataFrame(all_ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
+    return clean_candles(df)
+
+
+def fetch_range_kraken(symbol: str, start: str, end: str) -> pd.DataFrame:
+    """Fetch ``symbol`` candles for the range ``[start, end]`` from Kraken."""
+    exchange = ccxt.kraken()
+    timeframe = "1h"
+    limit = 720
+
+    start_ms = int(pd.Timestamp(start, tz="UTC").timestamp() * 1000)
+    end_ms = int(pd.Timestamp(end, tz="UTC").timestamp() * 1000)
+
+    since = start_ms
+    all_ohlcv = []
+    while since < end_ms:
+        ohlcv = exchange.fetch_ohlcv(symbol, timeframe=timeframe, since=since, limit=limit)
+        if not ohlcv:
+            break
+        all_ohlcv.extend(ohlcv)
+        last_ts = ohlcv[-1][0]
+        since = last_ts + 3600 * 1000
+        if last_ts >= end_ms:
+            break
+
+    df = pd.DataFrame(all_ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
+    df = df[df["timestamp"] <= end_ms]
+    return clean_candles(df)
+
+
+def load_or_fetch(tag: str, fetch_all: bool = False, start: Optional[str] = None, end: Optional[str] = None) -> pd.DataFrame:
+    """Load candles for ``tag`` from cache or fetch them if needed."""
+    cache_path = CACHE_DIR / f"{tag}_1h.parquet"
+    binance_symbol = _resolve_symbol(tag, "binance")
+    kraken_symbol = _resolve_symbol(tag, "kraken")
+
+    if fetch_all:
+        df = fetch_all_history_binance(binance_symbol)
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(cache_path, index=False)
+        return df
+
+    if start and end:
+        return fetch_range_kraken(kraken_symbol, start, end)
+    if start or end:
+        raise ValueError("Both start and end must be provided")
+
+    if cache_path.exists():
+        df = pd.read_parquet(cache_path)
+        return clean_candles(df)
+
+    df = fetch_all_history_binance(binance_symbol)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(cache_path, index=False)
+    return df
