@@ -1,0 +1,18 @@
+{
+  "R0": {
+    "buy_settings": {"buy_fraction": 0.5},
+    "sell_settings": {"maturity_gain_target": 0.05}
+  },
+  "R1": {
+    "buy_settings": {"buy_fraction": 0.3},
+    "sell_settings": {"maturity_gain_target": 0.02}
+  },
+  "R2": {
+    "buy_settings": {"buy_fraction": 0.2},
+    "sell_settings": {"maturity_gain_target": 0.01}
+  },
+  "R3": {
+    "buy_settings": {"buy_fraction": 0.4},
+    "sell_settings": {"maturity_gain_target": 0.03}
+  }
+}

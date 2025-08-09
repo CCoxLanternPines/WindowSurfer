@@ -1,0 +1,21 @@
+{
+  "simulation_capital": 1000,
+  "regime_settings": {
+    "feature_window": "30d",
+    "clusters": 4,
+    "blend": "top2",
+    "blend_alpha": 3.0,
+    "hysteresis": 3,
+    "micro_tune": {
+      "enabled": true,
+      "trials": 25,
+      "envelope_pct": 0.25,
+      "tunable_keys": [
+        "buy_settings.buy_fraction",
+        "sell_settings.maturity_gain_target",
+        "sell_settings.min_hold_time",
+        "sell_settings.trailing_stop_pct"
+      ]
+    }
+  }
+}
