@@ -1,7 +1,12 @@
 from __future__ import annotations
+
 import argparse, csv, json
 from pathlib import Path
 from typing import List, Tuple
+import sys
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from ledger_manager import LedgerManager
 
 # ts, open, high, low, close
 Candle = Tuple[int, float, float, float, float]
@@ -92,8 +97,7 @@ def run(tag: str) -> None:
     init_snapshot_log()
     prev_tb = 0.5
 
-    total_bought = 0.0
-    total_sold = 0.0
+    ledger = LedgerManager(tag)
 
 
     for i in range(WINDOW, len(candles), STEP):
@@ -101,6 +105,8 @@ def run(tag: str) -> None:
         lows   = [x[3] for x in window]
         highs  = [x[2] for x in window]
         closes = [x[4] for x in window]
+        price = closes[-1]
+        ts = window[-1][0]
 
         low_w, high_w = min(lows), max(highs)
         denom = max(1e-9, high_w - low_w)
@@ -201,25 +207,29 @@ def run(tag: str) -> None:
             # Resolve conflict by taking the stronger side only
             if should_buy >= should_sell and should_buy >= 0.5:
                 qty = BASE_UNIT * size_multiplier(should_buy)
-                total_bought += qty
+                ledger.buy(qty, price, ts)
                 action = f"BUYx{qty:.2f}"
             elif should_sell > should_buy and should_sell >= 0.5:
                 qty = BASE_UNIT * size_multiplier(should_sell)
-                total_sold += qty
+                ledger.sell(qty, price, ts)
                 action = f"SELLx{qty:.2f}"
-
 
         # Single clean print
         suffix = ""
         if action:
-            suffix = f" Action:{action} TotBuy:{total_bought:.2f} TotSell:{total_sold:.2f}"
+            suffix = f" Action:{action}"
 
         line = (
             f"TopBottom:{topbottom_smooth:.2f} "
             f"SellVar:{sell_var:.2f} BuyVar:{buy_var:.2f} "
             f"ShouldBuy:{should_buy:.2f} ShouldSell:{should_sell:.2f}{suffix}"
         )
+        line += f" | OpenNotes:{len(ledger.get_open_notes())} Coin:{ledger.total_coin():.4f}"
         log_snapshot(line)
+
+    out_dir = Path("data/tmp")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ledger.save(out_dir / "ledger_simple.json")
 
 
 def main() -> None:
