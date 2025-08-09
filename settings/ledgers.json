@@ -7,7 +7,7 @@
     "tag": "SOL",
     "window_size": "5w",
     "skip_candles": 4,
-    "investment_size": 0.01,
+    "investment_size": 0.2,
     "buy_multiplier": 3,
     "sell_multiplier": 3,
     "tunnel_settings": {
