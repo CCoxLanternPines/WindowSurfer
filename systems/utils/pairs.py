@@ -13,6 +13,11 @@ def load_cache(path: str | Path = CACHE_PATH) -> dict:
         return json.load(f)
 
 
+def raw_path(tag: str, base_dir: str | Path = "data/raw") -> Path:
+    """Return canonical raw data path for ``tag``."""
+    return Path(base_dir) / f"{tag.upper()}.csv"
+
+
 def resolve_by_tag(tag: str, cache: dict | None = None) -> dict:
     """
     Returns a dict of canonical symbols/codes for the logical tag.
