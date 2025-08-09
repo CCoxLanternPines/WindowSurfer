@@ -91,8 +91,12 @@ def run(tag: str, base: str) -> None:
         f"weights(div={W_DIVERGENCE:.2f}, wick={W_WICK:.2f}, depth={W_DEPTH:.2f})"
     )
 
-    BASE_UNIT = investment_size
     ODDS_LOOKBACK = snapback_lookback
+
+    sim = (cfg.get("sim_settings") or {})
+    fiat_start = float(sim.get("fiat_start", 0.0))
+    min_order_usd = float(sim.get("min_order_usd", 0.0))
+    allow_partial = bool(sim.get("allow_partial_buys", True))
 
     candles = load_candles(tag)
     
@@ -118,7 +122,12 @@ def run(tag: str, base: str) -> None:
     init_snapshot_log()
     prev_tb = 0.5
 
-    ledger = LedgerManager(base)
+    ledger = LedgerManager(
+        base,
+        fiat_start=fiat_start,
+        min_order_usd=min_order_usd,
+        allow_partial_buys=allow_partial,
+    )
 
 
     for i in range(WINDOW, len(candles), STEP):
@@ -128,6 +137,8 @@ def run(tag: str, base: str) -> None:
         closes = [x[4] for x in window]
         price = closes[-1]
         ts = window[-1][0]
+        fiat = ledger.get_fiat()
+        BASE_UNIT = (fiat * investment_size) / max(1e-9, price)
 
         low_w, high_w = min(lows), max(highs)
         denom = max(1e-9, high_w - low_w)
@@ -251,7 +262,10 @@ def run(tag: str, base: str) -> None:
             f"SellVar:{sell_var:.2f} BuyVar:{buy_var:.2f} "
             f"ShouldBuy:{should_buy:.2f} ShouldSell:{should_sell:.2f}{suffix}"
         )
-        line += f" | OpenNotes:{len(ledger.get_open_notes())} Coin:{ledger.total_coin():.4f}"
+        line += (
+            f" | OpenNotes:{len(ledger.get_open_notes())} "
+            f"Coin:{ledger.total_coin():.4f} Fiat:${fiat:.2f}"
+        )
         log_snapshot(line)
 
     final_price = candles[-1][4]
@@ -259,9 +273,10 @@ def run(tag: str, base: str) -> None:
     unrealized = ledger.unrealized_gain_usd(final_price)
     total = realized + unrealized
     coin = ledger.total_coin()
+    fiat_final = ledger.get_fiat()
     print(
         f"[SIM] PnL | Realized:${realized:.2f} | Unrealized:${unrealized:.2f} | "
-        f"Total:${total:.2f} | Coin:{coin:.6f} @ ${final_price:.4f}"
+        f"Total:${total:.2f} | Coin:{coin:.6f} @ ${final_price:.4f} | Fiat:${fiat_final:.2f}"
     )
 
     out_dir = Path("data/tmp")

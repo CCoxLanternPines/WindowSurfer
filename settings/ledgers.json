@@ -24,7 +24,9 @@
       "weights": { "divergence": 0.45, "wick": 0.35, "depth": 0.20 }
     },
     "sim_settings": {
-      fiat_amount:: 1000.00
+      "fiat_start": 1000.0,
+      "min_order_usd": 10.0,
+      "allow_partial_buys": true
     }
   }
 }
