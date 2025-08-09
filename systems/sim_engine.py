@@ -7,7 +7,7 @@ from typing import List, Tuple
 from systems.scripts.ledger_manager import LedgerManager
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
-from systems.utils.config import load_ledger, load_global, resolve_window_cfg
+from systems.utils.config import load_ledgers, resolve_ledger_cfg
 
 # ts, open, high, low, close
 Candle = Tuple[int, float, float, float, float]
@@ -50,38 +50,44 @@ def clip(x: float, lo: float, hi: float) -> float:
 
 
 def run(args: argparse.Namespace) -> None:
-    ledger_cfg = load_ledger()
-    global_cfg = load_global()
-    ledger_name = args.ledger or next(iter(ledger_cfg["ledger_settings"]))
-    window_key = args.window or next(
-        iter(ledger_cfg["ledger_settings"][ledger_name]["window_settings"])
-    )
-    print(f"Using ledger '{ledger_name}' window '{window_key}'")
-    cfg = resolve_window_cfg(
-        ledger_name,
-        window_key,
-        tag=args.tag,
-        ledger=ledger_cfg,
-        global_cfg=global_cfg,
-    )
+    all_cfg = load_ledgers("settings/ledgers.json")
+    ledger_name = args.ledger or next(iter(all_cfg.get("ledgers", {})))
+    cfg = resolve_ledger_cfg(ledger_name, all_cfg)
 
-    WINDOW = cfg["window_alg"]["window"]
-    STEP = cfg["window_alg"]["step"]
-    BASE_UNIT = cfg["base_unit"]
-    ALPHA_WICK = cfg["topbottom"]["alpha_wick"]
-    SMOOTH_EMA = cfg["topbottom"]["smooth_ema"]
-    MOMENTUM_BARS = cfg["topbottom"]["momentum_bars"]
-    MOMENTUM_EPS = cfg["topbottom"]["momentum_eps"]
-    if cfg["topbottom"].get("dead_zone_pct") is not None:
-        dead_zone_min = 0.5 - cfg["topbottom"]["dead_zone_pct"] / 2
-        dead_zone_max = 0.5 + cfg["topbottom"]["dead_zone_pct"] / 2
-    else:
-        dead_zone_min = cfg["topbottom"]["dead_zone_min"]
-        dead_zone_max = cfg["topbottom"]["dead_zone_max"]
-    ODDS_LOOKBACK = cfg["snapback_odds"]["lookback"]
+    wallet_code = cfg["wallet_code"]
+    kraken_name = cfg["kraken_name"]
+    binance_name = cfg["binance_name"]
+
+    window_size = cfg["window_size"]
+    investment_size = float(cfg["investment_size"])
+    buy_multiplier = float(cfg["buy_multiplier"])
+    sell_multiplier = float(cfg["sell_multiplier"])
+
+    wa = cfg["window_alg"]
+    window_alg_window = wa["window"]
+    window_alg_skip_candles = int(wa["skip_candles"])
+
+    TUN = cfg["tunnel_settings"]
+    ALPHA_WICK = float(TUN["alpha_wick"])
+    SMOOTH_EMA = float(TUN["smooth_ema"])
+    MOMENTUM_BARS = int(TUN["momentum_bars"])
+    MOMENTUM_EPS = float(TUN["momentum_eps"])
+    dead_zone_pct = TUN.get("dead_zone_pct")
+    dead_zone_min = float(TUN["dead_zone_min"])
+    dead_zone_max = float(TUN["dead_zone_max"])
+
+    snapback_lookback = int(cfg["snapback_odds"]["lookback"])
     W_DIVERGENCE = cfg["snapback_odds"]["weights"]["divergence"]
     W_WICK = cfg["snapback_odds"]["weights"]["wick"]
     W_DEPTH = cfg["snapback_odds"]["weights"]["depth"]
+
+    WINDOW = 300
+    STEP = window_alg_skip_candles
+    BASE_UNIT = investment_size
+    if dead_zone_pct is not None:
+        dead_zone_min = 0.5 - dead_zone_pct / 2
+        dead_zone_max = 0.5 + dead_zone_pct / 2
+    ODDS_LOOKBACK = snapback_lookback
 
     tag = args.tag
     candles = load_candles(tag)
@@ -246,7 +252,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Monthly wave snapshot with top/bottom score.")
     parser.add_argument("tag", help="Asset tag for CSV in data/raw/<TAG>.csv")
     parser.add_argument("--ledger", dest="ledger", help="Ledger name to use")
-    parser.add_argument("--window", dest="window", help="Window key to use")
     args = parser.parse_args()
     run(args)
 
