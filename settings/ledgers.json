@@ -5,11 +5,11 @@
   },
   "default": {
     "tag": "SOL",
-    "window_size": "1w",
+    "window_size": "3w",
     "skip_candles": 5,
-    "investment_size": 0.1,
-    "buy_multiplier": 10,
-    "sell_multiplier": 10,
+    "investment_size": 0.2,
+    "buy_multiplier": 2,
+    "sell_multiplier": 2,
     "tunnel_settings": {
       "alpha_wick": 0.12,
       "smooth_ema": 0.25,

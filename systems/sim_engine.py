@@ -10,7 +10,6 @@ from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.utils.config import load_ledgers, resolve_ledger_cfg
 from systems.utils.pairs import resolve_by_tag, raw_path
-from systems.utils.time import parse_cutoff
 
 # ts, open, high, low, close
 Candle = Tuple[int, float, float, float, float]
@@ -61,8 +60,8 @@ def run(tag: str, base: str) -> None:
     cfg = CFG
 
     investment_size = float(cfg["investment_size"])
-    buy_multiplier = float(cfg["buy_multiplier"])
-    sell_multiplier = float(cfg["sell_multiplier"])
+
+    skip_candles = int(cfg["skip_candles"])
 
     TUN = cfg["tunnel_settings"]
     ALPHA_WICK = float(TUN["alpha_wick"])
@@ -84,25 +83,12 @@ def run(tag: str, base: str) -> None:
     W_WICK = weights.get("wick", 0)
     W_DEPTH = weights.get("depth", 0)
 
-    # Derive candle interval (seconds) from the CSV timestamps
-    # Assumes timestamps are ms; fall back to seconds if needed.
-    sample_candles = load_candles(tag)
-    if len(sample_candles) < 2:
-        raise SystemExit("Not enough data to infer candle interval")
-    dt = sample_candles[1][0] - sample_candles[0][0]
-    candle_seconds = int(dt / 1000) if dt > 10_000 else int(dt)
-
-    # WINDOW from settings: e.g., "1w", "3d", "90m"
-    window_td = parse_cutoff(str(cfg.get("window_size", "3d")))
-    WINDOW = max(1, int(window_td.total_seconds() // candle_seconds))
-
-    # STEP from settings
-    STEP = int(cfg.get("skip_candles", 1))
-
+    WINDOW = 300
+    STEP = skip_candles
     BASE_UNIT = investment_size
     ODDS_LOOKBACK = snapback_lookback
 
-    candles = sample_candles  # reuse what we loaded for interval
+    candles = load_candles(tag)
     if len(candles) < WINDOW:
         print("Not enough data to simulate.")
         return
