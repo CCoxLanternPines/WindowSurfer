@@ -1,12 +1,21 @@
 {
   "simulation_capital": 1000,
-  "buy_frequency": 5,
-  "min_hold_time": 10,
-  "avg_window_all_time": 50,
-  "buy_fraction": 0.02,
-  "maturity_gain_target": 0.02,
-  "max_concurrent_notes": 20,
-  "dip_depth_entry": 0.03,
-  "slope_filter": 0.01,
-  "volatility_filter": 0.005
+
+  "buy_settings": {
+    "buy_frequency": 5,
+    "buy_fraction": 0.02,
+    "max_concurrent_notes": 20,
+    "dip_depth_entry": 0.03,
+    "slope_filter": 0.01,
+    "volatility_filter": 0.005
+  },
+
+  "sell_settings": {
+    "min_hold_time": 10,
+    "maturity_gain_target": 0.02,
+    "max_hold_time": 150,
+    "stop_loss_pct": 0.06,
+    "trailing_stop_pct": 0.03,
+    "trailing_start_gain": 0.02
+  }
 }
