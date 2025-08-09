@@ -69,6 +69,7 @@ def run_price_viz(
     squeeze_thr: float = 0.7, s_thr: float = 1e-4,
     i_thr: float = 0.6, t_thr: float = 1.5,
     snap_on: bool = True, snap_mode: str = "low", snap_alpha: float = 0.9,
+    snap_center_mult: int = 3, snap_fill: bool = True,
 ) -> None:
 
     df = load_raw(tag)
@@ -100,6 +101,9 @@ def run_price_viz(
         snap = np.maximum(0.0, (c - ema_k)) / (atr + 1e-9)
     else:  # "low"
         snap = (c - rolling_low_s) / (atr + 1e-9)
+
+    snap_center_span = max(snap_center_mult * s, s + 1)
+    snap_center = pd.Series(snap).ewm(span=snap_center_span, adjust=False).mean().to_numpy()
 
     pos = np.maximum(r, 0)
     neg = np.maximum(-r, 0)
@@ -170,8 +174,10 @@ def run_price_viz(
     ax_g.set_ylim(-1, 1)
 
     if snap_on:
-        ax_p = ax_g.twinx()
-        snap_line, = ax_p.plot([], [], lw=1.2, color="red", alpha=snap_alpha)
+        ax_p = ax_g.twinx()  # right y-axis for snapback pressure
+        snap_line, = ax_p.plot([], [], lw=1.4, color="red", alpha=snap_alpha)
+        snap_center_line, = ax_p.plot([], [], lw=1.0, color="0.4", alpha=0.7)
+        snap_neg_fill = None
         ax_p.tick_params(axis="y", labelcolor="red")
         ax_p.set_ylabel("Snap", color="red")
 
@@ -242,14 +248,33 @@ def run_price_viz(
 
         if snap_on:
             snap_win = snap[left_idx:idx+1]
+            snap_center_win = snap_center[left_idx:idx+1]
+
             snap_line.set_data(x_window, snap_win)
+            snap_center_line.set_data(x_window, snap_center_win)
+
+            ymax = float(np.nanmax(snap_win)) if snap_win.size else 1.0
+            ymin = float(np.nanmin(snap_win)) if snap_win.size else 0.0
+            pad = max(0.2, 0.1 * (ymax - ymin if ymax > ymin else 1.0))
             ax_p.set_xlim(float(x_window[0]), float(x_window[-1]))
-            ymax = float(snap_win.max()) if snap_win.size else 1.0
-            ax_p.set_ylim(0.0, max(0.5, ymax * 1.1))
+            ax_p.set_ylim(ymin - pad, ymax + pad)
+
+            nonlocal snap_neg_fill
+            if snap_neg_fill:
+                snap_neg_fill.remove()
+                snap_neg_fill = None
+            if snap_fill and snap_win.size:
+                snap_neg_fill = ax_p.fill_between(
+                    x_window, snap_win, snap_center_win,
+                    where=(snap_win < snap_center_win),
+                    interpolate=True, color="red", alpha=0.12
+                )
 
         objs = [line, dot, center_line, upper_band, lower_band, g_line, g_fill]
         if snap_on:
-            objs.append(snap_line)
+            objs.extend([snap_line, snap_center_line])
+            if snap_neg_fill:
+                objs.append(snap_neg_fill)
         return tuple(objs)
 
     anim = FuncAnimation(
