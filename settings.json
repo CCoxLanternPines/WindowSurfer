@@ -1,0 +1,6 @@
+{
+  "simulation_capital": 1000,
+  "buy_frequency": 5,
+  "min_hold_time": 10,
+  "avg_window_all_time": 50
+}
