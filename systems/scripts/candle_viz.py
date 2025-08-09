@@ -168,6 +168,24 @@ def run_price_viz(
     title_left = ax.text(0.01, 0.99, tag, transform=ax.transAxes, ha="left", va="top")
     title_right = ax.text(0.99, 0.99, "", transform=ax.transAxes, ha="right", va="top")
 
+    status_text = ax.text(
+        0.01,
+        0.01,
+        "",
+        transform=ax.transAxes,
+        ha="left",
+        va="bottom",
+        color="0.3",
+    )
+
+    def refresh_hud():
+        # show current speed, inventory and realized PnL
+        title_right.set_text(
+            f"{state['price']:.4f}  spd:{speed_ms_cur}ms  inv:{len(holdings)}  "
+            f"buys:{buys} sells:{sells}  PnL:{score:+.2f}"
+        )
+        fig.canvas.draw_idle()
+
     g_line, = ax_g.plot([], [], lw=1, color="C0")
     g_fill = ax_g.fill_between([], [], 0, color="C0", alpha=0.1)
     ax_g.axhline(0, color="k", lw=0.5)
@@ -204,7 +222,10 @@ def run_price_viz(
     buys = 0
     sells = 0
 
-    state = {"price": float(c[start_idx])}  # latest seen price for key handler
+    state = {
+        "price": float(c[start_idx]),
+        "ts": float(t[start_idx]),
+    }  # latest seen price for key handler
 
 
     window_size = 200  # number of candles to keep in view
@@ -227,9 +248,9 @@ def run_price_viz(
         lower_band.set_data(x_window, ema_k[left_idx:idx+1] - atr[left_idx:idx+1])
 
         # last sample in window is the current point we "see"
-        y_i = float(y_window[-1])
-        x_i = float(x_window[-1])
-        state["price"] = y_i
+        state["price"] = float(y_window[-1])
+        state["ts"] = float(x_window[-1])
+        refresh_hud()
 
         # Gravity subplot
         g_line.set_data(x_window, G[left_idx:idx+1])
@@ -244,13 +265,6 @@ def run_price_viz(
         ax.set_xlim(float(x_window[0]), float(x_window[-1]))
         ax.set_ylim(*_pad((float(y_window.min()), float(y_window.max())), 0.02))
         ax_g.set_xlim(float(x_window[0]), float(x_window[-1]))
-
-        # HUD: price/time + speed/inventory/PNL
-        ts = pd.to_datetime(x_i, unit="s")
-        title_right.set_text(
-            f"{y_i:.4f} @ {ts}\n"
-            f"spd:{speed_ms_cur}ms  inv:{len(holdings)}  PnL:{score:+.2f}"
-        )
 
         if snap_on:
             snap_win = snap[left_idx:idx+1]
@@ -285,6 +299,7 @@ def run_price_viz(
             g_line,
             g_fill,
             title_right,
+            status_text,
         ]
         if snap_on:
             objs.extend([snap_line, snap_center_line])
@@ -304,12 +319,14 @@ def run_price_viz(
     def on_key(event):
         nonlocal paused, speed_ms_cur, score, buys, sells, holdings
 
-        if event.key == "escape":
+        k = (event.key or "").lower()
+
+        if k == "escape":
             plt.close(fig)
             return
 
-        # Pause / resume
-        if event.key == " ":
+        # pause / resume
+        if k == " ":
             if paused:
                 anim.event_source.start()
             else:
@@ -317,28 +334,57 @@ def run_price_viz(
             paused = not paused
             return
 
-        # Speed controls: '+'/'=' = faster; '-' = slower
-        if event.key in ("+", "="):
+        # ----- speed controls -----
+        SPEED_UP = {"+", "=", "plus", "equal", "kp_add", "add"}
+        SPEED_DOWN = {"-", "_", "minus", "kp_subtract", "subtract"}
+
+        if k in SPEED_UP:
             speed_ms_cur = max(1, int(speed_ms_cur / 1.25))
+            # reapply interval; stop/start to ensure backend picks it up
+            was_running = not paused
+            anim.event_source.stop()
             anim.event_source.interval = speed_ms_cur
-            return
-        if event.key == "-":
-            speed_ms_cur = min(2000, int(speed_ms_cur * 1.25))
-            anim.event_source.interval = speed_ms_cur
+            if was_running:
+                anim.event_source.start()
+            refresh_hud()
+            status_text.set_text(f"speed ↑  {speed_ms_cur} ms")
             return
 
-        # Trading keys
-        if event.key == "x":                      # BUY 1
+        if k in SPEED_DOWN:
+            speed_ms_cur = min(2000, int(speed_ms_cur * 1.25))
+            was_running = not paused
+            anim.event_source.stop()
+            anim.event_source.interval = speed_ms_cur
+            if was_running:
+                anim.event_source.start()
+            refresh_hud()
+            status_text.set_text(f"speed ↓  {speed_ms_cur} ms")
+            return
+
+        # ----- trading -----
+        if k in {"x", "X"}:  # BUY 1
             holdings.append(state["price"])
             buys += 1
+            refresh_hud()
+            status_text.set_text(f"BUY @ {state['price']:.4f}")
+            status_text.set_color("tab:green")
             return
-        if event.key == "z":                      # SELL 1 (highest entry first)
+
+        if k in {"z", "Z"}:  # SELL 1 (highest entry first)
             if holdings:
                 i_max = max(range(len(holdings)), key=lambda i: holdings[i])
                 entry = holdings.pop(i_max)
                 pnl = state["price"] - entry
                 score += pnl
                 sells += 1
+                refresh_hud()
+                status_text.set_text(
+                    f"SELL @ {state['price']:.4f}  PnL {pnl:+.4f}"
+                )
+                status_text.set_color("tab:red")
+            else:
+                status_text.set_text("no holdings to sell")
+                status_text.set_color("0.5")
             return
 
     fig.canvas.mpl_connect("key_press_event", on_key)
