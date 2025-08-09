@@ -195,22 +195,16 @@ def run_price_viz(
     x_start_lim: tuple[float, float] | None = None
     y_start_lim: tuple[float, float] | None = None
 
+    # --- interactivity / scoring state ---
+    speed_ms_cur = int(speed_ms)   # live interval we can tweak
     paused = False
 
-    paused = False  # define in run_price_viz so it's in scope
+    holdings: list[float] = []     # entry prices
+    score = 0.0                    # realized PnL from sells
+    buys = 0
+    sells = 0
 
-    def on_key(event):
-        nonlocal paused  # allows us to modify the outer variable
-        if event.key == "escape":
-            plt.close(fig)
-        elif event.key == " ":
-            if paused:
-                anim.event_source.start()
-            else:
-                anim.event_source.stop()
-            paused = not paused
-
-    fig.canvas.mpl_connect("key_press_event", on_key)
+    state = {"price": float(c[start_idx])}  # latest seen price for key handler
 
 
     window_size = 200  # number of candles to keep in view
@@ -232,6 +226,11 @@ def run_price_viz(
         upper_band.set_data(x_window, ema_k[left_idx:idx+1] + atr[left_idx:idx+1])
         lower_band.set_data(x_window, ema_k[left_idx:idx+1] - atr[left_idx:idx+1])
 
+        # last sample in window is the current point we "see"
+        y_i = float(y_window[-1])
+        x_i = float(x_window[-1])
+        state["price"] = y_i
+
         # Gravity subplot
         g_line.set_data(x_window, G[left_idx:idx+1])
         nonlocal g_fill
@@ -245,6 +244,13 @@ def run_price_viz(
         ax.set_xlim(float(x_window[0]), float(x_window[-1]))
         ax.set_ylim(*_pad((float(y_window.min()), float(y_window.max())), 0.02))
         ax_g.set_xlim(float(x_window[0]), float(x_window[-1]))
+
+        # HUD: price/time + speed/inventory/PNL
+        ts = pd.to_datetime(x_i, unit="s")
+        title_right.set_text(
+            f"{y_i:.4f} @ {ts}\n"
+            f"spd:{speed_ms_cur}ms  inv:{len(holdings)}  PnL:{score:+.2f}"
+        )
 
         if snap_on:
             snap_win = snap[left_idx:idx+1]
@@ -270,7 +276,16 @@ def run_price_viz(
                     interpolate=True, color="red", alpha=0.12
                 )
 
-        objs = [line, dot, center_line, upper_band, lower_band, g_line, g_fill]
+        objs = [
+            line,
+            dot,
+            center_line,
+            upper_band,
+            lower_band,
+            g_line,
+            g_fill,
+            title_right,
+        ]
         if snap_on:
             objs.extend([snap_line, snap_center_line])
             if snap_neg_fill:
@@ -281,9 +296,52 @@ def run_price_viz(
         fig,
         update,
         frames=range(total_frames),
-        interval=speed_ms,
+        interval=speed_ms_cur,
         blit=False,
+        repeat=False,
     )
+
+    def on_key(event):
+        nonlocal paused, speed_ms_cur, score, buys, sells, holdings
+
+        if event.key == "escape":
+            plt.close(fig)
+            return
+
+        # Pause / resume
+        if event.key == " ":
+            if paused:
+                anim.event_source.start()
+            else:
+                anim.event_source.stop()
+            paused = not paused
+            return
+
+        # Speed controls: '+'/'=' = faster; '-' = slower
+        if event.key in ("+", "="):
+            speed_ms_cur = max(1, int(speed_ms_cur / 1.25))
+            anim.event_source.interval = speed_ms_cur
+            return
+        if event.key == "-":
+            speed_ms_cur = min(2000, int(speed_ms_cur * 1.25))
+            anim.event_source.interval = speed_ms_cur
+            return
+
+        # Trading keys
+        if event.key == "x":                      # BUY 1
+            holdings.append(state["price"])
+            buys += 1
+            return
+        if event.key == "z":                      # SELL 1 (highest entry first)
+            if holdings:
+                i_max = max(range(len(holdings)), key=lambda i: holdings[i])
+                entry = holdings.pop(i_max)
+                pnl = state["price"] - entry
+                score += pnl
+                sells += 1
+            return
+
+    fig.canvas.mpl_connect("key_press_event", on_key)
 
     if save_path:
         save_path = str(save_path)
