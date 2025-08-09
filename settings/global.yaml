@@ -1,0 +1,20 @@
+strategy_defaults:
+  snapback_odds:
+    weights:
+      divergence: 0.45
+      wick: 0.35
+      depth: 0.20
+  topbottom:
+    alpha_wick: 0.12
+    smooth_ema: 0.25
+    momentum_bars: 8
+    momentum_eps: 0.0015
+    dead_zone_pct: null
+    dead_zone_min: 0.44
+    dead_zone_max: 0.56
+  odds_lookback: 8
+engine_defaults:
+  window_alg:
+    window: 300
+    step: 5
+  base_unit: 1.0
