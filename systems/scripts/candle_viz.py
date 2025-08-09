@@ -10,6 +10,7 @@ import matplotlib
 matplotlib.use("TkAgg")  # Change to "Qt5Agg" if you use Qt
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
+from matplotlib.patches import Rectangle
 
 
 try:
@@ -77,6 +78,8 @@ def run_price_viz(
     c = df["close"].to_numpy()
     h = df["high"].to_numpy()
     l = df["low"].to_numpy()
+    all_time_low = np.nanmin(c)
+    all_time_high = np.nanmax(c)
     N = len(c)
     if start_idx >= N:
         print("[ERROR] start index beyond data length")
@@ -171,6 +174,34 @@ def run_price_viz(
         ax.grid(True, alpha=0.2)
         ax_g.grid(True, alpha=0.2)
 
+    # All-time range bar
+    bar_ax = ax.twinx()
+    bar_ax.set_ylim(all_time_low, all_time_high)
+    bar_ax.set_xlim(0, 1)
+    bar_ax.yaxis.set_ticks_position("right")
+    bar_ax.yaxis.set_label_position("right")
+    bar_ax.set_yticklabels([])
+    bar_ax.set_xticklabels([])
+
+    bar_width = 0.2
+    bar_bg = Rectangle(
+        (0.4, all_time_low),
+        bar_width,
+        all_time_high - all_time_low,
+        facecolor="lightgray",
+        alpha=0.3,
+    )
+    bar_ax.add_patch(bar_bg)
+
+    bar_marker = Rectangle(
+        (0.4, np.nan),
+        bar_width,
+        (all_time_high - all_time_low) * 0.01,
+        facecolor="red",
+        alpha=0.8,
+    )
+    bar_ax.add_patch(bar_marker)
+
     title_left = ax.text(0.01, 0.99, tag, transform=ax.transAxes, ha="left", va="top")
     title_right = ax.text(0.99, 0.99, "", transform=ax.transAxes, ha="right", va="top")
 
@@ -252,6 +283,11 @@ def run_price_viz(
         # last sample in window is the current point we "see"
         state["price"] = float(y_window[-1])
         state["ts"] = float(x_window[-1])
+
+        current_price = c[idx]
+        marker_height = (all_time_high - all_time_low) * 0.01
+        bar_marker.set_y(current_price - marker_height / 2)
+
         refresh_hud()
 
         # Keep window focus
@@ -294,6 +330,8 @@ def run_price_viz(
             blue_line,
             title_right,
             status_text,
+            bar_marker,
+            bar_bg,
         ]
         if snap_on:
             objs.extend([snap_line, snap_center_line])
