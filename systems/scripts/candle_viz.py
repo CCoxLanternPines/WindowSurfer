@@ -7,8 +7,7 @@ import sys
 
 import pandas as pd
 import matplotlib
-# Use a non-interactive backend by default for headless environments
-matplotlib.use("Agg")
+matplotlib.use("TkAgg")  # or "Qt5Agg" if you have Qt installed
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
 
@@ -78,17 +77,12 @@ def run_price_viz(
         return
 
     fps = max(1, int(1000 / max(1, speed_ms)))
-    zoom_frames = max(fps * zoom_seconds, 1)
+    total_frames = (N - start_idx + frameskip - 1) // frameskip
+    
+    zoom_frames = int(total_frames * 1)  # zoom done at 40% of draw time
 
     x_full = (float(t[0]), float(t[-1]))
     y_full = (float(y.min()), float(y.max()))
-
-    end_init = min(start_idx + 200, N - 1)
-    x0 = (float(t[start_idx]), float(t[end_init]))
-    y0 = (
-        float(y[start_idx : end_init + 1].min()),
-        float(y[start_idx : end_init + 1].max()),
-    )
 
     fig, ax = plt.subplots(figsize=(width, height))
     line, = ax.plot([], [], lw=1)
@@ -108,17 +102,45 @@ def run_price_viz(
 
     fig.canvas.mpl_connect("key_press_event", on_key)
 
+    # Outside update(), initialize before FuncAnimation:
+    x_zoom_start_frame = None
+    y_zoom_start_frame = None
+
     def update(frame: int):
+        nonlocal x_zoom_start_frame, y_zoom_start_frame
         idx = min(start_idx + frame * frameskip, N - 1)
         xs.append(float(t[idx]))
         ys.append(float(y[idx]))
         line.set_data(xs, ys)
-        dot.set_data(xs[-1], ys[-1])
+        if xs and ys:
+            dot.set_data([xs[-1]], [ys[-1]])
 
-        u = min(max(frame / zoom_frames, 0.0), 1.0)
-        s = u * u * (3 - 2 * u)
-        xlim = _lerp(x0, x_full, s)
-        ylim = _pad(_lerp(y0, y_full, s), 0.02)
+        # Detect milestones
+        if y_zoom_start_frame is None and min(ys) <= y_full[0]:
+            y_zoom_start_frame = frame
+        if x_zoom_start_frame is None and xs[0] <= x_full[0]:
+            x_zoom_start_frame = frame
+
+        # Progress for each axis
+        # X
+        if x_zoom_start_frame is not None:
+            
+            u_x = min(max((frame - x_zoom_start_frame) / zoom_frames, 0.0), 1.0)
+            s_x = u_x * u_x * (3 - 2 * u_x)
+            xlim = _lerp((xs[0], xs[-1]), x_full, s_x)
+        else:
+            xlim = (xs[0], xs[-1])
+
+        # Y
+        if y_zoom_start_frame is not None:
+            u_y = min(max((frame - y_zoom_start_frame) / zoom_frames, 0.0), 1.0)
+            s_y = u_y * u_y * (3 - 2 * u_y)
+            current_min = min(ys)
+            current_max = max(ys)
+            ylim = _pad(_lerp((current_min, current_max), y_full, s_y), 0.02)
+        else:
+            ylim = _pad((min(ys), max(ys)), 0.02)
+
         ax.set_xlim(*xlim)
         ax.set_ylim(*ylim)
 
