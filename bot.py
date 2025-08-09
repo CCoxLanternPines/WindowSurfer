@@ -17,6 +17,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--height", type=float, default=6.0)
     parser.add_argument("--save", help="path to mp4/gif output")
     parser.add_argument("--grid", action="store_true", help="show grid")
+    parser.add_argument("--snap", dest="snap_on", action="store_true", default=True, help="enable snapback overlay")
+    parser.add_argument("--no-snap", dest="snap_on", action="store_false", help="disable snapback overlay")
+    parser.add_argument("--snap-mode", choices=["low", "ema"], default="low")
 
     args = parser.parse_args(argv)
 
@@ -31,6 +34,8 @@ def main(argv: list[str] | None = None) -> None:
             height=args.height,
             save_path=args.save,
             show_grid=args.grid,
+            snap_on=args.snap_on,
+            snap_mode=args.snap_mode,
         )
     else:
         parser.error("--mode must be 'viz'")

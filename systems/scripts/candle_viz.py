@@ -68,6 +68,7 @@ def run_price_viz(
     g_thr: float = 0.25, d_min: float = 1.2, q: int = 8,
     squeeze_thr: float = 0.7, s_thr: float = 1e-4,
     i_thr: float = 0.6, t_thr: float = 1.5,
+    snap_on: bool = True, snap_mode: str = "low", snap_alpha: float = 0.9,
 ) -> None:
 
     df = load_raw(tag)
@@ -93,6 +94,12 @@ def run_price_viz(
         np.abs(l - prev_close),
     ])
     atr = pd.Series(tr).ewm(span=k, adjust=False).mean().to_numpy()
+
+    rolling_low_s = pd.Series(c).rolling(window=s, min_periods=1).min().to_numpy()
+    if snap_mode == "ema":
+        snap = np.maximum(0.0, (c - ema_k)) / (atr + 1e-9)
+    else:  # "low"
+        snap = (c - rolling_low_s) / (atr + 1e-9)
 
     pos = np.maximum(r, 0)
     neg = np.maximum(-r, 0)
@@ -162,6 +169,12 @@ def run_price_viz(
     ax_g.axhline(0, color="k", lw=0.5)
     ax_g.set_ylim(-1, 1)
 
+    if snap_on:
+        ax_p = ax_g.twinx()
+        snap_line, = ax_p.plot([], [], lw=1.2, color="red", alpha=snap_alpha)
+        ax_p.tick_params(axis="y", labelcolor="red")
+        ax_p.set_ylabel("Snap", color="red")
+
     # State
     xs: list[float] = []
     ys: list[float] = []
@@ -227,7 +240,17 @@ def run_price_viz(
         ax.set_ylim(*_pad((float(y_window.min()), float(y_window.max())), 0.02))
         ax_g.set_xlim(float(x_window[0]), float(x_window[-1]))
 
-        return line, dot, center_line, upper_band, lower_band, g_line, g_fill
+        if snap_on:
+            snap_win = snap[left_idx:idx+1]
+            snap_line.set_data(x_window, snap_win)
+            ax_p.set_xlim(float(x_window[0]), float(x_window[-1]))
+            ymax = float(snap_win.max()) if snap_win.size else 1.0
+            ax_p.set_ylim(0.0, max(0.5, ymax * 1.1))
+
+        objs = [line, dot, center_line, upper_band, lower_band, g_line, g_fill]
+        if snap_on:
+            objs.append(snap_line)
+        return tuple(objs)
 
     anim = FuncAnimation(
         fig,
