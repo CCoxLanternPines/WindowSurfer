@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-import argparse, csv, json
+import argparse
+import csv
 from pathlib import Path
 from typing import List, Tuple, Dict
 
 from systems.scripts.ledger_manager import LedgerManager
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
+from systems.utils.config import load_ledgers, resolve_ledger_cfg
 from systems.utils.pairs import resolve_by_tag, raw_path
 
 # ts, open, high, low, close
@@ -61,8 +63,7 @@ def run(tag: str, base: str) -> None:
     buy_multiplier = float(cfg["buy_multiplier"])
     sell_multiplier = float(cfg["sell_multiplier"])
 
-    wa = cfg["window_alg"]
-    window_alg_skip_candles = int(wa["skip_candles"])
+    skip_candles = int(cfg["skip_candles"])
 
     TUN = cfg["tunnel_settings"]
     ALPHA_WICK = float(TUN["alpha_wick"])
@@ -85,7 +86,7 @@ def run(tag: str, base: str) -> None:
     W_DEPTH = weights.get("depth", 0)
 
     WINDOW = 300
-    STEP = window_alg_skip_candles
+    STEP = skip_candles
     BASE_UNIT = investment_size
     ODDS_LOOKBACK = snapback_lookback
 
@@ -259,12 +260,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    with open("settings/ledgers.json", "r", encoding="utf-8") as f:
-        all_cfg = json.load(f)
-
-    base = dict(all_cfg.get("default", {}))
-    override = dict(all_cfg.get("ledgers", {}).get(args.ledger, {}))
-    cfg = {**base, **override}
+    all_cfg = load_ledgers("settings/ledgers.json")
+    cfg = resolve_ledger_cfg(args.ledger, all_cfg)
 
     tag = cfg.get("tag")
     if not tag:
