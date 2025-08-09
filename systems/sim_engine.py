@@ -1,17 +1,21 @@
 from __future__ import annotations
 
-import argparse, csv
+import argparse, csv, json
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 from systems.scripts.ledger_manager import LedgerManager
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
-from systems.utils.config import load_ledgers, resolve_ledger_cfg
 
 # ts, open, high, low, close
 Candle = Tuple[int, float, float, float, float]
 LOG_PATH = Path("data/tmp/snapshots.log")
+
+CFG: Dict[str, object] = {}
+DEAD_ZONE_PCT = None
+DEAD_ZONE_MIN = 0.45
+DEAD_ZONE_MAX = 0.55
 
 
 
@@ -49,22 +53,14 @@ def clip(x: float, lo: float, hi: float) -> float:
     return lo if x < lo else hi if x > hi else x
 
 
-def run(args: argparse.Namespace) -> None:
-    all_cfg = load_ledgers("settings/ledgers.json")
-    ledger_name = args.ledger or next(iter(all_cfg.get("ledgers", {})))
-    cfg = resolve_ledger_cfg(ledger_name, all_cfg)
+def run(tag: str) -> None:
+    cfg = CFG
 
-    wallet_code = cfg["wallet_code"]
-    kraken_name = cfg["kraken_name"]
-    binance_name = cfg["binance_name"]
-
-    window_size = cfg["window_size"]
     investment_size = float(cfg["investment_size"])
     buy_multiplier = float(cfg["buy_multiplier"])
     sell_multiplier = float(cfg["sell_multiplier"])
 
     wa = cfg["window_alg"]
-    window_alg_window = wa["window"]
     window_alg_skip_candles = int(wa["skip_candles"])
 
     TUN = cfg["tunnel_settings"]
@@ -72,24 +68,26 @@ def run(args: argparse.Namespace) -> None:
     SMOOTH_EMA = float(TUN["smooth_ema"])
     MOMENTUM_BARS = int(TUN["momentum_bars"])
     MOMENTUM_EPS = float(TUN["momentum_eps"])
-    dead_zone_pct = TUN.get("dead_zone_pct")
-    dead_zone_min = float(TUN["dead_zone_min"])
-    dead_zone_max = float(TUN["dead_zone_max"])
 
-    snapback_lookback = int(cfg["snapback_odds"]["lookback"])
-    W_DIVERGENCE = cfg["snapback_odds"]["weights"]["divergence"]
-    W_WICK = cfg["snapback_odds"]["weights"]["wick"]
-    W_DEPTH = cfg["snapback_odds"]["weights"]["depth"]
+    dz_pct = DEAD_ZONE_PCT
+    if dz_pct is None:
+        tun = cfg.get("tunnel_settings") or cfg.get("topbottom") or {}
+        dz_pct = tun.get("dead_zone_pct")
+    dead_zone_min = 0.5 - dz_pct / 2 if dz_pct is not None else DEAD_ZONE_MIN
+    dead_zone_max = 0.5 + dz_pct / 2 if dz_pct is not None else DEAD_ZONE_MAX
+
+    snapback = cfg.get("snapback_odds", {})
+    snapback_lookback = int(snapback.get("lookback", 0))
+    weights = snapback.get("weights", {})
+    W_DIVERGENCE = weights.get("divergence", 0)
+    W_WICK = weights.get("wick", 0)
+    W_DEPTH = weights.get("depth", 0)
 
     WINDOW = 300
     STEP = window_alg_skip_candles
     BASE_UNIT = investment_size
-    if dead_zone_pct is not None:
-        dead_zone_min = 0.5 - dead_zone_pct / 2
-        dead_zone_max = 0.5 + dead_zone_pct / 2
     ODDS_LOOKBACK = snapback_lookback
 
-    tag = args.tag
     candles = load_candles(tag)
     if len(candles) < WINDOW:
         print("Not enough data to simulate.")
@@ -249,11 +247,33 @@ def run(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Monthly wave snapshot with top/bottom score.")
-    parser.add_argument("tag", help="Asset tag for CSV in data/raw/<TAG>.csv")
-    parser.add_argument("--ledger", dest="ledger", help="Ledger name to use")
+    parser = argparse.ArgumentParser(
+        description="Simulate a ledger using settings/ledgers.json",
+        usage="sim_engine.py --ledger <name>",
+    )
+    parser.add_argument(
+        "--ledger",
+        required=True,
+        help="Ledger key under settings/ledgers.json: ledgers.{name}",
+    )
     args = parser.parse_args()
-    run(args)
+
+    with open("settings/ledgers.json", "r", encoding="utf-8") as f:
+        all_cfg = json.load(f)
+
+    base = dict(all_cfg.get("default", {}))
+    override = dict(all_cfg.get("ledgers", {}).get(args.ledger, {}))
+    cfg = {**base, **override}
+
+    tag = cfg.get("tag")
+    if not tag:
+        raise SystemExit(
+            f"[error] Ledger '{args.ledger}' missing required 'tag' in settings/ledgers.json"
+        )
+
+    global CFG
+    CFG = cfg
+    run(tag)
 
 
 if __name__ == "__main__":
