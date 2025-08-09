@@ -60,6 +60,8 @@ def run(tag: str, base: str) -> None:
     cfg = CFG
 
     investment_size = float(cfg["investment_size"])
+    buy_multiplier = float(cfg.get("buy_multiplier", 1.0))
+    sell_multiplier = float(cfg.get("sell_multiplier", 1.0))
 
     skip_candles = int(cfg["skip_candles"])
 
@@ -204,6 +206,8 @@ def run(tag: str, base: str) -> None:
             "price": price,
             "ts": ts,
             "total_coin": ledger.total_coin(),
+            "buy_multiplier": buy_multiplier,
+            "sell_multiplier": sell_multiplier,
         }
 
         buy_amt = evaluate_buy(ctx)
