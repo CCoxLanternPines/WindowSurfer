@@ -3,10 +3,10 @@ from __future__ import annotations
 import argparse, csv, json
 from pathlib import Path
 from typing import List, Tuple
-import sys
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-from ledger_manager import LedgerManager
+from systems.scripts.ledger_manager import LedgerManager
+from systems.scripts.evaluate_buy import evaluate_buy
+from systems.scripts.evaluate_sell import evaluate_sell
 
 # ts, open, high, low, close
 Candle = Tuple[int, float, float, float, float]
@@ -195,24 +195,28 @@ def run(tag: str) -> None:
         should_buy  = 2 * (should_buy - 0.5) / 0.5
         should_buy  = clip(should_buy, 0.0, 1.0)
 
-        # ----- Trigger logic (≥ 0.50) with multiplier: 0.50->1x, 1.00->3x -----
-        def size_multiplier(score: float) -> float:
-            # linear map: 0.5→1, 1.0→3  => m = 1 + 4*(score-0.5)
-            return 1.0 + 4.0 * (score - 0.5)
+        ctx = {
+            "topbottom": topbottom_smooth,
+            "buy_var": buy_var,
+            "sell_var": sell_var,
+            "should_buy": should_buy,
+            "should_sell": should_sell,
+            "base_unit": BASE_UNIT,
+            "price": price,
+            "ts": ts,
+            "total_coin": ledger.total_coin(),
+        }
+
+        buy_amt = evaluate_buy(ctx)
+        sell_amt = evaluate_sell(ctx)
 
         action = None
-        qty = 0.0
-
-        if should_buy >= 0.5 or should_sell >= 0.5:
-            # Resolve conflict by taking the stronger side only
-            if should_buy >= should_sell and should_buy >= 0.5:
-                qty = BASE_UNIT * size_multiplier(should_buy)
-                ledger.buy(qty, price, ts)
-                action = f"BUYx{qty:.2f}"
-            elif should_sell > should_buy and should_sell >= 0.5:
-                qty = BASE_UNIT * size_multiplier(should_sell)
-                ledger.sell(qty, price, ts)
-                action = f"SELLx{qty:.2f}"
+        if sell_amt > 0:
+            ledger.sell(sell_amt, ctx["price"], ctx["ts"])
+            action = f"SELLx{sell_amt:.2f}"
+        elif buy_amt > 0:
+            ledger.buy(buy_amt, ctx["price"], ctx["ts"])
+            action = f"BUYx{buy_amt:.2f}"
 
         # Single clean print
         suffix = ""
