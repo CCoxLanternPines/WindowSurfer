@@ -23,6 +23,18 @@
       "lookback": 10,
       "weights": { "divergence": 0.45, "wick": 0.35, "depth": 0.20 }
     },
+    "buy_rules": {
+      "ladder_tb":  [0.35, 0.25, 0.15],
+      "ladder_mult":[1.0,  2.0,  3.0],
+      "gate_momentum": true,
+      "gate_wick_bias": true
+    },
+    "sell_rules": {
+      "allow_loss": false,
+      "min_profit_pct": 0.003,
+      "tiers_tb":   [0.80, 0.90, 0.95],
+      "tiers_frac": [0.25, 0.50, 1.00]
+    },
     "sim_settings": {
       "fiat_start": 1000.0,
       "min_order_usd": 10.0,
