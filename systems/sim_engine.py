@@ -60,16 +60,6 @@ def clip(x: float, lo: float, hi: float) -> float:
 def run(tag: str, base: str) -> None:
     cfg = CFG
 
-    mode = (cfg.get("debug_sell_mode") or "").strip().upper()
-    min_profit_pct = float(cfg.get("debug_min_profit_pct", 0.005))
-    min_maturity_c = int(cfg.get("debug_min_maturity_candles", 24))
-    log_skips = bool(cfg.get("debug_log_skips", True))
-    if mode in {"A", "B", "C"}:
-        print(
-            f"[SIM] Debug sell mode={mode} | min_profit_pct={min_profit_pct} | "
-            f"min_maturity_candles={min_maturity_c}"
-        )
-
     investment_size = float(cfg["investment_size"])
     buy_multiplier = float(cfg.get("buy_multiplier", 1.0))
     sell_multiplier = float(cfg.get("sell_multiplier", 1.0))
@@ -237,25 +227,6 @@ def run(tag: str, base: str) -> None:
         should_buy  = 2 * (should_buy - 0.5) / 0.5
         should_buy  = clip(should_buy, 0.0, 1.0)
 
-        # Compute candle duration (sec) from this and prev candle (handles ms timestamps)
-        dt = (candles[i][0] - candles[i - 1][0])
-        candle_seconds = int(dt / 1000) if dt > 10_000 else int(dt)
-
-        eligible_coin = None
-        if mode in {"A", "B", "C"}:
-            eligible_coin = 0.0
-            for n in ledger.get_open_notes():
-                ok = True
-                if mode == "A":  # Loss gate: require price >= entry
-                    ok = price >= n["entry_price"]
-                elif mode == "B":  # Maturity gate: require age >= N candles
-                    age_sec = max(0, ts - int(n["entry_ts"]))
-                    ok = age_sec >= (min_maturity_c * candle_seconds)
-                elif mode == "C":  # Profit buffer: require price >= entry*(1+X%)
-                    ok = price >= (n["entry_price"] * (1.0 + min_profit_pct))
-                if ok:
-                    eligible_coin += float(n.get("remaining", 0.0))
-
         ctx = {
             "topbottom": topbottom_smooth,
             "buy_var": buy_var,
@@ -274,29 +245,11 @@ def run(tag: str, base: str) -> None:
         sell_amt = evaluate_sell(ctx)
 
         action = None
-
-        # SELL path first (your existing order)
         if sell_amt > 0:
-            if mode in {"A", "B", "C"}:
-                # cap to eligible inventory
-                capped = min(sell_amt, eligible_coin or 0.0)
-                if capped <= 0.0:
-                    if log_skips:
-                        log_snapshot(
-                            "[SKIP] sell: no eligible notes under debug mode " + mode,
-                            also_print=False,
-                        )
-                    # fall through to BUY check (so we can still buy same tick)
-                else:
-                    ledger.sell(capped, price, ts)
-                    action = f"SELLx{capped:.2f}"
-            else:
-                ledger.sell(sell_amt, price, ts)
-                action = f"SELLx{sell_amt:.2f}"
-
-        # BUY path
-        if action is None and buy_amt > 0:
-            ledger.buy(buy_amt, price, ts)
+            ledger.sell(sell_amt, ctx["price"], ctx["ts"])
+            action = f"SELLx{sell_amt:.2f}"
+        elif buy_amt > 0:
+            ledger.buy(buy_amt, ctx["price"], ctx["ts"])
             action = f"BUYx{buy_amt:.2f}"
 
         # Single clean print
