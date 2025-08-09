@@ -20,6 +20,8 @@ DEAD_ZONE_PCT = None  # override percentage; else derive from settings
 DEAD_ZONE_MIN = 0.44  # fallback dead-zone bounds when pct not provided
 DEAD_ZONE_MAX = 0.56
 
+BASE_UNIT = 1.0
+
 # SnapbackOdds knobs (structure-only; no new deps)
 ODDS_LOOKBACK = 8        # bars for micro slope
 W_DIVERGENCE  = 0.45     # weight: micro vs macro slope divergence
@@ -89,6 +91,10 @@ def run(tag: str) -> None:
 
     init_snapshot_log()
     prev_tb = 0.5
+
+    total_bought = 0.0
+    total_sold = 0.0
+
 
     for i in range(WINDOW, len(candles), STEP):
         window = candles[i - WINDOW : i]
@@ -162,8 +168,57 @@ def run(tag: str) -> None:
             topbottom_smooth = (1 - SMOOTH_EMA) * prev_tb + SMOOTH_EMA * topbottom_filt if SMOOTH_EMA > 0 else topbottom_filt
         prev_tb = topbottom_smooth
 
+        # Directional ramps (your request):
+        # SellVar: 0.5 -> 0, 0.3 -> 1
+        sell_var = (0.5 - snapback_up) / 0.2
+        sell_var = clip(sell_var, 0.0, 1.0)
+        # BuyVar: 0.5 -> 0, 0.7 -> 1
+        buy_var = (snapback_up - 0.5) / 0.2
+        buy_var = clip(buy_var, 0.0, 1.0)
+
+        # keep your existing sell_var / buy_var block here
+
+        # 75/25 weighting: TopBottom dominates, Var tops it off
+        should_sell = 0.75 * topbottom_smooth + 0.25 * sell_var
+        should_buy  = 0.75 * (1 - topbottom_smooth) + 0.25 * buy_var
+
+        # Remap: 0.5 → 0, 1 → 1, values below 0.5 become negative unless clipped
+        should_sell = 2 * (should_sell - 0.5) / 0.5
+        should_sell = clip(should_sell, 0.0, 1.0)
+
+        should_buy  = 2 * (should_buy - 0.5) / 0.5
+        should_buy  = clip(should_buy, 0.0, 1.0)
+
+        # ----- Trigger logic (≥ 0.50) with multiplier: 0.50->1x, 1.00->3x -----
+        def size_multiplier(score: float) -> float:
+            # linear map: 0.5→1, 1.0→3  => m = 1 + 4*(score-0.5)
+            return 1.0 + 4.0 * (score - 0.5)
+
+        action = None
+        qty = 0.0
+
+        if should_buy >= 0.5 or should_sell >= 0.5:
+            # Resolve conflict by taking the stronger side only
+            if should_buy >= should_sell and should_buy >= 0.5:
+                qty = BASE_UNIT * size_multiplier(should_buy)
+                total_bought += qty
+                action = f"BUYx{qty:.2f}"
+            elif should_sell > should_buy and should_sell >= 0.5:
+                qty = BASE_UNIT * size_multiplier(should_sell)
+                total_sold += qty
+                action = f"SELLx{qty:.2f}"
+
+
         # Single clean print
-        line = f"TopBottom:{topbottom_smooth:.2f} SellVar:{sell_var:.2f} BuyVar:{buy_var:.2f}"
+        suffix = ""
+        if action:
+            suffix = f" Action:{action} TotBuy:{total_bought:.2f} TotSell:{total_sold:.2f}"
+
+        line = (
+            f"TopBottom:{topbottom_smooth:.2f} "
+            f"SellVar:{sell_var:.2f} BuyVar:{buy_var:.2f} "
+            f"ShouldBuy:{should_buy:.2f} ShouldSell:{should_sell:.2f}{suffix}"
+        )
         log_snapshot(line)
 
 
