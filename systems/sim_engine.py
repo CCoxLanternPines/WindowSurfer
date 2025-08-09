@@ -13,7 +13,7 @@ Candle = Tuple[int, float, float, float, float]
 LOG_PATH = Path("data/tmp/snapshots.log")
 
 # Window and step sizes
-WINDOW = 72
+WINDOW = 300
 STEP = 5
 
 # --- Top/Bottom score knobs ---
