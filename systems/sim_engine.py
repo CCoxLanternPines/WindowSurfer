@@ -61,24 +61,22 @@ def clip(x: float, lo: float, hi: float) -> float:
     return lo if x < lo else hi if x > hi else x
 
 
-def run(tag: str, odds: bool = False) -> None:
+def run(tag: str) -> None:
     candles = load_candles(tag)
     if len(candles) < WINDOW:
         print("Not enough data to simulate.")
         return
 
+    # Resolve dead-zone from settings (optional)
     dz_pct = DEAD_ZONE_PCT
     if dz_pct is None:
         settings_path = Path("settings/settings.json")
         if settings_path.exists():
             try:
                 settings = json.loads(settings_path.read_text())
-                ledgers = settings.get("ledger_settings", {})
-                ledger_iter = ledgers.values() if isinstance(ledgers, dict) else ledgers
-                for ledger in ledger_iter:
+                for ledger in (settings.get("ledger_settings") or {}).values():
                     if ledger.get("tag") == tag:
-                        windows = ledger.get("window_settings", {})
-                        for cfg in windows.values():
+                        for cfg in (ledger.get("window_settings") or {}).values():
                             dz = cfg.get("dead_zone_pct")
                             if dz is not None:
                                 dz_pct = dz
@@ -86,58 +84,43 @@ def run(tag: str, odds: bool = False) -> None:
                         break
             except Exception:
                 pass
-    if dz_pct is not None:
-        dead_zone_min = 0.5 - dz_pct / 2
-        dead_zone_max = 0.5 + dz_pct / 2
-    else:
-        dead_zone_min = DEAD_ZONE_MIN
-        dead_zone_max = DEAD_ZONE_MAX
+    dead_zone_min = 0.5 - dz_pct / 2 if dz_pct is not None else DEAD_ZONE_MIN
+    dead_zone_max = 0.5 + dz_pct / 2 if dz_pct is not None else DEAD_ZONE_MAX
 
     init_snapshot_log()
     prev_tb = 0.5
 
     for i in range(WINDOW, len(candles), STEP):
         window = candles[i - WINDOW : i]
-        lows = [x[3] for x in window]
-        highs = [x[2] for x in window]
+        lows   = [x[3] for x in window]
+        highs  = [x[2] for x in window]
         closes = [x[4] for x in window]
 
-        low_w = min(lows)
-        high_w = max(highs)
+        low_w, high_w = min(lows), max(highs)
         denom = max(1e-9, high_w - low_w)
 
-        slope = (
-            (closes[-1] - closes[-MOMENTUM_BARS]) / denom
-            if len(closes) > MOMENTUM_BARS
-            else 0.0
-        )
+        # Micro slope
+        slope = (closes[-1] - closes[-MOMENTUM_BARS]) / denom if len(closes) > MOMENTUM_BARS else 0.0
 
+        # Window position
         pos_now = 0.5 if high_w == low_w else (closes[-1] - low_w) / denom
         pos_now = clip(pos_now, 0.0, 1.0)
 
-        norms = [(c - low_w) / denom for c in closes] if high_w != low_w else [0.5] * len(closes)
-        avg_pos = clip(sum(norms) / len(norms), 0.0, 1.0)
-
-        # Wick features from the last candle
-        last_ts, o, h, l, c = window[-1]
+        # Wick features (last candle)
+        _, o, h, l, c = window[-1]
         rng = max(1e-9, h - l)
         body_low, body_high = (min(o, c), max(o, c))
-        lower_wick = body_low - l      # rejection off lows
-        upper_wick = h - body_high     # rejection off highs
+        lower_wick = body_low - l
+        upper_wick = h - body_high
         lw_ratio = clip(lower_wick / rng, 0.0, 1.0)
         uw_ratio = clip(upper_wick / rng, 0.0, 1.0)
 
-        # Base top/bottom = normalized position
-        topbottom_raw = pos_now
-
-        # Symmetric wick skew: more upper wick ⇒ push toward top (↑),
-        # more lower wick ⇒ push toward bottom (↓)
+        # TopBottom (with wick skew + dead-zone filter + momentum confirm)
         wick_skew = ALPHA_WICK * (uw_ratio - lw_ratio)
-        topbottom_base = clip(topbottom_raw + wick_skew, 0.0, 1.0)
+        topbottom_base = clip(pos_now + wick_skew, 0.0, 1.0)
 
         if dead_zone_min <= topbottom_base <= dead_zone_max:
-            dead_zone_blend = 0.5 + 0.5 * (topbottom_base - 0.5)
-            topbottom_filt = dead_zone_blend
+            topbottom_filt = 0.5 + 0.5 * (topbottom_base - 0.5)  # halve deviation
         else:
             topbottom_filt = topbottom_base
 
@@ -148,60 +131,47 @@ def run(tag: str, odds: bool = False) -> None:
             if slope > MOMENTUM_EPS:
                 topbottom_filt = 0.75 * topbottom_filt + 0.25 * 0.5
 
-        # ---- SnapbackOdds components ----
-        # Wick imbalance (buyers rejecting lows)
+        # Snapback (structure-only): divergence + wick balance + depth
         wick_balance = lw_ratio - uw_ratio
-
-        # Micro vs. macro slope divergence
         if len(closes) > ODDS_LOOKBACK and denom > 1e-9:
             slope_micro = (closes[-1] - closes[-ODDS_LOOKBACK]) / denom
         else:
             slope_micro = 0.0
+
         slope_macro = (closes[-1] - closes[0]) / denom if denom > 1e-9 else 0.0
         macro_sign = 0.0 if slope_macro == 0 else (1.0 if slope_macro > 0 else -1.0)
-        divergence = -slope_micro * macro_sign
+        divergence = -slope_micro * macro_sign  # positive when micro fights macro
 
-        # Depth from mid-tunnel
-        depth = (0.5 - pos_now) * 2.0
+        depth = (0.5 - pos_now) * 2.0  # floor:+1, ceiling:-1
 
-        raw = (
-            W_DIVERGENCE * divergence
-            + W_WICK * wick_balance
-            + W_DEPTH * depth
-        )
+        raw = (W_DIVERGENCE * divergence) + (W_WICK * wick_balance) + (W_DEPTH * depth)
         snapback_up = clip(0.5 + 0.5 * raw, 0.0, 1.0)
-        go_deeper = 1.0 - snapback_up
 
-        # Optional EMA smoothing across snapshots
+        # Directional ramps (your request):
+        # SellVar: 0.5 -> 0, 0.3 -> 1
+        sell_var = (0.5 - snapback_up) / 0.2
+        sell_var = clip(sell_var, 0.0, 1.0)
+        # BuyVar: 0.5 -> 0, 0.7 -> 1
+        buy_var = (snapback_up - 0.5) / 0.2
+        buy_var = clip(buy_var, 0.0, 1.0)
+
+        # EMA smoothing for TopBottom
         if i == WINDOW:
             topbottom_smooth = topbottom_filt
         else:
-            topbottom_smooth = (
-                (1 - SMOOTH_EMA) * prev_tb + SMOOTH_EMA * topbottom_filt
-                if SMOOTH_EMA > 0
-                else topbottom_filt
-            )
+            topbottom_smooth = (1 - SMOOTH_EMA) * prev_tb + SMOOTH_EMA * topbottom_filt if SMOOTH_EMA > 0 else topbottom_filt
         prev_tb = topbottom_smooth
 
-        ts = last_ts
-        line = f"TopBottom:{topbottom_smooth:.2f}"
-        if odds:
-            line += f"  SnapbackOdds:{snapback_up:.2f}"
+        # Single clean print
+        line = f"TopBottom:{topbottom_smooth:.2f} SellVar:{sell_var:.2f} BuyVar:{buy_var:.2f}"
         log_snapshot(line)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Monthly wave snapshot with top/bottom score."
-    )
+    parser = argparse.ArgumentParser(description="Monthly wave snapshot with top/bottom score.")
     parser.add_argument("tag", help="Asset tag for CSV in data/raw/<TAG>.csv")
-    parser.add_argument(
-        "--odds",
-        action="store_true",
-        help="Append SnapbackOdds to each TopBottom print",
-    )
     args = parser.parse_args()
-    run(args.tag, odds=args.odds)
+    run(args.tag)
 
 
 if __name__ == "__main__":
