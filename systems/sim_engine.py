@@ -10,7 +10,8 @@ from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.utils.config import load_ledgers, resolve_ledger_cfg
 from systems.utils.pairs import resolve_by_tag, raw_path
-
+from systems.utils.time import parse_cutoff
+    
 # ts, open, high, low, close
 Candle = Tuple[int, float, float, float, float]
 LOG_PATH = Path("data/tmp/snapshots.log")
@@ -90,12 +91,26 @@ def run(tag: str, base: str) -> None:
         f"weights(div={W_DIVERGENCE:.2f}, wick={W_WICK:.2f}, depth={W_DEPTH:.2f})"
     )
 
-    WINDOW = 300
-    STEP = skip_candles
     BASE_UNIT = investment_size
     ODDS_LOOKBACK = snapback_lookback
 
     candles = load_candles(tag)
+    
+
+
+    window_str = str(cfg.get("window_size", "3d"))
+    window_td = parse_cutoff(window_str)
+
+    # get candle interval from first two candles (ms → seconds if needed)
+    dt = candles[1][0] - candles[0][0]
+    candle_seconds = int(dt / 1000) if dt > 10_000 else int(dt)
+
+    WINDOW = max(1, int(window_td.total_seconds() // candle_seconds))
+    STEP = int(cfg.get("skip_candles", skip_candles))
+
+    print(f"[SIM] window_size={window_str} → WINDOW={WINDOW} | STEP={STEP}")
+
+    
     if len(candles) < WINDOW:
         print("Not enough data to simulate.")
         return

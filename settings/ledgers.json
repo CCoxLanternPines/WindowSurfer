@@ -5,9 +5,9 @@
   },
   "default": {
     "tag": "SOL",
-    "window_size": "3w",
-    "skip_candles": 5,
-    "investment_size": 0.1,
+    "window_size": "5w",
+    "skip_candles": 4,
+    "investment_size": 0.01,
     "buy_multiplier": 3,
     "sell_multiplier": 3,
     "tunnel_settings": {
@@ -22,6 +22,9 @@
     "snapback_odds": {
       "lookback": 10,
       "weights": { "divergence": 0.45, "wick": 0.35, "depth": 0.20 }
+    },
+    "sim_settings": {
+      fiat_amount:: 1000.00
     }
   }
 }
