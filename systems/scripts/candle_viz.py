@@ -362,7 +362,7 @@ def run_price_viz(
             return
 
         # ----- trading -----
-        if k in {"x", "X"}:  # BUY 1
+        if k in {"z", "Z"}:  # BUY 1
             holdings.append(state["price"])
             buys += 1
             refresh_hud()
@@ -370,7 +370,7 @@ def run_price_viz(
             status_text.set_color("tab:green")
             return
 
-        if k in {"z", "Z"}:  # SELL 1 (highest entry first)
+        if k in {"x", "X"}:  # SELL 1 (highest entry first)
             if holdings:
                 i_max = max(range(len(holdings)), key=lambda i: holdings[i])
                 entry = holdings.pop(i_max)
