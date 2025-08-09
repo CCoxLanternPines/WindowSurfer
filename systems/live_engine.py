@@ -20,13 +20,10 @@ def run(args: argparse.Namespace) -> None:
     binance_symbol = pair["binance_symbol"]
 
     window_size = cfg["window_size"]
+    skip_candles = int(cfg["skip_candles"])
     investment_size = float(cfg["investment_size"])
     buy_multiplier = float(cfg["buy_multiplier"])
     sell_multiplier = float(cfg["sell_multiplier"])
-
-    wa = cfg["window_alg"]
-    window_alg_window = wa["window"]
-    window_alg_skip_candles = int(wa["skip_candles"])
 
     TUN = cfg["tunnel_settings"]
     alpha_wick = float(TUN["alpha_wick"])
@@ -40,7 +37,7 @@ def run(args: argparse.Namespace) -> None:
     snapback_lookback = int(cfg["snapback_odds"]["lookback"])
 
     print(
-        f"[LIVE] Loaded {ledger_name} | Kraken:{kraken_symbol} Binance:{binance_symbol} Window:{window_size}"
+        f"[LIVE] Loaded {ledger_name} | Kraken:{kraken_symbol} Binance:{binance_symbol} Window:{window_size} Skip:{skip_candles}"
     )
 
 
