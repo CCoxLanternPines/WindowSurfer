@@ -79,11 +79,16 @@ def run(tag: str, base: str) -> None:
     dead_zone_max = 0.5 + dz_pct / 2 if dz_pct is not None else DEAD_ZONE_MAX
 
     snapback = cfg.get("snapback_odds", {})
-    snapback_lookback = int(snapback.get("lookback", 0))
-    weights = snapback.get("weights", {})
-    W_DIVERGENCE = weights.get("divergence", 0)
-    W_WICK = weights.get("wick", 0)
-    W_DEPTH = weights.get("depth", 0)
+    snapback_lookback = int(snapback.get("lookback", 8))
+    weights = snapback.get("weights", {}) or {}
+    W_DIVERGENCE = float(weights.get("divergence", 0.45))
+    W_WICK       = float(weights.get("wick",       0.35))
+    W_DEPTH      = float(weights.get("depth",      0.20))
+
+    print(
+        f"[SIM] snapback lookback={snapback_lookback} "
+        f"weights(div={W_DIVERGENCE:.2f}, wick={W_WICK:.2f}, depth={W_DEPTH:.2f})"
+    )
 
     WINDOW = 300
     STEP = skip_candles
