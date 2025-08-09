@@ -8,8 +8,8 @@ Candle = Tuple[int, float, float, float, float]
 LOG_PATH = Path("data/tmp/snapshots.log")
 
 # Window and step sizes
-WINDOW = 132
-STEP = 15
+WINDOW = 72
+STEP = 5
 
 # --- Top/Bottom score knobs ---
 ALPHA_WICK = 0.12     # how strongly wicks skew PosNow toward 0/1
