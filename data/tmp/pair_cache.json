@@ -1,0 +1,70 @@
+{
+  "DOGE": {
+    "binance": [
+      {
+        "symbol": "DOGEUSDT",
+        "base": "DOGE",
+        "quote": "USDT",
+        "id": "DOGE/USDT",
+        "active": true
+      }
+    ],
+    "kraken": [
+      {
+        "symbol": "DOGE/USD",
+        "altname": "DOGEUSD",
+        "wsname": "DOGE/USD",
+        "baseId": "XXDG",
+        "quoteId": "ZUSD",
+        "pair": "XXDGZUSD",
+        "active": true
+      }
+    ],
+    "wallet_codes": {
+      "kraken_asset": "XXDG",
+      "binance_asset": "DOGE"
+    }
+  },
+  "SOL": {
+    "binance": [
+      {
+        "symbol": "SOLUSDT",
+        "base": "SOL",
+        "quote": "USDT",
+        "id": "SOL/USDT",
+        "active": true
+      },
+      {
+        "symbol": "SOLUSDC",
+        "base": "SOL",
+        "quote": "USDC",
+        "id": "SOL/USDC",
+        "active": true
+      }
+    ],
+    "kraken": [
+      {
+        "symbol": "SOL/USD",
+        "altname": "SOLUSD",
+        "wsname": "SOL/USD",
+        "baseId": "SOL",
+        "quoteId": "ZUSD",
+        "pair": "SOLZUSD",
+        "active": true
+      },
+      {
+        "symbol": "SOL/USDC",
+        "altname": "SOLUSDC",
+        "wsname": "SOL/USDC",
+        "baseId": "SOL",
+        "quoteId": "USDC",
+        "pair": "SOLUSDC",
+        "active": true
+      }
+    ],
+    "wallet_codes": {
+      "kraken_asset": "SOL",
+      "binance_asset": "SOL"
+    }
+  }
+}
