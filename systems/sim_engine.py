@@ -227,9 +227,20 @@ def run(tag: str) -> None:
         line += f" | OpenNotes:{len(ledger.get_open_notes())} Coin:{ledger.total_coin():.4f}"
         log_snapshot(line)
 
+    final_price = candles[-1][4]
+    realized = ledger.realized_gain_usd()
+    unrealized = ledger.unrealized_gain_usd(final_price)
+    total = realized + unrealized
+    coin = ledger.total_coin()
+    print(
+        f"[SIM] PnL | Realized:${realized:.2f} | Unrealized:${unrealized:.2f} | "
+        f"Total:${total:.2f} | Coin:{coin:.6f} @ ${final_price:.4f}"
+    )
+
     out_dir = Path("data/tmp")
     out_dir.mkdir(parents=True, exist_ok=True)
     ledger.save(out_dir / "ledger_simple.json")
+    ledger.save_summary(Path("data/tmp/ledger_simple_summary.json"), final_price)
 
 
 def main() -> None:
