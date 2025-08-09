@@ -27,6 +27,10 @@
       "fiat_start": 1000.0,
       "min_order_usd": 10.0,
       "allow_partial_buys": true
-    }
+    },
+    "debug_sell_mode": "A",
+    "debug_min_profit_pct": 0.005,
+    "debug_min_maturity_candles": 24,
+    "debug_log_skips": true
   }
 }
