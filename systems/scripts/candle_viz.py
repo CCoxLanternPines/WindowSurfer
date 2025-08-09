@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-"""Candle-by-candle price visualizer."""
+"""Candle-by-candle price visualizer with zoom-at-wall behavior and overlays."""
 
 from pathlib import Path
 import sys
-
+import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use("TkAgg")  # or "Qt5Agg" if you have Qt installed
+matplotlib.use("TkAgg")  # Change to "Qt5Agg" if you use Qt
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
 
+
 try:
     from systems.utils.config import resolve_path
-except Exception:  # pragma: no cover - fallback if config not present
+except Exception:  # fallback if config not present
     def resolve_path(rel_path: str) -> Path:
         return Path(__file__).resolve().parents[2] / rel_path
 
@@ -23,14 +24,7 @@ except Exception:  # pragma: no cover - fallback if config not present
 # ---------------------------------------------------------------------------
 
 def load_raw(tag: str) -> pd.DataFrame:
-    """Load raw candle data for ``tag``.
-
-    Parameters
-    ----------
-    tag: str
-        Trading pair tag such as ``DOGEUSD``.
-    """
-
+    """Load raw candle data for `tag`."""
     base_path = resolve_path("data/raw")
     csv_path = base_path / f"{tag}.csv"
     if not csv_path.exists():
@@ -39,11 +33,11 @@ def load_raw(tag: str) -> pd.DataFrame:
 
     df = pd.read_csv(csv_path, usecols=["timestamp", "open", "high", "low", "close", "volume"])
     df = df.sort_values("timestamp").reset_index(drop=True)
-    return df[["timestamp", "close"]]
+    return df[["timestamp", "high", "low", "close"]]
 
 
 # ---------------------------------------------------------------------------
-# Visualization
+# Utility helpers
 # ---------------------------------------------------------------------------
 
 def _pad(lim: tuple[float, float], pct: float) -> tuple[float, float]:
@@ -55,107 +49,192 @@ def _lerp(a: tuple[float, float], b: tuple[float, float], s: float) -> tuple[flo
     return a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s
 
 
+# ---------------------------------------------------------------------------
+# Main visualizer
+# ---------------------------------------------------------------------------
+
 def run_price_viz(
     tag: str,
     speed_ms: int = 10,
     frameskip: int = 1,
     start_idx: int = 0,
-    zoom_seconds: int = 5,
     width: float = 12.0,
     height: float = 6.0,
     save_path: str | None = None,
     show_grid: bool = False,
+    zoom_seconds: int | None = None,   # <-- add this back for compatibility
+    *,
+    k: int = 50, s: int = 20, m: int = 50,
+    g_thr: float = 0.25, d_min: float = 1.2, q: int = 8,
+    squeeze_thr: float = 0.7, s_thr: float = 1e-4,
+    i_thr: float = 0.6, t_thr: float = 1.5,
 ) -> None:
-    """Render a candle-by-candle price visualizer."""
 
     df = load_raw(tag)
     t = df["timestamp"].to_numpy()
-    y = df["close"].to_numpy()
-    N = len(y)
+    c = df["close"].to_numpy()
+    h = df["high"].to_numpy()
+    l = df["low"].to_numpy()
+    N = len(c)
     if start_idx >= N:
         print("[ERROR] start index beyond data length")
         return
 
-    fps = max(1, int(1000 / max(1, speed_ms)))
+    # ------------------------------------------------------------------
+    # Precompute series (vectorized)
+    # ------------------------------------------------------------------
+    r = np.diff(c, prepend=c[0])
+    ema_k = pd.Series(c).ewm(span=k, adjust=False).mean().to_numpy()
+
+    prev_close = np.r_[c[0], c[:-1]]
+    tr = np.maximum.reduce([
+        h - l,
+        np.abs(h - prev_close),
+        np.abs(l - prev_close),
+    ])
+    atr = pd.Series(tr).ewm(span=k, adjust=False).mean().to_numpy()
+
+    pos = np.maximum(r, 0)
+    neg = np.maximum(-r, 0)
+    U = pd.Series(pos).ewm(span=s, adjust=False).mean().to_numpy()
+    D = pd.Series(neg).ewm(span=s, adjust=False).mean().to_numpy()
+    G = (U - D) / (U + D + 1e-9)
+    min_g = np.minimum.accumulate(G)
+    GD = G - min_g
+
+    I = r / (atr + 1e-9)
+    T = (c - ema_k) / (atr + 1e-9)
+    atr_ma = pd.Series(atr).ewm(span=s, adjust=False).mean().to_numpy()
+    atr_ratio = atr / (atr_ma + 1e-9)
+    ema_m = pd.Series(c).ewm(span=m, adjust=False).mean().to_numpy()
+    ema_m_slope = np.gradient(ema_m, t)
+
+    tsnl = np.zeros(N, dtype=int)
+    min_price = c[0]
+    for i in range(1, N):
+        if c[i] <= min_price:
+            min_price = c[i]
+            tsnl[i] = 0
+        else:
+            tsnl[i] = tsnl[i - 1] + 1
+
+    S = (
+        (GD >= d_min)
+        & (tsnl >= q)
+        & (atr_ratio <= squeeze_thr)
+        & (np.abs(ema_m_slope) <= s_thr)
+    )
+    prev_S = np.r_[False, S[:-1]]
+    thrust = prev_S & (I >= i_thr) & (T >= t_thr)
+
+    # Animation timing
     total_frames = (N - start_idx + frameskip - 1) // frameskip
-    
-    zoom_frames = int(total_frames * 1)  # zoom done at 40% of draw time
+    fps = max(1, int(1000 / max(1, speed_ms)))
+    zoom_frames = int(total_frames * 1)  # same pacing as previous commit
 
+    # Full-series extents
     x_full = (float(t[0]), float(t[-1]))
-    y_full = (float(y.min()), float(y.max()))
+    y_full = (float(c.min()), float(c.max()))
 
-    fig, ax = plt.subplots(figsize=(width, height))
+    # Figure with gravity subplot
+    fig, (ax, ax_g) = plt.subplots(
+        2, 1,
+        sharex=True,
+        figsize=(width, height),
+        gridspec_kw={"height_ratios": [3, 1]},
+    )
     line, = ax.plot([], [], lw=1)
+    center_line, = ax.plot([], [], lw=1, color="C1")
+    upper_band, = ax.plot([], [], lw=1, color="C2", alpha=0.5)
+    lower_band, = ax.plot([], [], lw=1, color="C2", alpha=0.5)
     dot, = ax.plot([], [], "o", ms=4)
+    stall_scatter, = ax.plot([], [], "o", ms=4, color="orange")
+    thrust_scatter, = ax.plot([], [], "o", ms=4, color="green")
     if show_grid:
         ax.grid(True, alpha=0.2)
+        ax_g.grid(True, alpha=0.2)
 
     title_left = ax.text(0.01, 0.99, tag, transform=ax.transAxes, ha="left", va="top")
     title_right = ax.text(0.99, 0.99, "", transform=ax.transAxes, ha="right", va="top")
 
+    g_line, = ax_g.plot([], [], lw=1, color="C0")
+    g_fill = ax_g.fill_between([], [], 0, color="C0", alpha=0.1)
+    ax_g.axhline(0, color="k", lw=0.5)
+    ax_g.set_ylim(-1, 1)
+
+    # State
     xs: list[float] = []
     ys: list[float] = []
+    stall_x: list[float] = []
+    stall_y: list[float] = []
+    thrust_x: list[float] = []
+    thrust_y: list[float] = []
 
-    def on_key(event):  # pragma: no cover - UI interaction
+    # Zoom state
+    x_zoom_start: int | None = None
+    y_zoom_start: int | None = None
+    x_start_lim: tuple[float, float] | None = None
+    y_start_lim: tuple[float, float] | None = None
+
+    paused = False
+
+    paused = False  # define in run_price_viz so it's in scope
+
+    def on_key(event):
+        nonlocal paused  # allows us to modify the outer variable
         if event.key == "escape":
             plt.close(fig)
+        elif event.key == " ":
+            if paused:
+                anim.event_source.start()
+            else:
+                anim.event_source.stop()
+            paused = not paused
 
     fig.canvas.mpl_connect("key_press_event", on_key)
 
-    # Outside update(), initialize before FuncAnimation:
-    x_zoom_start_frame = None
-    y_zoom_start_frame = None
 
-    def update(frame: int):
-        nonlocal x_zoom_start_frame, y_zoom_start_frame
-        idx = min(start_idx + frame * frameskip, N - 1)
-        xs.append(float(t[idx]))
-        ys.append(float(y[idx]))
-        line.set_data(xs, ys)
-        if xs and ys:
-            dot.set_data([xs[-1]], [ys[-1]])
+    window_size = 200  # number of candles to keep in view
 
-        # Detect milestones
-        if y_zoom_start_frame is None and min(ys) <= y_full[0]:
-            y_zoom_start_frame = frame
-        if x_zoom_start_frame is None and xs[0] <= x_full[0]:
-            x_zoom_start_frame = frame
+    # Change total_frames so we start at a full window
+    total_frames = N - window_size
 
-        # Progress for each axis
-        # X
-        if x_zoom_start_frame is not None:
-            
-            u_x = min(max((frame - x_zoom_start_frame) / zoom_frames, 0.0), 1.0)
-            s_x = u_x * u_x * (3 - 2 * u_x)
-            xlim = _lerp((xs[0], xs[-1]), x_full, s_x)
-        else:
-            xlim = (xs[0], xs[-1])
+    def update(frame):
+        idx = frame + window_size  # shift so first frame shows full window
+        left_idx = idx - window_size
 
-        # Y
-        if y_zoom_start_frame is not None:
-            u_y = min(max((frame - y_zoom_start_frame) / zoom_frames, 0.0), 1.0)
-            s_y = u_y * u_y * (3 - 2 * u_y)
-            current_min = min(ys)
-            current_max = max(ys)
-            ylim = _pad(_lerp((current_min, current_max), y_full, s_y), 0.02)
-        else:
-            ylim = _pad((min(ys), max(ys)), 0.02)
+        x_window = t[left_idx:idx+1]
+        y_window = c[left_idx:idx+1]
 
-        ax.set_xlim(*xlim)
-        ax.set_ylim(*ylim)
+        # Plot main line and overlays
+        line.set_data(x_window, y_window)
+        dot.set_data([x_window[-1]], [y_window[-1]])
+        center_line.set_data(x_window, ema_k[left_idx:idx+1])
+        upper_band.set_data(x_window, ema_k[left_idx:idx+1] + atr[left_idx:idx+1])
+        lower_band.set_data(x_window, ema_k[left_idx:idx+1] - atr[left_idx:idx+1])
 
-        price = ys[-1]
-        ts = pd.to_datetime(xs[-1], unit="s")
-        title_right.set_text(f"{price:.4f} @ {ts}")
-        return line, dot, title_right
+        # Gravity subplot
+        g_line.set_data(x_window, G[left_idx:idx+1])
+        nonlocal g_fill
+        g_fill.remove()
+        g_fill = ax_g.fill_between(
+            x_window, G[left_idx:idx+1], 0,
+            where=G[left_idx:idx+1] < 0, color="C0", alpha=0.1
+        )
 
-    total_frames = (N - start_idx + frameskip - 1) // frameskip
+        # Keep window focus
+        ax.set_xlim(float(x_window[0]), float(x_window[-1]))
+        ax.set_ylim(*_pad((float(y_window.min()), float(y_window.max())), 0.02))
+        ax_g.set_xlim(float(x_window[0]), float(x_window[-1]))
+
+        return line, dot, center_line, upper_band, lower_band, g_line, g_fill
+
     anim = FuncAnimation(
         fig,
         update,
         frames=range(total_frames),
         interval=speed_ms,
-        blit=True,
+        blit=False,
     )
 
     if save_path:
