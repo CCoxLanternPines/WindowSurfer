@@ -17,30 +17,48 @@ def run(trials: int) -> None:
     with open("settings.json", "r", encoding="utf-8") as f:
         base_cfg: Dict[str, Any] = json.load(f)
     with open("knobs.json", "r", encoding="utf-8") as f:
-        knobs: Dict[str, list[int]] = json.load(f)
+        knobs: Dict[str, list[float]] = json.load(f)
 
     results_path = Path("tune_results.csv")
 
     def objective(trial: optuna.trial.Trial) -> float:
         cfg = base_cfg.copy()
-        params: Dict[str, int] = {}
+        params: Dict[str, float] = {}
         for name, bounds in knobs.items():
             low, high = bounds
-            value = trial.suggest_int(name, int(low), int(high))
+            if isinstance(low, int) and isinstance(high, int):
+                value = trial.suggest_int(name, int(low), int(high))
+            else:
+                value = trial.suggest_float(name, float(low), float(high))
             cfg[name] = value
             params[name] = value
 
         metrics = run_sim(cfg)
 
         row = OrderedDict([("trial", trial.number)])
-        row.update(params)
-        row.update(metrics)
+        for k in knobs.keys():
+            row[k] = params[k]
+        row["final_capital"] = metrics["final_capital"]
+        row["pnl"] = metrics["pnl"]
 
-        file_exists = results_path.exists()
+        fieldnames = list(row.keys())
+        header_line = ",".join(fieldnames)
+        if results_path.exists():
+            existing_content = results_path.read_text(encoding="utf-8")
+            first_line = existing_content.splitlines()[0] if existing_content else ""
+            if first_line != header_line:
+                with results_path.open("w", newline="", encoding="utf-8") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(fieldnames)
+                    if existing_content:
+                        f.write(existing_content)
+        else:
+            with results_path.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(fieldnames)
+
         with results_path.open("a", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=row.keys())
-            if not file_exists:
-                writer.writeheader()
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writerow(row)
             f.flush()
             os.fsync(f.fileno())

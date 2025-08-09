@@ -2,5 +2,11 @@
   "simulation_capital": 1000,
   "buy_frequency": 5,
   "min_hold_time": 10,
-  "avg_window_all_time": 50
+  "avg_window_all_time": 50,
+  "buy_fraction": 0.02,
+  "maturity_gain_target": 0.02,
+  "max_concurrent_notes": 20,
+  "dip_depth_entry": 0.03,
+  "slope_filter": 0.01,
+  "volatility_filter": 0.005
 }

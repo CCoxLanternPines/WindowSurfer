@@ -1,5 +1,11 @@
 {
   "buy_frequency": [1, 50],
   "min_hold_time": [1, 100],
-  "avg_window_all_time": [10, 200]
+  "avg_window_all_time": [10, 200],
+  "buy_fraction": [0.005, 0.1],
+  "maturity_gain_target": [0.005, 0.1],
+  "max_concurrent_notes": [5, 100],
+  "dip_depth_entry": [0.0, 0.2],
+  "slope_filter": [-0.05, 0.05],
+  "volatility_filter": [0.0, 0.05]
 }
