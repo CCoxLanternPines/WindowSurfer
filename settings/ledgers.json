@@ -1,12 +1,9 @@
 {
   "ledgers": {
-    "kris": {},
-    "travis": {}
+    "kris": { "tag": "DOGE" },
+    "travis": { "tag": "SOL" }
   },
   "default": {
-    "wallet_code": "XXDG",
-    "kraken_name": "DOGE/USD",
-    "binance_name": "DOGEUSDT",
     "window_size": "1m",
     "investment_size": 0.02,
     "buy_multiplier": 3,
