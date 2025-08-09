@@ -19,6 +19,9 @@
       "dead_zone_min": 0.44,
       "dead_zone_max": 0.56
     },
-    "snapback_odds": { "lookback": 20 }
+    "snapback_odds": {
+      "lookback": 10,
+      "weights": { "divergence": 0.45, "wick": 0.35, "depth": 0.20 }
+    }
   }
 }
