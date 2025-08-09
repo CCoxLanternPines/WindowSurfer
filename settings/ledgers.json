@@ -7,8 +7,8 @@
     "tag": "SOL",
     "window_size": "3w",
     "skip_candles": 5,
-    "investment_size": 0.2,
-    "buy_multiplier": 2,
+    "investment_size": 0.1,
+    "buy_multiplier": 3,
     "sell_multiplier": 3,
     "tunnel_settings": {
       "alpha_wick": 0.12,
@@ -19,6 +19,6 @@
       "dead_zone_min": 0.44,
       "dead_zone_max": 0.56
     },
-    "snapback_odds": { "lookback": 8 }
+    "snapback_odds": { "lookback": 20 }
   }
 }
