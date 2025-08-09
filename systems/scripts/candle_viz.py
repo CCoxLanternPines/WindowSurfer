@@ -82,6 +82,8 @@ def run_price_viz(
         print("[ERROR] start index beyond data length")
         return
 
+    window_size = 200  # number of candles to keep in view
+
     # ------------------------------------------------------------------
     # Precompute series (vectorized)
     # ------------------------------------------------------------------
@@ -101,6 +103,10 @@ def run_price_viz(
         snap = np.maximum(0.0, (c - ema_k)) / (atr + 1e-9)
     else:  # "low"
         snap = (c - rolling_low_s) / (atr + 1e-9)
+
+    snap_avg = (
+        pd.Series(snap).rolling(window=window_size, min_periods=1).mean().to_numpy()
+    )
 
     snap_center_span = max(snap_center_mult * s, s + 1)
     snap_center = pd.Series(snap).ewm(span=snap_center_span, adjust=False).mean().to_numpy()
@@ -186,8 +192,7 @@ def run_price_viz(
         )
         fig.canvas.draw_idle()
 
-    g_line, = ax_g.plot([], [], lw=1, color="C0")
-    g_fill = ax_g.fill_between([], [], 0, color="C0", alpha=0.1)
+    blue_line, = ax_g.plot([], [], lw=1.0, color="blue", alpha=0.8)
     ax_g.axhline(0, color="k", lw=0.5)
     ax_g.set_ylim(-1, 1)
 
@@ -227,9 +232,6 @@ def run_price_viz(
         "ts": float(t[start_idx]),
     }  # latest seen price for key handler
 
-
-    window_size = 200  # number of candles to keep in view
-
     # Change total_frames so we start at a full window
     total_frames = N - window_size
 
@@ -252,15 +254,6 @@ def run_price_viz(
         state["ts"] = float(x_window[-1])
         refresh_hud()
 
-        # Gravity subplot
-        g_line.set_data(x_window, G[left_idx:idx+1])
-        nonlocal g_fill
-        g_fill.remove()
-        g_fill = ax_g.fill_between(
-            x_window, G[left_idx:idx+1], 0,
-            where=G[left_idx:idx+1] < 0, color="C0", alpha=0.1
-        )
-
         # Keep window focus
         ax.set_xlim(float(x_window[0]), float(x_window[-1]))
         ax.set_ylim(*_pad((float(y_window.min()), float(y_window.max())), 0.02))
@@ -268,9 +261,11 @@ def run_price_viz(
 
         if snap_on:
             snap_win = snap[left_idx:idx+1]
+            snap_avg_win = snap_avg[left_idx:idx+1]
             snap_center_win = snap_center[left_idx:idx+1]
 
             snap_line.set_data(x_window, snap_win)
+            blue_line.set_data(x_window, snap_avg_win)
             snap_center_line.set_data(x_window, snap_center_win)
 
             ymax = float(np.nanmax(snap_win)) if snap_win.size else 1.0
@@ -296,8 +291,7 @@ def run_price_viz(
             center_line,
             upper_band,
             lower_band,
-            g_line,
-            g_fill,
+            blue_line,
             title_right,
             status_text,
         ]
