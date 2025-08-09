@@ -20,6 +20,12 @@ DEAD_ZONE_PCT = None  # override percentage; else derive from settings
 DEAD_ZONE_MIN = 0.44  # fallback dead-zone bounds when pct not provided
 DEAD_ZONE_MAX = 0.56
 
+# SnapbackOdds knobs (structure-only; no new deps)
+ODDS_LOOKBACK = 8        # bars for micro slope
+W_DIVERGENCE  = 0.45     # weight: micro vs macro slope divergence
+W_WICK        = 0.35     # weight: lower vs upper wick imbalance
+W_DEPTH       = 0.20     # weight: depth below mid-tunnel
+
 
 def load_candles(tag: str) -> List[Candle]:
     path = Path("data/raw") / f"{tag}.csv"
@@ -55,7 +61,7 @@ def clip(x: float, lo: float, hi: float) -> float:
     return lo if x < lo else hi if x > hi else x
 
 
-def run(tag: str) -> None:
+def run(tag: str, odds: bool = False) -> None:
     candles = load_candles(tag)
     if len(candles) < WINDOW:
         print("Not enough data to simulate.")
@@ -142,6 +148,30 @@ def run(tag: str) -> None:
             if slope > MOMENTUM_EPS:
                 topbottom_filt = 0.75 * topbottom_filt + 0.25 * 0.5
 
+        # ---- SnapbackOdds components ----
+        # Wick imbalance (buyers rejecting lows)
+        wick_balance = lw_ratio - uw_ratio
+
+        # Micro vs. macro slope divergence
+        if len(closes) > ODDS_LOOKBACK and denom > 1e-9:
+            slope_micro = (closes[-1] - closes[-ODDS_LOOKBACK]) / denom
+        else:
+            slope_micro = 0.0
+        slope_macro = (closes[-1] - closes[0]) / denom if denom > 1e-9 else 0.0
+        macro_sign = 0.0 if slope_macro == 0 else (1.0 if slope_macro > 0 else -1.0)
+        divergence = -slope_micro * macro_sign
+
+        # Depth from mid-tunnel
+        depth = (0.5 - pos_now) * 2.0
+
+        raw = (
+            W_DIVERGENCE * divergence
+            + W_WICK * wick_balance
+            + W_DEPTH * depth
+        )
+        snapback_up = clip(0.5 + 0.5 * raw, 0.0, 1.0)
+        go_deeper = 1.0 - snapback_up
+
         # Optional EMA smoothing across snapshots
         if i == WINDOW:
             topbottom_smooth = topbottom_filt
@@ -154,8 +184,9 @@ def run(tag: str) -> None:
         prev_tb = topbottom_smooth
 
         ts = last_ts
-        line = (
-             f"TopBottom:{topbottom_smooth:.2f}"        )
+        line = f"TopBottom:{topbottom_smooth:.2f}"
+        if odds:
+            line += f"  SnapbackOdds:{snapback_up:.2f}"
         log_snapshot(line)
 
 
@@ -164,8 +195,13 @@ def main() -> None:
         description="Monthly wave snapshot with top/bottom score."
     )
     parser.add_argument("tag", help="Asset tag for CSV in data/raw/<TAG>.csv")
+    parser.add_argument(
+        "--odds",
+        action="store_true",
+        help="Append SnapbackOdds to each TopBottom print",
+    )
     args = parser.parse_args()
-    run(args.tag)
+    run(args.tag, odds=args.odds)
 
 
 if __name__ == "__main__":
