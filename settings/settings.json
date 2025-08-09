@@ -1,9 +1,0 @@
-{
-  "simulation_capital": 1000,
-  "phase0_settings": {
-    "tag": "DOGEUSD",
-    "buy_interval": 5,
-    "buy_fraction": 0.01,
-    "maturity_gain": 0.02
-  }
-}
