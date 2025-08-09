@@ -7,6 +7,7 @@ from typing import List, Tuple, Dict
 from systems.scripts.ledger_manager import LedgerManager
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
+from systems.utils.pairs import resolve_by_tag
 
 # ts, open, high, low, close
 Candle = Tuple[int, float, float, float, float]
@@ -19,8 +20,8 @@ DEAD_ZONE_MAX = 0.55
 
 
 
-def load_candles(tag: str) -> List[Candle]:
-    path = Path("data/raw") / f"{tag}.csv"
+def load_candles(symbol: str) -> List[Candle]:
+    path = Path("data/raw") / f"{symbol}.csv"
     candles: List[Candle] = []
     with path.open() as f:
         reader = csv.DictReader(f)
@@ -53,7 +54,7 @@ def clip(x: float, lo: float, hi: float) -> float:
     return lo if x < lo else hi if x > hi else x
 
 
-def run(tag: str) -> None:
+def run(binance_symbol: str, base: str) -> None:
     cfg = CFG
 
     investment_size = float(cfg["investment_size"])
@@ -88,7 +89,7 @@ def run(tag: str) -> None:
     BASE_UNIT = investment_size
     ODDS_LOOKBACK = snapback_lookback
 
-    candles = load_candles(tag)
+    candles = load_candles(binance_symbol)
     if len(candles) < WINDOW:
         print("Not enough data to simulate.")
         return
@@ -96,7 +97,7 @@ def run(tag: str) -> None:
     init_snapshot_log()
     prev_tb = 0.5
 
-    ledger = LedgerManager(tag)
+    ledger = LedgerManager(base)
 
 
     for i in range(WINDOW, len(candles), STEP):
@@ -271,9 +272,13 @@ def main() -> None:
             f"[error] Ledger '{args.ledger}' missing required 'tag' in settings/ledgers.json"
         )
 
+    pair = resolve_by_tag(tag)
+    binance_symbol = pair["binance_symbol"]
+    kraken_symbol = pair["kraken_symbol"]
+
     global CFG
     CFG = cfg
-    run(tag)
+    run(binance_symbol, pair["binance_base"])
 
 
 if __name__ == "__main__":
