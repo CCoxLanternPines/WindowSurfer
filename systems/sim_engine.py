@@ -1,37 +1,18 @@
 from __future__ import annotations
 
-import argparse, csv, json
+import argparse, csv
 from pathlib import Path
 from typing import List, Tuple
 
 from systems.scripts.ledger_manager import LedgerManager
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
+from systems.utils.config import load_ledger, load_global, resolve_window_cfg
 
 # ts, open, high, low, close
 Candle = Tuple[int, float, float, float, float]
 LOG_PATH = Path("data/tmp/snapshots.log")
 
-# Window and step sizes
-WINDOW = 300
-STEP = 5
-
-# --- Top/Bottom score knobs ---
-ALPHA_WICK = 0.12     # how strongly wicks skew PosNow toward 0/1
-SMOOTH_EMA = 0.25     # 0 disables smoothing; else EMA factor in (0,1]
-MOMENTUM_BARS = 8     # lookback for micro-slope (last N closes)
-MOMENTUM_EPS = 0.0015
-DEAD_ZONE_PCT = None  # override percentage; else derive from settings
-DEAD_ZONE_MIN = 0.44  # fallback dead-zone bounds when pct not provided
-DEAD_ZONE_MAX = 0.56
-
-BASE_UNIT = 1.0
-
-# SnapbackOdds knobs (structure-only; no new deps)
-ODDS_LOOKBACK = 8        # bars for micro slope
-W_DIVERGENCE  = 0.45     # weight: micro vs macro slope divergence
-W_WICK        = 0.35     # weight: lower vs upper wick imbalance
-W_DEPTH       = 0.20     # weight: depth below mid-tunnel
 
 
 def load_candles(tag: str) -> List[Candle]:
@@ -68,31 +49,45 @@ def clip(x: float, lo: float, hi: float) -> float:
     return lo if x < lo else hi if x > hi else x
 
 
-def run(tag: str) -> None:
+def run(args: argparse.Namespace) -> None:
+    ledger_cfg = load_ledger()
+    global_cfg = load_global()
+    ledger_name = args.ledger or next(iter(ledger_cfg["ledger_settings"]))
+    window_key = args.window or next(
+        iter(ledger_cfg["ledger_settings"][ledger_name]["window_settings"])
+    )
+    print(f"Using ledger '{ledger_name}' window '{window_key}'")
+    cfg = resolve_window_cfg(
+        ledger_name,
+        window_key,
+        tag=args.tag,
+        ledger=ledger_cfg,
+        global_cfg=global_cfg,
+    )
+
+    WINDOW = cfg["window_alg"]["window"]
+    STEP = cfg["window_alg"]["step"]
+    BASE_UNIT = cfg["base_unit"]
+    ALPHA_WICK = cfg["topbottom"]["alpha_wick"]
+    SMOOTH_EMA = cfg["topbottom"]["smooth_ema"]
+    MOMENTUM_BARS = cfg["topbottom"]["momentum_bars"]
+    MOMENTUM_EPS = cfg["topbottom"]["momentum_eps"]
+    if cfg["topbottom"].get("dead_zone_pct") is not None:
+        dead_zone_min = 0.5 - cfg["topbottom"]["dead_zone_pct"] / 2
+        dead_zone_max = 0.5 + cfg["topbottom"]["dead_zone_pct"] / 2
+    else:
+        dead_zone_min = cfg["topbottom"]["dead_zone_min"]
+        dead_zone_max = cfg["topbottom"]["dead_zone_max"]
+    ODDS_LOOKBACK = cfg["snapback_odds"]["lookback"]
+    W_DIVERGENCE = cfg["snapback_odds"]["weights"]["divergence"]
+    W_WICK = cfg["snapback_odds"]["weights"]["wick"]
+    W_DEPTH = cfg["snapback_odds"]["weights"]["depth"]
+
+    tag = args.tag
     candles = load_candles(tag)
     if len(candles) < WINDOW:
         print("Not enough data to simulate.")
         return
-
-    # Resolve dead-zone from settings (optional)
-    dz_pct = DEAD_ZONE_PCT
-    if dz_pct is None:
-        settings_path = Path("settings/settings.json")
-        if settings_path.exists():
-            try:
-                settings = json.loads(settings_path.read_text())
-                for ledger in (settings.get("ledger_settings") or {}).values():
-                    if ledger.get("tag") == tag:
-                        for cfg in (ledger.get("window_settings") or {}).values():
-                            dz = cfg.get("dead_zone_pct")
-                            if dz is not None:
-                                dz_pct = dz
-                                break
-                        break
-            except Exception:
-                pass
-    dead_zone_min = 0.5 - dz_pct / 2 if dz_pct is not None else DEAD_ZONE_MIN
-    dead_zone_max = 0.5 + dz_pct / 2 if dz_pct is not None else DEAD_ZONE_MAX
 
     init_snapshot_log()
     prev_tb = 0.5
@@ -250,8 +245,10 @@ def run(tag: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Monthly wave snapshot with top/bottom score.")
     parser.add_argument("tag", help="Asset tag for CSV in data/raw/<TAG>.csv")
+    parser.add_argument("--ledger", dest="ledger", help="Ledger name to use")
+    parser.add_argument("--window", dest="window", help="Window key to use")
     args = parser.parse_args()
-    run(args.tag)
+    run(args)
 
 
 if __name__ == "__main__":
