@@ -71,6 +71,17 @@ def resolve_ccxt_symbols(tag: str) -> tuple[str, str]:
     return info.get("kraken_name", tag), info.get("binance_name", tag)
 
 
+def latest_run_id(tag: str) -> str:
+    """Return most recent run id for a given tag."""
+    candidates = list(TEMP_DIR.glob(f"*/cluster/centroids_{tag}*.json"))
+    if not candidates:
+        raise SystemExit(
+            f"No clustering artifacts found for tag {tag}; run regimes cluster first"
+        )
+    latest = max(candidates, key=lambda p: p.stat().st_mtime)
+    return latest.parent.parent.name
+
+
 # ---------------------------------------------------------------------------
 # Data commands
 # ---------------------------------------------------------------------------
@@ -436,21 +447,22 @@ def main(argv: Optional[List[str]] = None) -> None:
         if args.command == "brain":
             from systems.brain import finalize_brain
 
+            run_id = args.run_id or latest_run_id(args.tag)
+
             labels = None
             if args.labels:
                 with open(args.labels) as fh:
-                    labels = json.load(fh)
+                    raw = json.load(fh)
+                labels = {int(k): v for k, v in raw.items()}
+
             path = finalize_brain(
-                args.tag, args.run_id, labels, args.alpha, args.switch_margin
+                args.tag, run_id, labels, args.alpha, args.switch_margin
             )
-            with open(path) as fh:
-                brain = json.load(fh)
-            print(f"[BRAIN] Saved {path}")
-            print(
-                f"[BRAIN] K={brain['k']} | Features={len(brain['features'])} | Labels={brain.get('labels')}"
-            )
+            brain = json.loads(Path(path).read_text())
             row_sums = [round(sum(r), 6) for r in brain["transitions"]]
-            print(f"[BRAIN] Transition row sums (should be 1.0): {row_sums}")
+            print(f"[BRAIN] Saved {path}")
+            print(f"[BRAIN] Row sums: {row_sums}")
+            print(f"[BRAIN] Labels: {brain.get('labels', {})}")
         else:
             run_id = args.run_id or new_run_id("regimes")
             args.run_id = run_id
