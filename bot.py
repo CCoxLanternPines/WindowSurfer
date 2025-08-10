@@ -5,80 +5,154 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 
-from systems.block_planner import parse_duration, plan_blocks
-from systems.data_loader import load_or_fetch
-
+from systems.block_planner import plan_blocks
+from systems.cli.common_args import add_verbosity, parse_duration_1h, validate_dates
+from systems.data_loader import (
+    CACHE_DIR,
+    fetch_all_history_binance,
+    fetch_range_kraken,
+    load_or_fetch,
+)
 
 logger = logging.getLogger("bot")
 
 
-def main(argv: List[str] | None = None) -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", default="regimes")
-    parser.add_argument("--tag", required=True, help="Asset tag to load")
-    parser.add_argument("--train", required=True, help="Training window (e.g. 3m)")
-    parser.add_argument("--test", required=True, help="Testing window (e.g. 1m)")
-    parser.add_argument("--step", required=True, help="Step size between blocks")
-    parser.add_argument("--fetch-all", action="store_true", help="Fetch full history from Binance")
-    parser.add_argument("--start", help="Range start for Kraken fetch")
-    parser.add_argument("--end", help="Range end for Kraken fetch")
-    parser.add_argument("-v", action="count", default=0, dest="verbosity")
-    args = parser.parse_args(argv)
+def resolve_ccxt_symbols(tag: str) -> tuple[str, str]:
+    """Return (kraken_symbol, binance_symbol) for ``tag`` from settings.json."""
+    path = Path("settings.json")
+    settings = {}
+    if path.exists():
+        with path.open() as fh:
+            settings = json.load(fh)
+    info = settings.get(tag, {})
+    return info.get("kraken_name", tag), info.get("binance_name", tag)
 
-    logging.basicConfig(level=max(logging.WARNING - args.verbosity * 10, logging.DEBUG))
 
-    if args.mode != "regimes":
-        logger.error("Unsupported mode: %s", args.mode)
-        return
+def cmd_fetch_history(args: argparse.Namespace) -> None:
+    start, end = validate_dates(args.start, args.end)
+    if not args.fetch_all and not (start and end):
+        raise SystemExit("Provide --fetch-all or both --start and --end")
 
-    df = load_or_fetch(args.tag, fetch_all=args.fetch_all, start=args.start, end=args.end)
-    if df.empty:
-        logger.warning("No candles loaded")
-        return
-    first = pd.to_datetime(df.loc[0, "timestamp"], unit="s", utc=True)
-    last = pd.to_datetime(df.loc[len(df) - 1, "timestamp"], unit="s", utc=True)
-    logger.info("Loaded %d candles from %s to %s", len(df), first, last)
+    kraken_symbol, binance_symbol = resolve_ccxt_symbols(args.tag)
 
-    train_len = parse_duration(args.train)
-    test_len = parse_duration(args.test)
-    step_len = parse_duration(args.step)
-
-    blocks = plan_blocks(df, train_len, test_len, step_len)
-
-    rows = []
-    for idx, b in enumerate(blocks, start=1):
-        row = {
-            "Block": idx,
-            "Train Start": pd.to_datetime(b["train_start"], unit="s"),
-            "Train End": pd.to_datetime(b["train_end"], unit="s"),
-            "Test Start": pd.to_datetime(b["test_start"], unit="s"),
-            "Test End": pd.to_datetime(b["test_end"], unit="s"),
-            "Train Candles": b["train_candles"],
-            "Test Candles": b["test_candles"],
-        }
-        if args.verbosity >= 2:
-            row["Train Idx"] = f"{b['train_index_start']}-{b['train_index_end']}"
-            row["Test Idx"] = f"{b['test_index_start']}-{b['test_index_end']}"
-        rows.append(row)
-
-    table = pd.DataFrame(rows)
-    if not table.empty:
-        print(table.to_string(index=False))
+    if args.fetch_all:
+        df = fetch_all_history_binance(binance_symbol)
+        first = pd.to_datetime(df.loc[0, "timestamp"], unit="s", utc=True)
+        last = pd.to_datetime(df.loc[len(df) - 1, "timestamp"], unit="s", utc=True)
+        print(
+            f"[FETCH] TAG={args.tag} | Source=Binance | Candles={len(df)} | "
+            f"Range={first} -> {last}"
+        )
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_path = CACHE_DIR / f"{args.tag}_1h.parquet"
+        df.to_parquet(cache_path, index=False)
+        print(f"[CACHE] {cache_path}")
     else:
-        logger.warning("No blocks generated")
+        df = fetch_range_kraken(kraken_symbol, start, end)
+        first = (
+            pd.to_datetime(df.loc[0, "timestamp"], unit="s", utc=True)
+            if not df.empty
+            else None
+        )
+        last = (
+            pd.to_datetime(df.loc[len(df) - 1, "timestamp"], unit="s", utc=True)
+            if not df.empty
+            else None
+        )
+        print(
+            f"[FETCH] TAG={args.tag} | Source=Kraken | Candles={len(df)} | "
+            f"Range={first} -> {last}"
+        )
 
-    # Save plan
+
+def cmd_regimes(args: argparse.Namespace) -> None:
+    cache_path = CACHE_DIR / f"{args.tag}_1h.parquet"
+    if not cache_path.exists():
+        raise SystemExit(
+            f"Cache missing for {args.tag}; run fetch-history --fetch-all first"
+        )
+
+    df = load_or_fetch(args.tag)
+    diffs = df["timestamp"].diff().dropna()
+    assert diffs.empty or (diffs == 3600).all(), "Candles must be 1h spaced"
+
+    total = len(df)
+    train_c = parse_duration_1h(args.train)
+    test_c = parse_duration_1h(args.test)
+    step_c = parse_duration_1h(args.step)
+
+    blocks = plan_blocks(df, train_c, test_c, step_c)
+
+    print(
+        f"Total={total} | Train={train_c} | Test={test_c} | "
+        f"Step={step_c} | Blocks={len(blocks)}"
+    )
+
+    if args.verbosity >= 2:
+        for idx, b in enumerate(blocks, start=1):
+            ts = lambda x: pd.to_datetime(x, unit="s", utc=True)
+            print(
+                f"Block {idx}: Train {ts(b['train_start'])} -> {ts(b['train_end'])} | "
+                f"Test {ts(b['test_start'])} -> {ts(b['test_end'])}"
+            )
+
     logs_dir = Path("logs")
     logs_dir.mkdir(exist_ok=True)
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    out_path = logs_dir / f"block_plan_{args.tag}_{timestamp}.json"
-    with out_path.open("w") as fh:
+    plan_path = logs_dir / f"block_plan_{args.tag}_{timestamp}.json"
+    with plan_path.open("w") as fh:
         json.dump(blocks, fh, indent=2)
-    logger.info("Saved block plan to %s", out_path)
+    csv_path = logs_dir / "regime_walk_results.csv"
+    with csv_path.open("w") as fh:
+        fh.write("block,train_start,train_end,test_start,test_end\n")
+    logger.info("Saved block plan to %s", plan_path)
+
+
+def main(argv: Optional[List[str]] = None) -> None:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command")
+    parser.add_argument("--mode", choices=["fetch-history", "regimes"], help=argparse.SUPPRESS)
+
+    sp_fetch = subparsers.add_parser(
+        "fetch-history", help="Fetch and cache 1h candles"
+    )
+    sp_fetch.add_argument("--tag", required=True, help="Asset tag")
+    sp_fetch.add_argument("--fetch-all", action="store_true", help="Fetch full history")
+    sp_fetch.add_argument("--start", help="Range start (YYYY-MM-DD)")
+    sp_fetch.add_argument("--end", help="Range end (YYYY-MM-DD)")
+
+    sp_regimes = subparsers.add_parser(
+        "regimes", help="Walk-forward: Step 1 (plan blocks)"
+    )
+    sp_regimes.add_argument("--tag", required=True, help="Asset tag")
+    sp_regimes.add_argument("--train", required=True, help="Training window")
+    sp_regimes.add_argument("--test", required=True, help="Testing window")
+    sp_regimes.add_argument("--step", required=True, help="Step size")
+    add_verbosity(sp_regimes)
+
+    args = parser.parse_args(argv)
+
+    if getattr(args, "mode", None) and not args.command:
+        logger.warning("--mode is deprecated; use subcommands")
+        args.command = args.mode
+
+    if not getattr(args, "command", None):
+        parser.error("No command provided")
+
+    logging.basicConfig(
+        level=max(logging.WARNING - getattr(args, "verbosity", 0) * 10, logging.DEBUG)
+    )
+
+    if args.command == "fetch-history":
+        cmd_fetch_history(args)
+    elif args.command == "regimes":
+        cmd_regimes(args)
+    else:
+        parser.error(f"Unknown command: {args.command}")
 
 
 if __name__ == "__main__":
