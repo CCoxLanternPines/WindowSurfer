@@ -388,6 +388,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     sp_regimes.add_argument("--trials", type=int, default=50, help="Optuna trials")
     sp_regimes.add_argument("--metric", type=str, default="pnl_dd", help="Optimization metric")
     sp_regimes.add_argument("--seed", type=int, default=2, help="RNG seed")
+    sp_regimes.add_argument("--smoke", action="store_true", help=argparse.SUPPRESS)
 
     reg_sub = sp_regimes.add_subparsers(dest="command")
 
@@ -478,6 +479,7 @@ def main(argv: Optional[List[str]] = None) -> None:
                 metric=args.metric,
                 seed=args.seed,
                 verbose=args.verbose,
+                smoke=args.smoke,
             )
             return
         run_id = args.run_id or new_run_id("regimes")
