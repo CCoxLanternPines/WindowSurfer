@@ -1,0 +1,11 @@
+{
+  "position_pct": 0.06359949021420037,
+  "max_concurrent": 1,
+  "buy_cooldown": 12,
+  "volatility_gate": 0.8611934355709661,
+  "rsi_buy": 36,
+  "take_profit": 0.016919040167104604,
+  "trailing_stop": 0.010911567216908221,
+  "stop_loss": 0.05715625798103982,
+  "sell_cooldown": 7
+}
