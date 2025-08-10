@@ -106,7 +106,13 @@ def _run_block(
     knobs: Dict[str, Any],
     equity0: float,
     *,
-    verbosity: int = 0
+    verbosity: int = 0,
+    blend_enabled: bool = False,
+    brain: RegimeBrain | None = None,
+    seed_knobs: Dict[str, Dict[str, Any]] | None = None,
+    feat_idx: List[int] | None = None,
+    alpha: float = 0.7,
+    hyst_boost: float = 0.1,
 ) -> Dict[str, Any]:
     df = _clean_prices(df)
     if df.empty:
@@ -127,16 +133,10 @@ def _run_block(
 
     rsi = _rsi(close, period=14)
 
-    # knobs with sane defaults
-    rsi_buy = int(knobs.get("rsi_buy", 35))
-    rsi_sell = int(knobs.get("rsi_sell", 65))
-    buy_cooldown = int(knobs.get("buy_cooldown", 8))
-    sell_cooldown = int(knobs.get("sell_cooldown", 8))
-    take_profit = float(knobs.get("take_profit", 0.03))
-    stop_loss = float(knobs.get("stop_loss", 0.06))
-    trailing_stop = float(knobs.get("trailing_stop", 0.02))
-    position_pct = float(knobs.get("position_pct", 0.06))
-    max_concurrent = int(knobs.get("max_concurrent", 2))
+    # Blending context
+    history: List[int] = []
+    last_top: int | None = None
+    win = 50
 
     # Seed equity series at initial value (prevents empty/NaN issues)
     equity = np.full(len(close), float(equity0), dtype=float)
@@ -151,18 +151,54 @@ def _run_block(
     for i in range(len(close)):
         price = float(close[i])
         timestamp = ts[i]
+
+        current_knobs = knobs
+        if (
+            blend_enabled
+            and brain is not None
+            and seed_knobs is not None
+            and i >= win
+        ):
+            window = df.iloc[i - win : i]
+            feats = extract_features(window)
+            window_feats = feats[feat_idx] if feat_idx is not None else feats
+            weights_now = classify_current(window_feats, brain)
+            weights_next = predict_next(weights_now, history, alpha)
+            weights_final = apply_hysteresis(weights_next, last_top, hyst_boost)
+            current_knobs = blend_knobs(weights_final, seed_knobs)
+            if verbosity >= 3:
+                print(
+                    f"[BLEND] now={weights_now.round(3).tolist()} "
+                    f"next={weights_next.round(3).tolist()} "
+                    f"final={weights_final.round(3).tolist()} "
+                    f"knobs={current_knobs}"
+                )
+            top = int(np.argmax(weights_final))
+            history.append(top)
+            if len(history) > 50:
+                history.pop(0)
+            last_top = top
+
+        rsi_buy = int(current_knobs.get("rsi_buy", 35))
+        rsi_sell = int(current_knobs.get("rsi_sell", 65))
+        buy_cooldown_cfg = int(current_knobs.get("buy_cooldown", 8))
+        sell_cooldown_cfg = int(current_knobs.get("sell_cooldown", 8))
+        take_profit = float(current_knobs.get("take_profit", 0.03))
+        stop_loss = float(current_knobs.get("stop_loss", 0.06))
+        trailing_stop = float(current_knobs.get("trailing_stop", 0.02))
+        position_pct = float(current_knobs.get("position_pct", 0.06))
+        max_concurrent = int(current_knobs.get("max_concurrent", 2))
+
         if verbosity >= 3:
             print(
                 f"[TICK] {pd.to_datetime(timestamp, unit='s', utc=True)} "
                 f"close={price:.2f} open_notes={len(positions)} "
-                f"cool(buy={buy_cd},sell={sell_cd})"
+                f"cool(buy={buy_cd},sell={sell_cd})",
             )
 
-        # Update trailing peaks
         for p in positions:
             p["peak"] = max(p["peak"], price)
 
-        # Sells
         if sell_cd == 0 and positions:
             keep: List[Dict[str, float]] = []
             for p in positions:
@@ -174,28 +210,28 @@ def _run_block(
                     trades += 1
                     closed_rets.append(ret)
                     if verbosity >= 3:
-                        print(f"[SELL] note amt={p['size']/entry:.6f} at={price:.2f} pnl=${(p['size']*ret):.2f}")
+                        print(
+                            f"[SELL] note amt={p['size']/entry:.6f} at={price:.2f} pnl=${(p['size']*ret):.2f}"
+                        )
                 else:
                     keep.append(p)
             positions = keep
-            sell_cd = sell_cooldown if trades else 0
+            sell_cd = sell_cooldown_cfg if trades else 0
         else:
             sell_cd = max(0, sell_cd - 1)
 
-        # Buys
         if buy_cd == 0 and len(positions) < max_concurrent and rsi[i] <= rsi_buy:
             size = cash * position_pct
             if size > 0.0:
                 positions.append({"entry": price, "size": size, "peak": price})
                 cash -= size
                 trades += 1
-                buy_cd = buy_cooldown
+                buy_cd = buy_cooldown_cfg
                 if verbosity >= 3:
                     print(f"[BUY] note amt={size/max(price,1e-12):.6f} at={price:.2f}")
         else:
             buy_cd = max(0, buy_cd - 1)
 
-        # Mark-to-market
         pos_val = 0.0
         for p in positions:
             entry = max(p["entry"], 1e-12)
@@ -203,7 +239,6 @@ def _run_block(
         equity[i] = _finite(cash + pos_val, fallback=equity[i-1] if i > 0 else equity0)
         if positions:
             ticks_in_pos += 1
-
     # Force close remaining positions at last price
     if positions:
         price = float(close[-1])
@@ -256,6 +291,9 @@ def run_sim_blocks(
     run_id: str | None = None,
     log_path: str | None = None,
     audit: bool = True,
+    blend_enabled: bool = False,
+    alpha: float = 0.7,
+    hyst_boost: float = 0.1,
 ) -> Dict[str, Any]:
     """Execute simulation over blocks."""
 
@@ -293,6 +331,21 @@ def run_sim_blocks(
 
     # Starting capital
     capital = _finite(settings.get("capital", 1000.0), 1000.0)
+
+    brain = None
+    seed_knobs_by_regime: Dict[str, Dict[str, Any]] | None = None
+    feat_idx: List[int] | None = None
+    if blend_enabled:
+        brain_path = Path("data/brains") / f"brain_{tag}.json"
+        brain = RegimeBrain.from_file(brain_path)
+        feat_order = brain._b.get("features", [])
+        feat_idx = [ALL_FEATURES.index(f) for f in feat_order]
+        seed_all = load_seed_knobs()
+        seed_knobs_by_regime = seed_all.get(tag, {})
+        if not seed_knobs_by_regime:
+            raise ValueError(f"No seed knobs for tag {tag}")
+        if not knobs and seed_knobs_by_regime:
+            knobs = next(iter(seed_knobs_by_regime.values()))
     equity_curve: List[float] = []
     total_trades = 0
     total_pnl = 0.0
@@ -319,7 +372,18 @@ def run_sim_blocks(
                 _log(f"[BLOCK] k={k:02d} | empty block | candles=0")
             continue
 
-        res = _run_block(block_df, knobs, capital, verbosity=verbosity)
+        res = _run_block(
+            block_df,
+            knobs,
+            capital,
+            verbosity=verbosity,
+            blend_enabled=blend_enabled,
+            brain=brain,
+            seed_knobs=seed_knobs_by_regime,
+            feat_idx=feat_idx,
+            alpha=alpha,
+            hyst_boost=hyst_boost,
+        )
         capital += _finite(res.get("pnl"), 0.0)
         total_trades += int(res.get("trades", 0))
         total_pnl += _finite(res.get("pnl"), 0.0)
@@ -394,61 +458,5 @@ def run_sim_blocks(
     return result
 
 
-def run_blend_sim(
-    tag: str,
-    run_id: str = "blend",
-    *,
-    alpha: float = 0.7,
-    boost: float = 0.1,
-    verbosity: int = 0,
-) -> Dict[str, Any]:
-    """Run a light simulation with dynamic knob blending."""
-    candles = load_or_fetch(tag)
-    # Limit for smoke tests
-    candles = candles.tail(200).reset_index(drop=True)
 
-    brain_path = Path("data/brains") / f"brain_{tag}.json"
-    brain = RegimeBrain.from_file(brain_path)
-    feat_order = brain._b.get("features", [])
-    idx = [ALL_FEATURES.index(f) for f in feat_order]
-
-    seed_knobs_all = load_seed_knobs()
-    knobs_by_regime = seed_knobs_all.get(tag, {})
-    if not knobs_by_regime:
-        raise ValueError(f"No seed knobs for tag {tag}")
-
-    history: List[int] = []
-    last_top: int | None = None
-    win = 50
-    for i in range(win, len(candles)):
-        window = candles.iloc[i - win : i]
-        feats = extract_features(window)
-        window_feats = feats[idx]
-
-        weights_now = classify_current(window_feats, brain)
-        weights_next = predict_next(weights_now, history, alpha)
-        weights_final = apply_hysteresis(weights_next, last_top, boost)
-        blended_knobs = blend_knobs(weights_final, knobs_by_regime)
-
-        if verbosity >= 3:
-            print(
-                f"[BLEND] now={weights_now.round(3).tolist()} "
-                f"next={weights_next.round(3).tolist()} "
-                f"final={weights_final.round(3).tolist()} "
-                f"knobs={blended_knobs}"
-            )
-
-        price = float(window.iloc[-1]["close"])
-        evaluate_buy(price=price, knobs=blended_knobs)
-        evaluate_sell(price=price, knobs=blended_knobs)
-
-        top = int(np.argmax(weights_final))
-        history.append(top)
-        if len(history) > 50:
-            history.pop(0)
-        last_top = top
-
-    return {"ticks": len(candles) - win}
-
-
-__all__ = ["run_sim_blocks", "RUNNER_ID", "run_blend_sim"]
+__all__ = ["run_sim_blocks", "RUNNER_ID"]
