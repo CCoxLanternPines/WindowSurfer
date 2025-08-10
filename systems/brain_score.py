@@ -20,7 +20,7 @@ def _parse_horizon(h: str) -> int:
     return int(h)
 
 
-def _load_series(tag: str, args) -> tuple[dict, datetime, datetime]:
+def _load_series(tag: str, args=None) -> tuple[dict, datetime, datetime]:
     raw_dir = Path("data/raw")
     candidates = [raw_dir / f"{tag}.csv", raw_dir / f"{tag}.parquet", raw_dir / f"{tag.lower()}.csv"]
     if not any(p.exists() for p in candidates):
@@ -52,8 +52,12 @@ def _load_series(tag: str, args) -> tuple[dict, datetime, datetime]:
             low.append(float(row["low"]))
             close.append(float(row["close"]))
     series = {"ts": ts, "open": open_, "high": high, "low": low, "close": close}
-    start = datetime.fromisoformat(args.start) if args.start else datetime.fromtimestamp(ts[0])
-    end = datetime.fromisoformat(args.end) if args.end else datetime.fromtimestamp(ts[-1])
+    if args is not None:
+        start = datetime.fromisoformat(args.start) if args.start else datetime.fromtimestamp(ts[0])
+        end = datetime.fromisoformat(args.end) if args.end else datetime.fromtimestamp(ts[-1])
+    else:
+        start = datetime.fromtimestamp(ts[0])
+        end = datetime.fromtimestamp(ts[-1])
     return series, start, end
 
 
@@ -123,7 +127,11 @@ def score_coin(coin, series, cfg, start, end, args):
     min_events = args.min_events if args.min_events is not None else cfg["scoring"].get("min_events", 100)
     for name, (func, expl, bcfg) in brains.items():
         horizon = _parse_horizon(bcfg.get("horizons", ["24h"])[0])
-        baseline = _baseline(close, horizon)
+        if name == "BEAR":
+            baseline_up = _baseline(close, horizon)
+            baseline = 1.0 - baseline_up
+        else:
+            baseline = _baseline(close, horizon)
         events = []
         hits = 0
         total = idx[-1] if idx else 0
@@ -131,21 +139,29 @@ def score_coin(coin, series, cfg, start, end, args):
             print(f"[{coin}] {name} horizon={horizon}h baseline={baseline*100:.1f}% (events so far: 0)")
         interrupted = False
         try:
+            last_event_idx = -horizon
             for step, i in enumerate(idx):
                 if i + horizon >= len(close):
                     break
                 if args.verbose >= 2 and step % 1000 == 0:
                     p = hits / len(events) if events else 0.0
                     print(f"[{name}] i={i}/{total} events={len(events)} hits={hits} p={p*100:.1f}% lift={(p-baseline)*100:+.1f}%")
-                if args.verbose >= 3:
+                if name == "BEAR":
+                    dec, info = func(i, series, bcfg)
+                    reasons = info
+                elif args.verbose >= 3:
                     res = expl(i, series, bcfg)
                     dec = res.get("decision")
                     reasons = res.get("reasons", {})
                 else:
                     dec = func(i, series, bcfg)
+                    reasons = {}
                 if not dec:
                     continue
+                if name == "BEAR" and i - last_event_idx < horizon:
+                    continue
                 if name == "BEAR":
+                    last_event_idx = i
                     hit, _ = first_hits(close, i, bcfg.get("up_pct", 0.02), bcfg.get("down_pct", -0.02), horizon)
                     outcome = int(close[i + horizon] < close[i] or hit == "down")
                 elif name == "CHOP":
@@ -166,7 +182,7 @@ def score_coin(coin, series, cfg, start, end, args):
                         if isinstance(v, bool):
                             parts.append(f"{k}={'+' if v else '-'}")
                         elif isinstance(v, float):
-                            parts.append(f"{k}={v:+.1f}")
+                            parts.append(f"{k}={v:+.2f}")
                         else:
                             parts.append(f"{k}={v}")
                     reason_str = " ".join(parts)
@@ -241,3 +257,155 @@ def main(args):
                 f"{row['p_hat']*100:.1f}% {row['ci_low']*100:.1f}% {row['ci_high']*100:.1f}% "
                 f"{row['baseline']*100:.1f}% {row['lift']*100:+.1f}%"
             )
+
+
+def score_coin_single_brain(coin, series, cfg, start, end, brain_name, verbose, out=None):
+    ts = series["ts"]
+    close = series["close"]
+    start_ts = int(start.timestamp())
+    end_ts = int(end.timestamp())
+    idx = [i for i, t in enumerate(ts) if start_ts <= t <= end_ts]
+    if not idx:
+        return []
+    bcfg = cfg[brain_name.lower()]
+    max_w = bcfg.get("L", 0)
+    if brain_name == "CHOP":
+        max_w = bcfg.get("S", 0)
+    elif brain_name == "BULL":
+        max_w = bcfg.get("M", 0)
+    horizon = _parse_horizon(bcfg.get("horizons", ["24h"])[0])
+    start_i = max(0, idx[0] - max_w)
+    end_i = min(len(ts), idx[-1] + horizon + 1)
+    ts = ts[start_i:end_i]
+    close = close[start_i:end_i]
+    series = {
+        "ts": ts,
+        "close": close,
+        "open": series["open"][start_i:end_i],
+        "high": series["high"][start_i:end_i],
+        "low": series["low"][start_i:end_i],
+    }
+    idx = [i for i, t in enumerate(ts) if start_ts <= t <= end_ts]
+
+    if brain_name == "BEAR":
+        func = bear.parked
+        expl = None
+    elif brain_name == "CHOP":
+        func = chop.edge_long
+        expl = chop.explain
+    else:
+        func = bull.momo_long
+        expl = bull.explain
+
+    if brain_name == "BEAR":
+        baseline_up = _baseline(close, horizon)
+        baseline = 1.0 - baseline_up
+    else:
+        baseline = _baseline(close, horizon)
+
+    events = []
+    hits = 0
+    total = idx[-1] if idx else 0
+    if verbose >= 1:
+        print(f"[{coin}] {brain_name} horizon={horizon}h baseline={baseline*100:.1f}% (events so far: 0)")
+    interrupted = False
+    try:
+        last_event_idx = -horizon
+        for step, i in enumerate(idx):
+            if i + horizon >= len(close):
+                break
+            if verbose >= 2 and step % 1000 == 0:
+                p = hits / len(events) if events else 0.0
+                print(f"[{brain_name}] i={i}/{total} events={len(events)} hits={hits} p={p*100:.1f}% lift={(p-baseline)*100:+.1f}%")
+            if brain_name == "BEAR":
+                dec, reasons = func(i, series, bcfg)
+            else:
+                if verbose >= 3:
+                    res = expl(i, series, bcfg)
+                    dec = res.get("decision")
+                    reasons = res.get("reasons", {})
+                else:
+                    dec = func(i, series, bcfg)
+                    reasons = {}
+            if not dec:
+                continue
+            if brain_name == "BEAR" and i - last_event_idx < horizon:
+                continue
+            if brain_name == "BEAR":
+                last_event_idx = i
+                hit, _ = first_hits(close, i, bcfg.get("up_pct", 0.02), bcfg.get("down_pct", -0.02), horizon)
+                outcome = int(close[i + horizon] < close[i] or hit == "down")
+            elif brain_name == "CHOP":
+                hit, _ = first_hits(close, i, bcfg.get("tp_up", 0.04), bcfg.get("sl_dn", -0.03), horizon)
+                outcome = int(hit == "up")
+            else:
+                hit, _ = first_hits(close, i, bcfg.get("tp_up", 0.06), bcfg.get("sl_dn", -0.04), horizon)
+                outcome = int(hit == "up")
+            hits += outcome
+            events.append({"ts": ts[i], "outcome": outcome})
+            if verbose >= 2:
+                p = hits / len(events)
+                print(f"[{brain_name}] i={i}/{total} events={len(events)} hits={hits} p={p*100:.1f}% lift={(p-baseline)*100:+.1f}%")
+            if verbose >= 3:
+                t = datetime.fromtimestamp(ts[i]).isoformat(timespec="minutes")
+                parts = []
+                for k, v in reasons.items():
+                    if isinstance(v, bool):
+                        parts.append(f"{k}={'+' if v else '-'}")
+                    elif isinstance(v, float):
+                        parts.append(f"{k}={v:+.2f}")
+                    else:
+                        parts.append(f"{k}={v}")
+                reason_str = " ".join(parts)
+                print(f"[{brain_name}] t={t} {reason_str} OK -> OUTCOME={'up' if outcome else 'down'}")
+    except KeyboardInterrupt:
+        interrupted = True
+
+    events = _score_events(events, baseline)
+    if out:
+        events_path = brains_events_path(coin, brain_name)
+        with open(events_path, "w", newline="") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=["ts", "decision", "outcome", "p_hat", "ci_low", "ci_high", "lift"],
+            )
+            writer.writeheader()
+            for e in events:
+                row = {
+                    "ts": e["ts"],
+                    "decision": 1,
+                    "outcome": e["outcome"],
+                    "p_hat": e["p_hat"],
+                    "ci_low": e["ci_low"],
+                    "ci_high": e["ci_high"],
+                    "lift": e["lift"],
+                }
+                writer.writerow(row)
+
+    p_hat = events[-1]["p_hat"] if events else 0.0
+    ci_low, ci_high = _wilson(p_hat, len(events))
+    lift = p_hat - baseline
+    summary = {
+        "coin": coin,
+        "brain": brain_name,
+        "events": len(events),
+        "p_hat": p_hat,
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+        "baseline": baseline,
+        "lift": lift,
+        "insufficient_sample": int(len(events) < cfg["scoring"].get("min_events", 100)),
+        "drift": 0,
+    }
+    return [summary]
+
+
+def run_single_brain(args):
+    with open("settings.json") as f:
+        cfg = json.load(f)["brains"]
+    coin = args.tag
+    series, start, end = _load_series(coin)
+    summaries = score_coin_single_brain(
+        coin, series, cfg, start, end, args.brain.upper(), args.verbose, args.out
+    )
+    print(summaries)

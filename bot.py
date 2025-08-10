@@ -5,35 +5,19 @@ import argparse
 from systems import brain_score
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
-    sub = parser.add_subparsers(dest="cmd")
-
-    brains_p = sub.add_parser("brains")
-    brains_sub = brains_p.add_subparsers(dest="action")
-    score_p = brains_sub.add_parser("score")
-    score_p.add_argument("--coin")
-    score_p.add_argument("--coins")
-    score_p.add_argument("--start")
-    score_p.add_argument("--end")
-    score_p.add_argument("--horizons")
-    score_p.add_argument("--out")
-    score_p.add_argument("--no_write", action="store_true")
-    score_p.add_argument("--min_events", type=int)
-    score_p.add_argument("-v", dest="verbose", action="count", default=0)
-
+    parser.add_argument("--mode", choices=["test"], required=True)
+    parser.add_argument("--brain", choices=["bear", "chop", "bull"], required=True)
+    parser.add_argument("--tag", required=True)
+    parser.add_argument("--out")
+    parser.add_argument("-v", dest="verbose", action="count", default=0)
     args = parser.parse_args()
 
-    if args.cmd == "brains" and args.action == "score":
-        if not args.coin and not args.coins:
-            score_p.print_help()
-            return
-        if args.coin:
-            args.coins = args.coin
-        brain_score.main(args)
-    else:
-        parser.print_help()
+    if args.mode == "test":
+        brain_score.run_single_brain(args)
 
 
 if __name__ == "__main__":
     main()
+
