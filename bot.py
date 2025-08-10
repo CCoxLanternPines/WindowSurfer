@@ -398,6 +398,13 @@ def main(argv: Optional[List[str]] = None) -> None:
     sp_clust.add_argument("--seed", type=int, help="RNG seed")
     add_verbosity(sp_clust)
 
+    sp_purity = reg_sub.add_parser("purity", help="Estimate regime purity for blocks")
+    sp_purity.add_argument("--tag", required=True, help="Asset tag")
+    sp_purity.add_argument("--run-id", required=True, help="Run identifier")
+    sp_purity.add_argument("--tau", type=float, default=0.70, help="Purity threshold")
+    sp_purity.add_argument("--win", default="1w", help="Sub-window duration")
+    sp_purity.add_argument("--stride", type=int, default=6, help="Stride in candles")
+
     # Audit group
     sp_audit = subparsers.add_parser("audit", help="Audit regimes")
     audit_sub = sp_audit.add_subparsers(dest="command", required=True)
@@ -453,6 +460,16 @@ def main(argv: Optional[List[str]] = None) -> None:
         elif args.command == "cluster":
             regimes_cluster(
                 args.tag, run_id, k=args.k, seed=args.seed, verbosity=args.verbosity
+            )
+        elif args.command == "purity":
+            from systems.purity import compute_purity
+
+            compute_purity(
+                tag=args.tag,
+                run_id=run_id,
+                tau=args.tau,
+                win_dur=args.win,
+                stride=args.stride,
             )
     elif args.group == "audit":
         if args.command == "brain":
