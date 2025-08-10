@@ -5,7 +5,10 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-import ccxt
+try:
+    import ccxt  # type: ignore
+except Exception:  # pragma: no cover - optional
+    ccxt = None
 import pandas as pd
 
 from .paths import RAW_DIR, raw_parquet, ensure_dirs
@@ -63,6 +66,8 @@ def clean_candles(df: pd.DataFrame) -> pd.DataFrame:
 
 def fetch_all_history_binance(symbol: str) -> pd.DataFrame:
     """Fetch complete 1h history for ``symbol`` from Binance."""
+    if ccxt is None:
+        raise ImportError("ccxt required for fetching history")
     exchange = ccxt.binance()
     timeframe = "1h"
     limit = 1000
@@ -84,6 +89,8 @@ def fetch_all_history_binance(symbol: str) -> pd.DataFrame:
 
 def fetch_range_kraken(symbol: str, start: str, end: str) -> pd.DataFrame:
     """Fetch ``symbol`` candles for the range ``[start, end]`` from Kraken."""
+    if ccxt is None:
+        raise ImportError("ccxt required for fetching range")
     exchange = ccxt.kraken()
     timeframe = "1h"
     limit = 720
