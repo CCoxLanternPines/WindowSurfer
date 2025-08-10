@@ -151,7 +151,7 @@ A full search uses `--trials 80`. Ranges for R0:
 Artifacts are written to `data/regimes/{run-id}/tuning/{tag}/R{regime}/` (leaderboard.csv, best.json)【F:systems/regime_tuner.py†L223-L239】. Use `--write-seed` to promote the best knobs into `regimes/seed_knobs.json`【F:systems/regime_tuner.py†L242-L253】.
 
 ## Simulation & Live
-`systems/sim_engine.py` loads the first available simulation backend, falling back to `systems.simple_sim_engine`【F:systems/sim_engine.py†L4-L26】. Live execution runs hourly and reuses the same decision path as simulation, sharing cooldowns, order sizing and exchange minimum checks. Ledgers persist across runs and are appended atomically.
+`systems/sim_engine.py` loads the production simulation backend to maintain parity with live execution. Live execution runs hourly and reuses the same decision path as simulation, sharing cooldowns, order sizing and exchange minimum checks. Ledgers persist across runs and are appended atomically.
 
 ### Run a Plain Simulation
 ```bash
