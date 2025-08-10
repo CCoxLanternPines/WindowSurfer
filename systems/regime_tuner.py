@@ -72,7 +72,7 @@ def _bootstrap_centroids_from_brain(tag: str, run_id: str, cent_path: Path) -> N
     cent_path.parent.mkdir(parents=True, exist_ok=True)
     with cent_path.open("w") as fh:
         json.dump(payload, fh, indent=2)
-    print(f"[TUNE] Bootstrapped centroids from brain → {cent_path}")
+    print(f"[TUNE] Bootstrapped centroids from brain -> {cent_path}")
     print(
         f"[AUDIT] centroids:k={k} seed={seed} features={len(feature_names)} path={cent_path} ok"
     )

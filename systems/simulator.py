@@ -139,12 +139,13 @@ def run_sim_blocks(
     if run_id:
         path = Path(log_path) if log_path else log_file(tag, run_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        log_fh = path.open("a")
+        log_fh = path.open("a", encoding="utf-8", newline="")
 
-    def _log(msg: str) -> None:
-        print(msg)
+    def _log(msg: str, log_fh=log_fh) -> None:
+        safe = msg.encode("utf-8", "replace").decode("utf-8")
+        print(safe)
         if log_fh is not None:
-            log_fh.write(msg + "\n")
+            log_fh.write(safe + "\n")
             log_fh.flush()
 
     _log(f"[SIM] Using sim runner: {RUNNER_ID}")
@@ -192,7 +193,7 @@ def run_sim_blocks(
             start_dt = pd.to_datetime(block_df.iloc[0]["timestamp"], unit="s", utc=True)
             end_dt = pd.to_datetime(block_df.iloc[-1]["timestamp"], unit="s", utc=True)
             _log(
-                f"[BLOCK] k={k:02d} | {start_dt.date()} → {end_dt.date()} | candles={len(block_df)}"
+                f"[BLOCK] k={k:02d} | {start_dt.date()} -> {end_dt.date()} | candles={len(block_df)}"
             )
             _log(
                 f"[BLOCK] trades={res['trades']} pnl=${res['pnl']:.2f} maxdd={res['maxdd']:.2f}"

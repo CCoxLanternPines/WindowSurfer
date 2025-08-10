@@ -58,9 +58,9 @@ def log_to_file(tag: str, run_id: str):
     ensure_dirs()
     path = log_file(tag, run_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a") as fh, redirect_stdout(Tee(sys.stdout, fh)), redirect_stderr(
-        Tee(sys.stderr, fh)
-    ):
+    with open(path, "a", encoding="utf-8", newline="") as fh, redirect_stdout(
+        Tee(sys.stdout, fh)
+    ), redirect_stderr(Tee(sys.stderr, fh)):
         yield
 
 logger = logging.getLogger("bot")
