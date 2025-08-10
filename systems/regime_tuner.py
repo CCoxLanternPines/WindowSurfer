@@ -17,7 +17,7 @@ from systems.sim_engine import RUNNER_ID, run_sim_blocks
 
 def _bootstrap_centroids_from_brain(tag: str, run_id: str, cent_path: Path) -> None:
     """Create centroids file from the latest brain if missing."""
-    brain_dir = Path(f"data/regimes/{run_id}/brains")
+    brain_dir = Path("data/brains")
     brain_path: Path | None = None
     if brain_dir.exists():
         direct = brain_dir / f"brain_{tag}.json"

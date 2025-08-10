@@ -75,3 +75,9 @@ Total=43797 | Train=504 | Test=720 | Step=720 | Blocks=60
 [AUDIT++] R1 top deltas: -avg_dd_length, +price_range, +max_drawdown
 [AUDIT++] R2 top deltas: -avg_dd_length, +ma_bias, +vol_percentile
 [AUDIT++] Files: centroids_unscaled.csv, feature_influence.csv, top_drivers.csv, assignments_with_dates.csv, regime_spans.csv
+Total=43797 | Train=504 | Test=720 | Step=720 | Blocks=60
+[FEATURES] Dropped 0 features for low variance: []
+[FEATURES] Extracted 17 features for 60 blocks -> saved to features_SOLUSDT.parquet
+[CLUSTER] K=3 | Inertia=626.54
+[CLUSTER] Regime 0: 31 blocks | Regime 1: 11 blocks | Regime 2: 18 blocks
+[BRAIN] Saved brain_SOLUSDT__k3_seed2_20250810_130151.json and updated brain_SOLUSDT.json
