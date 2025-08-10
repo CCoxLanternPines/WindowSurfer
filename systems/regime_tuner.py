@@ -8,6 +8,10 @@ import numpy as np
 import optuna
 import pandas as pd
 
+from systems.utils.imports import ensure_project_root, import_module_safely
+
+ensure_project_root()
+
 
 def run_regime_tuning(
     tag: str,
@@ -52,16 +56,17 @@ def run_regime_tuning(
     from .purity import compute_purity
 
     # Lazy import to avoid circulars and context issues
+    # Prefer normal absolute import; fall back to direct file load
     try:
-        from systems.sim_engine import run_sim  # preferred public entry if it exists
-    except ImportError:
-        # Fallbacks: search for the actual public runner you’ve been using
-        # Options seen in this repo across branches: run_simulation, run_sim_blocks, run_sim_engine
-        from systems import sim_engine
-        run_sim = getattr(sim_engine, "run_simulation", None) or \
-                  getattr(sim_engine, "run_sim_blocks", None) or \
-                  getattr(sim_engine, "run_sim_engine", None) or \
-                  getattr(sim_engine, "run_sim")  # last resort
+        from systems.sim_engine import run_sim as _run_sim
+    except Exception:
+        sim_engine = import_module_safely("systems.sim_engine", "systems/sim_engine.py")
+        _run_sim = getattr(sim_engine, "run_sim", None) or \
+                   getattr(sim_engine, "run_simulation", None) or \
+                   getattr(sim_engine, "run_sim_blocks", None) or \
+                   getattr(sim_engine, "run_sim_engine", None)
+        if _run_sim is None:
+            raise ImportError("Could not locate a public sim runner in systems/sim_engine.py")
 
     # ------------------------------------------------------------------
     # Load settings for block planning
@@ -163,14 +168,14 @@ def run_regime_tuning(
             "sell_cooldown": trial.suggest_int("sell_cooldown", 3, 16),
         }
         try:
-            result = run_sim(
+            result = _run_sim(
                 tag=tag,
                 knobs=knobs,
                 block_ranges=ranges,
                 verbose=verbose >= 2,
             )
         except TypeError:
-            result = run_sim(
+            result = _run_sim(
                 tag=tag,
                 knobs=knobs,
                 start_end_ranges=ranges,
