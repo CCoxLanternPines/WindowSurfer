@@ -1,7 +1,7 @@
 {
   "brains": {
-    "bear": { "L": 50, "z_off": -1.0, "z_on_band": 0.5, "dwell": 3, "atr_cool_w": 50, "atr_cool_k": 1.0,
-               "horizons": ["24h", "72h"], "down_pct": -0.02, "up_pct": 0.02, "atr_stress": 1.2 },
+    "bear": { "L": 50, "M": 20, "z_off": -1.0, "z_on_band": 0.5, "dwell": 3, "atr_cool_w": 50, "atr_cool_k": 1.0,
+               "horizons": ["72h"], "down_pct": -0.02, "up_pct": 0.02, "atr_stress": 1.2 },
     "chop": { "S": 20, "z_buy": -1.0, "slope_w": 5, "horizons": ["7d"], "tp_up": 0.04, "sl_dn": -0.03 },
     "bull": { "M": 20, "hh_lookback": 5, "hh_min": 3, "horizons": ["10d"], "tp_up": 0.06, "sl_dn": -0.04 },
     "scoring": { "roll_N": 200, "min_events": 100, "ci": "wilson95", "pchart_target": 0.70, "pchart_z": 2,

@@ -218,16 +218,18 @@ Because each brain outputs a \*\*boolean decision\*\* given price series context
 
 
 
-### Quick Brain Check (single coin, full history, no files)
+### Quick Brain Test (single coin, full history)
 
 ```powershell
-python bot.py brains score --coin SOLUSDT --no_write -vvv
-```
+python bot.py --mode test --brain bear --tag SOLUSDT -vvv
+--brain = bear | chop | bull
 
---coin SOLUSDT → test one coin  
---no_write → print-only (no CSVs)  
--vvv → step-by-step debug; use -vv for periodic progress  
-Press Ctrl+C anytime — you’ll get a summary of Bear/Chop/Bull hit rates so far.
+--tag = coin symbol matching data\raw
+
+-vvv prints event reasons and outcomes.
+
+A progress bar stays on the bottom line. Press Ctrl+C anytime to see a partial summary.
+```
 
 \* Simulation harnesses to measure historical hit-rate.
 

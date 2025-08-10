@@ -3,6 +3,8 @@ from __future__ import annotations
 import csv
 import json
 import math
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -82,6 +84,19 @@ def _wilson(p_hat, n, z=1.96):
     return low, high
 
 
+def _render_bar(i, n, brain, coin):
+    width = 40
+    done = int(width * i / max(1, n))
+    bar = "#" * done + "-" * (width - done)
+    sys.stdout.write(f"\r[{brain}:{coin}] {i}/{n} [{bar}]")
+    sys.stdout.flush()
+
+
+def _newline_after_bar():
+    sys.stdout.write("\x1b[K\n")
+    sys.stdout.flush()
+
+
 def _score_events(events, baseline):
     hits = 0
     for i, e in enumerate(events, 1):
@@ -120,7 +135,7 @@ def score_coin(coin, series, cfg, start, end, args):
     idx = [i for i, t in enumerate(ts) if start_ts <= t <= end_ts]
     summaries = []
     brains = {
-        "BEAR": (bear.parked, bear.explain, cfg["bear"]),
+        "BEAR": (bear.parked, bear.parked_explain, cfg["bear"]),
         "CHOP": (chop.edge_long, chop.explain, cfg["chop"]),
         "BULL": (bull.momo_long, bull.explain, cfg["bull"]),
     }
@@ -139,16 +154,22 @@ def score_coin(coin, series, cfg, start, end, args):
             print(f"[{coin}] {name} horizon={horizon}h baseline={baseline*100:.1f}% (events so far: 0)")
         interrupted = False
         try:
-            last_event_idx = -horizon
+            last_evt = -10**9
             for step, i in enumerate(idx):
                 if i + horizon >= len(close):
                     break
+                if name == "BEAR" and (i - last_evt) < horizon:
+                    continue
                 if args.verbose >= 2 and step % 1000 == 0:
                     p = hits / len(events) if events else 0.0
                     print(f"[{name}] i={i}/{total} events={len(events)} hits={hits} p={p*100:.1f}% lift={(p-baseline)*100:+.1f}%")
                 if name == "BEAR":
-                    dec, info = func(i, series, bcfg)
-                    reasons = info
+                    dec = func(i, series, bcfg)
+                    if args.verbose >= 3:
+                        _, info = expl(i, series, bcfg)
+                        reasons = info
+                    else:
+                        reasons = {}
                 elif args.verbose >= 3:
                     res = expl(i, series, bcfg)
                     dec = res.get("decision")
@@ -158,10 +179,8 @@ def score_coin(coin, series, cfg, start, end, args):
                     reasons = {}
                 if not dec:
                     continue
-                if name == "BEAR" and i - last_event_idx < horizon:
-                    continue
                 if name == "BEAR":
-                    last_event_idx = i
+                    last_evt = i
                     hit, _ = first_hits(close, i, bcfg.get("up_pct", 0.02), bcfg.get("down_pct", -0.02), horizon)
                     outcome = int(close[i + horizon] < close[i] or hit == "down")
                 elif name == "CHOP":
@@ -289,36 +308,38 @@ def score_coin_single_brain(coin, series, cfg, start, end, brain_name, verbose, 
 
     if brain_name == "BEAR":
         func = bear.parked
-        expl = None
+        expl = bear.parked_explain
+        baseline_up = _baseline(close, horizon)
+        baseline = 1.0 - baseline_up
     elif brain_name == "CHOP":
         func = chop.edge_long
         expl = chop.explain
+        baseline = _baseline(close, horizon)
     else:
         func = bull.momo_long
         expl = bull.explain
-
-    if brain_name == "BEAR":
-        baseline_up = _baseline(close, horizon)
-        baseline = 1.0 - baseline_up
-    else:
         baseline = _baseline(close, horizon)
 
     events = []
     hits = 0
-    total = idx[-1] if idx else 0
+    total = len(idx)
     if verbose >= 1:
         print(f"[{coin}] {brain_name} horizon={horizon}h baseline={baseline*100:.1f}% (events so far: 0)")
     interrupted = False
+    last_evt = -10**9
     try:
-        last_event_idx = -horizon
-        for step, i in enumerate(idx):
+        for progress, i in enumerate(idx, 1):
             if i + horizon >= len(close):
                 break
-            if verbose >= 2 and step % 1000 == 0:
-                p = hits / len(events) if events else 0.0
-                print(f"[{brain_name}] i={i}/{total} events={len(events)} hits={hits} p={p*100:.1f}% lift={(p-baseline)*100:+.1f}%")
+            if brain_name == "BEAR" and (i - last_evt) < horizon:
+                _render_bar(progress, total, brain_name, coin)
+                continue
             if brain_name == "BEAR":
-                dec, reasons = func(i, series, bcfg)
+                dec = func(i, series, bcfg)
+                if verbose >= 3:
+                    _, reasons = expl(i, series, bcfg)
+                else:
+                    reasons = {}
             else:
                 if verbose >= 3:
                     res = expl(i, series, bcfg)
@@ -328,11 +349,10 @@ def score_coin_single_brain(coin, series, cfg, start, end, brain_name, verbose, 
                     dec = func(i, series, bcfg)
                     reasons = {}
             if not dec:
-                continue
-            if brain_name == "BEAR" and i - last_event_idx < horizon:
+                _render_bar(progress, total, brain_name, coin)
                 continue
             if brain_name == "BEAR":
-                last_event_idx = i
+                last_evt = i
                 hit, _ = first_hits(close, i, bcfg.get("up_pct", 0.02), bcfg.get("down_pct", -0.02), horizon)
                 outcome = int(close[i + horizon] < close[i] or hit == "down")
             elif brain_name == "CHOP":
@@ -343,21 +363,22 @@ def score_coin_single_brain(coin, series, cfg, start, end, brain_name, verbose, 
                 outcome = int(hit == "up")
             hits += outcome
             events.append({"ts": ts[i], "outcome": outcome})
-            if verbose >= 2:
-                p = hits / len(events)
-                print(f"[{brain_name}] i={i}/{total} events={len(events)} hits={hits} p={p*100:.1f}% lift={(p-baseline)*100:+.1f}%")
             if verbose >= 3:
                 t = datetime.fromtimestamp(ts[i]).isoformat(timespec="minutes")
                 parts = []
-                for k, v in reasons.items():
-                    if isinstance(v, bool):
-                        parts.append(f"{k}={'+' if v else '-'}")
-                    elif isinstance(v, float):
-                        parts.append(f"{k}={v:+.2f}")
-                    else:
-                        parts.append(f"{k}={v}")
+                for k in ["zL", "slopeM", "above_M", "reason"]:
+                    if k in reasons:
+                        v = reasons[k]
+                        if isinstance(v, float):
+                            parts.append(f"{k}={v:+.2f}")
+                        else:
+                            parts.append(f"{k}={v}")
                 reason_str = " ".join(parts)
-                print(f"[{brain_name}] t={t} {reason_str} OK -> OUTCOME={'up' if outcome else 'down'}")
+                outcome_str = "down" if outcome else "up"
+                print(f"[{brain_name}] t={t} {reason_str} -> OUTCOME={outcome_str}")
+                _render_bar(progress, total, brain_name, coin)
+            else:
+                _render_bar(progress, total, brain_name, coin)
     except KeyboardInterrupt:
         interrupted = True
 
@@ -397,6 +418,11 @@ def score_coin_single_brain(coin, series, cfg, start, end, brain_name, verbose, 
         "insufficient_sample": int(len(events) < cfg["scoring"].get("min_events", 100)),
         "drift": 0,
     }
+
+    if interrupted:
+        _newline_after_bar()
+        print([summary])
+
     return [summary]
 
 
@@ -404,8 +430,10 @@ def run_single_brain(args):
     with open("settings.json") as f:
         cfg = json.load(f)["brains"]
     coin = args.tag
+    brain = args.brain.upper()
     series, start, end = _load_series(coin)
     summaries = score_coin_single_brain(
-        coin, series, cfg, start, end, args.brain.upper(), args.verbose, args.out
+        coin, series, cfg, start, end, brain, args.verbose, args.out
     )
+    _newline_after_bar()
     print(summaries)
