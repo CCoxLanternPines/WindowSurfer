@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+from typing import Dict, Tuple
+
 import numpy as np
 import pandas as pd
 
@@ -109,3 +113,35 @@ def extract_all_features(candles: pd.DataFrame, blocks: list[dict]) -> pd.DataFr
 
     columns = ["block_id", *FEATURE_NAMES]
     return pd.DataFrame(rows, columns=columns)
+
+
+def scale_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, list]]:
+    """Standardize features and return scaled DataFrame and metadata."""
+    feature_matrix = df[FEATURE_NAMES].to_numpy(dtype=float)
+    mean = feature_matrix.mean(axis=0)
+    std = feature_matrix.std(axis=0)
+    std[std == 0] = 1
+    scaled = (feature_matrix - mean) / std
+    scaled_df = pd.DataFrame(scaled, columns=FEATURE_NAMES)
+    scaled_df.insert(0, "block_id", df["block_id"])
+    meta = {"mean": mean.tolist(), "std": std.tolist(), "features": FEATURE_NAMES}
+    return scaled_df, meta
+
+
+def save_features(df: pd.DataFrame, tag: str, timestamp: str) -> Dict[str, Path]:
+    """Save unscaled and scaled features along with metadata."""
+    features_dir = Path("features")
+    features_dir.mkdir(exist_ok=True)
+
+    raw_path = features_dir / f"features_{tag}_{timestamp}.parquet"
+    df.to_parquet(raw_path, index=False)
+
+    scaled_df, meta = scale_features(df)
+    scaled_path = features_dir / f"features_scaled_{tag}_{timestamp}.parquet"
+    scaled_df.to_parquet(scaled_path, index=False)
+
+    meta_path = features_dir / f"features_meta_{tag}_{timestamp}.json"
+    with meta_path.open("w") as fh:
+        json.dump(meta, fh, indent=2)
+
+    return {"raw": raw_path, "scaled": scaled_path, "meta": meta_path}

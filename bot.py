@@ -16,6 +16,7 @@ from systems.data_loader import (
     fetch_all_history_binance,
     fetch_range_kraken,
     load_or_fetch,
+    _load_settings,
 )
 
 logger = logging.getLogger("bot")
@@ -70,6 +71,46 @@ def cmd_fetch_history(args: argparse.Namespace) -> None:
 
 
 def cmd_regimes(args: argparse.Namespace) -> None:
+    if args.cluster:
+        features_dir = Path("features")
+        feat_files = sorted(features_dir.glob(f"features_{args.tag}_*.parquet"))
+        if not feat_files:
+            raise SystemExit(f"No features found for {args.tag}; run with --features first")
+        latest_feat = feat_files[-1]
+        stamp = "_".join(latest_feat.stem.split("_")[2:])
+        meta_path = features_dir / f"features_meta_{args.tag}_{stamp}.json"
+        if not meta_path.exists():
+            raise SystemExit(f"Meta file missing for {latest_feat.name}")
+
+        features_df = pd.read_parquet(latest_feat)
+        with meta_path.open() as fh:
+            meta = json.load(fh)
+
+        settings = _load_settings()
+        k = settings.get("regime_settings", {}).get("cluster_count", 3)
+
+        from systems.regime_cluster import cluster_features
+
+        assignments, centroids, inertia = cluster_features(features_df, meta, k)
+
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        assign_path = features_dir / f"regime_assignments_{args.tag}_{timestamp}.csv"
+        assignments.to_csv(assign_path, index=False)
+        cent_path = features_dir / f"centroids_{args.tag}_{timestamp}.json"
+        with cent_path.open("w") as fh:
+            json.dump(centroids, fh, indent=2)
+
+        counts = assignments["regime_id"].value_counts().sort_index()
+        count_str = " | ".join(
+            f"Regime {i}: {c} blocks" for i, c in counts.items()
+        )
+        print(f"[CLUSTER] K={k} | Inertia={inertia:.2f}")
+        print(f"[CLUSTER] {count_str}")
+        return
+
+    if not (args.train and args.test and args.step):
+        raise SystemExit("Provide --train, --test and --step or use --cluster")
+
     cache_path = CACHE_DIR / f"{args.tag}_1h.parquet"
     if not cache_path.exists():
         raise SystemExit(
@@ -112,34 +153,13 @@ def cmd_regimes(args: argparse.Namespace) -> None:
     logger.info("Saved block plan to %s", plan_path)
 
     if args.features:
-        from systems.features import FEATURE_NAMES, extract_all_features
+        from systems.features import FEATURE_NAMES, extract_all_features, save_features
 
         feat_df = extract_all_features(df, blocks)
-        feature_matrix = feat_df[FEATURE_NAMES].to_numpy()
-        mean = feature_matrix.mean(axis=0)
-        std = feature_matrix.std(axis=0)
-        std[std == 0] = 1
-        scaled = (feature_matrix - mean) / std
-        scaled_df = pd.DataFrame(scaled, columns=FEATURE_NAMES)
-        scaled_df.insert(0, "block_id", feat_df["block_id"])
-
-        features_dir = Path("features")
-        features_dir.mkdir(exist_ok=True)
-        feat_path = features_dir / f"features_{args.tag}_{timestamp}.parquet"
-        scaled_df.to_parquet(feat_path, index=False)
-
-        meta = {
-            "mean": mean.tolist(),
-            "std": std.tolist(),
-            "features": FEATURE_NAMES,
-        }
-        meta_path = features_dir / f"features_meta_{args.tag}_{timestamp}.json"
-        with meta_path.open("w") as fh:
-            json.dump(meta, fh, indent=2)
-
+        paths = save_features(feat_df, args.tag, timestamp)
         print(
             f"[FEATURES] Extracted {len(FEATURE_NAMES)} features for {len(blocks)} blocks "
-            f"-> saved to {feat_path.name}"
+            f"-> saved to {Path(paths['raw']).name}"
         )
 
 
@@ -160,13 +180,18 @@ def main(argv: Optional[List[str]] = None) -> None:
         "regimes", help="Walk-forward: Step 1 (plan blocks)"
     )
     sp_regimes.add_argument("--tag", required=True, help="Asset tag")
-    sp_regimes.add_argument("--train", required=True, help="Training window")
-    sp_regimes.add_argument("--test", required=True, help="Testing window")
-    sp_regimes.add_argument("--step", required=True, help="Step size")
+    sp_regimes.add_argument("--train", help="Training window")
+    sp_regimes.add_argument("--test", help="Testing window")
+    sp_regimes.add_argument("--step", help="Step size")
     sp_regimes.add_argument(
         "--features",
         action="store_true",
         help="Extract features for training windows",
+    )
+    sp_regimes.add_argument(
+        "--cluster",
+        action="store_true",
+        help="Run K-Means clustering on extracted features",
     )
     add_verbosity(sp_regimes)
 
