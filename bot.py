@@ -358,6 +358,41 @@ def cmd_audit_full(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 def main(argv: Optional[List[str]] = None) -> None:
+    if argv is None:
+        argv = sys.argv[1:]
+    if "--mode" in argv:
+        idx = argv.index("--mode")
+        mode_val = argv[idx + 1] if idx + 1 < len(argv) else None
+        if mode_val == "blend":
+            p = argparse.ArgumentParser()
+            p.add_argument("--mode", choices=["blend"], required=True)
+            p.add_argument("--tag", required=True)
+            p.add_argument("--run-id")
+            p.add_argument("--alpha", type=float, default=0.7)
+            p.add_argument("--hyst-boost", type=float, default=0.1)
+            p.add_argument("--live", action="store_true")
+            p.add_argument("-v", "--verbose", action="count", default=0)
+            args = p.parse_args(argv)
+            if args.live:
+                from systems.live_engine import run_blend_live
+
+                run_blend_live(
+                    args.tag,
+                    alpha=args.alpha,
+                    boost=args.hyst_boost,
+                    verbosity=args.verbose,
+                )
+            else:
+                from systems.simulator import run_blend_sim
+
+                run_blend_sim(
+                    tag=args.tag,
+                    run_id=args.run_id or "blend",
+                    alpha=args.alpha,
+                    boost=args.hyst_boost,
+                    verbosity=args.verbose,
+                )
+            return
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="group", required=True)
 
