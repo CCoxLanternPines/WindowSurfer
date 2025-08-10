@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-import json, shutil, numpy as np, pandas as pd
+import json, numpy as np, pandas as pd
 from datetime import datetime
 from systems.paths import BRAINS_DIR, temp_cluster_dir, temp_audit_dir
 from systems.paths import load_settings
@@ -56,11 +56,13 @@ def finalize_brain(tag: str, run_id: str, labels: dict[int, str] | None = None,
     BRAINS_DIR.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(brain, indent=2))
 
-    # Latest copy for convenience
-    latest = BRAINS_DIR / f"brain_{tag}.json"
-    shutil.copyfile(out, latest)
-
     return out
+
+
+def write_latest_copy(path: Path, tag: str) -> Path:
+    latest = BRAINS_DIR / f"brain_{tag}.json"
+    latest.write_text(Path(path).read_text())
+    return latest
 
 
 class RegimeBrain:

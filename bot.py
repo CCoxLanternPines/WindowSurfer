@@ -250,7 +250,7 @@ def regimes_cluster(
         with meta_path.open() as fh:
             meta = json.load(fh)
 
-        from systems.regime_cluster import cluster_features
+        from systems.regime_cluster import cluster_features, freeze_brain
 
         assignments, centroids, inertia = cluster_features(
             features_df, meta, k=k, seed=seed
@@ -269,6 +269,7 @@ def regimes_cluster(
         k_used = centroids.get("k", k)
         print(f"[CLUSTER] K={k_used} | Inertia={inertia:.2f}")
         print(f"[CLUSTER] {count_str}")
+        freeze_brain(tag, run_id)
 
 
 # ---------------------------------------------------------------------------
@@ -411,14 +412,24 @@ def main(argv: Optional[List[str]] = None) -> None:
     add_run_id(sp_full)
     add_verbosity(sp_full)
 
-    sp_brain = audit_sub.add_parser("brain", help="Finalize brain artifact")
-    sp_brain.add_argument("--tag", required=True, help="Asset tag")
-    add_run_id(sp_brain)
-    sp_brain.add_argument(
+    sp_brain_final = audit_sub.add_parser("brain", help="Finalize brain artifact")
+    sp_brain_final.add_argument("--tag", required=True, help="Asset tag")
+    add_run_id(sp_brain_final)
+    sp_brain_final.add_argument(
         "--labels", help="Path to JSON mapping regime id to label"
     )
-    sp_brain.add_argument("--alpha", type=float, default=0.2)
-    sp_brain.add_argument("--switch-margin", type=float, default=0.3)
+    sp_brain_final.add_argument("--alpha", type=float, default=0.2)
+    sp_brain_final.add_argument("--switch-margin", type=float, default=0.3)
+
+    # Brain group
+    sp_brain = subparsers.add_parser("brain", help="Brain utilities")
+    brain_sub = sp_brain.add_subparsers(dest="command", required=True)
+
+    sp_classify = brain_sub.add_parser("classify", help="Classify current regime")
+    sp_classify.add_argument("--tag", required=True, help="Asset tag")
+    sp_classify.add_argument("--train", required=True, help="Training window")
+    sp_classify.add_argument("--at", help="ISO timestamp")
+    sp_classify.add_argument("--from-csv", dest="from_csv", help="Path to CSV of candles")
 
     args = parser.parse_args(argv)
 
@@ -445,7 +456,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             )
     elif args.group == "audit":
         if args.command == "brain":
-            from systems.brain import finalize_brain
+            from systems.brain import finalize_brain, write_latest_copy
 
             run_id = args.run_id or latest_run_id(args.tag)
 
@@ -458,9 +469,10 @@ def main(argv: Optional[List[str]] = None) -> None:
             path = finalize_brain(
                 args.tag, run_id, labels, args.alpha, args.switch_margin
             )
+            latest = write_latest_copy(path, args.tag)
             brain = json.loads(Path(path).read_text())
             row_sums = [round(sum(r), 6) for r in brain["transitions"]]
-            print(f"[BRAIN] Saved {path}")
+            print(f"[BRAIN] Saved {path} and updated {latest}")
             print(f"[BRAIN] Row sums: {row_sums}")
             print(f"[BRAIN] Labels: {brain.get('labels', {})}")
         else:
@@ -470,6 +482,20 @@ def main(argv: Optional[List[str]] = None) -> None:
                 cmd_audit_summary(args)
             elif args.command == "full":
                 cmd_audit_full(args)
+    elif args.group == "brain":
+        if args.command == "classify":
+            from systems.live_classifier import classify
+
+            train_candles = parse_duration_1h(args.train)
+            res = classify(
+                tag=args.tag,
+                train_candles=train_candles,
+                at_ts=args.at,
+                csv_path=args.from_csv,
+            )
+            print(
+                f"[CLASSIFY] regime_id={res['regime_id']} | probs_next={res['probs_next']} | features={res['features_used']}"
+            )
     else:
         parser.error("Unknown command")
 
