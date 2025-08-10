@@ -5,12 +5,16 @@ from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 
-from .data_loader import _load_settings
 from .features import _feature_sha
+from .paths import load_settings
 
 
 def cluster_features(
-    features_df: pd.DataFrame, meta: Dict[str, list], k: int, seed: int = 0, max_iter: int = 100
+    features_df: pd.DataFrame,
+    meta: Dict[str, list],
+    k: int | None = None,
+    seed: int | None = None,
+    max_iter: int = 100,
 ) -> Tuple[pd.DataFrame, Dict[str, list], float]:
     """Cluster standardized features using K-Means.
 
@@ -20,10 +24,10 @@ def cluster_features(
         DataFrame with scaled feature columns and ``block_id``.
     meta : dict
         Metadata containing ``mean``, ``std`` and ``features``.
-    k : int
-        Number of clusters.
+    k : int, optional
+        Number of clusters. Defaults to settings ``cluster_count`` or 3.
     seed : int, optional
-        RNG seed for deterministic initialization.
+        RNG seed for deterministic initialization. Defaults to settings ``seed`` or 42.
     max_iter : int, optional
         Maximum K-Means iterations.
     """
@@ -32,16 +36,17 @@ def cluster_features(
     if sha_meta and sha_meta != _feature_sha(feature_names):
         raise ValueError("[FEATURES][FATAL] feature_sha mismatch; regenerate features")
 
-    settings = _load_settings()
-    cfg = settings.get("cluster_settings", {})
+    cfg = load_settings().get("cluster_settings", {})
+    k = k or int(cfg.get("cluster_count", 3))
+    seed = seed if seed is not None else int(cfg.get("seed", 42))
+    np.random.seed(seed)
     drops = set(cfg.get("drop_features", []))
     replacements = cfg.get("replace_features", {})
     feat_names_effective = [replacements.get(f, f) for f in feature_names if f not in drops]
 
     X = features_df[feat_names_effective].to_numpy(dtype=float)
 
-    rng = np.random.default_rng(seed)
-    indices = rng.choice(len(X), size=k, replace=False)
+    indices = np.random.choice(len(X), size=k, replace=False)
     centroids = X[indices]
 
     for _ in range(max_iter):
@@ -70,6 +75,7 @@ def cluster_features(
         "std_floor": meta.get("std_floor", 1e-6),
         "centroids": centroids_scaled,
         "k": k,
+        "seed": seed,
         "inertia": float(inertia),
     }
     return assignments_df, centroids_payload, inertia
