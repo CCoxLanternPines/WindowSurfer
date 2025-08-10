@@ -374,23 +374,36 @@ def main(argv: Optional[List[str]] = None) -> None:
             p.add_argument("-v", "--verbose", action="count", default=0)
             args = p.parse_args(argv)
             if args.live:
-                from systems.live_engine import run_blend_live
+                from systems.live_engine import run_live
 
-                run_blend_live(
+                run_live(
                     args.tag,
+                    blend_enabled=True,
                     alpha=args.alpha,
-                    boost=args.hyst_boost,
+                    hyst_boost=args.hyst_boost,
                     verbosity=args.verbose,
                 )
             else:
-                from systems.simulator import run_blend_sim
+                from systems.simulator import run_sim_blocks
+                from systems.policy_blender import load_seed_knobs
+                from systems.paths import load_settings
 
-                run_blend_sim(
+                seed_all = load_seed_knobs().get(args.tag, {})
+                if not seed_all:
+                    raise SystemExit(f"No seed knobs for tag {args.tag}")
+                base_knobs = next(iter(seed_all.values()))
+                settings = load_settings()
+
+                run_sim_blocks(
+                    blocks=[{}],
                     tag=args.tag,
-                    run_id=args.run_id or "blend",
-                    alpha=args.alpha,
-                    boost=args.hyst_boost,
+                    knobs=base_knobs,
+                    settings=settings,
                     verbosity=args.verbose,
+                    run_id=args.run_id or "blend",
+                    blend_enabled=True,
+                    alpha=args.alpha,
+                    hyst_boost=args.hyst_boost,
                 )
             return
     parser = argparse.ArgumentParser()
