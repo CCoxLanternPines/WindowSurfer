@@ -8,9 +8,11 @@ import numpy as np
 import optuna
 import pandas as pd
 
-from systems.utils.imports import ensure_project_root, import_module_safely
+from systems.utils.imports import ensure_project_root
 
 ensure_project_root()
+
+from systems.sim_engine import RUNNER_ID, run_sim_blocks
 
 
 def run_regime_tuning(
@@ -22,6 +24,7 @@ def run_regime_tuning(
     metric: str = "pnl_dd",
     seed: int = 2,
     verbose: int = 0,
+    smoke: bool = False,
     write_seed: bool = False,
 ) -> None:
     """Run Optuna tuning for a specific regime over pure blocks.
@@ -44,6 +47,8 @@ def run_regime_tuning(
         Random seed.
     verbose: int
         Verbosity level.
+    smoke: bool
+        If True, perform a lightweight discovery run and exit.
     write_seed: bool
         Update regimes/seed_knobs.json with best params.
     """
@@ -55,18 +60,7 @@ def run_regime_tuning(
     from .regime_cluster import align_centroids
     from .purity import compute_purity
 
-    # Lazy import to avoid circulars and context issues
-    # Prefer normal absolute import; fall back to direct file load
-    try:
-        from systems.sim_engine import run_sim as _run_sim
-    except Exception:
-        sim_engine = import_module_safely("systems.sim_engine", "systems/sim_engine.py")
-        _run_sim = getattr(sim_engine, "run_sim", None) or \
-                   getattr(sim_engine, "run_simulation", None) or \
-                   getattr(sim_engine, "run_sim_blocks", None) or \
-                   getattr(sim_engine, "run_sim_engine", None)
-        if _run_sim is None:
-            raise ImportError("Could not locate a public sim runner in systems/sim_engine.py")
+    print(f"[TUNE] Using sim runner: {RUNNER_ID}")
 
     # ------------------------------------------------------------------
     # Load settings for block planning
@@ -150,6 +144,10 @@ def run_regime_tuning(
         block = blocks[b_id - 1]  # block_id is 1-indexed
         ranges.append((block["test_start"], block["test_end"]))
 
+    print(f"[TUNE] Ranges: {len(ranges)} blocks | τ={tau:.2f} | regime=R{regime_id}")
+    if smoke:
+        return
+
     # ------------------------------------------------------------------
     # Optuna search space
     # ------------------------------------------------------------------
@@ -167,20 +165,12 @@ def run_regime_tuning(
             "stop_loss": trial.suggest_float("stop_loss", 0.02, 0.08),
             "sell_cooldown": trial.suggest_int("sell_cooldown", 3, 16),
         }
-        try:
-            result = _run_sim(
-                tag=tag,
-                knobs=knobs,
-                block_ranges=ranges,
-                verbose=verbose >= 2,
-            )
-        except TypeError:
-            result = _run_sim(
-                tag=tag,
-                knobs=knobs,
-                start_end_ranges=ranges,
-                verbose=verbose >= 2,
-            )
+        result = run_sim_blocks(
+            tag=tag,
+            ranges=ranges,
+            knobs=knobs,
+            verbose=verbose >= 2,
+        )
         pnl = float(result.get("pnl", 0.0))
         maxdd = float(result.get("maxdd", 0.0))
         trades = int(result.get("trades", 0))
