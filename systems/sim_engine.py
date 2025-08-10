@@ -6,7 +6,7 @@ from typing import Any, Iterable
 
 # candidate modules to search for a sim runner
 _CANDIDATE_MODULES: list[str] = [
-    "systems.scripts.sim_engine",   # main production sim
+    "systems.scripts.sim_engine",   # new production sim
     "systems.sim_engine",           # allow direct import if needed
     "engine.sim_engine",            # legacy path fallback
 ]
