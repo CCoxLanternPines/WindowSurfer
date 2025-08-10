@@ -33,7 +33,6 @@ from systems.paths import (
     TEMP_DIR,
     temp_run_dir,
 )
-from systems.utils.cli_args import add_action as cli_add_action
 from systems.utils.cli_args import add_run_id as cli_add_run_id
 from systems.utils.cli_args import add_tag as cli_add_tag
 from systems.utils.cli_args import add_verbose as cli_add_verbose
@@ -385,7 +384,12 @@ def main(argv: Optional[List[str]] = None) -> None:
     sp_regimes = subparsers.add_parser(
         "regimes", help="Regime training/assign/audit/tune"
     )
-    cli_add_action(sp_regimes, choices=["train", "assign", "audit", "tune"])
+    sp_regimes.add_argument(
+        "--action",
+        type=str,
+        choices=["train", "assign", "audit", "tune"],
+        help="Action to perform",
+    )
     cli_add_tag(sp_regimes, required=False)
     cli_add_run_id(sp_regimes, required=False)
     cli_add_verbose(sp_regimes)
@@ -424,6 +428,12 @@ def main(argv: Optional[List[str]] = None) -> None:
     sp_purity.add_argument("--tau", type=float, default=0.70, help="Purity threshold")
     sp_purity.add_argument("--win", default="1w", help="Sub-window duration")
     sp_purity.add_argument("--stride", type=int, default=6, help="Stride in candles")
+
+    sp_promote = reg_sub.add_parser(
+        "promote", help="Promote best knobs to seed_knobs.json"
+    )
+    sp_promote.add_argument("--run-id", required=True)
+    sp_promote.add_argument("--tag", required=True)
 
     # Audit group
     sp_audit = subparsers.add_parser("audit", help="Audit regimes")
@@ -473,7 +483,11 @@ def main(argv: Optional[List[str]] = None) -> None:
         elif args.command == "purge-temp":
             cmd_data_purge_temp(args)
     elif args.group == "regimes":
-        if args.action == "tune":
+        if args.command == "promote":
+            from systems.promote_knobs import promote_knobs
+
+            promote_knobs(args.run_id, args.tag)
+        elif args.action == "tune":
             from systems.regime_tuner import run_regime_tuning
 
             run_regime_tuning(
