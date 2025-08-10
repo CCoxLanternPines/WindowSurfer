@@ -373,7 +373,24 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     # Regimes group
     sp_regimes = subparsers.add_parser("regimes", help="Regime workflows")
-    reg_sub = sp_regimes.add_subparsers(dest="command", required=True)
+    sp_regimes.add_argument(
+        "--action",
+        choices=["train", "assign", "audit", "tune"],
+        help="High-level regime action",
+    )
+    sp_regimes.add_argument("--tag", help="Asset tag")
+    sp_regimes.add_argument("--regime-id", type=int, help="Regime identifier")
+    sp_regimes.add_argument("--tau", type=float, help="Purity threshold")
+    sp_regimes.add_argument("--trials", type=int, help="Optuna trials")
+    sp_regimes.add_argument("--metric", default="pnl_dd", help="Optimization metric")
+    sp_regimes.add_argument("--seed", type=int, default=2, help="RNG seed")
+    sp_regimes.add_argument(
+        "--write-seed", action="store_true", help="Persist best knobs to seed file"
+    )
+    add_run_id(sp_regimes)
+    add_verbosity(sp_regimes)
+
+    reg_sub = sp_regimes.add_subparsers(dest="command")
 
     def add_run_id(sp):
         sp.add_argument("--run-id", help="Run identifier")
@@ -453,7 +470,21 @@ def main(argv: Optional[List[str]] = None) -> None:
             cmd_data_purge_temp(args)
     elif args.group == "regimes":
         run_id = args.run_id or new_run_id("regimes")
-        if args.command == "plan":
+        if args.action == "tune":
+            from systems.regime_tuner import run_regime_tuning
+
+            run_regime_tuning(
+                tag=args.tag,
+                run_id=run_id,
+                regime_id=args.regime_id,
+                tau=args.tau,
+                trials=args.trials,
+                metric=args.metric,
+                seed=args.seed,
+                verbose=args.verbosity,
+                write_seed=args.write_seed,
+            )
+        elif args.command == "plan":
             regimes_plan(args.tag, args.train, args.test, args.step, run_id, args.verbosity)
         elif args.command == "features":
             regimes_features(args.tag, run_id, args.verbosity)
