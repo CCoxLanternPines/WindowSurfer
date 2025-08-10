@@ -18,7 +18,6 @@ from systems.data_loader import (
     fetch_all_history_binance,
     fetch_range_kraken,
     load_or_fetch,
-    _load_settings,
 )
 from systems.paths import (
     ensure_dirs,
@@ -222,7 +221,13 @@ def regimes_features(tag: str, run_id: str, verbosity: int = 0) -> None:
         )
 
 
-def regimes_cluster(tag: str, run_id: str, verbosity: int = 0) -> None:
+def regimes_cluster(
+    tag: str,
+    run_id: str,
+    k: int | None = None,
+    seed: int | None = None,
+    verbosity: int = 0,
+) -> None:
     with log_to_file(tag, run_id):
         feat_dir = temp_features_dir(run_id)
         features_path = feat_dir / f"features_{tag}.parquet"
@@ -234,12 +239,11 @@ def regimes_cluster(tag: str, run_id: str, verbosity: int = 0) -> None:
         with meta_path.open() as fh:
             meta = json.load(fh)
 
-        settings = _load_settings()
-        k = settings.get("regime_settings", {}).get("cluster_count", 3)
-
         from systems.regime_cluster import cluster_features
 
-        assignments, centroids, inertia = cluster_features(features_df, meta, k)
+        assignments, centroids, inertia = cluster_features(
+            features_df, meta, k=k, seed=seed
+        )
 
         cluster_dir = temp_cluster_dir(run_id)
         cluster_dir.mkdir(parents=True, exist_ok=True)
@@ -251,7 +255,8 @@ def regimes_cluster(tag: str, run_id: str, verbosity: int = 0) -> None:
 
         counts = assignments["regime_id"].value_counts().sort_index()
         count_str = " | ".join(f"Regime {i}: {c} blocks" for i, c in counts.items())
-        print(f"[CLUSTER] K={k} | Inertia={inertia:.2f}")
+        k_used = centroids.get("k", k)
+        print(f"[CLUSTER] K={k_used} | Inertia={inertia:.2f}")
         print(f"[CLUSTER] {count_str}")
 
 
@@ -317,7 +322,7 @@ def cmd_audit_full(args: argparse.Namespace) -> None:
     assign_path = cluster_dir / f"regime_assignments_{args.tag}.csv"
     cent_path = cluster_dir / f"centroids_{args.tag}.json"
     if not (assign_path.exists() and cent_path.exists()):
-        regimes_cluster(args.tag, run_id, args.verbosity)
+        regimes_cluster(args.tag, run_id, verbosity=args.verbosity)
     paths = _resolve_artifacts(args.tag, run_id)
     from systems.regime_audit import run_audit
     from systems.regime_audit_plus import run as run_plus
@@ -377,6 +382,8 @@ def main(argv: Optional[List[str]] = None) -> None:
     sp_clust = reg_sub.add_parser("cluster", help="Run K-Means clustering on features")
     sp_clust.add_argument("--tag", required=True, help="Asset tag")
     add_run_id(sp_clust)
+    sp_clust.add_argument("--k", type=int, help="Number of clusters")
+    sp_clust.add_argument("--seed", type=int, help="RNG seed")
     add_verbosity(sp_clust)
 
     # Audit group
@@ -392,6 +399,15 @@ def main(argv: Optional[List[str]] = None) -> None:
     sp_full.add_argument("--tag", required=True, help="Asset tag")
     add_run_id(sp_full)
     add_verbosity(sp_full)
+
+    sp_brain = audit_sub.add_parser("brain", help="Finalize brain artifact")
+    sp_brain.add_argument("--tag", required=True, help="Asset tag")
+    add_run_id(sp_brain)
+    sp_brain.add_argument(
+        "--labels", help="Path to JSON mapping regime id to label"
+    )
+    sp_brain.add_argument("--alpha", type=float, default=0.2)
+    sp_brain.add_argument("--switch-margin", type=float, default=0.3)
 
     args = parser.parse_args(argv)
 
@@ -413,14 +429,35 @@ def main(argv: Optional[List[str]] = None) -> None:
         elif args.command == "features":
             regimes_features(args.tag, run_id, args.verbosity)
         elif args.command == "cluster":
-            regimes_cluster(args.tag, run_id, args.verbosity)
+            regimes_cluster(
+                args.tag, run_id, k=args.k, seed=args.seed, verbosity=args.verbosity
+            )
     elif args.group == "audit":
-        run_id = args.run_id or new_run_id("regimes")
-        args.run_id = run_id
-        if args.command == "summary":
-            cmd_audit_summary(args)
-        elif args.command == "full":
-            cmd_audit_full(args)
+        if args.command == "brain":
+            from systems.brain import finalize_brain
+
+            labels = None
+            if args.labels:
+                with open(args.labels) as fh:
+                    labels = json.load(fh)
+            path = finalize_brain(
+                args.tag, args.run_id, labels, args.alpha, args.switch_margin
+            )
+            with open(path) as fh:
+                brain = json.load(fh)
+            print(f"[BRAIN] Saved {path}")
+            print(
+                f"[BRAIN] K={brain['k']} | Features={len(brain['features'])} | Labels={brain.get('labels')}"
+            )
+            row_sums = [round(sum(r), 6) for r in brain["transitions"]]
+            print(f"[BRAIN] Transition row sums (should be 1.0): {row_sums}")
+        else:
+            run_id = args.run_id or new_run_id("regimes")
+            args.run_id = run_id
+            if args.command == "summary":
+                cmd_audit_summary(args)
+            elif args.command == "full":
+                cmd_audit_full(args)
     else:
         parser.error("Unknown command")
 
