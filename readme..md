@@ -218,6 +218,17 @@ Because each brain outputs a \*\*boolean decision\*\* given price series context
 
 
 
+### Quick Brain Check (single coin, full history, no files)
+
+```powershell
+python bot.py brains score --coin SOLUSDT --no_write -vvv
+```
+
+--coin SOLUSDT → test one coin  
+--no_write → print-only (no CSVs)  
+-vvv → step-by-step debug; use -vv for periodic progress  
+Press Ctrl+C anytime — you’ll get a summary of Bear/Chop/Bull hit rates so far.
+
 \* Simulation harnesses to measure historical hit-rate.
 
 \* Live bots to gate trade execution.
