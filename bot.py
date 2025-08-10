@@ -4,7 +4,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from datetime import datetime
+import sys
+import shutil
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -13,12 +15,49 @@ import pandas as pd
 from systems.block_planner import plan_blocks
 from systems.cli.common_args import add_verbosity, parse_duration_1h, validate_dates
 from systems.data_loader import (
-    CACHE_DIR,
     fetch_all_history_binance,
     fetch_range_kraken,
     load_or_fetch,
     _load_settings,
 )
+from systems.paths import (
+    ensure_dirs,
+    new_run_id,
+    raw_parquet,
+    temp_blocks_dir,
+    temp_features_dir,
+    temp_cluster_dir,
+    temp_audit_dir,
+    results_csv,
+    log_file,
+    TEMP_DIR,
+    temp_run_dir,
+)
+from contextlib import contextmanager, redirect_stdout, redirect_stderr
+
+
+class Tee:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for s in self.streams:
+            s.write(data)
+
+    def flush(self):
+        for s in self.streams:
+            s.flush()
+
+
+@contextmanager
+def log_to_file(tag: str, run_id: str):
+    ensure_dirs()
+    path = log_file(tag, run_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as fh, redirect_stdout(Tee(sys.stdout, fh)), redirect_stderr(
+        Tee(sys.stderr, fh)
+    ):
+        yield
 
 logger = logging.getLogger("bot")
 
@@ -52,8 +91,8 @@ def cmd_data_fetch(args: argparse.Namespace) -> None:
             f"[FETCH] TAG={args.tag} | Source=Binance | Candles={len(df)} | "
             f"Range={first} -> {last}"
         )
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        cache_path = CACHE_DIR / f"{args.tag}_1h.parquet"
+        ensure_dirs()
+        cache_path = raw_parquet(args.tag)
         df.to_parquet(cache_path, index=False)
         print(f"[CACHE] {cache_path}")
     else:
@@ -75,7 +114,7 @@ def cmd_data_fetch(args: argparse.Namespace) -> None:
 
 
 def cmd_data_verify(args: argparse.Namespace) -> None:
-    cache_path = CACHE_DIR / f"{args.tag}_1h.parquet"
+    cache_path = raw_parquet(args.tag)
     if not cache_path.exists():
         raise SystemExit(f"Cache missing for {args.tag}; run data fetch-history first")
     df = pd.read_parquet(cache_path)
@@ -88,153 +127,204 @@ def cmd_data_verify(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Temp purge
+# ---------------------------------------------------------------------------
+
+
+def _parse_age(text: str) -> timedelta:
+    if text[-1] not in {"d", "h"}:
+        raise ValueError("Use 'd' for days or 'h' for hours")
+    value = int(text[:-1])
+    if text[-1] == "d":
+        return timedelta(days=value)
+    return timedelta(hours=value)
+
+
+def cmd_data_purge_temp(args: argparse.Namespace) -> None:
+    ensure_dirs()
+    if args.all:
+        for d in TEMP_DIR.glob("*"):
+            if d.is_dir():
+                shutil.rmtree(d)
+                print(f"[PURGE] Removed {d}")
+        return
+    threshold = datetime.utcnow() - _parse_age(args.older_than)
+    for d in TEMP_DIR.glob("*"):
+        if d.is_dir() and datetime.utcfromtimestamp(d.stat().st_mtime) < threshold:
+            shutil.rmtree(d)
+            print(f"[PURGE] Removed {d}")
+
+# ---------------------------------------------------------------------------
 # Regime utilities
 # ---------------------------------------------------------------------------
 
-def regimes_plan(tag: str, train: str, test: str, step: str, verbosity: int = 0) -> None:
-    cache_path = CACHE_DIR / f"{tag}_1h.parquet"
-    if not cache_path.exists():
-        raise SystemExit(f"Cache missing for {tag}; run data fetch-history first")
-    df = load_or_fetch(tag)
-    diffs = df["timestamp"].diff().dropna()
-    assert diffs.empty or (diffs == 3600).all(), "Candles must be 1h spaced"
+def regimes_plan(
+    tag: str, train: str, test: str, step: str, run_id: str, verbosity: int = 0
+) -> None:
+    with log_to_file(tag, run_id):
+        cache_path = raw_parquet(tag)
+        if not cache_path.exists():
+            raise SystemExit(f"Cache missing for {tag}; run data fetch-history first")
+        df = load_or_fetch(tag)
+        diffs = df["timestamp"].diff().dropna()
+        assert diffs.empty or (diffs == 3600).all(), "Candles must be 1h spaced"
 
-    total = len(df)
-    train_c = parse_duration_1h(train)
-    test_c = parse_duration_1h(test)
-    step_c = parse_duration_1h(step)
+        total = len(df)
+        train_c = parse_duration_1h(train)
+        test_c = parse_duration_1h(test)
+        step_c = parse_duration_1h(step)
 
-    blocks = plan_blocks(df, train_c, test_c, step_c)
+        blocks = plan_blocks(df, train_c, test_c, step_c)
 
-    print(
-        f"Total={total} | Train={train_c} | Test={test_c} | "
-        f"Step={step_c} | Blocks={len(blocks)}"
-    )
+        print(
+            f"Total={total} | Train={train_c} | Test={test_c} | "
+            f"Step={step_c} | Blocks={len(blocks)}"
+        )
 
-    if verbosity >= 2:
-        for idx, b in enumerate(blocks, start=1):
-            ts = lambda x: pd.to_datetime(x, unit="s", utc=True)
-            print(
-                f"Block {idx}: Train {ts(b['train_start'])} -> {ts(b['train_end'])} | "
-                f"Test {ts(b['test_start'])} -> {ts(b['test_end'])}"
-            )
+        if verbosity >= 2:
+            for idx, b in enumerate(blocks, start=1):
+                ts = lambda x: pd.to_datetime(x, unit="s", utc=True)
+                print(
+                    f"Block {idx}: Train {ts(b['train_start'])} -> {ts(b['train_end'])} | "
+                    f"Test {ts(b['test_start'])} -> {ts(b['test_end'])}"
+                )
 
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    plan_path = logs_dir / f"block_plan_{tag}_{timestamp}.json"
-    with plan_path.open("w") as fh:
-        json.dump(blocks, fh, indent=2)
-    csv_path = logs_dir / "regime_walk_results.csv"
-    with csv_path.open("w") as fh:
-        fh.write("block,train_start,train_end,test_start,test_end\n")
-    logger.info("Saved block plan to %s", plan_path)
-
-
-def regimes_features(tag: str, verbosity: int = 0) -> None:
-    cache_path = CACHE_DIR / f"{tag}_1h.parquet"
-    if not cache_path.exists():
-        raise SystemExit(f"Cache missing for {tag}; run data fetch-history first")
-    plan_files = sorted(Path("logs").glob(f"block_plan_{tag}_*.json"))
-    if not plan_files:
-        raise SystemExit(f"No block plan found for {tag}; run regimes plan first")
-    with plan_files[-1].open() as fh:
-        blocks = json.load(fh)
-    df = load_or_fetch(tag)
-    from systems.features import FEATURE_NAMES, extract_all_features, save_features
-
-    feat_df = extract_all_features(df, blocks)
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    paths = save_features(feat_df, tag, timestamp)
-    print(
-        f"[FEATURES] Extracted {len(FEATURE_NAMES)} features for {len(blocks)} blocks "
-        f"-> saved to {Path(paths['raw']).name}"
-    )
+        blocks_dir = temp_blocks_dir(run_id)
+        blocks_dir.mkdir(parents=True, exist_ok=True)
+        plan_path = blocks_dir / f"block_plan_{tag}.json"
+        with plan_path.open("w") as fh:
+            json.dump(blocks, fh, indent=2)
+        csv_path = results_csv(tag, run_id)
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        with csv_path.open("w") as fh:
+            fh.write("block,train_start,train_end,test_start,test_end\n")
+        logger.info("Saved block plan to %s", plan_path)
 
 
-def regimes_cluster(tag: str, verbosity: int = 0) -> None:
-    features_dir = Path("features")
-    feat_files = sorted(features_dir.glob(f"features_{tag}_*.parquet"))
-    if not feat_files:
-        raise SystemExit(f"No features found for {tag}; run regimes features first")
-    latest_feat = feat_files[-1]
-    stamp = "_".join(latest_feat.stem.split("_")[2:])
-    meta_path = features_dir / f"features_meta_{tag}_{stamp}.json"
-    if not meta_path.exists():
-        raise SystemExit(f"Meta file missing for {latest_feat.name}")
+def regimes_features(tag: str, run_id: str, verbosity: int = 0) -> None:
+    with log_to_file(tag, run_id):
+        cache_path = raw_parquet(tag)
+        if not cache_path.exists():
+            raise SystemExit(f"Cache missing for {tag}; run data fetch-history first")
+        blocks_path = temp_blocks_dir(run_id) / f"block_plan_{tag}.json"
+        if not blocks_path.exists():
+            raise SystemExit(f"No block plan found for {tag}; run regimes plan first")
+        with blocks_path.open() as fh:
+            blocks = json.load(fh)
+        df = load_or_fetch(tag)
+        from systems.features import FEATURE_NAMES, extract_all_features, save_features
 
-    features_df = pd.read_parquet(latest_feat)
-    with meta_path.open() as fh:
-        meta = json.load(fh)
+        feat_df = extract_all_features(df, blocks)
+        paths = save_features(feat_df, tag, run_id)
+        print(
+            f"[FEATURES] Extracted {len(FEATURE_NAMES)} features for {len(blocks)} blocks "
+            f"-> saved to {Path(paths['raw']).name}"
+        )
 
-    settings = _load_settings()
-    k = settings.get("regime_settings", {}).get("cluster_count", 3)
 
-    from systems.regime_cluster import cluster_features
+def regimes_cluster(tag: str, run_id: str, verbosity: int = 0) -> None:
+    with log_to_file(tag, run_id):
+        feat_dir = temp_features_dir(run_id)
+        features_path = feat_dir / f"features_{tag}.parquet"
+        meta_path = feat_dir / f"features_meta_{tag}.json"
+        if not features_path.exists() or not meta_path.exists():
+            raise SystemExit(f"No features found for {tag}; run regimes features first")
 
-    assignments, centroids, inertia = cluster_features(features_df, meta, k)
+        features_df = pd.read_parquet(features_path)
+        with meta_path.open() as fh:
+            meta = json.load(fh)
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    assign_path = features_dir / f"regime_assignments_{tag}_{timestamp}.csv"
-    assignments.to_csv(assign_path, index=False)
-    cent_path = features_dir / f"centroids_{tag}_{timestamp}.json"
-    with cent_path.open("w") as fh:
-        json.dump(centroids, fh, indent=2)
+        settings = _load_settings()
+        k = settings.get("regime_settings", {}).get("cluster_count", 3)
 
-    counts = assignments["regime_id"].value_counts().sort_index()
-    count_str = " | ".join(f"Regime {i}: {c} blocks" for i, c in counts.items())
-    print(f"[CLUSTER] K={k} | Inertia={inertia:.2f}")
-    print(f"[CLUSTER] {count_str}")
+        from systems.regime_cluster import cluster_features
+
+        assignments, centroids, inertia = cluster_features(features_df, meta, k)
+
+        cluster_dir = temp_cluster_dir(run_id)
+        cluster_dir.mkdir(parents=True, exist_ok=True)
+        assign_path = cluster_dir / f"regime_assignments_{tag}.csv"
+        assignments.to_csv(assign_path, index=False)
+        cent_path = cluster_dir / f"centroids_{tag}.json"
+        with cent_path.open("w") as fh:
+            json.dump(centroids, fh, indent=2)
+
+        counts = assignments["regime_id"].value_counts().sort_index()
+        count_str = " | ".join(f"Regime {i}: {c} blocks" for i, c in counts.items())
+        print(f"[CLUSTER] K={k} | Inertia={inertia:.2f}")
+        print(f"[CLUSTER] {count_str}")
 
 
 # ---------------------------------------------------------------------------
 # Audit utilities
 # ---------------------------------------------------------------------------
 
-def _resolve_latest_artifacts(tag: str) -> Dict[str, Path]:
-    features_dir = Path("features")
-    logs_dir = Path("logs")
-    feat_files = sorted(features_dir.glob(f"features_{tag}_*.parquet"))
-    meta_files = sorted(features_dir.glob(f"features_meta_{tag}_*.json"))
-    assign_files = sorted(features_dir.glob(f"regime_assignments_{tag}_*.csv"))
-    cent_files = sorted(features_dir.glob(f"centroids_{tag}_*.json"))
-    plan_files = sorted(logs_dir.glob(f"block_plan_{tag}_*.json"))
-    if not (feat_files and meta_files and assign_files and cent_files and plan_files):
-        raise SystemExit(
-            "Missing artifacts for audit; run regimes features and cluster first"
-        )
-    return {
-        "features": feat_files[-1],
-        "meta": meta_files[-1],
-        "assignments": assign_files[-1],
-        "centroids": cent_files[-1],
-        "block_plan": plan_files[-1],
-    }
+def _resolve_artifacts(tag: str, run_id: Optional[str]) -> Dict[str, Path]:
+    search_dirs = []
+    if run_id:
+        search_dirs.append(temp_run_dir(run_id))
+    existing = [d for d in TEMP_DIR.glob("*") if d.is_dir()]
+    search_dirs.extend(sorted(existing, key=lambda p: p.stat().st_mtime, reverse=True))
+
+    for base in search_dirs:
+        feat = base / "features" / f"features_{tag}.parquet"
+        meta = base / "features" / f"features_meta_{tag}.json"
+        assign = base / "cluster" / f"regime_assignments_{tag}.csv"
+        cent = base / "cluster" / f"centroids_{tag}.json"
+        plan = base / "blocks" / f"block_plan_{tag}.json"
+        if all(p.exists() for p in [feat, meta, assign, cent, plan]):
+            return {
+                "features": feat,
+                "meta": meta,
+                "assignments": assign,
+                "centroids": cent,
+                "block_plan": plan,
+            }
+
+    legacy_feat = Path("features")
+    if legacy_feat.exists():
+        print("[DEPRECATED] Legacy layout detected; migrating...")
+        try:
+            from scripts.migrate_layout import main as _migrate
+
+            _migrate()
+        except Exception as exc:
+            print(f"[MIGRATE][WARN] {exc}")
+        return _resolve_artifacts(tag, run_id)
+
+    raise SystemExit(
+        "Missing artifacts for audit; run regimes features and cluster first"
+    )
 
 
 def cmd_audit_summary(args: argparse.Namespace) -> None:
-    paths = _resolve_latest_artifacts(args.tag)
+    run_id = args.run_id
+    paths = _resolve_artifacts(args.tag, run_id)
     from systems.regime_audit import run_audit
 
-    run_audit(args.tag, paths, args.verbosity)
+    with log_to_file(args.tag, run_id):
+        run_audit(args.tag, paths, run_id, args.verbosity)
 
 
 def cmd_audit_full(args: argparse.Namespace) -> None:
-    features_dir = Path("features")
-    feat_files = sorted(features_dir.glob(f"features_{args.tag}_*.parquet"))
-    meta_files = sorted(features_dir.glob(f"features_meta_{args.tag}_*.json"))
-    if not (feat_files and meta_files):
-        regimes_features(args.tag, args.verbosity)
-    assign_files = sorted(features_dir.glob(f"regime_assignments_{args.tag}_*.csv"))
-    cent_files = sorted(features_dir.glob(f"centroids_{args.tag}_*.json"))
-    if not (assign_files and cent_files):
-        regimes_cluster(args.tag, args.verbosity)
-    paths = _resolve_latest_artifacts(args.tag)
+    run_id = args.run_id
+    feat_dir = temp_features_dir(run_id)
+    features_path = feat_dir / f"features_{args.tag}.parquet"
+    meta_path = feat_dir / f"features_meta_{args.tag}.json"
+    if not (features_path.exists() and meta_path.exists()):
+        regimes_features(args.tag, run_id, args.verbosity)
+    cluster_dir = temp_cluster_dir(run_id)
+    assign_path = cluster_dir / f"regime_assignments_{args.tag}.csv"
+    cent_path = cluster_dir / f"centroids_{args.tag}.json"
+    if not (assign_path.exists() and cent_path.exists()):
+        regimes_cluster(args.tag, run_id, args.verbosity)
+    paths = _resolve_artifacts(args.tag, run_id)
     from systems.regime_audit import run_audit
     from systems.regime_audit_plus import run as run_plus
 
-    run_audit(args.tag, paths, args.verbosity)
-    run_plus(args.tag, args.verbosity)
+    with log_to_file(args.tag, run_id):
+        run_audit(args.tag, paths, run_id, args.verbosity)
+        run_plus(args.tag, paths, run_id, args.verbosity)
 
 
 # ---------------------------------------------------------------------------
@@ -260,23 +350,33 @@ def main(argv: Optional[List[str]] = None) -> None:
     sp_verify.add_argument("--tag", required=True, help="Asset tag")
     add_verbosity(sp_verify)
 
+    sp_purge = data_sub.add_parser("purge-temp", help="Purge temporary run data")
+    sp_purge.add_argument("--older-than", default="7d", help="Age threshold, e.g. 7d")
+    sp_purge.add_argument("--all", action="store_true", help="Remove all temp runs")
+
     # Regimes group
     sp_regimes = subparsers.add_parser("regimes", help="Regime workflows")
     reg_sub = sp_regimes.add_subparsers(dest="command", required=True)
+
+    def add_run_id(sp):
+        sp.add_argument("--run-id", help="Run identifier")
 
     sp_plan = reg_sub.add_parser("plan", help="Plan walk-forward blocks")
     sp_plan.add_argument("--tag", required=True, help="Asset tag")
     sp_plan.add_argument("--train", required=True, help="Training window")
     sp_plan.add_argument("--test", required=True, help="Testing window")
     sp_plan.add_argument("--step", required=True, help="Step size")
+    add_run_id(sp_plan)
     add_verbosity(sp_plan)
 
     sp_feat = reg_sub.add_parser("features", help="Extract features for blocks")
     sp_feat.add_argument("--tag", required=True, help="Asset tag")
+    add_run_id(sp_feat)
     add_verbosity(sp_feat)
 
     sp_clust = reg_sub.add_parser("cluster", help="Run K-Means clustering on features")
     sp_clust.add_argument("--tag", required=True, help="Asset tag")
+    add_run_id(sp_clust)
     add_verbosity(sp_clust)
 
     # Audit group
@@ -285,10 +385,12 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     sp_sum = audit_sub.add_parser("summary", help="Run audit summary")
     sp_sum.add_argument("--tag", required=True, help="Asset tag")
+    add_run_id(sp_sum)
     add_verbosity(sp_sum)
 
     sp_full = audit_sub.add_parser("full", help="Run full audit pipeline")
     sp_full.add_argument("--tag", required=True, help="Asset tag")
+    add_run_id(sp_full)
     add_verbosity(sp_full)
 
     args = parser.parse_args(argv)
@@ -302,14 +404,19 @@ def main(argv: Optional[List[str]] = None) -> None:
             cmd_data_fetch(args)
         elif args.command == "verify":
             cmd_data_verify(args)
+        elif args.command == "purge-temp":
+            cmd_data_purge_temp(args)
     elif args.group == "regimes":
+        run_id = args.run_id or new_run_id("regimes")
         if args.command == "plan":
-            regimes_plan(args.tag, args.train, args.test, args.step, args.verbosity)
+            regimes_plan(args.tag, args.train, args.test, args.step, run_id, args.verbosity)
         elif args.command == "features":
-            regimes_features(args.tag, args.verbosity)
+            regimes_features(args.tag, run_id, args.verbosity)
         elif args.command == "cluster":
-            regimes_cluster(args.tag, args.verbosity)
+            regimes_cluster(args.tag, run_id, args.verbosity)
     elif args.group == "audit":
+        run_id = args.run_id or new_run_id("regimes")
+        args.run_id = run_id
         if args.command == "summary":
             cmd_audit_summary(args)
         elif args.command == "full":

@@ -1,7 +1,4 @@
-from __future__ import annotations
-
 import json
-from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
@@ -9,33 +6,11 @@ import numpy as np
 import pandas as pd
 
 from .regime_cluster import align_centroids
+from .paths import temp_audit_dir
 
 
-def _resolve_latest(tag: str) -> Dict[str, Path]:
-    features_dir = Path("features")
-    logs_dir = Path("logs")
-    feat_files = sorted(features_dir.glob(f"features_{tag}_*.parquet"))
-    meta_files = sorted(features_dir.glob(f"features_meta_{tag}_*.json"))
-    assign_files = sorted(features_dir.glob(f"regime_assignments_{tag}_*.csv"))
-    cent_files = sorted(features_dir.glob(f"centroids_{tag}_*.json"))
-    plan_files = sorted(logs_dir.glob(f"block_plan_{tag}_*.json"))
-    if not (feat_files and meta_files and assign_files and cent_files and plan_files):
-        raise FileNotFoundError(
-            "Missing artifacts for audit; run regimes features and cluster first"
-        )
-    return {
-        "features": feat_files[-1],
-        "meta": meta_files[-1],
-        "assignments": assign_files[-1],
-        "centroids": cent_files[-1],
-        "block_plan": plan_files[-1],
-    }
-
-
-def run(tag: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
-    """Perform extended audit on latest regime artifacts for ``tag``."""
-    paths = _resolve_latest(tag)
-
+def run(tag: str, paths: Dict[str, Path], run_id: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
+    """Perform extended audit on regime artifacts."""
     features_df = pd.read_parquet(paths["features"])
     with Path(paths["meta"]).open() as fh:
         meta = json.load(fh)
@@ -63,15 +38,14 @@ def run(tag: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
     reg_means = np.nan_to_num(reg_means_df.to_numpy())
     max_diff = float(np.max(np.abs(reg_means - C_unscaled)))
 
-    audit_dir = Path("audit")
-    audit_dir.mkdir(exist_ok=True)
-    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    audit_dir = temp_audit_dir(run_id)
+    audit_dir.mkdir(parents=True, exist_ok=True)
 
     cent_df = pd.DataFrame({"regime_id": range(C_unscaled.shape[0])})
     for i, f in enumerate(feat):
         cent_df[f"centroid_{f}"] = C_unscaled[:, i]
         cent_df[f"mean_{f}"] = reg_means[:, i]
-    cent_path = audit_dir / f"centroids_unscaled_{tag}_{ts}.csv"
+    cent_path = audit_dir / f"centroids_unscaled_{tag}.csv"
     cent_df.to_csv(cent_path, index=False)
 
     global_mean = Xu.mean(axis=0)
@@ -97,7 +71,7 @@ def run(tag: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
     )
     for k in range(K):
         fi_df[f"cluster_{k}_mean"] = reg_means[k]
-    fi_path = audit_dir / f"feature_influence_{tag}_{ts}.csv"
+    fi_path = audit_dir / f"feature_influence_{tag}.csv"
     fi_df.to_csv(fi_path, index=False)
 
     top_records = []
@@ -117,7 +91,7 @@ def run(tag: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
                 }
             )
     top_df = pd.DataFrame(top_records)
-    top_path = audit_dir / f"top_drivers_{tag}_{ts}.csv"
+    top_path = audit_dir / f"top_drivers_{tag}.csv"
     top_df.to_csv(top_path, index=False)
 
     bp_df = pd.DataFrame(block_plan)
@@ -125,7 +99,7 @@ def run(tag: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
     assign_dates = assignments.merge(
         bp_df[["block_id", "train_start", "train_end"]], on="block_id", how="left"
     )
-    assign_path = audit_dir / f"assignments_with_dates_{tag}_{ts}.csv"
+    assign_path = audit_dir / f"assignments_with_dates_{tag}.csv"
     assign_dates.to_csv(assign_path, index=False)
 
     spans = []
@@ -147,7 +121,7 @@ def run(tag: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
                 count = 1
         spans.append({"regime_id": rid, "start_date": s, "end_date": e, "num_blocks": count})
     span_df = pd.DataFrame(spans)
-    span_path = audit_dir / f"regime_spans_{tag}_{ts}.csv"
+    span_path = audit_dir / f"regime_spans_{tag}.csv"
     span_df.to_csv(span_path, index=False)
 
     counts = assignments["regime_id"].value_counts().sort_index().to_dict()

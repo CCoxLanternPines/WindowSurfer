@@ -8,6 +8,9 @@ from typing import Dict, Tuple
 import json as _json
 import numpy as np
 import pandas as pd
+import json
+
+from .paths import temp_features_dir
 
 
 def _feature_sha(features: list[str]) -> str:
@@ -216,10 +219,7 @@ def scale_features(
     return scaled_df, meta
 
 
-def save_features(df: pd.DataFrame, tag: str, timestamp: str) -> Dict[str, Path]:
-    features_dir = Path("features")
-    features_dir.mkdir(exist_ok=True)
-
+def save_features(df: pd.DataFrame, tag: str, run_id: str) -> Dict[str, Path]:
     raw = df.copy()
     nan_cols = [c for c in ALL_FEATURES if raw[c].isna().any()]
     if nan_cols:
@@ -241,15 +241,16 @@ def save_features(df: pd.DataFrame, tag: str, timestamp: str) -> Dict[str, Path]
             f"[FEATURES][FATAL] Non-finite values after scaling at indices: {bad[:5].tolist()} ..."
         )
 
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
-    summary_path = logs_dir / f"feature_summary_{tag}_{timestamp}.csv"
+    features_dir = temp_features_dir(run_id)
+    features_dir.mkdir(parents=True, exist_ok=True)
+
+    summary_path = features_dir / f"feature_summary_{tag}.csv"
     summary_df = scaled_df[FEATURE_NAMES].agg(["mean", "std", "min", "max"]).transpose()
     summary_df.to_csv(summary_path)
 
-    features_path = features_dir / f"features_{tag}_{timestamp}.parquet"
+    features_path = features_dir / f"features_{tag}.parquet"
     scaled_df.to_parquet(features_path, index=False)
-    meta_path = features_dir / f"features_meta_{tag}_{timestamp}.json"
+    meta_path = features_dir / f"features_meta_{tag}.json"
     with meta_path.open("w") as fh:
         json.dump(meta, fh, indent=2)
     return {"raw": features_path, "meta": meta_path, "summary": summary_path}

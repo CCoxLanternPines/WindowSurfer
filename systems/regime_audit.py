@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from datetime import datetime
 from typing import Dict
 
 import numpy as np
 import pandas as pd
 
 from .regime_cluster import align_centroids
+from .paths import temp_audit_dir
 
 
-def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
+def run_audit(tag: str, paths: Dict[str, Path], run_id: str, verbose: int = 0) -> None:
     """Run audit on existing regime clustering artifacts."""
     features_df = pd.read_parquet(paths["features"])
     with Path(paths["meta"]).open() as fh:
@@ -45,13 +45,12 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
     print(f"[AUDIT] K={K} | sizes: {counts.to_dict()}")
     print(f"[AUDIT] Centroid sanity max abs diff: {max_diff:.6f}")
 
-    audit_dir = Path("audit")
-    audit_dir.mkdir(exist_ok=True)
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    audit_dir = temp_audit_dir(run_id)
+    audit_dir.mkdir(parents=True, exist_ok=True)
 
     cent_df = pd.DataFrame(centroids_unscaled, columns=feat)
     cent_df.insert(0, "regime_id", range(K))
-    cent_path = audit_dir / f"centroids_unscaled_{tag}_{timestamp}.csv"
+    cent_path = audit_dir / f"centroids_unscaled_{tag}.csv"
     cent_df.to_csv(cent_path, index=False)
     if verbose >= 3:
         print(cent_df.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
@@ -72,7 +71,7 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
                 }
             )
     top_df = pd.DataFrame(deltas_records)
-    top_path = audit_dir / f"top_features_{tag}_{timestamp}.csv"
+    top_path = audit_dir / f"top_features_{tag}.csv"
     top_df.to_csv(top_path, index=False)
 
     dist_matrix = np.sqrt(
@@ -101,7 +100,7 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
     )
     for j in range(K):
         quality_df[f"dist_to_{j}"] = dist_matrix[:, j]
-    qual_path = audit_dir / f"regime_quality_{tag}_{timestamp}.csv"
+    qual_path = audit_dir / f"regime_quality_{tag}.csv"
     quality_df.to_csv(qual_path, index=False)
 
     vol_idx = feature_idx.get("volatility")
@@ -167,7 +166,7 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
         )
 
     labels_df = pd.DataFrame(labels)
-    labels_path = audit_dir / f"regime_labels_{tag}_{timestamp}.csv"
+    labels_path = audit_dir / f"regime_labels_{tag}.csv"
     labels_df.to_csv(labels_path, index=False)
 
     print("[AUDIT] Top drivers:")
@@ -192,5 +191,5 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
     assign_dates = assign_dates[
         ["block_id", "regime_id", "label", "train_start", "train_end"]
     ]
-    assign_path = audit_dir / f"assignments_with_dates_{tag}_{timestamp}.csv"
+    assign_path = audit_dir / f"assignments_with_dates_{tag}.csv"
     assign_dates.to_csv(assign_path, index=False)

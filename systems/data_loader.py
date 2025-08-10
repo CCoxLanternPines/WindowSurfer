@@ -8,10 +8,12 @@ from typing import Optional
 import ccxt
 import pandas as pd
 
+from .paths import RAW_DIR, raw_parquet, ensure_dirs
+
 
 logger = logging.getLogger(__name__)
 
-CACHE_DIR = Path("data/historical")
+CACHE_DIR = RAW_DIR
 
 
 def _load_settings() -> dict:
@@ -108,13 +110,14 @@ def fetch_range_kraken(symbol: str, start: str, end: str) -> pd.DataFrame:
 
 def load_or_fetch(tag: str, fetch_all: bool = False, start: Optional[str] = None, end: Optional[str] = None) -> pd.DataFrame:
     """Load candles for ``tag`` from cache or fetch them if needed."""
-    cache_path = CACHE_DIR / f"{tag}_1h.parquet"
+    ensure_dirs()
+    cache_path = raw_parquet(tag)
     binance_symbol = _resolve_symbol(tag, "binance")
     kraken_symbol = _resolve_symbol(tag, "kraken")
 
     if fetch_all:
         df = fetch_all_history_binance(binance_symbol)
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        RAW_DIR.mkdir(parents=True, exist_ok=True)
         df.to_parquet(cache_path, index=False)
         return df
 
@@ -128,6 +131,6 @@ def load_or_fetch(tag: str, fetch_all: bool = False, start: Optional[str] = None
         return clean_candles(df)
 
     df = fetch_all_history_binance(binance_symbol)
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
     df.to_parquet(cache_path, index=False)
     return df
