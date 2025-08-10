@@ -6,11 +6,9 @@ from typing import Any, Iterable
 
 # candidate modules to search for a sim runner
 _CANDIDATE_MODULES: list[str] = [
-    "systems.scripts.simple_sim_engine",
-    "systems.simple_sim_engine",
-    "systems.scripts.sim_engine",
-    "engine.simple_sim_engine",
-    "engine.sim_engine",
+    "systems.scripts.sim_engine",   # main production sim
+    "systems.sim_engine",           # allow direct import if needed
+    "engine.sim_engine",            # legacy path fallback
 ]
 
 # candidate function names within those modules
@@ -84,6 +82,7 @@ def run_sim_blocks(tag, ranges, knobs, verbose: int = 0):
     ranges: list of (start_ts, end_ts) or list of candle-index tuples.
     Must return dict with at least: {'pnl': float, 'maxdd': float, 'trades': int}
     """
+    print(f"[SIM] Using sim runner: {RUNNER_ID}")
     if _FN_NAME in ("run_sim_blocks", "run_simulation_blocks"):
         return _call_runner_with_ranges(tag, ranges, knobs, verbose)
 
