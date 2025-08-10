@@ -126,6 +126,8 @@ def _run_block(
     buy_cd = 0
     sell_cd = 0
     trades = 0
+    ticks_in_pos = 0
+    closed_rets: list[float] = []
 
     for i in range(len(close)):
         price = float(close[i])
@@ -151,6 +153,7 @@ def _run_block(
                 if (ret >= take_profit) or (ret <= -stop_loss) or trail_hit or (rsi[i] >= rsi_sell):
                     cash += p["size"] * (1.0 + ret)
                     trades += 1
+                    closed_rets.append(ret)
                     if verbosity >= 3:
                         print(f"[SELL] note amt={p['size']/entry:.6f} at={price:.2f} pnl=${(p['size']*ret):.2f}")
                 else:
@@ -179,6 +182,8 @@ def _run_block(
             entry = max(p["entry"], 1e-12)
             pos_val += p["size"] * (price / entry)
         equity[i] = _finite(cash + pos_val, fallback=equity[i-1] if i > 0 else equity0)
+        if positions:
+            ticks_in_pos += 1
 
     # Force close remaining positions at last price
     if positions:
@@ -187,6 +192,7 @@ def _run_block(
             entry = max(p["entry"], 1e-12)
             ret = (price - entry) / entry
             cash += p["size"] * (1.0 + ret)
+            closed_rets.append(ret)
         positions.clear()
 
     equity[-1] = _finite(cash, fallback=equity[-1])
@@ -199,6 +205,10 @@ def _run_block(
     prev = np.where(equity[:-1] <= 0.0, 1e-12, equity[:-1])
     returns[1:] = (equity[1:] - equity[:-1]) / prev
 
+    block_time_in_market = ticks_in_pos / max(len(close), 1)
+    block_win_ct = sum(1 for r in closed_rets if r > 0)
+    block_win_rate = block_win_ct / max(len(closed_rets), 1)
+
     return {
         "pnl": pnl,
         "maxdd": maxdd,
@@ -206,6 +216,10 @@ def _run_block(
         "equity_series": equity.tolist(),
         "returns": returns.tolist(),
         "ledger": {"cash": float(cash)},
+        "time_in_market": float(block_time_in_market),
+        "win_rate": float(block_win_rate),
+        "closed_rets": closed_rets,
+        "had_trades": bool(len(closed_rets) > 0),
     }
 
 
@@ -263,6 +277,10 @@ def run_sim_blocks(
     equity_curve: List[float] = []
     total_trades = 0
     total_pnl = 0.0
+    time_in_market_sum = 0.0
+    candles_sum = 0
+    all_closed_rets: List[float] = []
+    blocks_traded = 0
 
     block_count = 0
     for k, block in enumerate(blocks, 1):
@@ -286,6 +304,11 @@ def run_sim_blocks(
         capital += _finite(res.get("pnl"), 0.0)
         total_trades += int(res.get("trades", 0))
         total_pnl += _finite(res.get("pnl"), 0.0)
+        time_in_market_sum += res.get("time_in_market", 0.0) * len(block_df)
+        candles_sum += len(block_df)
+        all_closed_rets.extend(res.get("closed_rets", []))
+        if res.get("had_trades"):
+            blocks_traded += 1
 
         es = res.get("equity_series") or []
         if es:
@@ -307,7 +330,9 @@ def run_sim_blocks(
             _log(
                 f"[BLOCK] trades={int(res.get('trades',0))} "
                 f"pnl=${_finite(res.get('pnl')):.2f} "
-                f"maxdd={_finite(res.get('maxdd')):.2f}"
+                f"maxdd={_finite(res.get('maxdd')):.2f} "
+                f"tim={_finite(res.get('time_in_market')):.2f} "
+                f"win={_finite(res.get('win_rate')):.2f}"
             )
 
     # Ensure equity_curve has at least one point
@@ -315,18 +340,30 @@ def run_sim_blocks(
         equity_curve = [float(capital)]
 
     maxdd_all = _max_drawdown(np.asarray(equity_curve, dtype=float))
+    time_in_market = time_in_market_sum / max(candles_sum, 1)
+    time_flat = 1.0 - time_in_market
+    win_rate = (sum(1 for r in all_closed_rets if r > 0) /
+                max(len(all_closed_rets), 1))
+    avg_trade_ret = float(np.mean(all_closed_rets)) if all_closed_rets else 0.0
+
     result = {
         "trades": int(total_trades),
         "pnl": _finite(total_pnl, 0.0),
         "maxdd": _finite(maxdd_all, 0.0),
         "equity_series": equity_curve,
+        "time_in_market": float(time_in_market),
+        "time_flat": float(time_flat),
+        "win_rate": float(win_rate),
+        "avg_trade_ret": float(avg_trade_ret),
+        "blocks_traded": int(blocks_traded),
     }
 
     if verbosity >= 1:
         pnl_dd = result["pnl"] * (1 - 1.5 * result["maxdd"])
         _log(
             f"[TRIAL] tag={tag} blocks={block_count} trades={result['trades']} "
-            f"pnl=${result['pnl']:,.2f} maxdd={result['maxdd']:.2f} pnl_dd=${pnl_dd:,.2f}"
+            f"pnl=${result['pnl']:,.2f} maxdd={result['maxdd']:.2f} pnl_dd=${pnl_dd:,.2f} "
+            f"| tim={time_in_market:.2f} win={win_rate:.2f} btr={blocks_traded}"
         )
 
     if log_fh is not None:

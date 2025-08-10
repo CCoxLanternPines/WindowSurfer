@@ -239,6 +239,11 @@ def run_regime_tuning(
         maxdd = float(result.get("maxdd", 0.0))
         trades = int(result.get("trades", 0))
         returns = np.asarray(result.get("returns", []), dtype=float)
+        time_in_market = float(result.get("time_in_market", 0.0))
+        time_flat = float(result.get("time_flat", 0.0))
+        win_rate = float(result.get("win_rate", 0.0))
+        avg_trade_ret = float(result.get("avg_trade_ret", 0.0))
+        blocks_traded = int(result.get("blocks_traded", 0))
         if trades < 10:
             objective_val = -1e12
         else:
@@ -257,11 +262,18 @@ def run_regime_tuning(
                 "pnl_dd": pnl * (1 - 1.5 * maxdd),
                 "trades": trades,
                 **knobs,
+                "time_in_market": time_in_market,
+                "time_flat": time_flat,
+                "win_rate": win_rate,
+                "avg_trade_ret": avg_trade_ret,
+                "blocks_traded": blocks_traded,
             }
         )
         if verbose:
             print(
-                f"[TUNE] trial={trial.number} pnl={pnl:.2f} maxdd={maxdd:.3f} trades={trades} obj={metric}={objective_val:.2f}"
+                f"[TUNE] trial={trial.number} pnl={pnl:.2f} maxdd={maxdd:.3f} trades={trades} "
+                f"obj={metric}={objective_val:.2f} tim={time_in_market:.2f} "
+                f"win={win_rate:.2f} btr={blocks_traded}"
             )
             if verbose >= 3:
                 tb = result.get("trades_by_block")
@@ -283,11 +295,26 @@ def run_regime_tuning(
     best_params = study.best_trial.params
     best_row = lb_df.loc[lb_df["trial"] == study.best_trial.number].iloc[0]
     best_path = out_dir / "best.json"
+    best_payload = {
+        "params": best_params,
+        "pnl": float(best_row["pnl"]),
+        "maxdd": float(best_row["maxdd"]),
+        "pnl_dd": float(best_row["pnl_dd"]),
+        "trades": int(best_row["trades"]),
+        "time_in_market": float(best_row.get("time_in_market", 0.0)),
+        "time_flat": float(best_row.get("time_flat", 0.0)),
+        "win_rate": float(best_row.get("win_rate", 0.0)),
+        "avg_trade_ret": float(best_row.get("avg_trade_ret", 0.0)),
+        "blocks_traded": int(best_row.get("blocks_traded", 0)),
+    }
     with best_path.open("w") as fh:
-        json.dump(best_params, fh, indent=2)
+        json.dump(best_payload, fh, indent=2)
 
     print(
-        f"[TUNE] BestTrial R{regime_id} τ={tau} | pnl={best_row['pnl']:.2f} maxdd={best_row['maxdd']:.3f} pnl_dd={best_row['pnl_dd']:.2f} trades={int(best_row['trades'])}"
+        f"[TUNE] BestTrial R{regime_id} τ={tau} | pnl={best_row['pnl']:.2f} maxdd={best_row['maxdd']:.3f} "
+        f"pnl_dd={best_row['pnl_dd']:.2f} trades={int(best_row['trades'])} "
+        f"| tim={best_row.get('time_in_market', 0.0):.2f} win={best_row.get('win_rate', 0.0):.2f} "
+        f"btr={int(best_row.get('blocks_traded', 0))}"
     )
     param_str = ", ".join(f"{k}={v}" for k, v in best_params.items())
     print(f"[TUNE] Params: {param_str}")
