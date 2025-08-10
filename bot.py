@@ -108,6 +108,32 @@ def cmd_regimes(args: argparse.Namespace) -> None:
         print(f"[CLUSTER] {count_str}")
         return
 
+    if args.audit:
+        features_dir = Path("features")
+        feat_files = sorted(features_dir.glob(f"features_{args.tag}_*.parquet"))
+        meta_files = sorted(features_dir.glob(f"features_meta_{args.tag}_*.json"))
+        assign_files = sorted(features_dir.glob(f"regime_assignments_{args.tag}_*.csv"))
+        cent_files = sorted(features_dir.glob(f"centroids_{args.tag}_*.json"))
+        plan_files = sorted(Path("logs").glob(f"block_plan_{args.tag}_*.json"))
+
+        if not (feat_files and meta_files and assign_files and cent_files and plan_files):
+            raise SystemExit(
+                "Missing artifacts for audit; run with --features then --cluster first"
+            )
+
+        paths = {
+            "features": feat_files[-1],
+            "meta": meta_files[-1],
+            "assignments": assign_files[-1],
+            "centroids": cent_files[-1],
+            "block_plan": plan_files[-1],
+        }
+
+        from systems.regime_audit import run_audit
+
+        run_audit(args.tag, paths, args.verbosity)
+        return
+
     if not (args.train and args.test and args.step):
         raise SystemExit("Provide --train, --test and --step or use --cluster")
 
@@ -192,6 +218,11 @@ def main(argv: Optional[List[str]] = None) -> None:
         "--cluster",
         action="store_true",
         help="Run K-Means clustering on extracted features",
+    )
+    sp_regimes.add_argument(
+        "--audit",
+        action="store_true",
+        help="Audit latest clustering results",
     )
     add_verbosity(sp_regimes)
 
