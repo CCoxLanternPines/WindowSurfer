@@ -9,6 +9,7 @@ import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
+from pathlib import Path
 
 import pandas as pd
 
@@ -273,7 +274,12 @@ def regimes_cluster(
         k_used = centroids.get("k", k)
         print(f"[CLUSTER] K={k_used} | Inertia={inertia:.2f}")
         print(f"[CLUSTER] {count_str}")
-        freeze_brain(tag, run_id)
+        assignments_dir = temp_run_dir(run_id) / "assignments"
+        if any(assignments_dir.glob("assignments_with_dates_*.csv")):
+            freeze_brain(tag, run_id)
+        else:
+            print("[CLUSTER] Skipping freeze_brain: no assignments_with_dates file found")
+
 
 
 # ---------------------------------------------------------------------------

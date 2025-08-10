@@ -1,0 +1,20 @@
+Total=43797 | Train=168 | Test=168 | Step=168 | Blocks=259
+[FEATURES] Dropped 1 features for low variance: ['ma_bias']
+[FEATURES] Extracted 16 features for 259 blocks -> saved to features_SOLUSDT.parquet
+[CLUSTER] K=2 | Inertia=2964.38
+[CLUSTER] Regime 0: 100 blocks | Regime 1: 159 blocks
+Total=43797 | Train=168 | Test=168 | Step=168 | Blocks=259
+[FEATURES] Dropped 1 features for low variance: ['ma_bias']
+[FEATURES] Extracted 16 features for 259 blocks -> saved to features_SOLUSDT.parquet
+[CLUSTER] K=2 | Inertia=2964.38
+[CLUSTER] Regime 0: 100 blocks | Regime 1: 159 blocks
+Total=43797 | Train=168 | Test=168 | Step=168 | Blocks=259
+[FEATURES] Dropped 1 features for low variance: ['ma_bias']
+[FEATURES] Extracted 16 features for 259 blocks -> saved to features_SOLUSDT.parquet
+[CLUSTER] K=2 | Inertia=2964.38
+[CLUSTER] Regime 0: 100 blocks | Regime 1: 159 blocks
+[SIM] Using sim runner: systems.simulator.run_sim_blocks
+[AUDIT] Sim runner active: systems.simulator.run_sim_blocks (production parity mode)
+[CLUSTER] K=2 | Inertia=2964.38
+[CLUSTER] Regime 0: 100 blocks | Regime 1: 159 blocks
+[CLUSTER] Skipping freeze_brain: no assignments_with_dates file found
