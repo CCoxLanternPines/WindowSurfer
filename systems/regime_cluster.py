@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from typing import Dict, Tuple
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from .features import _feature_sha
 from .paths import load_settings
+from .brain import finalize_brain, write_latest_copy
 
 
 def cluster_features(
@@ -119,3 +121,10 @@ def align_centroids(meta: Dict[str, list], centroids: Dict[str, list]) -> Dict[s
             f"[ALIGN][FATAL] Too few common features after realign: {len(aligned_features)}"
         )
     return centroids
+
+
+def freeze_brain(tag: str, run_id: str) -> Path:
+    brain_path = finalize_brain(tag=tag, run_id=run_id, labels=None, alpha=0.2, switch_margin=0.3)
+    latest = write_latest_copy(brain_path, tag)
+    print(f"[BRAIN] Saved {brain_path.name} and updated {latest.name}")
+    return brain_path
