@@ -12,7 +12,10 @@ def main() -> None:
     parser.add_argument("--start")
     parser.add_argument("--end")
     parser.add_argument("--no_write", action="store_true")
-    parser.add_argument("--min_events", type=int)
+    parser.add_argument("--plain", action="store_true")
+    parser.add_argument("--gate", type=float)
+    parser.add_argument("--min_events", type=int, default=100)
+    parser.add_argument("--ascii", action="store_true")
     parser.add_argument("-v", dest="verbose", action="count", default=0)
     args = parser.parse_args()
 

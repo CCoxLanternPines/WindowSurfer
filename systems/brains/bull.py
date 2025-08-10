@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from ._utils import sma, slope
+from ._utils import sma, slope, zscore
 
 
 def _higher_highs(close, lookback, hh_min):
@@ -24,14 +24,16 @@ def momo_long(candle_idx: int, series: dict, cfg: dict) -> bool:
 
     sma_M = sma(close, M)
     slope_M = slope(sma_M, M)
+    z_M = zscore(close, M)
 
     if candle_idx >= len(close):
         return False
     sl = slope_M[candle_idx]
     ma = sma_M[candle_idx]
-    if math.isnan(sl) or math.isnan(ma):
+    z = z_M[candle_idx]
+    if math.isnan(sl) or math.isnan(ma) or math.isnan(z):
         return False
-    if sl <= 0 or close[candle_idx] <= ma:
+    if sl <= 0.10 or z <= 1.5 or close[candle_idx] <= ma:
         return False
     start = max(0, candle_idx - hh_lookback + 1)
     return _higher_highs(close[start:candle_idx + 1], hh_lookback, hh_min)
@@ -45,15 +47,18 @@ def explain(candle_idx: int, series: dict, cfg: dict) -> dict:
 
     sma_M = sma(close, M)
     slope_M = slope(sma_M, M)
+    z_M = zscore(close, M)
 
     if candle_idx >= len(close):
         return {"decision": False, "reasons": {}}
     sl = slope_M[candle_idx]
     ma = sma_M[candle_idx]
-    slope_ok = not math.isnan(sl) and sl > 0
+    z = z_M[candle_idx]
+    slope_ok = not math.isnan(sl) and sl > 0.10
+    z_ok = not math.isnan(z) and z > 1.5
     above_ma = not math.isnan(ma) and close[candle_idx] > ma
     start = max(0, candle_idx - hh_lookback + 1)
     hh = _higher_highs(close[start:candle_idx + 1], hh_lookback, hh_min)
-    decision = slope_ok and above_ma and hh
-    reasons = {"slopeM_ok": slope_ok, "above_MA": above_ma, "higher_highs": hh}
+    decision = slope_ok and z_ok and above_ma and hh
+    reasons = {"slopeM_ok": slope_ok, "zM_ok": z_ok, "above_MA": above_ma, "higher_highs": hh}
     return {"decision": decision, "reasons": reasons}

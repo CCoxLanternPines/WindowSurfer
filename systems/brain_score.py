@@ -436,4 +436,31 @@ def run_single_brain(args):
         coin, series, cfg, start, end, brain, args.verbose, args.out
     )
     _newline_after_bar()
-    print(summaries)
+    summary = summaries[0] if summaries else {
+        "coin": coin,
+        "brain": brain,
+        "events": 0,
+        "p_hat": 0.0,
+    }
+    p = summary["p_hat"]
+    n = summary["events"]
+    brain_name = summary["brain"]
+    coin_name = summary["coin"]
+    min_events = args.min_events if args.min_events is not None else 100
+    if args.plain:
+        print(f"{p*100:.1f}")
+    else:
+        if n < min_events:
+            verdict = "INSUFFICIENT"
+        elif p >= 0.70:
+            verdict = "PASS"
+        elif p >= 0.60:
+            verdict = "STRONG"
+        elif p >= 0.50:
+            verdict = "MANAGEABLE"
+        else:
+            verdict = "FAIL"
+        arrow = "->" if args.ascii else "→"
+        print(f"{brain_name} on {coin_name} {arrow} {p*100:.1f}% over {n} events {arrow} {verdict}")
+    if args.gate is not None and n >= min_events:
+        sys.exit(0 if p >= args.gate else 1)
