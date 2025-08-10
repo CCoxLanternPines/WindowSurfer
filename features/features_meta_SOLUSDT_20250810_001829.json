@@ -1,0 +1,38 @@
+{
+  "mean": [
+    NaN,
+    NaN,
+    NaN,
+    NaN,
+    NaN,
+    0.49591672557958116,
+    NaN,
+    NaN,
+    NaN,
+    NaN
+  ],
+  "std": [
+    NaN,
+    NaN,
+    NaN,
+    NaN,
+    NaN,
+    0.013253491368443816,
+    NaN,
+    NaN,
+    NaN,
+    NaN
+  ],
+  "features": [
+    "mean_return",
+    "volatility",
+    "skew_return",
+    "kurt_return",
+    "max_drawdown",
+    "up_day_ratio",
+    "avg_volume",
+    "vol_slope",
+    "price_slope",
+    "price_range"
+  ]
+}
