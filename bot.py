@@ -32,6 +32,10 @@ from systems.paths import (
     TEMP_DIR,
     temp_run_dir,
 )
+from systems.utils.cli_args import add_action as cli_add_action
+from systems.utils.cli_args import add_run_id as cli_add_run_id
+from systems.utils.cli_args import add_tag as cli_add_tag
+from systems.utils.cli_args import add_verbose as cli_add_verbose
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 
 
@@ -372,52 +376,44 @@ def main(argv: Optional[List[str]] = None) -> None:
     sp_purge.add_argument("--all", action="store_true", help="Remove all temp runs")
 
     # Regimes group
-    sp_regimes = subparsers.add_parser("regimes", help="Regime workflows")
-    sp_regimes.add_argument(
-        "--action",
-        choices=["train", "assign", "audit", "tune"],
-        help="High-level regime action",
+    sp_regimes = subparsers.add_parser(
+        "regimes", help="Regime training/assign/audit/tune"
     )
-    sp_regimes.add_argument("--tag", help="Asset tag")
+    cli_add_action(sp_regimes, choices=["train", "assign", "audit", "tune"])
+    cli_add_tag(sp_regimes, required=False)
+    cli_add_run_id(sp_regimes, required=False)
+    cli_add_verbose(sp_regimes)
     sp_regimes.add_argument("--regime-id", type=int, help="Regime identifier")
-    sp_regimes.add_argument("--tau", type=float, help="Purity threshold")
-    sp_regimes.add_argument("--trials", type=int, help="Optuna trials")
-    sp_regimes.add_argument("--metric", default="pnl_dd", help="Optimization metric")
+    sp_regimes.add_argument("--tau", type=float, default=0.70, help="Purity threshold")
+    sp_regimes.add_argument("--trials", type=int, default=50, help="Optuna trials")
+    sp_regimes.add_argument("--metric", type=str, default="pnl_dd", help="Optimization metric")
     sp_regimes.add_argument("--seed", type=int, default=2, help="RNG seed")
-    sp_regimes.add_argument(
-        "--write-seed", action="store_true", help="Persist best knobs to seed file"
-    )
-    add_run_id(sp_regimes)
-    add_verbosity(sp_regimes)
 
     reg_sub = sp_regimes.add_subparsers(dest="command")
-
-    def add_run_id(sp):
-        sp.add_argument("--run-id", help="Run identifier")
 
     sp_plan = reg_sub.add_parser("plan", help="Plan walk-forward blocks")
     sp_plan.add_argument("--tag", required=True, help="Asset tag")
     sp_plan.add_argument("--train", required=True, help="Training window")
     sp_plan.add_argument("--test", required=True, help="Testing window")
     sp_plan.add_argument("--step", required=True, help="Step size")
-    add_run_id(sp_plan)
+    cli_add_run_id(sp_plan)
     add_verbosity(sp_plan)
 
     sp_feat = reg_sub.add_parser("features", help="Extract features for blocks")
     sp_feat.add_argument("--tag", required=True, help="Asset tag")
-    add_run_id(sp_feat)
+    cli_add_run_id(sp_feat)
     add_verbosity(sp_feat)
 
     sp_clust = reg_sub.add_parser("cluster", help="Run K-Means clustering on features")
     sp_clust.add_argument("--tag", required=True, help="Asset tag")
-    add_run_id(sp_clust)
+    cli_add_run_id(sp_clust)
     sp_clust.add_argument("--k", type=int, help="Number of clusters")
     sp_clust.add_argument("--seed", type=int, help="RNG seed")
     add_verbosity(sp_clust)
 
     sp_purity = reg_sub.add_parser("purity", help="Estimate regime purity for blocks")
     sp_purity.add_argument("--tag", required=True, help="Asset tag")
-    sp_purity.add_argument("--run-id", required=True, help="Run identifier")
+    cli_add_run_id(sp_purity, required=True)
     sp_purity.add_argument("--tau", type=float, default=0.70, help="Purity threshold")
     sp_purity.add_argument("--win", default="1w", help="Sub-window duration")
     sp_purity.add_argument("--stride", type=int, default=6, help="Stride in candles")
@@ -428,17 +424,17 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     sp_sum = audit_sub.add_parser("summary", help="Run audit summary")
     sp_sum.add_argument("--tag", required=True, help="Asset tag")
-    add_run_id(sp_sum)
+    cli_add_run_id(sp_sum)
     add_verbosity(sp_sum)
 
     sp_full = audit_sub.add_parser("full", help="Run full audit pipeline")
     sp_full.add_argument("--tag", required=True, help="Asset tag")
-    add_run_id(sp_full)
+    cli_add_run_id(sp_full)
     add_verbosity(sp_full)
 
     sp_brain_final = audit_sub.add_parser("brain", help="Finalize brain artifact")
     sp_brain_final.add_argument("--tag", required=True, help="Asset tag")
-    add_run_id(sp_brain_final)
+    cli_add_run_id(sp_brain_final)
     sp_brain_final.add_argument(
         "--labels", help="Path to JSON mapping regime id to label"
     )
@@ -457,8 +453,9 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     args = parser.parse_args(argv)
 
+    verbosity = getattr(args, "verbosity", getattr(args, "verbose", 0))
     logging.basicConfig(
-        level=max(logging.WARNING - getattr(args, "verbosity", 0) * 10, logging.DEBUG)
+        level=max(logging.WARNING - verbosity * 10, logging.DEBUG)
     )
 
     if args.group == "data":
@@ -469,22 +466,22 @@ def main(argv: Optional[List[str]] = None) -> None:
         elif args.command == "purge-temp":
             cmd_data_purge_temp(args)
     elif args.group == "regimes":
-        run_id = args.run_id or new_run_id("regimes")
         if args.action == "tune":
             from systems.regime_tuner import run_regime_tuning
 
             run_regime_tuning(
                 tag=args.tag,
-                run_id=run_id,
+                run_id=(args.run_id or "default"),
                 regime_id=args.regime_id,
                 tau=args.tau,
                 trials=args.trials,
                 metric=args.metric,
                 seed=args.seed,
-                verbose=args.verbosity,
-                write_seed=args.write_seed,
+                verbose=args.verbose,
             )
-        elif args.command == "plan":
+            return
+        run_id = args.run_id or new_run_id("regimes")
+        if args.command == "plan":
             regimes_plan(args.tag, args.train, args.test, args.step, run_id, args.verbosity)
         elif args.command == "features":
             regimes_features(args.tag, run_id, args.verbosity)
