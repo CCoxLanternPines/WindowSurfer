@@ -111,6 +111,37 @@ def cmd_regimes(args: argparse.Namespace) -> None:
         fh.write("block,train_start,train_end,test_start,test_end\n")
     logger.info("Saved block plan to %s", plan_path)
 
+    if args.features:
+        from systems.features import FEATURE_NAMES, extract_all_features
+
+        feat_df = extract_all_features(df, blocks)
+        feature_matrix = feat_df[FEATURE_NAMES].to_numpy()
+        mean = feature_matrix.mean(axis=0)
+        std = feature_matrix.std(axis=0)
+        std[std == 0] = 1
+        scaled = (feature_matrix - mean) / std
+        scaled_df = pd.DataFrame(scaled, columns=FEATURE_NAMES)
+        scaled_df.insert(0, "block_id", feat_df["block_id"])
+
+        features_dir = Path("features")
+        features_dir.mkdir(exist_ok=True)
+        feat_path = features_dir / f"features_{args.tag}_{timestamp}.parquet"
+        scaled_df.to_parquet(feat_path, index=False)
+
+        meta = {
+            "mean": mean.tolist(),
+            "std": std.tolist(),
+            "features": FEATURE_NAMES,
+        }
+        meta_path = features_dir / f"features_meta_{args.tag}_{timestamp}.json"
+        with meta_path.open("w") as fh:
+            json.dump(meta, fh, indent=2)
+
+        print(
+            f"[FEATURES] Extracted {len(FEATURE_NAMES)} features for {len(blocks)} blocks "
+            f"-> saved to {feat_path.name}"
+        )
+
 
 def main(argv: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser()
@@ -132,6 +163,11 @@ def main(argv: Optional[List[str]] = None) -> None:
     sp_regimes.add_argument("--train", required=True, help="Training window")
     sp_regimes.add_argument("--test", required=True, help="Testing window")
     sp_regimes.add_argument("--step", required=True, help="Step size")
+    sp_regimes.add_argument(
+        "--features",
+        action="store_true",
+        help="Extract features for training windows",
+    )
     add_verbosity(sp_regimes)
 
     args = parser.parse_args(argv)
