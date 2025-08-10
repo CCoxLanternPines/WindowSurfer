@@ -44,7 +44,7 @@ def clean_candles(df: pd.DataFrame) -> pd.DataFrame:
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit=unit, utc=True)
 
     # create continuous 1h range and reindex
-    full_range = pd.date_range(df["timestamp"].min(), df["timestamp"].max(), freq="1H")
+    full_range = pd.date_range(df["timestamp"].min(), df["timestamp"].max(), freq="1h")
     df = df.set_index("timestamp").reindex(full_range)
     df.index.name = "timestamp"
     df = df.reset_index()
@@ -55,7 +55,7 @@ def clean_candles(df: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("Non 1h candle intervals detected after cleaning")
 
     # convert back to seconds
-    df["timestamp"] = (df["timestamp"].view("int64") // 10**9).astype(int)
+    df["timestamp"] = (df["timestamp"].astype("int64") // 10**9).astype(int)
     return df[["timestamp", "open", "high", "low", "close", "volume"]]
 
 
