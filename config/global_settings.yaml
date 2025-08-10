@@ -1,0 +1,10 @@
+{
+  "fiat": "USDC",
+  "tunnel": {"retries": 3},
+  "trading": {"slippage": 0.01},
+  "coins": {
+    "SOL": {
+      "trading": {"leverage": 1}
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "SOL": {
+    "USDC": {
+      "pair": "SOLUSDC",
+      "min_order_fiat": 10,
+      "min_order_coin": 0.1,
+      "price_precision": 2,
+      "quantity_precision": 3
+    }
+  }
+}
