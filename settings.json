@@ -1,6 +1,16 @@
 {
+  "paths": {
+    "data_root": "data",
+    "raw_dir": "data/raw",
+    "temp_dir": "data/temp",
+    "brains_dir": "data/brains",
+    "results_dir": "data/results",
+    "logs_dir": "data/logs"
+  },
   "cluster_settings": {
     "drop_features": ["avg_volume"],
-    "replace_features": {}
+    "replace_features": {},
+    "std_floor": 1e-6
   }
 }
+
