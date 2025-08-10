@@ -8,6 +8,8 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 
+from .regime_cluster import align_centroids
+
 
 def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
     """Run audit on existing regime clustering artifacts."""
@@ -20,24 +22,23 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
     with Path(paths["block_plan"]).open() as fh:
         block_plan = json.load(fh)
 
-    features = meta["features"]
-    mean = np.asarray(meta["mean"], dtype=float)
-    std = np.asarray(meta["std"], dtype=float)
+    centroids_info = align_centroids(meta, centroids_info)
+    feat = centroids_info["features"]
+    mean = np.asarray(centroids_info["mean"], dtype=float)
+    std = np.asarray(centroids_info["std"], dtype=float)
 
     centroids_scaled = np.asarray(centroids_info["centroids"], dtype=float)
-    assert centroids_info["features"] == features, "Feature order mismatch"
-
     centroids_unscaled = centroids_scaled * std + mean
 
-    X_scaled = features_df[features].to_numpy(dtype=float)
-    X_unscaled = X_scaled * std + mean
-    df_unscaled = pd.DataFrame(X_unscaled, columns=features)
+    Xs = features_df[feat].to_numpy(dtype=float)
+    Xu = Xs * std + mean
+    df_unscaled = pd.DataFrame(Xu, columns=feat)
     df_unscaled.insert(0, "block_id", features_df["block_id"].to_numpy())
     merged_unscaled = assignments.merge(df_unscaled, on="block_id")
-    reg_means = merged_unscaled.groupby("regime_id")[features].mean().to_numpy()
+    reg_means = merged_unscaled.groupby("regime_id")[feat].mean().to_numpy()
     max_diff = float(np.max(np.abs(reg_means - centroids_unscaled)))
 
-    global_mean = X_unscaled.mean(axis=0)
+    global_mean = Xu.mean(axis=0)
 
     counts = assignments["regime_id"].value_counts().sort_index()
     K = centroids_scaled.shape[0]
@@ -48,7 +49,7 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
     audit_dir.mkdir(exist_ok=True)
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
-    cent_df = pd.DataFrame(centroids_unscaled, columns=features)
+    cent_df = pd.DataFrame(centroids_unscaled, columns=feat)
     cent_df.insert(0, "regime_id", range(K))
     cent_path = audit_dir / f"centroids_unscaled_{tag}_{timestamp}.csv"
     cent_df.to_csv(cent_path, index=False)
@@ -56,7 +57,7 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
         print(cent_df.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
 
     deltas_records = []
-    feature_idx = {f: i for i, f in enumerate(features)}
+    feature_idx = {f: i for i, f in enumerate(feat)}
     for r in range(K):
         delta = centroids_unscaled[r] - global_mean
         top_idx = np.argsort(np.abs(delta))[::-1][:3]
@@ -64,7 +65,7 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
             deltas_records.append(
                 {
                     "regime_id": r,
-                    "feature": features[idx],
+                    "feature": feat[idx],
                     "delta_unscaled": delta[idx],
                     "centroid_value": centroids_unscaled[r, idx],
                     "global_mean": global_mean[idx],
@@ -82,7 +83,7 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
     merged_scaled = assignments.merge(features_df, on="block_id")
     intra_variance = {}
     for r in range(K):
-        Xr = merged_scaled[merged_scaled["regime_id"] == r][features].to_numpy(dtype=float)
+        Xr = merged_scaled[merged_scaled["regime_id"] == r][feat].to_numpy(dtype=float)
         if len(Xr):
             var = float(((Xr - centroids_scaled[r]) ** 2).sum(axis=1).mean())
         else:
@@ -107,13 +108,9 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
     volvol_idx = feature_idx.get("vol_of_vol")
     bb_idx = feature_idx.get("bb_width_avg")
 
-    vol_med = np.median(X_unscaled[:, vol_idx]) if vol_idx is not None else np.nan
-    volvol_med = (
-        np.median(X_unscaled[:, volvol_idx]) if volvol_idx is not None else np.nan
-    )
-    bb_third = (
-        np.quantile(X_unscaled[:, bb_idx], 1 / 3) if bb_idx is not None else np.nan
-    )
+    vol_med = np.median(Xu[:, vol_idx]) if vol_idx is not None else np.nan
+    volvol_med = np.median(Xu[:, volvol_idx]) if volvol_idx is not None else np.nan
+    bb_third = np.quantile(Xu[:, bb_idx], 1 / 3) if bb_idx is not None else np.nan
 
     labels = []
     for r in range(K):
@@ -181,7 +178,7 @@ def run_audit(tag: str, paths: Dict[str, Path], verbose: int = 0) -> None:
         parts = []
         for idx in top_idx:
             sign = "+" if delta[idx] >= 0 else "-"
-            parts.append(f"{features[idx]}({sign})")
+            parts.append(f"{feat[idx]}({sign})")
         print(f"  R{r}({label}?): " + ", ".join(parts))
 
     bp_df = pd.DataFrame(block_plan)
