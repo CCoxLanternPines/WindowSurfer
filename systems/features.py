@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Dict, Tuple
 
+import json as _json
 import numpy as np
 import pandas as pd
+
+
+def _feature_sha(features: list[str]) -> str:
+    # stable JSON encoding for deterministic hash
+    payload = _json.dumps(features, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
 
 ALL_FEATURES = [
     "mean_return",
@@ -190,14 +198,21 @@ def scale_features(
 ) -> Tuple[pd.DataFrame, Dict[str, list]]:
     if feature_names is None:
         feature_names = FEATURE_NAMES
-    feature_matrix = df[feature_names].to_numpy(dtype=float)
-    mean = feature_matrix.mean(axis=0)
-    std = feature_matrix.std(axis=0)
-    std[std == 0] = 1
-    scaled = (feature_matrix - mean) / std
-    scaled_df = pd.DataFrame(scaled, columns=feature_names)
+    X = df[feature_names].to_numpy(dtype=float)
+    mean = X.mean(axis=0)
+    std = X.std(axis=0)
+    eps = 1e-6
+    std = np.where(std < eps, eps, std)  # std floor
+    Z = (X - mean) / std
+    scaled_df = pd.DataFrame(Z, columns=feature_names)
     scaled_df.insert(0, "block_id", df["block_id"].to_numpy())
-    meta = {"mean": mean.tolist(), "std": std.tolist(), "features": feature_names}
+    meta = {
+        "features": feature_names,
+        "feature_sha": _feature_sha(feature_names),
+        "mean": mean.tolist(),
+        "std": std.tolist(),
+        "std_floor": eps,
+    }
     return scaled_df, meta
 
 

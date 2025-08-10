@@ -1,0 +1,6 @@
+{
+  "cluster_settings": {
+    "drop_features": ["avg_volume"],
+    "replace_features": {}
+  }
+}

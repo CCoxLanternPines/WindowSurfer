@@ -8,6 +8,8 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 
+from .regime_cluster import align_centroids
+
 
 def _resolve_latest(tag: str) -> Dict[str, Path]:
     features_dir = Path("features")
@@ -43,22 +45,21 @@ def run(tag: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
     with Path(paths["block_plan"]).open() as fh:
         block_plan = json.load(fh)
 
-    features = meta["features"]
-    mean = np.asarray(meta["mean"], dtype=float)
-    std = np.asarray(meta["std"], dtype=float)
-    cent_feat = centroids["features"]
-    assert features == cent_feat, "Feature order mismatch: meta vs centroids"
+    centroids = align_centroids(meta, centroids)
+    feat = centroids["features"]
+    mean = np.asarray(centroids["mean"], dtype=float)
+    std = np.asarray(centroids["std"], dtype=float)
 
     C_scaled = np.asarray(centroids["centroids"], dtype=float)
     C_unscaled = C_scaled * std + mean
 
-    Xs = features_df[features].to_numpy(dtype=float)
+    Xs = features_df[feat].to_numpy(dtype=float)
     Xu = np.nan_to_num(Xs * std + mean)
-    df_unscaled = pd.DataFrame(Xu, columns=features)
+    df_unscaled = pd.DataFrame(Xu, columns=feat)
     df_unscaled.insert(0, "block_id", features_df["block_id"].to_numpy())
     merged = assignments.merge(df_unscaled, on="block_id")
 
-    reg_means_df = merged.groupby("regime_id")[features].mean().reindex(range(C_unscaled.shape[0]))
+    reg_means_df = merged.groupby("regime_id")[feat].mean().reindex(range(C_unscaled.shape[0]))
     reg_means = np.nan_to_num(reg_means_df.to_numpy())
     max_diff = float(np.max(np.abs(reg_means - C_unscaled)))
 
@@ -67,7 +68,7 @@ def run(tag: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
     cent_df = pd.DataFrame({"regime_id": range(C_unscaled.shape[0])})
-    for i, f in enumerate(features):
+    for i, f in enumerate(feat):
         cent_df[f"centroid_{f}"] = C_unscaled[:, i]
         cent_df[f"mean_{f}"] = reg_means[:, i]
     cent_path = audit_dir / f"centroids_unscaled_{tag}_{ts}.csv"
@@ -89,7 +90,7 @@ def run(tag: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
 
     fi_df = pd.DataFrame(
         {
-            "feature": features,
+            "feature": feat,
             "F_score": F_scores,
             "global_mean": global_mean,
         }
@@ -108,7 +109,7 @@ def run(tag: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
                 {
                     "regime_id": k,
                     "rank": rank,
-                    "feature": features[idx],
+                    "feature": feat[idx],
                     "delta_unscaled": deltas[idx],
                     "cluster_mean": reg_means[k, idx],
                     "global_mean": global_mean[idx],
@@ -160,7 +161,7 @@ def run(tag: str, verbose: int = 0) -> Dict[str, Path | float | dict]:
         parts = []
         for idx in order:
             sign = '+' if deltas[idx] >= 0 else '-'
-            parts.append(f"{sign}{features[idx]}")
+            parts.append(f"{sign}{feat[idx]}")
         print(f"[AUDIT++] R{k} top deltas: {', '.join(parts)}")
     print(
         "[AUDIT++] Files: centroids_unscaled.csv, feature_influence.csv, top_drivers.csv, "

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from typing import Dict, Tuple
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Tuple
+
+from .data_loader import _load_settings
+from .features import _feature_sha
 
 
 def cluster_features(
@@ -13,7 +17,7 @@ def cluster_features(
     Parameters
     ----------
     features_df : pd.DataFrame
-        DataFrame with unscaled feature columns and ``block_id``.
+        DataFrame with scaled feature columns and ``block_id``.
     meta : dict
         Metadata containing ``mean``, ``std`` and ``features``.
     k : int
@@ -24,11 +28,17 @@ def cluster_features(
         Maximum K-Means iterations.
     """
     feature_names = meta["features"]
-    mean = np.asarray(meta["mean"], dtype=float)
-    std = np.asarray(meta["std"], dtype=float)
+    sha_meta = meta.get("feature_sha")
+    if sha_meta and sha_meta != _feature_sha(feature_names):
+        raise ValueError("[FEATURES][FATAL] feature_sha mismatch; regenerate features")
 
-    X_raw = features_df[feature_names].to_numpy(dtype=float)
-    X = (X_raw - mean) / std
+    settings = _load_settings()
+    cfg = settings.get("cluster_settings", {})
+    drops = set(cfg.get("drop_features", []))
+    replacements = cfg.get("replace_features", {})
+    feat_names_effective = [replacements.get(f, f) for f in feature_names if f not in drops]
+
+    X = features_df[feat_names_effective].to_numpy(dtype=float)
 
     rng = np.random.default_rng(seed)
     indices = rng.choice(len(X), size=k, replace=False)
@@ -48,10 +58,58 @@ def cluster_features(
     inertia = float(distances.sum())
 
     assignments_df = pd.DataFrame({"block_id": features_df["block_id"], "regime_id": labels})
-    centroids_dict = {
-        "features": feature_names,
-        "mean": mean.tolist(),
-        "std": std.tolist(),
-        "centroids": centroids.tolist(),
+
+    mean = [meta["mean"][meta["features"].index(f)] for f in feat_names_effective]
+    std = [meta["std"][meta["features"].index(f)] for f in feat_names_effective]
+    centroids_scaled = centroids.tolist()
+    centroids_payload = {
+        "features": feat_names_effective,
+        "feature_sha": _feature_sha(feat_names_effective),
+        "mean": mean,
+        "std": std,
+        "std_floor": meta.get("std_floor", 1e-6),
+        "centroids": centroids_scaled,
+        "k": k,
+        "inertia": float(inertia),
     }
-    return assignments_df, centroids_dict, inertia
+    return assignments_df, centroids_payload, inertia
+
+
+def align_centroids(meta: Dict[str, list], centroids: Dict[str, list]) -> Dict[str, list]:
+    """Verify and realign centroids against feature meta."""
+    if centroids.get("feature_sha") != _feature_sha(centroids.get("features", [])):
+        raise ValueError("[CLUSTER] Corrupt centroids: internal feature_sha mismatch.")
+
+    sha_meta = meta.get("feature_sha")
+    sha_cent = centroids.get("feature_sha")
+    if sha_meta == sha_cent and meta["features"] == centroids["features"]:
+        aligned_features = meta["features"]
+    else:
+        meta_set = set(meta["features"])
+        cent_set = set(centroids["features"])
+        common = [f for f in meta["features"] if f in cent_set]
+        dropped_meta = [f for f in meta["features"] if f not in cent_set]
+        dropped_cent = [f for f in centroids["features"] if f not in meta_set]
+        print(
+            f"[ALIGN] Realigning features; dropping only-in-meta: {dropped_meta}, "
+            f"only-in-centroids: {dropped_cent}"
+        )
+        mean = [meta["mean"][meta["features"].index(f)] for f in common]
+        std = [meta["std"][meta["features"].index(f)] for f in common]
+        cent_order = [centroids["features"].index(f) for f in common]
+        C = np.asarray(centroids["centroids"] )[:, cent_order]
+        centroids = {
+            **centroids,
+            "features": common,
+            "centroids": C.tolist(),
+            "mean": mean,
+            "std": std,
+            "feature_sha": _feature_sha(common),
+        }
+        aligned_features = common
+
+    if len(aligned_features) < 6:
+        raise ValueError(
+            f"[ALIGN][FATAL] Too few common features after realign: {len(aligned_features)}"
+        )
+    return centroids
