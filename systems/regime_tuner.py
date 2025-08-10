@@ -50,7 +50,18 @@ def run_regime_tuning(
     from .features import extract_all_features
     from .regime_cluster import align_centroids
     from .purity import compute_purity
-    from . import sim_engine
+
+    # Lazy import to avoid circulars and context issues
+    try:
+        from systems.sim_engine import run_sim  # preferred public entry if it exists
+    except ImportError:
+        # Fallbacks: search for the actual public runner you’ve been using
+        # Options seen in this repo across branches: run_simulation, run_sim_blocks, run_sim_engine
+        from systems import sim_engine
+        run_sim = getattr(sim_engine, "run_simulation", None) or \
+                  getattr(sim_engine, "run_sim_blocks", None) or \
+                  getattr(sim_engine, "run_sim_engine", None) or \
+                  getattr(sim_engine, "run_sim")  # last resort
 
     # ------------------------------------------------------------------
     # Load settings for block planning
@@ -151,9 +162,20 @@ def run_regime_tuning(
             "stop_loss": trial.suggest_float("stop_loss", 0.02, 0.08),
             "sell_cooldown": trial.suggest_int("sell_cooldown", 3, 16),
         }
-        result = sim_engine.run_sim(
-            knobs=knobs, tag=tag, start_end_ranges=ranges, verbose=verbose >= 2
-        )
+        try:
+            result = run_sim(
+                tag=tag,
+                knobs=knobs,
+                block_ranges=ranges,
+                verbose=verbose >= 2,
+            )
+        except TypeError:
+            result = run_sim(
+                tag=tag,
+                knobs=knobs,
+                start_end_ranges=ranges,
+                verbose=verbose >= 2,
+            )
         pnl = float(result.get("pnl", 0.0))
         maxdd = float(result.get("maxdd", 0.0))
         trades = int(result.get("trades", 0))
