@@ -1,50 +1,56 @@
 from __future__ import annotations
 
 import math
+from typing import Dict, Tuple
 
-from ._utils import sma, zscore, slope, atr
+from ._utils import slope, zscore
 
 
-def parked(candle_idx: int, series: dict, cfg: dict) -> bool:
+# track slope hysteresis per series id
+_slope_state: Dict[int, bool] = {}
+
+
+def parked(candle_idx: int, series: dict, cfg: dict) -> Tuple[bool, dict]:
+    """Determine if the bear brain should be parked.
+
+    Returns a tuple of decision and debug info including trigger reason.
+    """
     close = series["close"]
     L = cfg.get("L", 50)
-    z_off = cfg.get("z_off", -1.0)
 
-    sma_L = sma(close, L)
-    z_L = zscore(close, L)
-    slope_L = slope(sma_L, L)
+    sl_arr = slope(close, L)
+    z_arr = zscore(close, L)
 
     if candle_idx >= len(close):
-        return False
-    sl = slope_L[candle_idx]
-    z = z_L[candle_idx]
+        return False, {"slopeL": math.nan, "zL": math.nan, "reason": None}
+
+    sl = sl_arr[candle_idx]
+    z = z_arr[candle_idx]
     if math.isnan(sl) or math.isnan(z):
-        return False
-    return sl < 0 or z < z_off
+        return False, {"slopeL": sl, "zL": z, "reason": None}
+
+    key = id(close)
+    slope_triggered = _slope_state.get(key, False)
+    reasons = []
+
+    z_hit = z <= -1.0
+    if z_hit:
+        reasons.append("zscore")
+
+    if sl <= -0.05 and not slope_triggered:
+        slope_triggered = True
+        reasons.append("slope")
+    elif slope_triggered and sl >= 0.05:
+        slope_triggered = False
+    _slope_state[key] = slope_triggered
+
+    if reasons:
+        reason = "both" if len(reasons) == 2 else reasons[0]
+        return True, {"slopeL": sl, "zL": z, "reason": reason}
+    return False, {"slopeL": sl, "zL": z, "reason": None}
 
 
 def explain(candle_idx: int, series: dict, cfg: dict) -> dict:
-    close = series["close"]
-    high = series["high"]
-    low = series["low"]
-    L = cfg.get("L", 50)
-    z_off = cfg.get("z_off", -1.0)
-    atr_cool = cfg.get("atr_cool", 0.02)
+    decision, info = parked(candle_idx, series, cfg)
+    return {"decision": decision, "reasons": info}
 
-    sma_L = sma(close, L)
-    z_L = zscore(close, L)
-    slope_L = slope(sma_L, L)
-    atr_L = atr(high, low, close, L)
-
-    if candle_idx >= len(close):
-        return {"decision": False, "reasons": {}}
-    sl = slope_L[candle_idx]
-    z = z_L[candle_idx]
-    atr_rel = atr_L[candle_idx] / close[candle_idx] if close[candle_idx] else math.nan
-    atr_ok = not math.isnan(atr_rel) and atr_rel < atr_cool
-    if math.isnan(sl) or math.isnan(z):
-        decision = False
-    else:
-        decision = sl < 0 or z < z_off
-    reasons = {"slopeL": sl, "zL": z, "atr_cool_ok": atr_ok}
-    return {"decision": decision, "reasons": reasons}
