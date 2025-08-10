@@ -1,0 +1,77 @@
+Total=43797 | Train=504 | Test=720 | Step=720 | Blocks=60
+[FEATURES] Dropped 0 features for low variance: []
+[FEATURES] Extracted 17 features for 60 blocks -> saved to features_SOLUSDT.parquet
+[CLUSTER] K=3 | Inertia=542.31
+[CLUSTER] Regime 0: 33 blocks | Regime 1: 11 blocks | Regime 2: 16 blocks
+[ALIGN] Realigning features; dropping only-in-meta: ['avg_volume'], only-in-centroids: []
+[AUDIT] K=3 | sizes: {0: 33, 1: 11, 2: 16}
+[AUDIT] Centroid sanity max abs diff: 0.000000
+[AUDIT] Inter-centroid distances (scaled): [[0.0, 4.42, 4.49], [4.42, 0.0, 6.45], [4.49, 6.45, 0.0]]
+[AUDIT] Intra variance (per regime): R0=6.225, R1=14.454, R2=11.117
+[AUDIT] Top drivers:
+  R0(Transition?): avg_dd_length(-), price_range(-), ma_bias(-)
+  R1(Bear?): avg_dd_length(+), price_range(+), ma_bias(-)
+  R2(Bull?): avg_dd_length(-), ma_bias(+), up_vol_ratio(+)
+[ALIGN] Realigning features; dropping only-in-meta: ['avg_volume'], only-in-centroids: []
+[AUDIT++] K=3 | sizes: {0: 33, 1: 11, 2: 16}
+[AUDIT++] Max centroid diff (empirical vs model, unscaled): 0.000000
+[AUDIT++] Top global drivers (F-score): mean_return, up_vol_ratio, price_slope
+[AUDIT++] R0 top deltas: -avg_dd_length, -price_range, -ma_bias
+[AUDIT++] R1 top deltas: +avg_dd_length, +price_range, -ma_bias
+[AUDIT++] R2 top deltas: -avg_dd_length, +ma_bias, +up_vol_ratio
+[AUDIT++] Files: centroids_unscaled.csv, feature_influence.csv, top_drivers.csv, assignments_with_dates.csv, regime_spans.csv
+[CLUSTER] K=3 | Inertia=626.54
+[CLUSTER] Regime 0: 31 blocks | Regime 1: 11 blocks | Regime 2: 18 blocks
+[ALIGN] Realigning features; dropping only-in-meta: ['avg_volume'], only-in-centroids: []
+[AUDIT] K=3 | sizes: {0: 31, 1: 11, 2: 18}
+[AUDIT] Centroid sanity max abs diff: 0.000000
+[AUDIT] Inter-centroid distances (scaled): [[0.0, 4.55, 3.67], [4.55, 0.0, 5.23], [3.67, 5.23, 0.0]]
+[AUDIT] Intra variance (per regime): R0=7.779, R1=23.175, R2=7.248
+[AUDIT] Top drivers:
+  R0(Transition?): avg_dd_length(+), ma_bias(-), price_range(-)
+  R1(Bear?): avg_dd_length(-), price_range(+), max_drawdown(+)
+  R2(Bull?): avg_dd_length(-), ma_bias(+), vol_percentile(+)
+[CLUSTER] K=2 | Inertia=744.60
+[CLUSTER] Regime 0: 40 blocks | Regime 1: 20 blocks
+[ALIGN] Realigning features; dropping only-in-meta: ['avg_volume'], only-in-centroids: []
+[AUDIT] K=2 | sizes: {0: 40, 1: 20}
+[AUDIT] Centroid sanity max abs diff: 0.000000
+[AUDIT] Inter-centroid distances (scaled): [[0.0, 4.02], [4.02, 0.0]]
+[AUDIT] Intra variance (per regime): R0=11.904, R1=13.422
+[AUDIT] Top drivers:
+  R0(Bull?): avg_dd_length(-), ma_bias(+), vol_percentile(+)
+  R1(Bear?): avg_dd_length(+), ma_bias(-), vol_percentile(-)
+[CLUSTER] K=4 | Inertia=468.48
+[CLUSTER] Regime 0: 9 blocks | Regime 1: 9 blocks | Regime 2: 15 blocks | Regime 3: 27 blocks
+[ALIGN] Realigning features; dropping only-in-meta: ['avg_volume'], only-in-centroids: []
+[AUDIT] K=4 | sizes: {0: 9, 1: 9, 2: 15, 3: 27}
+[AUDIT] Centroid sanity max abs diff: 0.000000
+[AUDIT] Inter-centroid distances (scaled): [[0.0, 7.3, 4.6, 6.04], [7.3, 0.0, 6.39, 4.38], [4.6, 6.39, 0.0, 2.84], [6.04, 4.38, 2.84, 0.0]]
+[AUDIT] Intra variance (per regime): R0=10.763, R1=15.379, R2=4.492, R3=6.141
+[AUDIT] Top drivers:
+  R0(Bull?): avg_dd_length(-), ma_bias(+), price_range(+)
+  R1(Bear?): avg_dd_length(+), ma_bias(-), price_range(+)
+  R2(Bull?): avg_dd_length(-), ma_bias(+), price_range(-)
+  R3(Transition?): avg_dd_length(+), ma_bias(-), price_range(-)
+[CLUSTER] K=3 | Inertia=626.54
+[CLUSTER] Regime 0: 31 blocks | Regime 1: 11 blocks | Regime 2: 18 blocks
+[CLUSTER] K=3 | Inertia=626.54
+[CLUSTER] Regime 0: 31 blocks | Regime 1: 11 blocks | Regime 2: 18 blocks
+[BRAIN] Saved brain_SOLUSDT__k3_seed2_20250810_030927.json and updated brain_SOLUSDT.json
+[ALIGN] Realigning features; dropping only-in-meta: ['avg_volume'], only-in-centroids: []
+[AUDIT] K=3 | sizes: {0: 31, 1: 11, 2: 18}
+[AUDIT] Centroid sanity max abs diff: 0.000000
+[AUDIT] Inter-centroid distances (scaled): [[0.0, 4.55, 3.67], [4.55, 0.0, 5.23], [3.67, 5.23, 0.0]]
+[AUDIT] Intra variance (per regime): R0=7.779, R1=23.175, R2=7.248
+[AUDIT] Top drivers:
+  R0(Transition?): avg_dd_length(+), ma_bias(-), price_range(-)
+  R1(Bear?): avg_dd_length(-), price_range(+), max_drawdown(+)
+  R2(Bull?): avg_dd_length(-), ma_bias(+), vol_percentile(+)
+[ALIGN] Realigning features; dropping only-in-meta: ['avg_volume'], only-in-centroids: []
+[AUDIT++] K=3 | sizes: {0: 31, 1: 11, 2: 18}
+[AUDIT++] Max centroid diff (empirical vs model, unscaled): 0.000000
+[AUDIT++] Top global drivers (F-score): volatility, bb_width_avg, vol_of_vol
+[AUDIT++] R0 top deltas: +avg_dd_length, -ma_bias, -price_range
+[AUDIT++] R1 top deltas: -avg_dd_length, +price_range, +max_drawdown
+[AUDIT++] R2 top deltas: -avg_dd_length, +ma_bias, +vol_percentile
+[AUDIT++] Files: centroids_unscaled.csv, feature_influence.csv, top_drivers.csv, assignments_with_dates.csv, regime_spans.csv
