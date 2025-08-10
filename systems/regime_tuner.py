@@ -15,6 +15,68 @@ ensure_project_root()
 from systems.sim_engine import RUNNER_ID, run_sim_blocks
 
 
+def _bootstrap_centroids_from_brain(tag: str, run_id: str, cent_path: Path) -> None:
+    """Create centroids file from the latest brain if missing."""
+    brain_dir = Path(f"data/regimes/{run_id}/brains")
+    brain_path: Path | None = None
+    if brain_dir.exists():
+        direct = brain_dir / f"brain_{tag}.json"
+        if direct.exists():
+            brain_path = direct
+        else:
+            candidates = sorted(brain_dir.glob(f"brain_{tag}__k*_seed*_*"))
+            if candidates:
+                brain_path = max(candidates, key=lambda p: p.stat().st_mtime)
+    if brain_path is None:
+        raise SystemExit(
+            f"[TUNE] No centroids or brain found for {tag} under run-id {run_id}. Run the cluster step first."
+        )
+
+    with brain_path.open() as fh:
+        brain = json.load(fh)
+    centroids = None
+    for key in ["centroids", "kmeans_centroids", "centers", "cluster_centers_"]:
+        if key in brain:
+            centroids = brain[key]
+            break
+    if centroids is None:
+        raise SystemExit(
+            f"[TUNE] No centroids or brain found for {tag} under run-id {run_id}. Run the cluster step first."
+        )
+
+    k = brain.get("k") or len(centroids)
+    seed = brain.get("seed")
+    feature_names = brain.get("feature_names") or brain.get("features") or []
+
+    scaler = brain.get("scaler", {})
+    payload = {
+        "k": k,
+        "seed": seed,
+        "feature_names": feature_names,
+        "centroids": centroids,
+    }
+    if feature_names:
+        payload["features"] = feature_names
+    if scaler.get("mean") is not None and scaler.get("std") is not None:
+        payload.update(
+            {
+                "mean": scaler.get("mean"),
+                "std": scaler.get("std"),
+                "std_floor": scaler.get("std_floor", 1e-6),
+            }
+        )
+    if brain.get("feature_sha"):
+        payload["feature_sha"] = brain.get("feature_sha")
+
+    cent_path.parent.mkdir(parents=True, exist_ok=True)
+    with cent_path.open("w") as fh:
+        json.dump(payload, fh, indent=2)
+    print(f"[TUNE] Bootstrapped centroids from brain → {cent_path}")
+    print(
+        f"[AUDIT] centroids:k={k} seed={seed} features={len(feature_names)} path={cent_path} ok"
+    )
+
+
 def run_regime_tuning(
     tag: str,
     run_id: str,
@@ -93,9 +155,11 @@ def run_regime_tuning(
     # ------------------------------------------------------------------
     cent_path = Path(f"data/regimes/{run_id}/centroids/centroids_{tag}.json")
     if not cent_path.exists():
-        raise SystemExit(f"[TUNE] Missing centroids at {cent_path}")
+        _bootstrap_centroids_from_brain(tag, run_id, cent_path)
     with cent_path.open() as fh:
         centroids = json.load(fh)
+    if "feature_names" in centroids and "features" not in centroids:
+        centroids["features"] = centroids["feature_names"]
     centroids = align_centroids(
         {
             "features": centroids["features"],
