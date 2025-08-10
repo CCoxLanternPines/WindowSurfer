@@ -12,7 +12,8 @@ from systems.utils.imports import ensure_project_root
 
 ensure_project_root()
 
-from systems.sim_engine import RUNNER_ID, run_sim_blocks
+from systems.simulator import RUNNER_ID, run_sim_blocks
+from systems.paths import load_settings
 
 
 def _bootstrap_centroids_from_brain(tag: str, run_id: str, cent_path: Path) -> None:
@@ -122,18 +123,14 @@ def run_regime_tuning(
     from .regime_cluster import align_centroids
     from .purity import compute_purity
 
-    print(f"[TUNE] Using sim runner: {RUNNER_ID}")
+    if verbose >= 1:
+        print(f"[SIM] Using sim runner: {RUNNER_ID}")
+        print(f"[AUDIT] Sim runner active: {RUNNER_ID} (production parity mode)")
 
     # ------------------------------------------------------------------
     # Load settings for block planning
     # ------------------------------------------------------------------
-    settings_path = Path("settings/settings.json")
-    if not settings_path.exists():
-        settings_path = Path("settings.json")
-    settings: Dict[str, Dict] = {}
-    if settings_path.exists():
-        with settings_path.open() as fh:
-            settings = json.load(fh)
+    settings: Dict[str, Dict] = load_settings()
     rset = settings.get("regime_settings", {})
     train_cfg = rset.get("train", "3w")
     test_cfg = rset.get("test", "1m")
@@ -203,10 +200,11 @@ def run_regime_tuning(
         print(f"[TUNE] No pure blocks for R{regime_id} at τ={tau}")
         raise SystemExit(1)
 
-    ranges = []
+    ranges: List[tuple] = []
     for b_id in pure_blocks:
         block = blocks[b_id - 1]  # block_id is 1-indexed
         ranges.append((block["test_start"], block["test_end"]))
+    sim_blocks = [{"start_ts": s, "end_ts": e} for s, e in ranges]
 
     print(f"[TUNE] Ranges: {len(ranges)} blocks | τ={tau:.2f} | regime=R{regime_id}")
     if smoke:
@@ -230,10 +228,12 @@ def run_regime_tuning(
             "sell_cooldown": trial.suggest_int("sell_cooldown", 3, 16),
         }
         result = run_sim_blocks(
+            blocks=sim_blocks,
             tag=tag,
-            ranges=ranges,
             knobs=knobs,
-            verbose=verbose >= 2,
+            settings=settings,
+            verbosity=verbose,
+            run_id=run_id,
         )
         pnl = float(result.get("pnl", 0.0))
         maxdd = float(result.get("maxdd", 0.0))
