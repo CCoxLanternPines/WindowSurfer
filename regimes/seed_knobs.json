@@ -1,0 +1,37 @@
+{
+  "SOLUSDT": {
+    "R0": {
+      "buy_cooldown": 4,
+      "max_concurrent": 3,
+      "position_pct": 0.08444801111822013,
+      "rsi_buy": 45,
+      "sell_cooldown": 13,
+      "stop_loss": 0.05702822594197733,
+      "take_profit": 0.033215774554690054,
+      "trailing_stop": 0.02091634483875559,
+      "volatility_gate": 1.1764491011668894
+    },
+    "R1": {
+      "buy_cooldown": 18,
+      "max_concurrent": 1,
+      "position_pct": 0.11195542095987207,
+      "rsi_buy": 42,
+      "sell_cooldown": 11,
+      "stop_loss": 0.02548228418441187,
+      "take_profit": 0.031962491837302896,
+      "trailing_stop": 0.027217919030684087,
+      "volatility_gate": 0.7767958859785473
+    },
+    "R2": {
+      "buy_cooldown": 6,
+      "max_concurrent": 3,
+      "position_pct": 0.11340600070602243,
+      "rsi_buy": 45,
+      "sell_cooldown": 15,
+      "stop_loss": 0.06814591549330425,
+      "take_profit": 0.03483108866144966,
+      "trailing_stop": 0.02781047141410789,
+      "volatility_gate": 1.1986725553532933
+    }
+  }
+}

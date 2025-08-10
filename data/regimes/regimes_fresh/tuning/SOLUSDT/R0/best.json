@@ -1,11 +1,22 @@
 {
-  "position_pct": 0.06359949021420037,
-  "max_concurrent": 1,
-  "buy_cooldown": 12,
-  "volatility_gate": 0.8611934355709661,
-  "rsi_buy": 36,
-  "take_profit": 0.016919040167104604,
-  "trailing_stop": 0.010911567216908221,
-  "stop_loss": 0.05715625798103982,
-  "sell_cooldown": 7
+  "params": {
+    "position_pct": 0.08444801111822013,
+    "max_concurrent": 3,
+    "buy_cooldown": 4,
+    "volatility_gate": 1.1764491011668894,
+    "rsi_buy": 45,
+    "take_profit": 0.033215774554690054,
+    "trailing_stop": 0.02091634483875559,
+    "stop_loss": 0.05702822594197733,
+    "sell_cooldown": 13
+  },
+  "pnl": 349.97709511959124,
+  "maxdd": 0.17567980158138063,
+  "pnl_dd": 257.75123517663457,
+  "trades": 2123,
+  "time_in_market": 0.6901515151515152,
+  "time_flat": 0.3098484848484848,
+  "win_rate": 0.4223255813953488,
+  "avg_trade_ret": 0.003748452673391398,
+  "blocks_traded": 22
 }

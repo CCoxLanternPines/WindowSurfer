@@ -1,0 +1,22 @@
+{
+  "params": {
+    "position_pct": 0.11195542095987207,
+    "max_concurrent": 1,
+    "buy_cooldown": 18,
+    "volatility_gate": 0.7767958859785473,
+    "rsi_buy": 42,
+    "take_profit": 0.031962491837302896,
+    "trailing_stop": 0.027217919030684087,
+    "stop_loss": 0.02548228418441187,
+    "sell_cooldown": 11
+  },
+  "pnl": 78.11352993451374,
+  "maxdd": 0.06656895870117607,
+  "pnl_dd": 70.31362541219315,
+  "trades": 147,
+  "time_in_market": 0.46284722222222224,
+  "time_flat": 0.5371527777777778,
+  "win_rate": 0.4666666666666667,
+  "avg_trade_ret": 0.00929321596928484,
+  "blocks_traded": 4
+}

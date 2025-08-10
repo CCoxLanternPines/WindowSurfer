@@ -148,3 +148,68 @@ Total=43797 | Train=168 | Test=168 | Step=168 | Blocks=259
 [BLOCK] k=31 | 2025-07-07 -> 2025-08-06 | candles=720
 [BLOCK] trades=28 pnl=$-4.36 maxdd=0.01
 [TRIAL] tag=SOLUSDT blocks=31 trades=987 pnl=$-21.92 maxdd=0.04 pnl_dd=$-20.56
+[SIM] Using sim runner: systems.simulator.run_sim_blocks
+[AUDIT] Sim runner active: systems.simulator.run_sim_blocks (production parity mode)
+[BLOCK] k=01 | 2020-10-01 -> 2020-10-31 | candles=720
+[BLOCK] trades=48 pnl=$-25.53 maxdd=0.03 tim=0.21 win=0.33
+[BLOCK] k=02 | 2020-10-31 -> 2020-11-30 | candles=720
+[BLOCK] trades=26 pnl=$0.01 maxdd=0.01 tim=0.16 win=0.38
+[BLOCK] k=03 | 2020-11-30 -> 2020-12-30 | candles=720
+[BLOCK] trades=38 pnl=$-11.75 maxdd=0.02 tim=0.22 win=0.42
+[BLOCK] k=04 | 2020-12-30 -> 2021-01-29 | candles=720
+[BLOCK] trades=25 pnl=$8.91 maxdd=0.02 tim=0.10 win=0.46
+[BLOCK] k=05 | 2021-07-28 -> 2021-08-27 | candles=720
+[BLOCK] trades=18 pnl=$16.15 maxdd=0.00 tim=0.08 win=0.78
+[BLOCK] k=06 | 2021-11-25 -> 2021-12-25 | candles=720
+[BLOCK] trades=32 pnl=$2.68 maxdd=0.01 tim=0.19 win=0.50
+[BLOCK] k=07 | 2022-01-24 -> 2022-02-23 | candles=720
+[BLOCK] trades=36 pnl=$-11.77 maxdd=0.02 tim=0.20 win=0.28
+[BLOCK] k=08 | 2022-02-23 -> 2022-03-25 | candles=720
+[BLOCK] trades=38 pnl=$3.19 maxdd=0.01 tim=0.22 win=0.47
+[BLOCK] k=09 | 2022-04-24 -> 2022-05-24 | candles=720
+[BLOCK] trades=44 pnl=$-3.26 maxdd=0.01 tim=0.24 win=0.27
+[BLOCK] k=10 | 2022-08-22 -> 2022-09-21 | candles=720
+[BLOCK] trades=32 pnl=$3.50 maxdd=0.01 tim=0.26 win=0.44
+[BLOCK] k=11 | 2022-09-21 -> 2022-10-21 | candles=720
+[BLOCK] trades=41 pnl=$-2.78 maxdd=0.01 tim=0.46 win=0.38
+[BLOCK] k=12 | 2022-10-21 -> 2022-11-20 | candles=720
+[BLOCK] trades=36 pnl=$-2.39 maxdd=0.01 tim=0.16 win=0.39
+[BLOCK] k=13 | 2022-12-20 -> 2023-01-19 | candles=720
+[BLOCK] trades=28 pnl=$-0.06 maxdd=0.01 tim=0.23 win=0.36
+[BLOCK] k=14 | 2023-02-18 -> 2023-03-20 | candles=720
+[BLOCK] trades=34 pnl=$-9.92 maxdd=0.02 tim=0.29 win=0.41
+[BLOCK] k=15 | 2023-03-20 -> 2023-04-19 | candles=720
+[BLOCK] trades=18 pnl=$3.43 maxdd=0.00 tim=0.24 win=0.56
+[BLOCK] k=16 | 2023-05-19 -> 2023-06-18 | candles=720
+[BLOCK] trades=30 pnl=$3.08 maxdd=0.00 tim=0.28 win=0.60
+[BLOCK] k=17 | 2023-06-18 -> 2023-07-18 | candles=720
+[BLOCK] trades=22 pnl=$14.30 maxdd=0.00 tim=0.16 win=0.73
+[BLOCK] k=18 | 2023-09-16 -> 2023-10-16 | candles=720
+[BLOCK] trades=25 pnl=$5.78 maxdd=0.01 tim=0.40 win=0.46
+[BLOCK] k=19 | 2024-01-14 -> 2024-02-13 | candles=720
+[BLOCK] trades=28 pnl=$1.61 maxdd=0.01 tim=0.17 win=0.50
+[BLOCK] k=20 | 2024-04-13 -> 2024-05-13 | candles=720
+[BLOCK] trades=37 pnl=$-3.87 maxdd=0.01 tim=0.23 win=0.47
+[BLOCK] k=21 | 2024-05-13 -> 2024-06-12 | candles=720
+[BLOCK] trades=34 pnl=$7.26 maxdd=0.00 tim=0.31 win=0.53
+[BLOCK] k=22 | 2024-06-12 -> 2024-07-12 | candles=720
+[BLOCK] trades=39 pnl=$-0.79 maxdd=0.01 tim=0.26 win=0.45
+[BLOCK] k=23 | 2024-08-11 -> 2024-09-10 | candles=720
+[BLOCK] trades=32 pnl=$-0.89 maxdd=0.01 tim=0.21 win=0.50
+[BLOCK] k=24 | 2024-09-10 -> 2024-10-10 | candles=720
+[BLOCK] trades=23 pnl=$3.04 maxdd=0.00 tim=0.17 win=0.50
+[BLOCK] k=25 | 2024-12-09 -> 2025-01-08 | candles=720
+[BLOCK] trades=36 pnl=$1.91 maxdd=0.01 tim=0.24 win=0.44
+[BLOCK] k=26 | 2025-01-08 -> 2025-02-07 | candles=720
+[BLOCK] trades=30 pnl=$-2.18 maxdd=0.01 tim=0.17 win=0.40
+[BLOCK] k=27 | 2025-02-07 -> 2025-03-09 | candles=720
+[BLOCK] trades=39 pnl=$-10.00 maxdd=0.02 tim=0.21 win=0.40
+[BLOCK] k=28 | 2025-03-09 -> 2025-04-08 | candles=720
+[BLOCK] trades=36 pnl=$-11.64 maxdd=0.01 tim=0.24 win=0.28
+[BLOCK] k=29 | 2025-04-08 -> 2025-05-08 | candles=720
+[BLOCK] trades=24 pnl=$12.08 maxdd=0.00 tim=0.19 win=0.67
+[BLOCK] k=30 | 2025-06-07 -> 2025-07-07 | candles=720
+[BLOCK] trades=30 pnl=$-7.65 maxdd=0.01 tim=0.33 win=0.47
+[BLOCK] k=31 | 2025-07-07 -> 2025-08-06 | candles=720
+[BLOCK] trades=28 pnl=$-4.36 maxdd=0.01 tim=0.22 win=0.36
+[TRIAL] tag=SOLUSDT blocks=31 trades=987 pnl=$-21.92 maxdd=0.04 pnl_dd=$-20.56 | tim=0.23 win=0.44 btr=31
