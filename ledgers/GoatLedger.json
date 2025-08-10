@@ -1,0 +1,13 @@
+{
+  "name": "GoatLedger",
+  "fiat": "USDC",
+  "tunnel": {
+    "retries": 5
+  },
+  "coins": {
+    "SOL": {
+      "tunnel": {"endpoint": "wss://sol"},
+      "trading": {"leverage": 2}
+    }
+  }
+}
