@@ -35,9 +35,13 @@ def run_live(
     alpha: float = 0.7,
     hyst_boost: float = 0.1,
     verbosity: int = 0,
+    blend_window: int | None = None,
 ) -> Dict[str, Any]:
     """Simplified live engine with optional knob blending."""
     candles = _clean_prices(load_or_fetch(tag))
+    if blend_enabled and blend_window:
+        candles = candles.iloc[-blend_window:].copy()
+        print(f"[BLEND] Using last {blend_window} candles for test")
 
     brain = None
     seed_knobs: Dict[str, Dict[str, Any]] | None = None

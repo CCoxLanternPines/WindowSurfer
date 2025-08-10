@@ -294,6 +294,7 @@ def run_sim_blocks(
     blend_enabled: bool = False,
     alpha: float = 0.7,
     hyst_boost: float = 0.1,
+    blend_window: int | None = None,
 ) -> Dict[str, Any]:
     """Execute simulation over blocks."""
 
@@ -323,6 +324,9 @@ def run_sim_blocks(
         sim_dir.mkdir(parents=True, exist_ok=True)
 
     candles = load_or_fetch(tag)
+    if blend_enabled and blend_window:
+        candles = candles.iloc[-blend_window:].copy()
+        _log(f"[BLEND] Using last {blend_window} candles for test")
     # Ensure timestamps are int64 seconds
     candles = candles.copy()
     candles["timestamp"] = pd.to_numeric(candles["timestamp"], errors="coerce").astype("Int64")

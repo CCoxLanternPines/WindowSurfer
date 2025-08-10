@@ -372,6 +372,15 @@ def main(argv: Optional[List[str]] = None) -> None:
             p.add_argument("--hyst-boost", type=float, default=0.1)
             p.add_argument("--live", action="store_true")
             p.add_argument("-v", "--verbose", action="count", default=0)
+            p.add_argument(
+                "--blend-window",
+                type=int,
+                default=None,
+                help=(
+                    "Number of most recent candles to use for blend mode "
+                    "(default: full history)"
+                ),
+            )
             args = p.parse_args(argv)
             if args.live:
                 from systems.live_engine import run_live
@@ -382,6 +391,7 @@ def main(argv: Optional[List[str]] = None) -> None:
                     alpha=args.alpha,
                     hyst_boost=args.hyst_boost,
                     verbosity=args.verbose,
+                    blend_window=args.blend_window,
                 )
             else:
                 from systems.simulator import run_sim_blocks
@@ -404,6 +414,7 @@ def main(argv: Optional[List[str]] = None) -> None:
                     blend_enabled=True,
                     alpha=args.alpha,
                     hyst_boost=args.hyst_boost,
+                    blend_window=args.blend_window,
                 )
             return
     parser = argparse.ArgumentParser()
