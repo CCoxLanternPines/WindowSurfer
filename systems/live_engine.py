@@ -18,7 +18,11 @@ from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.scripts.smoke_test import run_smoke_test
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings
-from systems.utils.resolve_symbol import split_tag, load_pair_cache, resolve_wallet_codes
+from systems.utils.resolve_symbol import (
+    load_pair_cache,
+    resolve_wallet_codes,
+    resolve_ccxt_symbols,
+)
 
 
 def _run_iteration(
@@ -30,14 +34,16 @@ def _run_iteration(
     smoke: bool = False,
     smoke_save: bool = False,
 ) -> None:
+    cache = load_pair_cache()
     for name, ledger_cfg in settings.get("ledger_settings", {}).items():
-        tag = ledger_cfg.get("tag", "").upper()
+        coin = ledger_cfg["coin"]
+        fiat = ledger_cfg["fiat"]
         window_settings = ledger_cfg.get("window_settings", {})
         try:
-            df = fetch_candles(tag)
+            df = fetch_candles(coin, fiat)
         except FileNotFoundError:
             addlog(
-                f"[WARN] Candle data missing for {tag}",
+                f"[WARN] Candle data missing for {coin}/{fiat}",
                 verbose_int=1,
                 verbose_state=verbose,
             )
@@ -45,27 +51,21 @@ def _run_iteration(
         if df.empty:
             continue
         t = len(df) - 1
-        ledger_obj = Ledger.load_ledger(tag=ledger_cfg["tag"])
+        ledger_obj = Ledger.load_ledger(tag=name)
         prev = runtime_states.get(name, {"verbose": verbose})
         state = build_runtime_state(
             settings,
             ledger_cfg,
             mode="live",
+            ledger_name=name,
             prev=prev,
         )
         runtime_states[name] = state
-        wallet_code = ledger_cfg.get("wallet_code")
-        if not wallet_code:
-            cache = load_pair_cache()
-            coin = ledger_cfg.get("coin") or split_tag(ledger_cfg["tag"])[0]
-            fiat = ledger_cfg.get("fiat") or split_tag(ledger_cfg["tag"])[1]
-            codes = resolve_wallet_codes(coin, fiat, cache, state.get("verbose", 0))
-            wallet_code = codes["base_wallet_code"]
-            addlog(
-                f"[RESOLVE] Wallet codes → base={wallet_code} quote={codes['quote_wallet_code']}",
-                verbose_int=1,
-                verbose_state=state.get("verbose", 0),
-            )
+        codes = resolve_wallet_codes(coin, fiat, cache, state.get("verbose", 0))
+        wallet_code = ledger_cfg.get("wallet_code") or codes["base_wallet_code"]
+        fiat_code = codes["quote_wallet_code"]
+        syms = resolve_ccxt_symbols(coin, fiat, cache, state.get("verbose", 0))
+        pair_code = syms["kraken_pair"]
 
         price = float(df.iloc[t]["close"])
         candle = df.iloc[t].to_dict()
@@ -84,10 +84,11 @@ def _run_iteration(
             if buy_res:
                 result = execute_buy(
                     None,
-                    symbol=ledger_cfg["tag"],
+                    pair_code=pair_code,
+                    fiat_symbol=fiat_code,
                     price=price,
                     amount_usd=buy_res["size_usd"],
-                    ledger_name=ledger_cfg["tag"],
+                    ledger_name=name,
                     wallet_code=wallet_code,
                     verbose=state.get("verbose", 0),
                 )
@@ -115,10 +116,11 @@ def _run_iteration(
             for note in sell_notes:
                 result = execute_sell(
                     None,
-                    symbol=ledger_cfg["tag"],
+                    pair_code=pair_code,
+                    fiat_symbol=fiat_code,
                     coin_amount=note.get("entry_amount", 0.0),
                     price=price,
-                    ledger_name=ledger_cfg["tag"],
+                    ledger_name=name,
                     verbose=state.get("verbose", 0),
                 )
                 if result:
@@ -133,7 +135,7 @@ def _run_iteration(
 
         if dry and smoke and not did_buy and not did_sell:
             run_smoke_test(
-                ledger_name=ledger_cfg["tag"],
+                ledger_name=name,
                 ledger_cfg=ledger_cfg,
                 settings=settings,
                 candle=candle,
@@ -142,7 +144,7 @@ def _run_iteration(
                 verbose=verbose,
             )
 
-        save_ledger(ledger_cfg["tag"], ledger_obj)
+        save_ledger(name, ledger_obj)
 
 
 def run_live(
@@ -169,9 +171,10 @@ def run_live(
             from systems.sim_engine import run_simulation
 
             for name, ledger_cfg in settings.get("ledger_settings", {}).items():
-                tag = ledger_cfg.get("tag", "").upper()
+                coin = ledger_cfg["coin"]
+                fiat = ledger_cfg["fiat"]
                 try:
-                    df = fetch_candles(tag)
+                    df = fetch_candles(coin, fiat)
                 except FileNotFoundError:
                     continue
                 if df.empty:

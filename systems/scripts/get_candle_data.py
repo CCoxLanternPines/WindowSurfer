@@ -35,15 +35,15 @@ def get_candle_data_df(df, row_offset: int = 0) -> dict | None:
     return _extract_candle_row(df, row_offset)
 
 
-def get_candle_data_json(tag: str, row_offset: int = 0) -> dict | None:
-    """Load candle data from CSV for ``tag`` and return a row."""
+def get_candle_data_json(coin: str, *, fiat: str | None = None, row_offset: int = 0) -> dict | None:
+    """Load candle data from CSV for ``coin`` and return a row."""
     try:
         import pandas as pd
     except Exception:  # pragma: no cover - pandas may not be installed
         pd = None  # type: ignore
 
     root = resolve_path("")
-    path: Path = root / "data" / "raw" / f"{tag.upper()}.csv"
+    path: Path = root / "data" / "raw" / f"{coin.upper()}.csv"
 
     if pd is None:
         if not path.exists():
@@ -66,13 +66,25 @@ def get_candle_data_json(tag: str, row_offset: int = 0) -> dict | None:
     try:
         df = pd.read_csv(path)
     except FileNotFoundError:
-        return None
+        if fiat:
+            legacy = root / "data" / "raw" / f"{(coin + fiat).upper()}.csv"
+            if legacy.exists():
+                addlog(
+                    f"[COMPAT] Using legacy raw file: {legacy.name}",
+                    verbose_int=1,
+                    verbose_state=0,
+                )
+                df = pd.read_csv(legacy)
+            else:
+                return None
+        else:
+            return None
 
     return _extract_candle_row(df, row_offset)
 
 
-def get_candle_data(tag: str, row_offset: int = 0, verbose: int = 0) -> Dict[str, Any]:
-    """Return the most recent candle for ``tag`` from the raw CSV data.
+def get_candle_data(coin: str, *, fiat: str | None = None, row_offset: int = 0, verbose: int = 0) -> Dict[str, Any]:
+    """Return the most recent candle for ``coin`` from the raw CSV data.
 
     Parameters
     ----------
@@ -97,14 +109,23 @@ def get_candle_data(tag: str, row_offset: int = 0, verbose: int = 0) -> Dict[str
     """
 
     addlog(
-        f"[get_candle_data] tag={tag} row_offset={row_offset}",
+        f"[get_candle_data] coin={coin} row_offset={row_offset}",
         verbose_int=3,
         verbose_state=verbose,
     )
 
     root = resolve_path("")
-    path: Path = root / "data" / "raw" / f"{tag.upper()}.csv"
+    path: Path = root / "data" / "raw" / f"{coin.upper()}.csv"
 
+    if not path.exists() and fiat:
+        legacy = root / "data" / "raw" / f"{(coin + fiat).upper()}.csv"
+        if legacy.exists():
+            addlog(
+                f"[COMPAT] Using legacy raw file: {legacy.name}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            path = legacy
     if not path.exists():
         raise FileNotFoundError(f"Raw candle file not found: {path}")
 

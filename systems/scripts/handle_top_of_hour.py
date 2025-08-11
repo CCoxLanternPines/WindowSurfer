@@ -366,9 +366,11 @@ def handle_top_of_hour(
                     1 for n in ledger.get_closed_notes() if n.get("window") == win
                 )
                 note_counts[win.title()] = (open_n, closed_n)
+            coin = ledger_cfg.get("coin") or split_tag(tag)[0]
+            fiat = ledger_cfg.get("fiat") or split_tag(tag)[1]
             report = format_top_of_hour_report(
                 ledger_name,
-                tag,
+                f"{coin}/{fiat}",
                 datetime.utcnow(),
                 usd_balance,
                 coin_balance_usd,
@@ -381,7 +383,8 @@ def handle_top_of_hour(
 
             send_top_hour_report(
                 ledger_name=ledger_name,
-                tag=tag,
+                coin=coin,
+                fiat=fiat,
                 strategy_summary=strategy_summary,
                 verbose=general_cfg.get("verbose", 0),
             )

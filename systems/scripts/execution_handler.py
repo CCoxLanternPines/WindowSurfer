@@ -8,7 +8,6 @@ from urllib.parse import urlencode
 from systems.scripts.kraken_auth import load_kraken_keys
 from systems.scripts.kraken_utils import get_live_price
 from systems.utils.addlog import addlog, send_telegram_message
-from systems.utils.resolve_symbol import split_tag
 from systems.utils.snapshot import load_snapshot, prime_snapshot
 
 
@@ -173,7 +172,8 @@ def place_order(
 def execute_buy(
     client,
     *,
-    symbol: str,
+    pair_code: str,
+    fiat_symbol: str,
     price: float,
     amount_usd: float,
     ledger_name: str,
@@ -186,10 +186,9 @@ def execute_buy(
     currently unused as ``place_order`` pulls pricing from Kraken directly.
     """
 
-    _, fiat_symbol = split_tag(symbol)
     result = place_order(
         "buy",
-        symbol,
+        pair_code,
         fiat_symbol,
         amount_usd,
         ledger_name,
@@ -222,7 +221,8 @@ def execute_buy(
 def execute_sell(
     client,
     *,
-    symbol: str,
+    pair_code: str,
+    fiat_symbol: str,
     coin_amount: float,
     price: float | None = None,
     ledger_name: str,
@@ -233,12 +233,11 @@ def execute_sell(
     ``price`` is optional and, if absent, the current live price is fetched to
     estimate USD notional.
     """
-    sell_price = price if price is not None else get_live_price(symbol)
+    sell_price = price if price is not None else get_live_price(pair_code)
     usd_amount = coin_amount * sell_price
-    _, fiat_symbol = split_tag(symbol)
     result = place_order(
         "sell",
-        symbol,
+        pair_code,
         fiat_symbol,
         usd_amount,
         ledger_name,

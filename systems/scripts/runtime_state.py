@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from systems.scripts.execution_handler import load_or_fetch_snapshot
-from systems.utils.resolve_symbol import split_tag
+from systems.utils.resolve_symbol import load_pair_cache, resolve_wallet_codes
 
 
 def build_runtime_state(
@@ -11,6 +11,7 @@ def build_runtime_state(
     ledger_cfg: Dict[str, Any],
     mode: str,
     *,
+    ledger_name: str | None = None,
     prev: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build and refresh runtime state for engines.
@@ -20,7 +21,7 @@ def build_runtime_state(
     settings:
         Global settings dictionary.
     ledger_cfg:
-        Ledger configuration mapping containing at least ``tag``.
+        Ledger configuration mapping containing ``coin`` and ``fiat``.
     mode:
         Either ``"sim"`` or ``"live"``.
     prev:
@@ -40,11 +41,15 @@ def build_runtime_state(
     if mode == "sim":
         capital = float(settings.get("simulation_capital", 0.0))
     elif mode == "live":
-        tag = ledger_cfg.get("tag", "")
-        snapshot = load_or_fetch_snapshot(tag)
-        _, quote = split_tag(tag)
+        if not ledger_name:
+            raise ValueError("ledger_name required for live mode")
+        snapshot = load_or_fetch_snapshot(ledger_name)
+        coin = ledger_cfg["coin"]
+        fiat = ledger_cfg["fiat"]
+        cache = load_pair_cache()
+        codes = resolve_wallet_codes(coin, fiat, cache, prev.get("verbose", 0))
         balance = snapshot.get("balance", {})
-        capital = float(balance.get(quote, 0.0))
+        capital = float(balance.get(codes["quote_wallet_code"], 0.0))
     else:
         capital = prev.get("capital", 0.0)
 

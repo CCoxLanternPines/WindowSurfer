@@ -36,10 +36,11 @@ def run_simulation(
 ) -> dict:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
-    tag = ledger_cfg.get("tag", "").upper()
+    coin = ledger_cfg["coin"]
+    fiat = ledger_cfg["fiat"]
     window_settings = ledger_cfg.get("window_settings", {})
 
-    df = fetch_candles(tag)
+    df = fetch_candles(coin, fiat)
     total = len(df)
     if total == 0:
         return {"buys": 0, "sells": 0, "realized_gain": 0.0, "open_value": 0.0}
@@ -53,6 +54,7 @@ def run_simulation(
         settings,
         ledger_cfg,
         mode="sim",
+        ledger_name=ledger,
         prev={"verbose": verbose},
     )
 
@@ -69,7 +71,11 @@ def run_simulation(
             "realized_trades": 0,
             "realized_roi_accum": 0.0,
         }
-    addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
+    addlog(
+        f"[SIM] Starting simulation for {coin}/{fiat}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
 
     iterator = range(start, end + 1)
     if progress:
@@ -262,7 +268,7 @@ def run_simulation(
         json.dump(json_data, f_json, indent=2)
 
     save_ledger(
-        ledger_cfg["tag"],
+        ledger,
         ledger_obj,
         sim=True,
         final_tick=end,

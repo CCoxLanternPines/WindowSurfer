@@ -7,7 +7,11 @@ from zoneinfo import ZoneInfo
 
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.config import load_settings
-from systems.utils.resolve_symbol import split_tag, load_pair_cache, resolve_wallet_codes
+from systems.utils.resolve_symbol import (
+    load_pair_cache,
+    resolve_wallet_codes,
+    resolve_ccxt_symbols,
+)
 from systems.utils.snapshot import load_snapshot
 
 
@@ -29,7 +33,8 @@ def _get_latest_price(trades: dict, pair: str) -> float:
 
 def send_top_hour_report(
     ledger_name: str,
-    tag: str,
+    coin: str,
+    fiat: str,
     strategy_summary: dict,
     verbose: int = 0,
 ) -> None:
@@ -46,31 +51,28 @@ def send_top_hour_report(
     settings = load_settings()
     ledger_cfg = settings.get("ledger_settings", {}).get(ledger_name, {})
     wallet_code = ledger_cfg.get("wallet_code", "")
-    _, fiat_code = split_tag(tag)
+    cache = load_pair_cache()
+    codes = resolve_wallet_codes(coin, fiat, cache, verbose)
     if not wallet_code:
-        cache = load_pair_cache()
-        coin = ledger_cfg.get("coin") or split_tag(ledger_cfg["tag"])[0]
-        fiat = ledger_cfg.get("fiat") or split_tag(ledger_cfg["tag"])[1]
-        codes = resolve_wallet_codes(coin, fiat, cache, verbose)
         wallet_code = codes["base_wallet_code"]
-        fiat_code = codes["quote_wallet_code"]
         addlog(
-            f"[RESOLVE] Wallet codes → base={wallet_code} quote={fiat_code}",
+            f"[RESOLVE] Wallet codes → base={wallet_code} quote={codes['quote_wallet_code']}",
             verbose_int=1,
             verbose_state=verbose,
         )
+    fiat_code = codes["quote_wallet_code"]
 
     balance = snapshot.get("balance", {})
     trades = snapshot.get("trades", {})
 
     usd_balance = float(balance.get(fiat_code, 0.0))
     coin_balance = float(balance.get(wallet_code, 0.0))
-    pair_code = ledger_cfg.get("kraken_pair") or tag
+    syms = resolve_ccxt_symbols(coin, fiat, cache, verbose)
+    pair_code = ledger_cfg.get("kraken_pair") or syms["kraken_pair"]
     price = _get_latest_price(trades, pair_code)
     if price == 0.0:
-        alt_pair = ledger_cfg.get("kraken_name")
-        if alt_pair:
-            price = _get_latest_price(trades, alt_pair)
+        alt_pair = ledger_cfg.get("kraken_name") or syms["kraken_name"]
+        price = _get_latest_price(trades, alt_pair)
         if price == 0.0:
             addlog(
                 f"[WARN] Price for {ledger_name} {pair_code} not found; balances only",
@@ -81,13 +83,11 @@ def send_top_hour_report(
     total_value = usd_balance + coin_value
 
     # Determine display names
-    fiat_symbol = fiat_code.replace("Z", "").replace("X", "")
-    coin_symbol = (
-        tag[: -len(fiat_symbol)] if fiat_symbol and tag.endswith(fiat_symbol) else tag
-    )
+    fiat_symbol = fiat
+    coin_symbol = coin
 
     ct_now = datetime.now(ZoneInfo("America/Chicago")).strftime("%I:%M%p")
-    lines = [f"🕒 {ct_now} CT | Ledger: {ledger_name}", ""]
+    lines = [f"🕒 {ct_now} CT | Ledger: {ledger_name} | {coin}/{fiat}", ""]
 
     for name, data in strategy_summary.items():
         strat_name = name.title()

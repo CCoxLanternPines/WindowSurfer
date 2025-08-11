@@ -101,4 +101,48 @@ def load_ledger_config(ledger_name: str) -> Dict[str, Any]:
     ledgers = settings.get("ledger_settings", {})
     if ledger_name not in ledgers:
         raise ValueError(f"Ledger '{ledger_name}' not found in settings")
-    return ledgers[ledger_name]
+
+    ledger_cfg: Dict[str, Any] = dict(ledgers[ledger_name])
+
+    # ------------------------------------------------------------------
+    # Canonicalise coin/fiat settings and drop legacy tag usage.
+    # ------------------------------------------------------------------
+    def _split_legacy_tag(t: str) -> tuple[str, str]:
+        t = t.strip().upper()
+        for q in ("USDT", "USDC", "USD", "EUR", "GBP", "BTC", "ETH"):
+            if t.endswith(q):
+                return t[:-len(q)], q
+        raise ValueError(f"Cannot derive coin/fiat from legacy tag '{t}'")
+
+    coin = ledger_cfg.get("coin")
+    fiat = ledger_cfg.get("fiat")
+    if (not coin or not fiat) and ledger_cfg.get("tag"):
+        coin, fiat = _split_legacy_tag(str(ledger_cfg["tag"]))
+    if not isinstance(coin, str) or not coin.strip():
+        raise ValueError(f"Ledger '{ledger_name}' missing 'coin'")
+    if not isinstance(fiat, str) or not fiat.strip():
+        raise ValueError(f"Ledger '{ledger_name}' missing 'fiat'")
+    ledger_cfg["coin"] = coin.strip().upper()
+    ledger_cfg["fiat"] = fiat.strip().upper()
+    ledger_cfg.pop("tag", None)
+
+    # Warn if multiple ledgers share the same coin with different fiats.
+    _coin_seen = getattr(load_ledger_config, "_coin_seen", {})
+    prev = _coin_seen.get(ledger_cfg["coin"])
+    if prev and prev != ledger_cfg["fiat"]:
+        addlog(
+            f"[WARN] Multiple ledgers share COIN={ledger_cfg['coin']}; raw file is shared.",
+            verbose_int=1,
+            verbose_state=True,
+        )
+    else:
+        _coin_seen[ledger_cfg["coin"]] = ledger_cfg["fiat"]
+    setattr(load_ledger_config, "_coin_seen", _coin_seen)
+
+    addlog(
+        f"[ID] Using market {ledger_cfg['coin']}/{ledger_cfg['fiat']}; raw file = data/raw/{ledger_cfg['coin'].upper()}.csv",
+        verbose_int=1,
+        verbose_state=True,
+    )
+
+    return ledger_cfg

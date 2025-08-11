@@ -24,7 +24,7 @@ from systems.utils.addlog import addlog
 from systems.scripts.fetch_core import (
     _load_existing,
     _merge_and_save,
-    get_raw_path,
+    get_raw_path_for_coin,
     COLUMNS,
     compute_missing_ranges,
     fetch_range,
@@ -54,33 +54,33 @@ def main(argv: list[str] | None = None) -> None:
     verbose = args.verbose
 
     ledger_cfg = load_ledger_config(args.ledger)
-    tag = ledger_cfg["tag"].upper()
+    coin = ledger_cfg["coin"]
+    fiat = ledger_cfg["fiat"]
     if getattr(args, "cache", False):
         refresh_pair_cache(verbose)
     cache = load_pair_cache()
-    coin = ledger_cfg.get("coin")
-    fiat = ledger_cfg.get("fiat")
-    if coin and fiat:
-        syms = resolve_ccxt_symbols(coin, fiat, cache, verbose)
-        kraken_symbol = syms["kraken_name"]
-        binance_symbol = syms["binance_name"]
-    else:
-        kraken_symbol = ledger_cfg.get("kraken_name")
-        binance_symbol = ledger_cfg.get("binance_name")
-        if not kraken_symbol or not binance_symbol:
-            addlog(
-                f"[ERROR] Missing kraken_name/binance_name in settings for ledger {args.ledger}",
-                verbose_int=1,
-                verbose_state=True,
-            )
-            sys.exit(1)
+    syms = resolve_ccxt_symbols(coin, fiat, cache, verbose)
+    kraken_symbol = syms["kraken_name"]
+    binance_symbol = syms["binance_name"]
 
     start_ts, end_ts = parse_relative_time(time_window)
     start_ts = int(start_ts // 3600 * 3600)
     end_ts = int(end_ts // 3600 * 3600)
     interval_ms = 3_600_000
-    out_path = get_raw_path(tag)
-    existing = _load_existing(out_path)
+    out_path = get_raw_path_for_coin(coin)
+    if not out_path.exists():
+        legacy = resolve_path("") / "data" / "raw" / f"{(coin + fiat).upper()}.csv"
+        if legacy.exists():
+            addlog(
+                f"[COMPAT] Using legacy raw file: {legacy.name}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            existing = pd.read_csv(legacy)
+        else:
+            existing = _load_existing(out_path)
+    else:
+        existing = _load_existing(out_path)
     gaps = compute_missing_ranges(existing, start_ts, end_ts, interval_ms)
 
     new_frames: List[pd.DataFrame] = []
@@ -172,33 +172,33 @@ def fetch_missing_candles(
     refresh_cache: bool = False,
 ) -> None:
     ledger_cfg = load_ledger_config(ledger)
-    tag = ledger_cfg["tag"].upper()
+    coin = ledger_cfg["coin"]
+    fiat = ledger_cfg["fiat"]
     if refresh_cache:
         refresh_pair_cache(verbose)
     cache = load_pair_cache()
-    coin = ledger_cfg.get("coin")
-    fiat = ledger_cfg.get("fiat")
-    if coin and fiat:
-        syms = resolve_ccxt_symbols(coin, fiat, cache, verbose)
-        kraken_symbol = syms["kraken_name"]
-        binance_symbol = syms["binance_name"]
-    else:
-        kraken_symbol = ledger_cfg.get("kraken_name")
-        binance_symbol = ledger_cfg.get("binance_name")
-        if not kraken_symbol or not binance_symbol:
-            addlog(
-                f"[ERROR] Missing kraken_name/binance_name in settings for ledger {ledger}",
-                verbose_int=1,
-                verbose_state=True,
-            )
-            raise RuntimeError("Missing exchange symbols")
+    syms = resolve_ccxt_symbols(coin, fiat, cache, verbose)
+    kraken_symbol = syms["kraken_name"]
+    binance_symbol = syms["binance_name"]
 
     start_ts, end_ts = parse_relative_time(relative_window)
     start_ts = int(start_ts // 3600 * 3600)
     end_ts = int(end_ts // 3600 * 3600)
     interval_ms = 3_600_000
-    out_path = get_raw_path(tag)
-    existing = _load_existing(out_path)
+    out_path = get_raw_path_for_coin(coin)
+    if not out_path.exists():
+        legacy = resolve_path("") / "data" / "raw" / f"{(coin + fiat).upper()}.csv"
+        if legacy.exists():
+            addlog(
+                f"[COMPAT] Using legacy raw file: {legacy.name}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            existing = pd.read_csv(legacy)
+        else:
+            existing = _load_existing(out_path)
+    else:
+        existing = _load_existing(out_path)
     gaps = compute_missing_ranges(existing, start_ts, end_ts, interval_ms)
 
     new_frames: List[pd.DataFrame] = []
