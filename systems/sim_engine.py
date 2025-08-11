@@ -14,6 +14,13 @@ from systems.scripts.fetch_canles import fetch_candles
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
+from systems.scripts.runtime_state import build_runtime_state
+from systems.scripts.trade_apply import (
+    apply_buy_result_to_ledger,
+    apply_sell_result_to_ledger,
+    paper_execute_buy,
+    paper_execute_sell,
+)
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
 
@@ -27,17 +34,12 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     df = fetch_candles(tag)
     total = len(df)
 
-    general = settings.get("general_settings", {})
-    limits = {
-        "min_note_size": float(general.get("minimum_note_size", 0.0)),
-        "max_note_usdt": float(general.get("max_note_usdt", float("inf"))),
-    }
-    runtime_state = {
-        "capital": float(settings.get("simulation_capital", 0.0)),
-        "buy_unlock_p": {},
-        "verbose": verbose,
-        "limits": limits,
-    }
+    runtime_state = build_runtime_state(
+        settings,
+        ledger_cfg,
+        mode="sim",
+        prev={"verbose": verbose},
+    )
 
     ledger_obj = Ledger()
     win_metrics = {}
@@ -68,27 +70,18 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                 runtime_state=runtime_state,
             )
             if buy_res:
-                size_usd = buy_res["size_usd"]
-                amount = size_usd / price if price else 0.0
-                note = {
-                    "id": f"{window_name}-{t}",
-                    "entry_idx": t,
-                    "entry_price": price,
-                    "entry_usdt": size_usd,
-                    "entry_amount": amount,
-                    "window_name": buy_res["window_name"],
-                    "window_size": buy_res["window_size"],
-                    "p_buy": buy_res["p_buy"],
-                    "target_price": buy_res["target_price"],
-                    "target_roi": buy_res["target_roi"],
-                    "unlock_p": buy_res["unlock_p"],
-                }
-                if "created_idx" in buy_res:
-                    note["created_idx"] = buy_res["created_idx"]
-                if "created_ts" in buy_res:
-                    note["created_ts"] = buy_res["created_ts"]
-                ledger_obj.open_note(note)
-                runtime_state["capital"] -= size_usd
+                ts = None
+                if "timestamp" in df.columns:
+                    ts = int(df.iloc[t]["timestamp"])
+                result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
+                note = apply_buy_result_to_ledger(
+                    ledger=ledger_obj,
+                    window_name=window_name,
+                    t=t,
+                    meta=buy_res,
+                    result=result,
+                    state=runtime_state,
+                )
                 if runtime_state["capital"] < -1e-9:
                     addlog(
                         f"[BUG] capital negative after buy: ${runtime_state['capital']:.2f}",
@@ -96,11 +89,10 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                         verbose_state=verbose,
                     )
                     runtime_state["capital"] = 0.0
-                runtime_state["buy_unlock_p"][window_name] = buy_res["unlock_p"]
 
                 m_buy = win_metrics.get(window_name)
                 if m_buy is not None:
-                    cost = price * amount
+                    cost = result["filled_amount"] * result["avg_price"]
                     m_buy["buys"] += 1
                     m_buy["gross_invested"] += cost
 
@@ -115,20 +107,24 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                 runtime_state=runtime_state,
             )
             for note in sell_notes:
-                exit_usdt = note["entry_amount"] * price if price else 0.0
-                note["exit_idx"] = t
-                note["exit_price"] = price
-                note["exit_usdt"] = exit_usdt
-                note["gain"] = exit_usdt - note["entry_usdt"]
-                note["gain_pct"] = (
-                    note["gain"] / note["entry_usdt"] if note["entry_usdt"] else 0.0
+                ts = None
+                if "timestamp" in df.columns:
+                    ts = int(df.iloc[t]["timestamp"])
+                result = paper_execute_sell(price, note.get("entry_amount", 0.0), timestamp=ts)
+                apply_sell_result_to_ledger(
+                    ledger=ledger_obj,
+                    note=note,
+                    t=t,
+                    result=result,
+                    state=runtime_state,
                 )
 
                 w = note.get("window_name")
                 qty = note.get("entry_amount", 0.0)
                 buy_price = note.get("entry_price", 0.0)
+                exit_price = note.get("exit_price", 0.0)
                 cost = buy_price * qty
-                proceeds = price * qty
+                proceeds = exit_price * qty
                 roi_trade = (proceeds - cost) / cost if cost > 0 else 0.0
                 m_sell = win_metrics.get(w)
                 if m_sell is not None:
@@ -137,9 +133,6 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                     m_sell["realized_proceeds"] += proceeds
                     m_sell["realized_trades"] += 1
                     m_sell["realized_roi_accum"] += roi_trade
-
-                ledger_obj.close_note(note)
-                runtime_state["capital"] += exit_usdt
 
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)
