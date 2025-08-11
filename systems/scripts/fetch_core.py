@@ -1,120 +1,193 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import List
+"""Core helpers for deterministic, gapless historical fetches."""
 
-import pandas as pd
+from pathlib import Path
+from typing import Iterable, List, Tuple
+
 import ccxt
+import pandas as pd
 
 from systems.utils.config import resolve_path
-from systems.utils.addlog import addlog
 
 COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
 
 
-def _fetch_kraken(symbol: str, start_ms: int, end_ms: int) -> List[List]:
+class FetchAbort(RuntimeError):
+    """Raised when a deterministic fetch cannot be completed."""
+
+
+# ---------------------------------------------------------------------------
+# fetching
+# ---------------------------------------------------------------------------
+
+def _fetch_kraken(symbol: str, start_ms: int, end_ms: int) -> pd.DataFrame:
     exchange = ccxt.kraken({"enableRateLimit": True})
-    limit = min(720, int((end_ms - start_ms) // 3600000) + 1)
+    limit = min(720, int((end_ms - start_ms) // 3_600_000))
     ohlcv = exchange.fetch_ohlcv(symbol, timeframe="1h", since=start_ms, limit=limit)
-    return [row for row in ohlcv if row and start_ms <= row[0] <= end_ms]
+    rows = [row for row in ohlcv if row and start_ms <= row[0] < end_ms]
+    df = pd.DataFrame(rows, columns=COLUMNS)
+    df = canonicalize(df)
+    if df.empty:
+        raise FetchAbort(
+            f"0 candles returned symbol={symbol} span=[{start_ms},{end_ms}]"
+        )
+    return df
 
 
-def _fetch_binance(symbol: str, start_ms: int, end_ms: int) -> List[List]:
+def _fetch_binance(symbol: str, start_ms: int, end_ms: int) -> pd.DataFrame:
     exchange = ccxt.binance({"enableRateLimit": True})
-    limit = 1000
+    limit = 1_000
     rows: List[List] = []
-    current_end = end_ms
-    while current_end >= start_ms:
-        since = max(start_ms, current_end - limit * 3600000)
-        chunk = exchange.fetch_ohlcv(symbol, timeframe="1h", since=since, limit=limit)
+    current = start_ms
+    while current < end_ms:
+        chunk = exchange.fetch_ohlcv(symbol, timeframe="1h", since=current, limit=limit)
         if not chunk:
             break
-        filtered = [r for r in chunk if r and since <= r[0] <= current_end]
-        rows.extend(filtered)
-        earliest = filtered[0][0]
-        if earliest <= start_ms:
+        filtered = [r for r in chunk if r and current <= r[0] < end_ms]
+        if not filtered:
             break
-        current_end = earliest - 3600000
-    return rows
+        rows.extend(filtered)
+        last = filtered[-1][0]
+        current = last + 3_600_000
+    df = pd.DataFrame(rows, columns=COLUMNS)
+    df = canonicalize(df)
+    if df.empty:
+        try:
+            recent = exchange.fetch_ohlcv(symbol, timeframe="1h", limit=1)
+            if recent:
+                first_ts = recent[0][0]
+                if first_ts > start_ms:
+                    pass  # listing is newer than requested span
+        except Exception:
+            pass
+        if symbol.upper().endswith("USDC"):
+            print(
+                f"[HINT] Binance {symbol} may have limited history. "
+                "Try SOLUSDT or reduce --time ≤ 720 to use Kraken."
+            )
+        raise FetchAbort(
+            f"0 candles returned symbol={symbol} span=[{start_ms},{end_ms}]"
+        )
+    return df
 
 
-def _load_existing(path: Path) -> pd.DataFrame:
-    if path.exists():
-        df = pd.read_csv(path)
-        df["timestamp"] = pd.to_numeric(df["timestamp"], errors="coerce")
-        df = df.dropna(subset=["timestamp"]).sort_values("timestamp")
-        return df
-    return pd.DataFrame(columns=COLUMNS)
+# ---------------------------------------------------------------------------
+# dataframe helpers
+# ---------------------------------------------------------------------------
+
+def canonicalize(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure canonical columns and hourly UTC timestamps in ms."""
+    if df.empty:
+        return pd.DataFrame(columns=COLUMNS)
+    df = df.copy()
+    df.columns = COLUMNS
+    df["timestamp"] = (df["timestamp"].astype("int64") // 3_600_000) * 3_600_000
+    df = df.drop_duplicates(subset="timestamp").sort_values("timestamp")
+    return df.reset_index(drop=True)
 
 
-def _merge_and_save(path: Path, existing: pd.DataFrame, new_frames: List[pd.DataFrame]) -> int:
-    combined = pd.concat([existing] + new_frames, ignore_index=True)
-    combined = combined.drop_duplicates(subset="timestamp").sort_values("timestamp")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    combined.to_csv(path, index=False)
-    return len(combined)
+def _find_gaps(ts: Iterable[int]) -> List[Tuple[int, int, int]]:
+    ts_list = sorted(ts)
+    gaps: List[Tuple[int, int, int]] = []
+    for prev, nxt in zip(ts_list, ts_list[1:]):
+        if nxt - prev > 3_600_000:
+            start = prev + 3_600_000
+            end = nxt - 3_600_000
+            k = int((end - start) // 3_600_000 + 1)
+            gaps.append((start, end, k))
+    return gaps
 
 
-def get_raw_path(tag: str, ext: str = "csv") -> Path:
-    """Return the full path to the raw-data file for a given tag.
+def reindex_hourly(
+    df: pd.DataFrame, start_ms: int, end_ms: int
+) -> Tuple[pd.DataFrame, List[Tuple[int, int, int]]]:
+    """Reindex ``df`` to an hourly grid and return gaps."""
+    idx = range(start_ms, end_ms, 3_600_000)
+    if df.empty:
+        full = pd.DataFrame(index=idx, columns=COLUMNS)
+        full.index.name = "timestamp"
+        full = full.reset_index()
+        gap_end = end_ms - 3_600_000 if end_ms > start_ms else start_ms
+        gaps = [(start_ms, gap_end, len(idx))] if len(idx) else []
+        return full, gaps
 
-    Ensures the raw data directory exists and logs the resolved paths.
-    """
+    df = df.set_index("timestamp").reindex(idx)
+    df.index.name = "timestamp"
+    full = df.reset_index()
+    gaps = []
+    i = 0
+    while i < len(full):
+        if pd.isna(full.loc[i, "open"]):
+            gap_start = full.loc[i, "timestamp"]
+            while i < len(full) and pd.isna(full.loc[i, "open"]):
+                i += 1
+            gap_end = full.loc[i - 1, "timestamp"]
+            k = int((gap_end - gap_start) // 3_600_000 + 1)
+            gaps.append((gap_start, gap_end, k))
+        else:
+            i += 1
+    return full, gaps
 
+
+# ---------------------------------------------------------------------------
+# path helper
+# ---------------------------------------------------------------------------
+
+def get_raw_path(tag: str) -> Path:
     root = resolve_path("")
     raw_dir = root / "data" / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
-    out_path = raw_dir / f"{tag}.{ext}"
-    addlog(f"[FETCH][PATH] root={root} out={out_path}", verbose_state=True)
-    return out_path
+    return raw_dir / f"{tag}_1h.parquet"
 
 
-def compute_missing_ranges(
-    candles_df: pd.DataFrame, start_ts: int, end_ts: int, interval_ms: int
-) -> List[tuple[int, int]]:
-    """Return a list of (start, end) tuples for missing candle ranges."""
-    interval_s = interval_ms // 1000
-    if candles_df.empty:
-        return [(start_ts, end_ts)]
+# ---------------------------------------------------------------------------
+# public entry
+# ---------------------------------------------------------------------------
 
-    windowed = candles_df[
-        (candles_df["timestamp"] >= start_ts)
-        & (candles_df["timestamp"] <= end_ts)
-    ]["timestamp"].sort_values()
-
-    ranges: List[tuple[int, int]] = []
-    current = start_ts
-    for ts in windowed:
-        if ts > current:
-            ranges.append((current, min(ts - interval_s, end_ts)))
-        current = ts + interval_s
-        if current > end_ts:
-            break
-
-    if current <= end_ts:
-        ranges.append((current, end_ts))
-
-    return ranges
-
-
-def fetch_range(
-    exchange_name: str, tag: str, start_ts: int, end_ts: int
+def get_gapless_1h_for_span(
+    ledger_cfg: dict, start_ms: int, end_ms: int
 ) -> pd.DataFrame:
-    """Fetch candles for ``tag`` on ``exchange_name`` within [start_ts, end_ts]."""
-    start_ms = int(start_ts * 1000)
-    end_ms = int(end_ts * 1000)
+    """Return a gapless DataFrame for the requested span applying policy A/B."""
 
-    if exchange_name.lower() == "kraken":
-        rows = _fetch_kraken(tag, start_ms, end_ms)
-    elif exchange_name.lower() == "binance":
-        rows = _fetch_binance(tag, start_ms, end_ms)
-    else:
-        raise ValueError(f"Unknown exchange '{exchange_name}'")
+    binance_symbol = ledger_cfg["binance_name"]
+    kraken_symbol = ledger_cfg["kraken_name"]
+    candles = int((end_ms - start_ms) // 3_600_000)
 
-    df = pd.DataFrame(rows, columns=COLUMNS)
-    if not df.empty:
-        df["timestamp"] = (
-            pd.to_datetime(df["timestamp"], unit="ms", utc=True).astype("int64")
-            // 1_000_000_000
-        )
-    return df
+    if candles <= 720:
+        df_k = _fetch_kraken(kraken_symbol, start_ms, end_ms)
+        df_full, gaps = reindex_hourly(df_k, start_ms, end_ms)
+        if gaps:
+            df_b = _fetch_binance(binance_symbol, start_ms, end_ms)
+            df_merge = canonicalize(pd.concat([df_k, df_b], ignore_index=True))
+            df_full, gaps = reindex_hourly(df_merge, start_ms, end_ms)
+            if gaps:
+                raise FetchAbort(
+                    "[ABORT][FETCH] Unhealable gaps in ≤720 span (Kraken primary). "
+                    f"details={gaps}"
+                )
+        return df_full
+
+    # Policy B: >720 candles
+    df_b = _fetch_binance(binance_symbol, start_ms, end_ms)
+    df_full, gaps = reindex_hourly(df_b, start_ms, end_ms)
+    if gaps:
+        recent_threshold = end_ms - 720 * 3_600_000
+        recent = [g for g in gaps if g[1] >= recent_threshold]
+        older = [g for g in gaps if g[1] < recent_threshold]
+        if older:
+            raise FetchAbort(
+                "[ABORT][FETCH] Old gaps outside the last 720 candles. Run a full refresh or shorten --time."
+                f" details={older}"
+            )
+        df_current = df_b
+        for gstart, gend, _ in recent:
+            df_k = _fetch_kraken(kraken_symbol, gstart, gend)
+            df_current = canonicalize(pd.concat([df_current, df_k], ignore_index=True))
+        df_full, gaps = reindex_hourly(df_current, start_ms, end_ms)
+        if gaps:
+            raise FetchAbort(
+                "[ABORT][FETCH] Unhealable gaps after auto-heal. details="
+                f"{gaps}"
+            )
+    return df_full
