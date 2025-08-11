@@ -7,6 +7,7 @@ import pandas as pd
 import ccxt
 
 from systems.utils.config import resolve_path
+from systems.utils.addlog import addlog
 
 COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
 
@@ -49,6 +50,17 @@ def _load_existing(path: Path) -> pd.DataFrame:
 def _merge_and_save(path: Path, existing: pd.DataFrame, new_frames: List[pd.DataFrame]) -> int:
     combined = pd.concat([existing] + new_frames, ignore_index=True)
     combined = combined.drop_duplicates(subset="timestamp").sort_values("timestamp")
+
+    ts = combined["timestamp"].to_numpy()
+    if len(ts) > 1:
+        gaps = (ts[1:] - ts[:-1]) != 3600
+        if gaps.any():
+            missing_spans = int(gaps.sum())
+            addlog(
+                f"[WARN] Post-merge gaps detected: {missing_spans} hour(s) missing",
+                verbose_state=True,
+            )
+
     path.parent.mkdir(parents=True, exist_ok=True)
     combined.to_csv(path, index=False)
     return len(combined)
@@ -56,8 +68,7 @@ def _merge_and_save(path: Path, existing: pd.DataFrame, new_frames: List[pd.Data
 
 def get_raw_path(tag: str, ext: str = "csv") -> Path:
     """Return the full path to the raw-data file for a given tag."""
-
-    root = find_project_root()
+    root = resolve_path("")
     return root / "data" / "raw" / f"{tag}.{ext}"
 
 
@@ -109,4 +120,8 @@ def fetch_range(
             pd.to_datetime(df["timestamp"], unit="ms", utc=True).astype("int64")
             // 1_000_000_000
         )
+        df["timestamp"] = (df["timestamp"] // 3600) * 3600
+        df = df[(df["timestamp"] >= start_ts) & (df["timestamp"] <= end_ts)]
+        df[COLUMNS] = df[COLUMNS].apply(pd.to_numeric, errors="coerce")
+        df = df.dropna(subset=["timestamp"])
     return df

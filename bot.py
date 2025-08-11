@@ -15,6 +15,12 @@ from systems.utils.cli import build_parser
 
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
+    for action in parser._actions:
+        if action.dest == "mode" and action.choices is not None:
+            action.choices = list(action.choices) + ["fetch"]
+            break
+    parser.add_argument("--time", required=False, help="Time window (e.g. 120h)")
+
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
         parser.error("--mode is required")
@@ -88,9 +94,26 @@ def main(argv: list[str] | None = None) -> None:
             dry=args.dry,
             verbose=args.verbose,
         )
+    elif mode == "fetch":
+        if not args.ledger:
+            addlog("Error: --ledger is required for fetch mode", verbose_int=1, verbose_state=verbose)
+            sys.exit(1)
+        time_window = args.time if args.time else "48h"
+        try:
+            from systems.fetch import fetch_missing_candles
+
+            fetch_missing_candles(
+                ledger=args.ledger,
+                relative_window=time_window,
+                verbose=args.verbose,
+            )
+        except Exception as e:
+            addlog(f"[ERROR] Fetch failed: {e}", verbose_int=1, verbose_state=True)
+            sys.exit(1)
+        sys.exit(0)
     else:
         addlog(
-            "Error: --mode must be either 'sim', 'simtune', 'live', or 'wallet'",
+            "Error: --mode must be either 'sim', 'simtune', 'live', 'wallet', or 'fetch'",
             verbose_int=1,
             verbose_state=verbose,
         )
