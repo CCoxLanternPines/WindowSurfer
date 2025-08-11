@@ -6,13 +6,14 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from systems.utils.cli import build_parser
-from systems.utils.config import load_settings, resolve_path
+from systems.utils.config import load_settings
 from systems.scripts.fetch_core import (
     FetchAbort,
     _fetch_binance,
     _fetch_kraken,
     canonicalize,
     get_raw_path,
+    write_csv_atomic,
     reindex_hourly,
 )
 
@@ -50,13 +51,12 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--time", required=True, help="Fetch window, e.g. 90d")
     args = parser.parse_args(argv)
 
-    settings = load_settings()
+    settings = load_settings().get("ledger_settings", {})
     ledger_name = args.ledger or "default"
-    ledgers = settings.get("ledger_settings", {})
-    cfg = ledgers.get(ledger_name, ledgers.get("default", {}))
-    tag = cfg.get("tag")
-    binance_symbol = cfg.get("binance_name")
-    kraken_symbol = cfg.get("kraken_name")
+    cfg = settings[ledger_name] if ledger_name in settings else settings["default"]
+    tag = cfg["tag"]
+    binance_symbol = cfg["binance_name"]
+    kraken_symbol = cfg["kraken_name"]
 
     candles = parse_time_to_candles(args.time)
     now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
@@ -72,13 +72,13 @@ def main(argv: Optional[list[str]] = None) -> None:
     )
 
     out_path = get_raw_path(tag)
-    root = resolve_path("")
-    print(f"[FETCH][PATH] root={root} out={out_path}")
+    print(f"[FETCH][PATH] out={out_path.resolve()}")
 
     try:
         if candles > 720:
+            print("[MODE] >720 → FULL_REFRESH_BINANCE")
             if out_path.exists():
-                print(f"[REFRESH] deleting cache at {out_path}")
+                print(f"[REFRESH] deleting {out_path}")
                 out_path.unlink()
             df_b = _fetch_binance(binance_symbol, start_ms, end_ms)
             df_b = canonicalize(df_b)
@@ -90,15 +90,16 @@ def main(argv: Optional[list[str]] = None) -> None:
             df_full, gaps = reindex_hourly(df_b, start_ms, end_ms)
             if gaps:
                 raise FetchAbort(
-                    f"Full refresh not gapless. symbol={binance_symbol} gaps={gaps} "
-                    "(Policy: >720 → no healing. Use a symbol with full history or shorten --time.)"
+                    "Full refresh not gapless (policy: >720 → no healing). "
+                    f"symbol={binance_symbol} gaps={gaps}"
                 )
         else:
+            print("[MODE] ≤720 → KRAKEN_SPAN_HEAL")
             df_k = _fetch_kraken(kraken_symbol, start_ms, end_ms)
             df_k = canonicalize(df_k)
             df_full, gaps = reindex_hourly(df_k, start_ms, end_ms)
             if gaps:
-                print(f"[HEAL][≤720] gaps={len(gaps)} via Binance (same span)")
+                print(f"[HEAL][≤720] gaps={len(gaps)} via Binance same span")
                 df_b = _fetch_binance(binance_symbol, start_ms, end_ms)
                 df_b = canonicalize(df_b)
                 df_full_idx = df_full.set_index("ts")
@@ -107,12 +108,12 @@ def main(argv: Optional[list[str]] = None) -> None:
                 df_full, gaps = reindex_hourly(df_full, start_ms, end_ms)
                 if gaps:
                     raise FetchAbort(
-                        "Unhealable gaps in ≤720 span. symbols: "
+                        "Unhealable gaps in ≤720 span. "
                         f"kraken={kraken_symbol} binance={binance_symbol} details={gaps}"
                     )
-        df_full.to_parquet(out_path, index=False)
+        write_csv_atomic(df_full, out_path)
         print(
-            f"[FETCH] gapless \u2713 rows={len(df_full)} span={start_iso}→{end_iso}"
+            f"[FETCH] gapless \u2713 rows={len(df_full)} span={start_iso}→{end_iso} out={out_path}"
         )
     except FetchAbort as exc:
         print(f"[ABORT][FETCH] {exc}")

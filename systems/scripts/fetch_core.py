@@ -71,15 +71,23 @@ def _fetch_binance(symbol: str, start_ms: int, end_ms: int) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 def canonicalize(df: pd.DataFrame) -> pd.DataFrame:
-    """Ensure canonical columns and hourly UTC timestamps in ms."""
+    """Return a canonically formatted hourly dataframe.
+
+    Columns are ordered as ``COLUMNS`` with UTC timestamps truncated to the
+    top of the hour. Duplicate timestamps are dropped, rows are sorted, and all
+    numeric fields are cast to ``float``.
+    """
 
     if df.empty:
         return pd.DataFrame(columns=COLUMNS)
+
     df = df.copy()
     df.columns = COLUMNS
     df["ts"] = (df["ts"].astype("int64") // 3_600_000) * 3_600_000
-    df = df.drop_duplicates(subset="ts").sort_values("ts")
-    return df.reset_index(drop=True)
+    df = df.drop_duplicates(subset="ts").sort_values("ts").reset_index(drop=True)
+    for col in COLUMNS[1:]:
+        df[col] = df[col].astype("float64")
+    return df
 
 
 def _find_gaps(ts: Iterable[int]) -> List[Tuple[int, int, int]]:
@@ -131,11 +139,19 @@ def reindex_hourly(
 # ---------------------------------------------------------------------------
 
 def get_raw_path(tag: str) -> Path:
-    """Return the canonical raw-data path for ``tag``."""
+    """Return the canonical raw-data path for ``tag`` (CSV)."""
 
     root = resolve_path("")
     raw_dir = root / "data" / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
-    return raw_dir / f"{tag}_1h.parquet"
+    return raw_dir / f"{tag}_1h.csv"
+
+
+def write_csv_atomic(df: pd.DataFrame, out_path: Path) -> None:
+    """Write ``df`` to ``out_path`` as CSV atomically."""
+
+    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    df.to_csv(tmp_path, index=False, float_format="%.8f")
+    tmp_path.replace(out_path)
 
 
