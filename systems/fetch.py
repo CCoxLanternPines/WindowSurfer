@@ -15,7 +15,6 @@ if __package__ is None or __package__ == "":
 
 from systems.utils.time import parse_relative_time
 
-from tqdm import tqdm
 from systems.utils.addlog import addlog
 from systems.scripts.fetch_core import (
     _load_existing,
@@ -46,13 +45,23 @@ def main(argv: list[str] | None = None) -> None:
 
     ledger_cfg = load_ledger_config(args.ledger)
     tag = ledger_cfg["tag"].upper()
-    kraken_symbol = ledger_cfg["tag"]
-    binance_symbol = ledger_cfg["binance_name"]
+    kraken_symbol = ledger_cfg.get("kraken_name")
+    binance_symbol = ledger_cfg.get("binance_name")
+    if not kraken_symbol or not binance_symbol:
+        addlog(
+            f"[ERROR] Missing kraken_name/binance_name in settings for ledger {args.ledger}",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        sys.exit(1)
 
     start_ts, end_ts = parse_relative_time(time_window)
+    start_ts = int(start_ts // 3600 * 3600)
+    end_ts = int(end_ts // 3600 * 3600)
+    interval_ms = 3_600_000
     out_path = get_raw_path(tag)
     existing = _load_existing(out_path)
-    gaps = compute_missing_ranges(existing, start_ts, end_ts, 3_600_000)
+    gaps = compute_missing_ranges(existing, start_ts, end_ts, interval_ms)
 
     new_frames: List[pd.DataFrame] = []
     added_binance = 0
@@ -61,10 +70,11 @@ def main(argv: list[str] | None = None) -> None:
 
     for gap_start, gap_end in gaps:
         diff_hours = int((gap_end - gap_start) // 3600) + 1
+        iso = lambda ts: datetime.utcfromtimestamp(ts).isoformat()
         if diff_hours <= 720:
             addlog(
-                f" Fetching from Kraken: {datetime.utcfromtimestamp(gap_start)} to {datetime.utcfromtimestamp(gap_end)}",
-                verbose_int=3,
+                f"[FETCH] Kraken {kraken_symbol} {iso(gap_start)} → {iso(gap_end)} (≤720h)",
+                verbose_int=2,
                 verbose_state=verbose,
             )
             df = fetch_range("kraken", kraken_symbol, gap_start, gap_end)
@@ -74,8 +84,8 @@ def main(argv: list[str] | None = None) -> None:
         else:
             kraken_end = gap_start + 720 * 3600
             addlog(
-                f" Fetching from Kraken: {datetime.utcfromtimestamp(gap_start)} to {datetime.utcfromtimestamp(kraken_end)}",
-                verbose_int=3,
+                f"[FETCH] Kraken {kraken_symbol} {iso(gap_start)} → {iso(kraken_end)} (≤720h)",
+                verbose_int=2,
                 verbose_state=verbose,
             )
             df_k = fetch_range("kraken", kraken_symbol, gap_start, kraken_end)
@@ -83,54 +93,51 @@ def main(argv: list[str] | None = None) -> None:
                 new_frames.append(df_k)
                 added_kraken += len(df_k)
                 kraken_limited = True
+            binance_start = kraken_end + 3600
             addlog(
-                f" Fetching from Binance: {datetime.utcfromtimestamp(kraken_end + 3600)} to {datetime.utcfromtimestamp(gap_end)}",
-                verbose_int=3,
+                f"[FETCH] Binance {binance_symbol} {iso(binance_start)} → {iso(gap_end)} (tail)",
+                verbose_int=2,
                 verbose_state=verbose,
             )
-            df_b = fetch_range("binance", binance_symbol, kraken_end + 3600, gap_end)
+            df_b = fetch_range("binance", binance_symbol, binance_start, gap_end)
             if not df_b.empty:
                 new_frames.append(df_b)
                 added_binance += len(df_b)
 
     total_rows = _merge_and_save(out_path, existing, new_frames)
-
-    range_str = f"{datetime.fromtimestamp(start_ts, timezone.utc).strftime('%Y-%m-%d')} to {datetime.fromtimestamp(end_ts, timezone.utc).strftime('%Y-%m-%d')}"
-    addlog(
-        f"ℹ  Target range: {range_str}",
-        verbose_int=2,
-        verbose_state=verbose,
-    )
-    existing_rows = existing[
-        (existing["timestamp"] >= start_ts) & (existing["timestamp"] <= end_ts)
-    ]
-    addlog(
-        f"ℹ  Existing rows found: {len(existing_rows)}",
-        verbose_int=2,
-        verbose_state=verbose,
-    )
-
-    if added_binance or added_kraken:
-        addlog(f" Raw data updated: {out_path}", verbose_int=2, verbose_state=verbose)
-        if added_binance:
-            addlog(
-                f" Added {added_binance} candles from Binance",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-        if added_kraken:
-            addlog(
-                f" Added {added_kraken} candles from Kraken",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-        if kraken_limited:
-            addlog(
-                " Could not retrieve full range: Kraken limited to 720 candles",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
+    post_df = _load_existing(out_path)
+    post_gaps = compute_missing_ranges(post_df, start_ts, end_ts, interval_ms)
+    if post_gaps:
+        missing_hours = sum(int((e - s) // 3600) + 1 for s, e in post_gaps)
+        addlog(
+            f"[WARN] Post-merge gaps detected: {missing_hours} hour(s) missing",
+            verbose_state=True,
+        )
     else:
+        addlog(
+            "[SYNC] No post-merge gaps remain",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+
+    addlog(
+        f"[SYNC] Total rows in file: {total_rows}",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
+
+    addlog(
+        f"[SYNC] Added {added_kraken} candles from Kraken, {added_binance} from Binance",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
+    if kraken_limited:
+        addlog(
+            "[INFO] Could not retrieve full range: Kraken limited to 720 candles",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+    if not added_binance and not added_kraken:
         addlog(
             " Raw data already complete. No candles fetched",
             verbose_int=2,
@@ -143,21 +150,38 @@ def fetch_missing_candles(
 ) -> None:
     ledger_cfg = load_ledger_config(ledger)
     tag = ledger_cfg["tag"].upper()
-    kraken_symbol = ledger_cfg["tag"]
-    binance_symbol = ledger_cfg["binance_name"]
+    kraken_symbol = ledger_cfg.get("kraken_name")
+    binance_symbol = ledger_cfg.get("binance_name")
+    if not kraken_symbol or not binance_symbol:
+        addlog(
+            f"[ERROR] Missing kraken_name/binance_name in settings for ledger {ledger}",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        raise RuntimeError("Missing exchange symbols")
 
     start_ts, end_ts = parse_relative_time(relative_window)
+    start_ts = int(start_ts // 3600 * 3600)
+    end_ts = int(end_ts // 3600 * 3600)
+    interval_ms = 3_600_000
     out_path = get_raw_path(tag)
     existing = _load_existing(out_path)
-    gaps = compute_missing_ranges(existing, start_ts, end_ts, 3_600_000)
+    gaps = compute_missing_ranges(existing, start_ts, end_ts, interval_ms)
 
     new_frames: List[pd.DataFrame] = []
     added_binance = 0
     added_kraken = 0
+    kraken_limited = False
 
     for gap_start, gap_end in gaps:
         diff_hours = int((gap_end - gap_start) // 3600) + 1
+        iso = lambda ts: datetime.utcfromtimestamp(ts).isoformat()
         if diff_hours <= 720:
+            addlog(
+                f"[FETCH] Kraken {kraken_symbol} {iso(gap_start)} → {iso(gap_end)} (≤720h)",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
             try:
                 df = fetch_range("kraken", kraken_symbol, gap_start, gap_end)
                 if not df.empty:
@@ -171,19 +195,31 @@ def fetch_missing_candles(
                 )
         else:
             kraken_end = gap_start + 720 * 3600
+            addlog(
+                f"[FETCH] Kraken {kraken_symbol} {iso(gap_start)} → {iso(kraken_end)} (≤720h)",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
             try:
                 df_k = fetch_range("kraken", kraken_symbol, gap_start, kraken_end)
                 if not df_k.empty:
                     new_frames.append(df_k)
                     added_kraken += len(df_k)
+                    kraken_limited = True
             except Exception as e:
                 addlog(
                     f"[WARN] Kraken fetch error: {e}",
                     verbose_int=2,
                     verbose_state=verbose,
                 )
+            binance_start = kraken_end + 3600
+            addlog(
+                f"[FETCH] Binance {binance_symbol} {iso(binance_start)} → {iso(gap_end)} (tail)",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
             try:
-                df_b = fetch_range("binance", binance_symbol, kraken_end + 3600, gap_end)
+                df_b = fetch_range("binance", binance_symbol, binance_start, gap_end)
                 if not df_b.empty:
                     new_frames.append(df_b)
                     added_binance += len(df_b)
@@ -194,13 +230,45 @@ def fetch_missing_candles(
                     verbose_state=verbose,
                 )
 
-    _merge_and_save(out_path, existing, new_frames)
+    total_rows = _merge_and_save(out_path, existing, new_frames)
+    post_df = _load_existing(out_path)
+    post_gaps = compute_missing_ranges(post_df, start_ts, end_ts, interval_ms)
+    if post_gaps:
+        missing_hours = sum(int((e - s) // 3600) + 1 for s, e in post_gaps)
+        addlog(
+            f"[WARN] Post-merge gaps detected: {missing_hours} hour(s) missing",
+            verbose_state=True,
+        )
+    else:
+        addlog(
+            "[SYNC] No post-merge gaps remain",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+
+    addlog(
+        f"[SYNC] Total rows in file: {total_rows}",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
 
     addlog(
         f"[SYNC] Added {added_kraken} candles from Kraken, {added_binance} from Binance",
         verbose_int=2,
         verbose_state=verbose,
     )
+    if kraken_limited:
+        addlog(
+            "[INFO] Could not retrieve full range: Kraken limited to 720 candles",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+    if not added_binance and not added_kraken:
+        addlog(
+            " Raw data already complete. No candles fetched",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
 
 
 if __name__ == "__main__":
