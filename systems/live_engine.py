@@ -8,7 +8,7 @@ from typing import Dict
 
 from tqdm import tqdm
 
-from systems.scripts.fetch_core import get_gapless_1h
+from systems.scripts.fetch_canles import fetch_candles
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -21,7 +21,7 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
         tag = ledger_cfg.get("tag", "").upper()
         window_settings = ledger_cfg.get("window_settings", {})
         try:
-            df = get_gapless_1h(tag=settings["ledger_settings"]["default"]["tag"])
+            df = fetch_candles(tag)
         except FileNotFoundError:
             addlog(
                 f"[WARN] Candle data missing for {tag}",

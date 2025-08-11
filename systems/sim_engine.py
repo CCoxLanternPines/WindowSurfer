@@ -10,7 +10,7 @@ import json
 
 from tqdm import tqdm
 
-from systems.scripts.fetch_core import get_gapless_1h
+from systems.scripts.fetch_canles import fetch_candles
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -24,7 +24,7 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     tag = ledger_cfg.get("tag", "").upper()
     window_settings = ledger_cfg.get("window_settings", {})
 
-    df = get_gapless_1h(tag=settings["ledger_settings"]["default"]["tag"])
+    df = fetch_candles(tag)
     total = len(df)
 
     runtime_state = {
