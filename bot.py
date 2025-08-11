@@ -31,14 +31,19 @@ def _timespan(value: str | None) -> Optional[str]:
 
 
 def _setup_logging(verbosity: int) -> None:
-    level = logging.WARNING
     if verbosity >= 3:
-        level = logging.NOTSET
+        level = logging.DEBUG  # most verbose
     elif verbosity == 2:
-        level = logging.DEBUG
-    elif verbosity == 1:
         level = logging.INFO
-    logging.basicConfig(level=level, format="%(message)s")
+    elif verbosity == 1:
+        level = logging.WARNING
+    else:
+        level = logging.ERROR
+
+    logging.basicConfig(
+        level=level,
+        format="[%(levelname)s] %(message)s"
+    )
 
 
 def run_fetch(

@@ -3,8 +3,11 @@ from __future__ import annotations
 from typing import Dict, List
 from datetime import datetime
 
+import logging
+
 from .ledger import Ledger
 from .tunnel import Tunnel
+from .logger import logger
 
 
 class TunnelManager:
@@ -18,7 +21,7 @@ class TunnelManager:
         tunnels_cfg = cfg.get("tunnels", {})
         for symbol, tunnel_map in tunnels_cfg.items():
             self.tunnels[symbol] = {
-                tunnel_id: Tunnel(tcfg) for tunnel_id, tcfg in tunnel_map.items()
+                tunnel_id: Tunnel(tcfg, symbol, tunnel_id) for tunnel_id, tcfg in tunnel_map.items()
             }
 
     # ------------------------------------------------------------------
@@ -26,16 +29,25 @@ class TunnelManager:
         """Process one tick of prices. Returns logs of actions."""
         actions: Dict[str, List[str]] = {sym: [] for sym in prices.keys()}
 
-        # Update windows first
+        # Update windows first with optional summaries
         for symbol, price in prices.items():
-            for tunnel in self.tunnels.get(symbol, {}).values():
+            for tunnel_id, tunnel in self.tunnels.get(symbol, {}).items():
                 tunnel.update_window(price)
+                if logger.isEnabledFor(logging.INFO):
+                    pos = tunnel.current_position
+                    pos_str = f"{pos:.3f}" if pos is not None else "nan"
+                    logger.info(
+                        f"[TICK] {symbol}/{tunnel_id} pos={pos_str} buy_trig={tunnel.buy_trigger_position:.3f} "
+                        f"maturity_mult={tunnel.sell_maturity_multiplier:.3f} can_buy={tunnel.can_buy}"
+                    )
+
+        debug_mode = logger.isEnabledFor(logging.DEBUG)
 
         # Handle sells first to free capital
         for symbol, price in prices.items():
             for tunnel_id, tunnel in self.tunnels.get(symbol, {}).items():
                 notes = self.ledger.get_notes(symbol, tunnel_id)
-                sells = tunnel.check_sell_opportunities(notes)
+                sells = tunnel.check_sell_opportunities(notes, price, debug=debug_mode)
                 for sell in sells:
                     fiat = self.ledger.sell(
                         symbol,
@@ -50,6 +62,9 @@ class TunnelManager:
                         actions[symbol].append(
                             f"sell {tunnel_id} {sell['qty']:.4f} @ {price:.2f}"
                         )
+                        logger.warning(
+                            f"[SELL] {symbol}/{tunnel_id} sold {sell['qty']:.4f} @ {price:.2f}"
+                        )
 
         # Compute available funds
         open_value = self.ledger.total_fiat_value(prices)
@@ -59,7 +74,7 @@ class TunnelManager:
         buy_orders = []
         for symbol, price in prices.items():
             for tunnel_id, tunnel in self.tunnels.get(symbol, {}).items():
-                qty = tunnel.check_buy_opportunity()
+                qty = tunnel.check_buy_opportunity(price, debug=debug_mode)
                 if qty > 0:
                     cost = qty * price
                     maturity_price = price * tunnel.sell_maturity_multiplier
@@ -90,5 +105,8 @@ class TunnelManager:
                 available -= order["cost"]
                 actions[order["symbol"]].append(
                     f"buy {order['tunnel_id']} {order['qty']:.4f} @ {order['price']:.2f}"
+                )
+                logger.warning(
+                    f"[BUY] {order['symbol']}/{order['tunnel_id']} bought {order['qty']:.4f} @ {order['price']:.2f}"
                 )
         return actions

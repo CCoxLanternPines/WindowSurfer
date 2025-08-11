@@ -3,12 +3,18 @@ from __future__ import annotations
 from collections import deque
 from typing import Dict, List, Optional
 
+import logging
+
+from .logger import logger
+
 
 class Tunnel:
     """Maintains window based state and trading triggers."""
 
-    def __init__(self, cfg: Dict) -> None:
+    def __init__(self, cfg: Dict, symbol: str, tunnel_id: str) -> None:
         self.cfg = cfg
+        self.symbol = symbol
+        self.tunnel_id = tunnel_id
         self.window_size_hours = int(cfg.get("window_size_hours", 24))
         self.base_bet_fraction = float(cfg.get("base_bet_fraction", 0.0))
         self.buy_trigger_position = float(cfg.get("buy_trigger_position", 0.0))
@@ -66,21 +72,35 @@ class Tunnel:
         return max(wtf_min, min(wtf_max, mult))
 
     # ------------------------------------------------------------------
-    def check_buy_opportunity(self) -> float:
+    def check_buy_opportunity(self, price: float, debug: bool = False) -> float:
+        if debug:
+            logger.debug(
+                f"[BUYCHK] {self.symbol}/{self.tunnel_id} pos={self.current_position:.3f} "
+                f"buy_trig={self.buy_trigger_position:.3f} can_buy={self.can_buy} "
+                f"reset={self.buy_reset_triggered} wtf_mult={self.calc_wtf_multiplier():.2f}"
+            )
         if self.current_position is None:
             return 0.0
         if self.can_buy and self.current_position <= self.buy_trigger_position:
             qty = self.base_bet_fraction * self.calc_wtf_multiplier()
             self.can_buy = False
             return qty
+        if debug and not self.can_buy:
+            logger.debug(
+                f"[BUYCHK] Skipped — cooldown active for {self.symbol}/{self.tunnel_id}"
+            )
         return 0.0
 
     # ------------------------------------------------------------------
-    def check_sell_opportunities(self, notes: List) -> List[Dict]:
+    def check_sell_opportunities(self, notes: List, price: float, debug: bool = False) -> List[Dict]:
         if self.current_position is None:
             return []
+        if debug:
+            logger.debug(
+                f"[SELLCHK] {self.symbol}/{self.tunnel_id} pos={self.current_position:.3f} "
+                f"maturity_mult={self.sell_maturity_multiplier:.3f} min_roi={self.min_roi:.3f}"
+            )
         sells: List[Dict] = []
-        price = self.prices[-1]
         for idx, note in enumerate(notes):
             # Partial sell at midpoint
             if (
