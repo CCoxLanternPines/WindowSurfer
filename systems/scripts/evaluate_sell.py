@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-"""Position-based sell evaluation."""
+"""Price-target-based sell evaluation."""
 
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
-from systems.scripts.window_utils import get_window_bounds, get_window_position
+from systems.scripts.window_utils import get_window_bounds
 from systems.utils.addlog import addlog
 
 
@@ -24,37 +24,64 @@ def evaluate_sell(
     if runtime_state:
         verbose = runtime_state.get("verbose", 0)
 
-    win_low, win_high = get_window_bounds(series, t, cfg["window_size"])
     price = float(series.iloc[t]["close"])
-    p = get_window_position(price, win_low, win_high)
+    win_low, win_high = get_window_bounds(series, t, cfg["window_size"])
 
-    maturity_pos = cfg.get("maturity_position", 1.0)
-    if p < maturity_pos:
+    # Filter notes for the current window and meeting target price
+    candidates = [
+        n
+        for n in open_notes
+        if n.get("window_name") == window_name
+        and price >= n.get("target_price", float("inf"))
+    ]
+
+    if not candidates:
         addlog(
-            f"[HOLD][{window_name} {cfg['window_size']}] p={p:.3f} < maturity={maturity_pos:.2f}",
+            f"[HOLD][{window_name} {cfg['window_size']}] price=${price:.4f} candidates=0",
             verbose_int=3,
             verbose_state=verbose,
         )
         return []
 
-    candidates = [
-        n
-        for n in open_notes
-        if n.get("window_name") == window_name and price >= n.get("target_price", float("inf"))
-    ]
-    if not candidates:
-        return []
+    def roi_now(note: Dict[str, Any]) -> float:
+        buy = note.get("entry_price", 0.0)
+        return (price - buy) / buy if buy else 0.0
 
-    candidates.sort(
-        key=lambda n: (price - n["entry_price"]) / n["entry_price"], reverse=True
-    )
+    candidates.sort(key=roi_now, reverse=True)
     cap = cfg.get("max_notes_sell_per_candle", 1)
     selected = candidates[:cap]
+
+    addlog(
+        f"[MATURE][{window_name} {cfg['window_size']}] eligible={len(candidates)} sold={len(selected)} cap={cap}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+
+    maturity_pos = cfg.get("maturity_position", 1.0)
     for note in selected:
-        roi = (price - note["entry_price"]) / note["entry_price"]
+        buy = note.get("entry_price", 0.0)
+        qty = note.get("entry_amount", 0.0)
+        target = note.get("target_price", 0.0)
+        roi = roi_now(note)
+
+        if maturity_pos >= 0.99 and target < buy:
+            addlog(
+                f"[WARN] SellTargetBelowBuy note=#{note.get('id', '')} buy=${buy:.4f} target=${target:.4f} win=[${win_low:.4f}, ${win_high:.4f}] p_buy={note.get('p_buy', 0.0):.3f}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+        if roi > 5.0:
+            addlog(
+                f"[WARN] UnusuallyHighROI note=#{note.get('id', '')} roi={roi*100:.2f}% (check scale/decimals)",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+
         addlog(
-            f"[SELL][{window_name} {cfg['window_size']}] note={note.get('id', '')} roi={roi*100:.2f}% target=${note['target_price']:.4f} price=${price:.4f}",
+            f"[SELL][{window_name} {cfg['window_size']}] note=#{note.get('id', '')} qty={qty:.6f} buy=${buy:.4f} now=${price:.4f} target=${target:.4f} roi={roi*100:.2f}%",
             verbose_int=1,
             verbose_state=verbose,
         )
+
     return selected
+
