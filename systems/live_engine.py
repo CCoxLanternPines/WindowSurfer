@@ -8,7 +8,8 @@ from typing import Dict
 
 from tqdm import tqdm
 
-from systems.scripts.fetch_canles import fetch_candles
+from systems.scripts.fetch_candles import fetch_candles
+from systems.scripts.candle_refresh import refresh_to_last_closed_hour
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -112,6 +113,19 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
     runtime_states: Dict[str, Dict] = {}
 
     if dry:
+        addlog(
+            "[LIVE] Refreshing candles from Kraken...",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        for ledger_cfg in settings.get("ledger_settings", {}).values():
+            refresh_to_last_closed_hour(
+                settings,
+                ledger_cfg["tag"],
+                exchange="kraken",
+                lookback_hours=72,
+                verbose=1,
+            )
         _run_iteration(settings, runtime_states, dry=dry, verbose=verbose)
         return
 
@@ -130,5 +144,18 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
             for _ in range(remaining):
                 time.sleep(1)
                 pbar.update(1)
+        addlog(
+            "[LIVE] Refreshing candles from Kraken...",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        for ledger_cfg in settings.get("ledger_settings", {}).values():
+            refresh_to_last_closed_hour(
+                settings,
+                ledger_cfg["tag"],
+                exchange="kraken",
+                lookback_hours=72,
+                verbose=1,
+            )
         addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
         _run_iteration(settings, runtime_states, dry=dry, verbose=verbose)

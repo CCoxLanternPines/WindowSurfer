@@ -25,6 +25,7 @@ from systems.utils.config import resolve_path
 from systems.utils.top_hour_report import format_top_of_hour_report
 from systems.utils.resolve_symbol import split_tag
 from systems.scripts.window_position_tools import get_trade_params
+from systems.scripts.candle_refresh import refresh_to_last_closed_hour
 
 
 def handle_top_of_hour(
@@ -78,6 +79,13 @@ def handle_top_of_hour(
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
             tag = ledger_cfg["tag"]
+            refresh_to_last_closed_hour(
+                settings,
+                tag,
+                exchange="kraken",
+                lookback_hours=72,
+                verbose=verbose,
+            )
             _, quote = split_tag(tag)
             wallet_code = ledger_cfg["wallet_code"]
             window_settings = ledger_cfg.get("window_settings", {})

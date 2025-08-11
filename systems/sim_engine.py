@@ -10,7 +10,7 @@ import json
 
 from tqdm import tqdm
 
-from systems.scripts.fetch_canles import fetch_candles
+from systems.scripts.fetch_candles import fetch_candles
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell

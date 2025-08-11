@@ -12,7 +12,7 @@ from typing import Any, Dict
 import optuna
 
 from systems.sim_engine import run_simulation
-from systems.scripts.fetch_canles import fetch_candles
+from systems.scripts.fetch_candles import fetch_candles
 from systems.scripts.ledger import Ledger
 from systems.utils.addlog import addlog
 from systems.utils.config import (
