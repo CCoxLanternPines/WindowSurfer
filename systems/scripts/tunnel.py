@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections import deque
 from typing import Dict, List, Optional
 
-import logging
-
 from .logger import logger
 
 
@@ -77,11 +75,11 @@ class Tunnel:
 
     # ------------------------------------------------------------------
     def check_buy_opportunity(self, price: float, debug: bool = False) -> float:
-        pos_str = f"{self.current_position:.3f}" if self.current_position is not None else "nan"
+        pos = self.current_position if self.current_position is not None else float("nan")
         wtf_mult = self.calc_wtf_multiplier()
         if debug:
             logger.debug(
-                f"[BUYCHK] {self.symbol}/{self.tunnel_id} pos={pos_str} "
+                f"[BUYCHK] {self.symbol}/{self.tunnel_id} pos={pos:.3f} "
                 f"buy_trig={self.buy_trigger_position:.3f} can_buy={self.can_buy} "
                 f"reset={self.buy_reset_triggered} wtf_mult={wtf_mult:.2f}"
             )
@@ -105,15 +103,14 @@ class Tunnel:
             return 0.0
         qty = self.base_bet_fraction * wtf_mult
         if qty > 0:
-            cost = qty * price
             if debug:
                 logger.debug(
-                    f"[BUY] {self.symbol}/{self.tunnel_id} qty={qty:.6f} cost={cost:.2f} "
-                    f"available_capital_check_passed"
+                    f"[BUY] {self.symbol}/{self.tunnel_id} qty={qty:.6f} cost={qty * price:.2f} "
+                    f"cap_ok"
                 )
             self.can_buy = False
             return qty
-        if debug:
+        if debug and qty == 0:
             logger.debug(
                 f"[BUYCHK] Skip — qty below min order for {self.symbol}/{self.tunnel_id}"
             )
@@ -123,11 +120,10 @@ class Tunnel:
     def check_sell_opportunities(self, notes: List, price: float, debug: bool = False) -> List[Dict]:
         if self.current_position is None:
             return []
-        pos_str = f"{self.current_position:.3f}"
         if debug:
             logger.debug(
-                f"[SELLCHK] {self.symbol}/{self.tunnel_id} pos={pos_str} "
-                f"maturity_mult={self.sell_maturity_multiplier:.3f} min_roi={self.min_roi:.3f}"
+                f"[SELLCHK] {self.symbol}/{self.tunnel_id} pos={self.current_position:.3f} "
+                f"maturity={self.sell_maturity_multiplier:.3f} min_roi={self.min_roi:.3f}"
             )
         sells: List[Dict] = []
         for idx, note in enumerate(notes):
@@ -143,9 +139,8 @@ class Tunnel:
                     sell_qty = note.qty / 2
                     sells.append({"note_idx": idx, "qty": sell_qty, "partial": True})
                     if debug:
-                        roi = (price - note.buy_price) / note.buy_price
                         logger.debug(
-                            f"[SELL] {self.symbol}/{self.tunnel_id} qty={sell_qty:.6f} at price={price:.2f} roi={roi:.3f}"
+                            f"[SELL] {self.symbol}/{self.tunnel_id} qty={sell_qty:.6f} at price={price:.2f}"
                         )
                     continue
             maturity_price = note.maturity_price * self.sell_maturity_multiplier
@@ -155,7 +150,7 @@ class Tunnel:
                 sells.append({"note_idx": idx, "qty": sell_qty, "partial": False})
                 if debug:
                     logger.debug(
-                        f"[SELL] {self.symbol}/{self.tunnel_id} qty={sell_qty:.6f} at price={price:.2f} roi={roi:.3f}"
+                        f"[SELL] {self.symbol}/{self.tunnel_id} qty={sell_qty:.6f} at price={price:.2f}"
                     )
             elif debug:
                 logger.debug(

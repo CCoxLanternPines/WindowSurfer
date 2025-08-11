@@ -1,4 +1,12 @@
 import logging
 
-# Shared logger for the WindowSurfer system
-logger = logging.getLogger()
+logger = logging.getLogger("WindowSurfer")
+
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+    logger.addHandler(handler)
+
+# Allow bot.py verbosity setup to override this
+logger.setLevel(logging.DEBUG)
+logger.propagate = False
