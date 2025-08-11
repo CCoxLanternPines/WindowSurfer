@@ -1,13 +1,46 @@
 {
-  "name": "GoatLedger",
   "fiat": "USDC",
   "tunnel": {
-    "retries": 5
+    "retries": 3
+  },
+  "trading": {
+    "slippage": 0.01
   },
   "coins": {
     "SOL": {
-      "tunnel": {"endpoint": "wss://sol"},
-      "trading": {"leverage": 2}
+      "trading": {
+        "leverage": 1
+      },
+      "tunnels": {
+        "day": {
+          "window_hours": 24,
+          "base_bet_fraction": 0.001
+        },
+        "week": {
+          "window_hours": 168,
+          "base_bet_fraction": 0.002
+        },
+        "month": {
+          "window_hours": 720,
+          "base_bet_fraction": 0.003
+        },
+        "four_month": {
+          "window_hours": 2880,
+          "base_bet_fraction": 0.004
+        }
+      },
+      "settings": {
+        "buy_trigger_position": 0.1,
+        "rebuy_unlock_position": 0.5,
+        "sell_maturity_multiplier": 0.9,
+        "min_roi": 0.0,
+        "wtf": {
+          "enabled": true,
+          "formula": "(1 - WTF) + 1",
+          "min_multiplier": 0.75,
+          "max_multiplier": 2.0
+        }
+      }
     }
   }
 }

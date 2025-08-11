@@ -6,7 +6,8 @@ from systems.scripts.fetch_core import build_wallet_cache, fetch_full_history, f
 
 
 def _load_ledger(name: str):
-    path = Path("data/ledgers") / f"{name}.json"
+    path = Path("data/ledgers") / f"{ledger_name}_{mode}.json"
+
     if not path.exists():
         raise FileNotFoundError(f"ledger not found: {path}")
     with open(path, "r", encoding="utf-8") as fh:
