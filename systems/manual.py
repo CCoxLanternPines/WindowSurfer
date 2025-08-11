@@ -11,6 +11,7 @@ from systems.scripts.kraken_utils import ensure_snapshot, get_live_price
 from systems.utils.cli import build_parser
 from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.scripts.ledger import save_ledger
+from systems.utils.resolve_symbol import split_tag, load_pair_cache, resolve_wallet_codes
 
 
 def _load_ledger(ledger_name: str) -> dict:
@@ -65,13 +66,25 @@ def main(argv: Optional[list[str]] = None) -> None:
     coin_amt = args.usd / price
     coin_str = _coin_label(tag)
     ledger = _load_ledger(args.ledger)
+    wallet_code = ledger_cfg.get("wallet_code")
+    if not wallet_code:
+        cache = load_pair_cache()
+        coin = ledger_cfg.get("coin") or split_tag(ledger_cfg["tag"])[0]
+        fiat = ledger_cfg.get("fiat") or split_tag(ledger_cfg["tag"])[1]
+        codes = resolve_wallet_codes(coin, fiat, cache, args.verbose)
+        wallet_code = codes["base_wallet_code"]
+        addlog(
+            f"[RESOLVE] Wallet codes → base={wallet_code} quote={codes['quote_wallet_code']}",
+            verbose_int=1,
+            verbose_state=args.verbose,
+        )
 
     if args.buy:
         if not args.dry:
             result = execute_buy(
                 None,
                 symbol=tag,
-                wallet_code=ledger_cfg["wallet_code"],
+                wallet_code=wallet_code,
                 price=price,
                 amount_usd=args.usd,
                 ledger_name=args.ledger,

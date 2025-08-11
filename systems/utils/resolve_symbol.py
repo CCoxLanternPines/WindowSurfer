@@ -1,9 +1,121 @@
 """Helpers for resolving symbol and ledger configuration."""
 
+from pathlib import Path
+import json
+
+import ccxt
+
 from systems.utils.config import load_settings
+from systems.utils.addlog import addlog
 
 
 SETTINGS = load_settings()
+
+
+CACHE_DIR = Path("data/cache")
+KRAKEN_FILE = CACHE_DIR / "kraken_markets.json"
+BINANCE_FILE = CACHE_DIR / "binance_markets.json"
+
+
+def refresh_pair_cache(verbose: int = 0) -> None:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    kraken = ccxt.kraken({"enableRateLimit": True})
+    binance = ccxt.binance({"enableRateLimit": True})
+    k_markets = kraken.load_markets()
+    b_markets = binance.load_markets()
+    with KRAKEN_FILE.open("w") as f:
+        json.dump(
+            {
+                k: {
+                    "symbol": v.get("symbol"),
+                    "id": v.get("id"),
+                    "altname": v.get("info", {}).get("altname"),
+                    "base": v.get("base"),
+                    "quote": v.get("quote"),
+                    "baseId": v.get("baseId"),
+                    "quoteId": v.get("quoteId"),
+                }
+                for k, v in k_markets.items()
+            },
+            f,
+        )
+    with BINANCE_FILE.open("w") as f:
+        json.dump(
+            {
+                k: {
+                    "symbol": v.get("symbol"),
+                    "base": v.get("base"),
+                    "quote": v.get("quote"),
+                }
+                for k, v in b_markets.items()
+            },
+            f,
+        )
+    addlog("[CACHE] Refreshed Kraken & Binance market maps", verbose_int=1, verbose_state=verbose)
+
+
+def load_pair_cache() -> dict:
+    if not KRAKEN_FILE.exists() or not BINANCE_FILE.exists():
+        refresh_pair_cache()
+    with KRAKEN_FILE.open() as fk, BINANCE_FILE.open() as fb:
+        return {"kraken": json.load(fk), "binance": json.load(fb)}
+
+
+def resolve_ccxt_symbols(
+    coin: str, fiat: str, cache: dict | None = None, verbose: int = 0
+) -> dict:
+    cache = cache or load_pair_cache()
+    coin, fiat = coin.upper(), fiat.upper()
+    for m in cache["kraken"].values():
+        if m.get("base") == coin and m.get("quote") == fiat:
+            kraken_name = m.get("symbol")
+            kraken_pair = m.get("id")
+            break
+    else:
+        target_alt = f"{coin}{fiat}"
+        for m in cache["kraken"].values():
+            if m.get("altname") == target_alt:
+                kraken_name, kraken_pair = m.get("symbol"), m.get("id")
+                break
+        else:
+            raise RuntimeError(f"Kraken symbol not found for {coin}/{fiat}")
+
+    binance_name = None
+    for m in cache["binance"].values():
+        if m.get("base") == coin and m.get("quote") == fiat:
+            binance_name = m.get("symbol")
+            break
+    if not binance_name:
+        raise RuntimeError(f"Binance symbol not found for {coin}/{fiat}")
+
+    addlog(
+        f"[RESOLVE] {coin}/{fiat} → Kraken: {kraken_name} ({kraken_pair}), Binance: {binance_name}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+    return {
+        "kraken_name": kraken_name,
+        "kraken_pair": kraken_pair,
+        "binance_name": binance_name,
+    }
+
+
+def resolve_wallet_codes(
+    coin: str, fiat: str, cache: dict | None = None, verbose: int = 0
+) -> dict:
+    cache = cache or load_pair_cache()
+    coin, fiat = coin.upper(), fiat.upper()
+    for m in cache["kraken"].values():
+        if m.get("base") == coin and m.get("quote") == fiat:
+            base_code = m.get("baseId")
+            quote_code = m.get("quoteId")
+            addlog(
+                f"[RESOLVE] Wallet codes → base={base_code} quote={quote_code}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            return {"base_wallet_code": base_code, "quote_wallet_code": quote_code}
+    raise RuntimeError(f"Kraken wallet codes not found for {coin}/{fiat}")
 
 
 def resolve_ledger_settings(tag: str, settings: dict | None = None) -> dict:

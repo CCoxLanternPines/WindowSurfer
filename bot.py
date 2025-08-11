@@ -35,6 +35,11 @@ def main(argv: list[str] | None = None) -> None:
         type=int,
         help="After dry tick, replay the last N hours in sim mode",
     )
+    parser.add_argument(
+        "--cache",
+        action="store_true",
+        help="Refresh exchange pair cache before running",
+    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -124,6 +129,7 @@ def main(argv: list[str] | None = None) -> None:
                 ledger=args.ledger,
                 relative_window=time_window,
                 verbose=args.verbose,
+                refresh_cache=args.cache,
             )
         except Exception as e:
             addlog(f"[ERROR] Fetch failed: {e}", verbose_int=1, verbose_state=True)

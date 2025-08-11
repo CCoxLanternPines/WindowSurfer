@@ -18,6 +18,7 @@ from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.scripts.smoke_test import run_smoke_test
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings
+from systems.utils.resolve_symbol import split_tag, load_pair_cache, resolve_wallet_codes
 
 
 def _run_iteration(
@@ -53,6 +54,18 @@ def _run_iteration(
             prev=prev,
         )
         runtime_states[name] = state
+        wallet_code = ledger_cfg.get("wallet_code")
+        if not wallet_code:
+            cache = load_pair_cache()
+            coin = ledger_cfg.get("coin") or split_tag(ledger_cfg["tag"])[0]
+            fiat = ledger_cfg.get("fiat") or split_tag(ledger_cfg["tag"])[1]
+            codes = resolve_wallet_codes(coin, fiat, cache, state.get("verbose", 0))
+            wallet_code = codes["base_wallet_code"]
+            addlog(
+                f"[RESOLVE] Wallet codes → base={wallet_code} quote={codes['quote_wallet_code']}",
+                verbose_int=1,
+                verbose_state=state.get("verbose", 0),
+            )
 
         price = float(df.iloc[t]["close"])
         candle = df.iloc[t].to_dict()
@@ -75,7 +88,7 @@ def _run_iteration(
                     price=price,
                     amount_usd=buy_res["size_usd"],
                     ledger_name=ledger_cfg["tag"],
-                    wallet_code=ledger_cfg.get("wallet_code", ""),
+                    wallet_code=wallet_code,
                     verbose=state.get("verbose", 0),
                 )
                 if result:

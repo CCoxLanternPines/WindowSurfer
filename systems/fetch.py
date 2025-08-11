@@ -9,6 +9,11 @@ import sys
 import pandas as pd
 from systems.utils.config import load_ledger_config, resolve_path
 from systems.utils.cli import build_parser
+from systems.utils.resolve_symbol import (
+    refresh_pair_cache,
+    load_pair_cache,
+    resolve_ccxt_symbols,
+)
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -36,6 +41,11 @@ def main(argv: list[str] | None = None) -> None:
         required=False,
         help="Time window (e.g. 120h)",
     )
+    parser.add_argument(
+        "--cache",
+        action="store_true",
+        help="Refresh exchange pair cache before running",
+    )
     args = parser.parse_args(argv)
     if not args.ledger:
         parser.error("--ledger is required")
@@ -45,15 +55,25 @@ def main(argv: list[str] | None = None) -> None:
 
     ledger_cfg = load_ledger_config(args.ledger)
     tag = ledger_cfg["tag"].upper()
-    kraken_symbol = ledger_cfg.get("kraken_name")
-    binance_symbol = ledger_cfg.get("binance_name")
-    if not kraken_symbol or not binance_symbol:
-        addlog(
-            f"[ERROR] Missing kraken_name/binance_name in settings for ledger {args.ledger}",
-            verbose_int=1,
-            verbose_state=True,
-        )
-        sys.exit(1)
+    if getattr(args, "cache", False):
+        refresh_pair_cache(verbose)
+    cache = load_pair_cache()
+    coin = ledger_cfg.get("coin")
+    fiat = ledger_cfg.get("fiat")
+    if coin and fiat:
+        syms = resolve_ccxt_symbols(coin, fiat, cache, verbose)
+        kraken_symbol = syms["kraken_name"]
+        binance_symbol = syms["binance_name"]
+    else:
+        kraken_symbol = ledger_cfg.get("kraken_name")
+        binance_symbol = ledger_cfg.get("binance_name")
+        if not kraken_symbol or not binance_symbol:
+            addlog(
+                f"[ERROR] Missing kraken_name/binance_name in settings for ledger {args.ledger}",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            sys.exit(1)
 
     start_ts, end_ts = parse_relative_time(time_window)
     start_ts = int(start_ts // 3600 * 3600)
@@ -146,19 +166,32 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def fetch_missing_candles(
-    ledger: str, relative_window: str = "48h", verbose: int = 1
+    ledger: str,
+    relative_window: str = "48h",
+    verbose: int = 1,
+    refresh_cache: bool = False,
 ) -> None:
     ledger_cfg = load_ledger_config(ledger)
     tag = ledger_cfg["tag"].upper()
-    kraken_symbol = ledger_cfg.get("kraken_name")
-    binance_symbol = ledger_cfg.get("binance_name")
-    if not kraken_symbol or not binance_symbol:
-        addlog(
-            f"[ERROR] Missing kraken_name/binance_name in settings for ledger {ledger}",
-            verbose_int=1,
-            verbose_state=True,
-        )
-        raise RuntimeError("Missing exchange symbols")
+    if refresh_cache:
+        refresh_pair_cache(verbose)
+    cache = load_pair_cache()
+    coin = ledger_cfg.get("coin")
+    fiat = ledger_cfg.get("fiat")
+    if coin and fiat:
+        syms = resolve_ccxt_symbols(coin, fiat, cache, verbose)
+        kraken_symbol = syms["kraken_name"]
+        binance_symbol = syms["binance_name"]
+    else:
+        kraken_symbol = ledger_cfg.get("kraken_name")
+        binance_symbol = ledger_cfg.get("binance_name")
+        if not kraken_symbol or not binance_symbol:
+            addlog(
+                f"[ERROR] Missing kraken_name/binance_name in settings for ledger {ledger}",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            raise RuntimeError("Missing exchange symbols")
 
     start_ts, end_ts = parse_relative_time(relative_window)
     start_ts = int(start_ts // 3600 * 3600)

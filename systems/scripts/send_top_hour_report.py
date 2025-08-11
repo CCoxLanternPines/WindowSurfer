@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.config import load_settings
-from systems.utils.resolve_symbol import split_tag
+from systems.utils.resolve_symbol import split_tag, load_pair_cache, resolve_wallet_codes
 from systems.utils.snapshot import load_snapshot
 
 
@@ -47,6 +47,18 @@ def send_top_hour_report(
     ledger_cfg = settings.get("ledger_settings", {}).get(ledger_name, {})
     wallet_code = ledger_cfg.get("wallet_code", "")
     _, fiat_code = split_tag(tag)
+    if not wallet_code:
+        cache = load_pair_cache()
+        coin = ledger_cfg.get("coin") or split_tag(ledger_cfg["tag"])[0]
+        fiat = ledger_cfg.get("fiat") or split_tag(ledger_cfg["tag"])[1]
+        codes = resolve_wallet_codes(coin, fiat, cache, verbose)
+        wallet_code = codes["base_wallet_code"]
+        fiat_code = codes["quote_wallet_code"]
+        addlog(
+            f"[RESOLVE] Wallet codes → base={wallet_code} quote={fiat_code}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
 
     balance = snapshot.get("balance", {})
     trades = snapshot.get("trades", {})

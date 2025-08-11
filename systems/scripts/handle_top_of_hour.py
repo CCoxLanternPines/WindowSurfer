@@ -23,7 +23,7 @@ from systems.utils.addlog import addlog, send_telegram_message
 from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.config import resolve_path
 from systems.utils.top_hour_report import format_top_of_hour_report
-from systems.utils.resolve_symbol import split_tag
+from systems.utils.resolve_symbol import split_tag, load_pair_cache, resolve_wallet_codes
 from systems.scripts.window_position_tools import get_trade_params
 
 
@@ -79,7 +79,19 @@ def handle_top_of_hour(
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
             tag = ledger_cfg["tag"]
             _, quote = split_tag(tag)
-            wallet_code = ledger_cfg["wallet_code"]
+            wallet_code = ledger_cfg.get("wallet_code")
+            if not wallet_code:
+                cache = load_pair_cache()
+                coin = ledger_cfg.get("coin") or split_tag(ledger_cfg["tag"])[0]
+                fiat = ledger_cfg.get("fiat") or split_tag(ledger_cfg["tag"])[1]
+                codes = resolve_wallet_codes(coin, fiat, cache, verbose)
+                wallet_code = codes["base_wallet_code"]
+                quote = codes["quote_wallet_code"]
+                addlog(
+                    f"[RESOLVE] Wallet codes → base={wallet_code} quote={quote}",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
             window_settings = ledger_cfg.get("window_settings", {})
             triggered_strategies = {wn.title(): False for wn in window_settings}
             strategy_summary: dict[str, dict] = {}
