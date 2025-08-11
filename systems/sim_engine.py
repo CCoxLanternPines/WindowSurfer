@@ -25,7 +25,15 @@ from systems.utils.addlog import addlog
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
 
 
-def run_simulation(*, ledger: str, verbose: int = 0) -> None:
+def run_simulation(
+    *,
+    ledger: str,
+    verbose: int = 0,
+    start_idx: int | None = None,
+    end_idx: int | None = None,
+    save_ledger_file: bool = True,
+    progress: bool = True,
+) -> dict:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
     tag = ledger_cfg.get("tag", "").upper()
@@ -33,6 +41,13 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
 
     df = fetch_candles(tag)
     total = len(df)
+    if total == 0:
+        return {"buys": 0, "sells": 0, "realized_gain": 0.0, "open_value": 0.0}
+
+    start = start_idx if start_idx is not None else 0
+    end = end_idx if end_idx is not None else total - 1
+    end = min(end, total - 1)
+    start = max(0, start)
 
     runtime_state = build_runtime_state(
         settings,
@@ -56,7 +71,11 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         }
     addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
 
-    for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
+    iterator = range(start, end + 1)
+    if progress:
+        iterator = tqdm(iterator, desc="📉 Sim Progress", dynamic_ncols=True)
+
+    for t in iterator:
         price = float(df.iloc[t]["close"])
 
         for window_name, wcfg in window_settings.items():
@@ -193,6 +212,17 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         verbose_int=1,
         verbose_state=verbose,
     )
+    total_buys = sum(m["buys"] for m in win_metrics.values())
+    total_sells = sum(m["sells"] for m in win_metrics.values())
+    result_summary = {
+        "buys": total_buys,
+        "sells": total_sells,
+        "realized_gain": summary.get("realized_gain", 0.0),
+        "open_value": summary.get("open_value", 0.0),
+    }
+
+    if not save_ledger_file:
+        return result_summary
 
     root = resolve_path("")
     logs_dir = root / "logs"
@@ -231,9 +261,16 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     with json_path.open("w", encoding="utf-8") as f_json:
         json.dump(json_data, f_json, indent=2)
 
-    save_ledger(ledger_cfg["tag"], ledger_obj, sim=True, final_tick=total - 1, summary=summary)
+    save_ledger(
+        ledger_cfg["tag"],
+        ledger_obj,
+        sim=True,
+        final_tick=end,
+        summary=summary,
+    )
     default_path = root / "data" / "tmp" / "simulation" / f"{ledger}.json"
     sim_path = root / "data" / "tmp" / f"simulation_{ledger}.json"
     if default_path.exists() and default_path != sim_path:
         sim_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(default_path, sim_path)
+    return result_summary
