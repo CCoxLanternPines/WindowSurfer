@@ -74,6 +74,13 @@ def get_raw_path_for_coin(coin: str, ext: str = "csv") -> Path:
     return raw_dir / f"{coin.strip().upper()}.{ext}"
 
 
+def get_raw_path_for_pair(coin: str, fiat: str, ext: str = "csv") -> Path:
+    root = resolve_path("")
+    raw_dir = root / "data" / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    return raw_dir / f"{coin.strip().upper()}-{fiat.strip().upper()}.{ext}"
+
+
 def compute_missing_ranges(
     candles_df: pd.DataFrame, start_ts: int, end_ts: int, interval_ms: int
 ) -> List[tuple[int, int]]:

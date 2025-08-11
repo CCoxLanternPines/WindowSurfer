@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Time-aware historical data fetcher."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import List
 import sys
@@ -19,7 +19,7 @@ from systems.utils.addlog import addlog
 from systems.scripts.fetch_core import (
     _load_existing,
     _merge_and_save,
-    get_raw_path_for_coin,
+    get_raw_path_for_pair,
     COLUMNS,
     compute_missing_ranges,
     fetch_range,
@@ -74,24 +74,27 @@ def fetch_missing_candles(
     )
     if refresh_cache:
         refresh_pair_cache(verbose)
+    try:
+        cache = load_pair_cache()
+    except Exception:
+        if refresh_cache:
+            refresh_pair_cache(verbose)
+            cache = load_pair_cache()
+        else:
+            raise RuntimeError("[ERROR] Failed to load pair cache (tip: pass --cache once)")
 
-    cache = load_pair_cache()
     ledger_cfg = load_ledger_config(ledger)
     coin = ledger_cfg.get("coin")
     fiat = ledger_cfg.get("fiat")
+    if not coin or not fiat:
+        raise RuntimeError("[ERROR] Ledger config missing coin or fiat for pair resolution")
+    syms = resolve_ccxt_symbols(coin, fiat, cache)
+    kraken_symbol = syms["kraken_name"]
+    binance_symbol = syms["binance_name"]
 
-    if coin and fiat:
-        syms = resolve_ccxt_symbols(coin, fiat, cache)
-        kraken_symbol = syms["kraken_name"]
-        binance_symbol = syms["binance_name"]
-        market_label = f"{coin}/{fiat}"
-    else:
-        kraken_symbol = ledger_cfg["kraken_name"]
-        binance_symbol = ledger_cfg["binance_name"]
-        market_label = kraken_symbol
-
+    out_path = get_raw_path_for_pair(coin, fiat)
     addlog(
-        f"[FETCH][LEDGER={ledger}] pair={market_label} source={source} window={relative_window}",
+        f"[FETCH] ledger={ledger} pair={coin}/{fiat} source={source} file={out_path}",
         verbose_int=1,
         verbose_state=verbose,
     )
@@ -100,20 +103,35 @@ def fetch_missing_candles(
     start_ts = int(start_ts // 3600 * 3600)
     end_ts = int(end_ts // 3600 * 3600)
     interval_ms = 3_600_000
-    out_path = get_raw_path_for_coin(coin)
-    if not out_path.exists():
-        legacy = resolve_path("") / "data" / "raw" / f"{(coin + fiat).upper()}.csv"
-        if legacy.exists():
-            addlog(
-                f"[COMPAT] Using legacy raw file: {legacy.name}",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-            existing = pd.read_csv(legacy)
-        else:
-            existing = _load_existing(out_path)
+
+    if source == "binance" and out_path.exists():
+        out_path.unlink()
+        addlog("[RESET] Deleted old file (if existed)", verbose_int=1, verbose_state=verbose)
+
+    if source == "binance":
+        existing = pd.DataFrame(columns=COLUMNS)
     else:
-        existing = _load_existing(out_path)
+        if out_path.exists():
+            existing = _load_existing(out_path)
+        else:
+            legacy1 = resolve_path("") / "data" / "raw" / f"{coin.upper()}.csv"
+            legacy2 = resolve_path("") / "data" / "raw" / f"{(coin + fiat).upper()}.csv"
+            if legacy1.exists():
+                addlog(
+                    f"[COMPAT] Using legacy raw file: {legacy1.name}",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
+                existing = pd.read_csv(legacy1)
+            elif legacy2.exists():
+                addlog(
+                    f"[COMPAT] Using legacy raw file: {legacy2.name}",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
+                existing = pd.read_csv(legacy2)
+            else:
+                existing = _load_existing(out_path)
     gaps = compute_missing_ranges(existing, start_ts, end_ts, interval_ms)
 
     new_frames: List[pd.DataFrame] = []
@@ -257,7 +275,7 @@ def fetch_missing_candles(
         )
 
     addlog(
-        f"[FETCH][DONE] rows_added: kraken={added_kraken} binance={added_binance} file={out_path}",
+        f"[FETCH][DONE] kraken_added={added_kraken} binance_added={added_binance}",
         verbose_int=1,
         verbose_state=verbose,
     )

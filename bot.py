@@ -67,7 +67,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         cache = load_pair_cache()
     except Exception:
-        if mode == "fetch" and args.cache:
+        if args.cache:
             addlog(
                 "[CACHE] Pair cache missing → refreshing…",
                 verbose_int=1,
@@ -75,16 +75,9 @@ def main(argv: list[str] | None = None) -> None:
             )
             refresh_pair_cache(verbose)
             cache = load_pair_cache()
-        elif mode == "fetch":
-            addlog(
-                "[ERROR] Failed to load pair cache (tip: pass --cache once)",
-                verbose_int=1,
-                verbose_state=True,
-            )
-            sys.exit(1)
         else:
             addlog(
-                "[ERROR] Failed to load pair cache",
+                "[ERROR] Failed to load pair cache (tip: pass --cache once)",
                 verbose_int=1,
                 verbose_state=True,
             )
