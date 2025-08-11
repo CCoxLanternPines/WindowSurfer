@@ -29,10 +29,12 @@ class TunnelManager:
         """Process one tick of prices. Returns logs of actions."""
         actions: Dict[str, List[str]] = {sym: [] for sym in prices.keys()}
 
+        debug_mode = logger.isEnabledFor(logging.DEBUG)
+
         # Update windows first with optional summaries
         for symbol, price in prices.items():
             for tunnel_id, tunnel in self.tunnels.get(symbol, {}).items():
-                tunnel.update_window(price)
+                tunnel.update_window(price, debug=debug_mode)
                 if logger.isEnabledFor(logging.INFO):
                     pos = tunnel.current_position
                     pos_str = f"{pos:.3f}" if pos is not None else "nan"
@@ -40,8 +42,6 @@ class TunnelManager:
                         f"[TICK] {symbol}/{tunnel_id} pos={pos_str} buy_trig={tunnel.buy_trigger_position:.3f} "
                         f"maturity_mult={tunnel.sell_maturity_multiplier:.3f} can_buy={tunnel.can_buy}"
                     )
-
-        debug_mode = logger.isEnabledFor(logging.DEBUG)
 
         # Handle sells first to free capital
         for symbol, price in prices.items():
