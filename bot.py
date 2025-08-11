@@ -8,7 +8,11 @@ from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
 from systems.utils.addlog import init_logger, addlog
 from systems.utils.config import load_settings, load_ledger_config
-from systems.utils.resolve_symbol import load_pair_cache, resolve_ccxt_symbols
+from systems.utils.resolve_symbol import (
+    load_pair_cache,
+    refresh_pair_cache,
+    resolve_ccxt_symbols,
+)
 from systems.utils.cli import build_parser
 
 
@@ -57,12 +61,28 @@ def main(argv: list[str] | None = None) -> None:
     try:
         cache = load_pair_cache()
     except Exception:
-        addlog(
-            "[ERROR] Failed to load pair cache",
-            verbose_int=1,
-            verbose_state=True,
-        )
-        sys.exit(1)
+        if mode == "fetch" and args.cache:
+            addlog(
+                "[CACHE] Pair cache missing → refreshing…",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            refresh_pair_cache(verbose)
+            cache = load_pair_cache()
+        elif mode == "fetch":
+            addlog(
+                "[ERROR] Failed to load pair cache (tip: pass --cache once)",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            sys.exit(1)
+        else:
+            addlog(
+                "[ERROR] Failed to load pair cache",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            sys.exit(1)
 
     for ledger_cfg in settings.get("ledger_settings", {}).values():
         coin = ledger_cfg.get("coin")
