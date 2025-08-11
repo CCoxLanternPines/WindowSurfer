@@ -48,41 +48,31 @@
         "minnow": {
           "window_size": "1d",
           "buy_trigger_position": 0.1,
-          "reset_buy_percent": 0.3,
+          "reset_buy_percent": 0.15,
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.01,
-          "window_transform_multiplier": 2.0,
+          "investment_fraction": 0.15,
+          "window_transform_multiplier": 1,
           "max_open_notes": 100
         },
         "fish": {
-          "window_size": "5d",
+          "window_size": "3d",
           "buy_trigger_position": 0.1,
-          "reset_buy_percent": 0.3,
+          "reset_buy_percent": 0.15,
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.01,
-          "window_transform_multiplier": 2.0,
-          "max_open_notes": 100
-        },
-        "shark": {
-          "window_size": "10d",
-          "buy_trigger_position": 0.1,
-          "reset_buy_percent": 0.3,
-          "maturity_position": 1.0,
-          "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.01,
-          "window_transform_multiplier": 2.0,
+          "investment_fraction": 0.2,
+          "window_transform_multiplier": 2,
           "max_open_notes": 100
         },
         "whale": {
-          "window_size": "30d",
+          "window_size": "6d",
           "buy_trigger_position": 0.1,
-          "reset_buy_percent": 0.3,
+          "reset_buy_percent": 0.15,
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.01,
-          "window_transform_multiplier": 2.0,
+          "investment_fraction": 0.15,
+          "window_transform_multiplier": 5,
           "max_open_notes": 100
         }
       }

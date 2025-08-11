@@ -1,0 +1,65 @@
+{
+  "windows": [
+    {
+      "window": "minnow",
+      "window_size": "1d",
+      "buys": 329,
+      "sells": 310,
+      "gross_invested": 6143.706220736132,
+      "realized_cost": 5657.02372325541,
+      "realized_proceeds": 6061.224050806831,
+      "realized_pnl": 404.20032755142074,
+      "realized_roi": 0.0714510575392846,
+      "avg_trade_roi": 0.06954556828760904,
+      "open_value_now": 374.728037762696,
+      "window_total_at_liq": 6435.9520885695265
+    },
+    {
+      "window": "fish",
+      "window_size": "5d",
+      "buys": 82,
+      "sells": 76,
+      "gross_invested": 1490.2984061755521,
+      "realized_cost": 1341.1317813485493,
+      "realized_proceeds": 1527.0492135745455,
+      "realized_pnl": 185.9174322259962,
+      "realized_roi": 0.13862726602381348,
+      "avg_trade_roi": 0.13733129936657007,
+      "open_value_now": 117.01004404662376,
+      "window_total_at_liq": 1644.0592576211693
+    },
+    {
+      "window": "shark",
+      "window_size": "10d",
+      "buys": 42,
+      "sells": 38,
+      "gross_invested": 750.6069239775626,
+      "realized_cost": 655.1677098441724,
+      "realized_proceeds": 781.7326919704687,
+      "realized_pnl": 126.5649821262964,
+      "realized_roi": 0.1931795175870299,
+      "avg_trade_roi": 0.19224265129940407,
+      "open_value_now": 75.62018177914489,
+      "window_total_at_liq": 857.3528737496137
+    },
+    {
+      "window": "whale",
+      "window_size": "30d",
+      "buys": 19,
+      "sells": 17,
+      "gross_invested": 314.62180018755754,
+      "realized_cost": 275.60885816599006,
+      "realized_proceeds": 358.39201684549164,
+      "realized_pnl": 82.78315867950158,
+      "realized_roi": 0.3003646516674876,
+      "avg_trade_roi": 0.30268745645960776,
+      "open_value_now": 39.90365967905217,
+      "window_total_at_liq": 398.2956765245438
+    }
+  ],
+  "global": {
+    "cash": 1029.1646221205413,
+    "open_value_now": 607.2619232675167,
+    "total_at_liq": 1636.426545388058
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "windows": [
+    {
+      "window": "minnow",
+      "window_size": "1d",
+      "buys": 150,
+      "sells": 133,
+      "gross_invested": 18460.850496945262,
+      "realized_cost": 15825.382469316068,
+      "realized_proceeds": 17388.746696791455,
+      "realized_pnl": 1563.3642274753875,
+      "realized_roi": 0.09878840088109109,
+      "avg_trade_roi": 0.08647942099096037,
+      "open_value_now": 1754.8904481649417,
+      "window_total_at_liq": 19143.637144956396
+    },
+    {
+      "window": "fish",
+      "window_size": "3d",
+      "buys": 62,
+      "sells": 57,
+      "gross_invested": 7409.377450767979,
+      "realized_cost": 6578.75800767778,
+      "realized_proceeds": 7531.422580967022,
+      "realized_pnl": 952.6645732892421,
+      "realized_roi": 0.14480918315849722,
+      "avg_trade_roi": 0.12780638303082492,
+      "open_value_now": 574.1340766517125,
+      "window_total_at_liq": 8105.556657618735
+    },
+    {
+      "window": "shark",
+      "window_size": "6d",
+      "buys": 28,
+      "sells": 25,
+      "gross_invested": 1242.1624103594963,
+      "realized_cost": 1025.7680839365114,
+      "realized_proceeds": 1179.1937993897482,
+      "realized_pnl": 153.42571545323676,
+      "realized_roi": 0.149571543369186,
+      "avg_trade_roi": 0.14674544305557605,
+      "open_value_now": 153.0845596420144,
+      "window_total_at_liq": 1332.2783590317626
+    },
+    {
+      "window": "whale",
+      "window_size": "3w",
+      "buys": 15,
+      "sells": 13,
+      "gross_invested": 543.5357404971521,
+      "realized_cost": 513.2177639216181,
+      "realized_proceeds": 573.6168832454023,
+      "realized_pnl": 60.399119323784134,
+      "realized_roi": 0.11768711757414674,
+      "avg_trade_roi": 0.19650779619415853,
+      "open_value_now": 27.745812416865334,
+      "window_total_at_liq": 601.3626956622676
+    }
+  ],
+  "global": {
+    "cash": 17.053861823737876,
+    "open_value_now": 2509.854896875534,
+    "total_at_liq": 2526.908758699272
+  }
+}
