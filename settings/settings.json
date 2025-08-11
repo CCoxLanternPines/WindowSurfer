@@ -1,11 +1,8 @@
 {
   "ledger_settings": {
     "Kris_Ledger": {
-      "tag": "DOGEUSD",
-      "wallet_code": "XXDG",
-      "kraken_name": "DOGE/USD",
-      "kraken_pair": "XXDGZUSD",
-      "binance_name": "DOGEUSDT",
+      "coin": "DOGE",
+      "fiat": "USD",
       "window_settings": {
         "minnow": {
           "window_size": "1d",
@@ -40,11 +37,8 @@
       }
     },
     "Travis_Ledger": {
-      "tag": "SOLUSDC",
-      "wallet_code": "SOL.F",
-      "kraken_name": "SOL/USDC",
-      "kraken_pair": "SOLUSDC",
-      "binance_name": "SOLUSDC",
+      "coin": "SOL",
+      "fiat": "USDC",
       "window_settings": {
         "mouse": {
           "window_size": "1d",
