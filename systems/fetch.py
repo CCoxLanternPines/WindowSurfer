@@ -41,6 +41,12 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Refresh exchange pair cache before running",
     )
+    parser.add_argument(
+        "--source",
+        choices=["auto", "binance", "kraken"],
+        default="auto",
+        help="Where to fetch OHLC: auto (default), binance, or kraken",
+    )
     args = parser.parse_args(argv)
     if not args.ledger:
         parser.error("--ledger is required")
@@ -50,6 +56,7 @@ def main(argv: list[str] | None = None) -> None:
         relative_window=args.time if args.time else "48h",
         verbose=args.verbose,
         refresh_cache=args.cache,
+        source=args.source,
     )
 
 
@@ -58,6 +65,7 @@ def fetch_missing_candles(
     relative_window: str = "48h",
     verbose: int = 1,
     refresh_cache: bool = False,
+    source: str = "auto",
 ) -> None:
     from systems.utils.resolve_symbol import (
         refresh_pair_cache,
@@ -83,7 +91,7 @@ def fetch_missing_candles(
         market_label = kraken_symbol
 
     addlog(
-        f"[FETCH][LEDGER={ledger}] pair={market_label} kraken={kraken_symbol} binance={binance_symbol} window={relative_window}",
+        f"[FETCH][LEDGER={ledger}] pair={market_label} source={source} window={relative_window}",
         verbose_int=1,
         verbose_state=verbose,
     )
@@ -112,21 +120,64 @@ def fetch_missing_candles(
     added_binance = 0
     added_kraken = 0
     kraken_limited = False
-
     for gap_start, gap_end in gaps:
         diff_hours = int((gap_end - gap_start) // 3600) + 1
         iso = lambda ts: datetime.utcfromtimestamp(ts).isoformat()
-        if diff_hours <= 720:
+
+        if source == "binance":
             addlog(
-                f"[FETCH] Kraken {kraken_symbol} {iso(gap_start)} → {iso(gap_end)}",
+                f"[FETCH][Binance] {binance_symbol} {iso(gap_start)} → {iso(gap_end)}",
                 verbose_int=2,
                 verbose_state=verbose,
             )
             try:
-                df = fetch_range("kraken", kraken_symbol, gap_start, gap_end)
-                if not df.empty:
-                    new_frames.append(df)
-                    added_kraken += len(df)
+                df_b = fetch_range("binance", binance_symbol, gap_start, gap_end)
+                if not df_b.empty:
+                    new_frames.append(df_b)
+                    added_binance += len(df_b)
+            except Exception as e:
+                addlog(
+                    f"[WARN] Binance fetch error: {e}",
+                    verbose_int=2,
+                    verbose_state=verbose,
+                )
+            continue
+
+        if source == "kraken":
+            seg_start = gap_start
+            while seg_start <= gap_end:
+                seg_end = min(seg_start + 720 * 3600, gap_end)
+                addlog(
+                    f"[FETCH][Kraken ] {kraken_symbol} {iso(seg_start)} → {iso(seg_end)}",
+                    verbose_int=2,
+                    verbose_state=verbose,
+                )
+                try:
+                    df_k = fetch_range("kraken", kraken_symbol, seg_start, seg_end)
+                    if not df_k.empty:
+                        new_frames.append(df_k)
+                        added_kraken += len(df_k)
+                except Exception as e:
+                    addlog(
+                        f"[WARN] Kraken fetch error: {e}",
+                        verbose_int=2,
+                        verbose_state=verbose,
+                    )
+                seg_start = seg_end + 3600
+            continue
+
+        # source == "auto"
+        if diff_hours <= 720:
+            addlog(
+                f"[FETCH][Kraken ] {kraken_symbol} {iso(gap_start)} → {iso(gap_end)}",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
+            try:
+                df_k = fetch_range("kraken", kraken_symbol, gap_start, gap_end)
+                if not df_k.empty:
+                    new_frames.append(df_k)
+                    added_kraken += len(df_k)
             except Exception as e:
                 addlog(
                     f"[WARN] Kraken fetch error: {e}",
@@ -136,7 +187,7 @@ def fetch_missing_candles(
         else:
             kraken_end = gap_start + 720 * 3600
             addlog(
-                f"[FETCH] Kraken {kraken_symbol} {iso(gap_start)} → {iso(kraken_end)}",
+                f"[FETCH][Kraken ] {kraken_symbol} {iso(gap_start)} → {iso(kraken_end)}",
                 verbose_int=2,
                 verbose_state=verbose,
             )
@@ -154,7 +205,7 @@ def fetch_missing_candles(
                 )
             binance_start = kraken_end + 3600
             addlog(
-                f"[FETCH] Binance {binance_symbol} {iso(binance_start)} → {iso(gap_end)}",
+                f"[FETCH][Binance] {binance_symbol} {iso(binance_start)} → {iso(gap_end)}",
                 verbose_int=2,
                 verbose_state=verbose,
             )

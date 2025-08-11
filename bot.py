@@ -43,6 +43,12 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Refresh exchange pair cache before running",
     )
+    parser.add_argument(
+        "--source",
+        choices=["auto", "binance", "kraken"],
+        default="auto",
+        help="Where to fetch OHLC: auto (default), binance, or kraken",
+    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -152,6 +158,7 @@ def main(argv: list[str] | None = None) -> None:
                 relative_window=time_window,
                 verbose=args.verbose,
                 refresh_cache=args.cache,
+                source=args.source,
             )
         except Exception as e:
             addlog(f"[ERROR] Fetch failed: {e}", verbose_int=1, verbose_state=True)
