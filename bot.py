@@ -20,6 +20,21 @@ def main(argv: list[str] | None = None) -> None:
             action.choices = list(action.choices) + ["fetch"]
             break
     parser.add_argument("--time", required=False, help="Time window (e.g. 120h)")
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Perform a paper buy+sell if no actions occur (dry live mode)",
+    )
+    parser.add_argument(
+        "--smoke-save",
+        action="store_true",
+        help="Persist smoke ledger to data/tmp/",
+    )
+    parser.add_argument(
+        "--replay-hours",
+        type=int,
+        help="After dry tick, replay the last N hours in sim mode",
+    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -93,6 +108,9 @@ def main(argv: list[str] | None = None) -> None:
         run_live(
             dry=args.dry,
             verbose=args.verbose,
+            smoke=args.smoke,
+            smoke_save=args.smoke_save,
+            replay_hours=args.replay_hours,
         )
     elif mode == "fetch":
         if not args.ledger:
