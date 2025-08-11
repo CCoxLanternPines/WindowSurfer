@@ -355,6 +355,7 @@ def handle_top_of_hour(
                 )
                 note_counts[win.title()] = (open_n, closed_n)
             report = format_top_of_hour_report(
+                ledger_name,
                 tag,
                 datetime.utcnow(),
                 usd_balance,

@@ -53,8 +53,18 @@ def send_top_hour_report(
 
     usd_balance = float(balance.get(fiat_code, 0.0))
     coin_balance = float(balance.get(wallet_code, 0.0))
-    pair_code = tag
+    pair_code = ledger_cfg.get("kraken_pair") or tag
     price = _get_latest_price(trades, pair_code)
+    if price == 0.0:
+        alt_pair = ledger_cfg.get("kraken_name")
+        if alt_pair:
+            price = _get_latest_price(trades, alt_pair)
+        if price == 0.0:
+            addlog(
+                f"[WARN] Price for {ledger_name} {pair_code} not found; balances only",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
     coin_value = coin_balance * price
     total_value = usd_balance + coin_value
 

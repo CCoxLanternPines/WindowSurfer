@@ -5,6 +5,7 @@ from typing import Dict, Tuple
 
 
 def format_top_of_hour_report(
+    ledger_name: str,
     symbol: str,
     ts: datetime,
     usd_balance: float,
@@ -35,6 +36,6 @@ def format_top_of_hour_report(
     hour_str = ts.strftime("%I:%M%p")
 
     return (
-        f"[My Ledger] {hour_str} | {symbol} | 💰${total_liquid_value:.2f} | "
+        f"[{ledger_name}] {hour_str} | {symbol} | 💰${total_liquid_value:.2f} | "
         f"💵${usd_balance:.2f} | 🪙${coin_balance_usd:.2f} | {trigger_str} | Notes: {notes_str}"
     )
