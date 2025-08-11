@@ -7,6 +7,7 @@ import pandas as pd
 import ccxt
 
 from systems.utils.config import resolve_path
+from systems.utils.addlog import addlog
 
 COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
 
@@ -55,10 +56,17 @@ def _merge_and_save(path: Path, existing: pd.DataFrame, new_frames: List[pd.Data
 
 
 def get_raw_path(tag: str, ext: str = "csv") -> Path:
-    """Return the full path to the raw-data file for a given tag."""
+    """Return the full path to the raw-data file for a given tag.
 
-    root = find_project_root()
-    return root / "data" / "raw" / f"{tag}.{ext}"
+    Ensures the raw data directory exists and logs the resolved paths.
+    """
+
+    root = resolve_path("")
+    raw_dir = root / "data" / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    out_path = raw_dir / f"{tag}.{ext}"
+    addlog(f"[FETCH][PATH] root={root} out={out_path}", verbose_state=True)
+    return out_path
 
 
 def compute_missing_ranges(
