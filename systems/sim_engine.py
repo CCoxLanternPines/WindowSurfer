@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
 
+import builtins
 import pandas as pd
 
 from .scripts.config_loader import load_runtime_config
@@ -48,7 +49,7 @@ def run(
     ledger_name: str,
     *,
     start: Optional[str] = None,
-    range: Optional[str] = None,
+    range_span: Optional[str] = None,
 ) -> Dict[str, float]:
     """Run a historical backtest for ``ledger_name``.
 
@@ -56,7 +57,7 @@ def run(
     ----------
     ledger_name:
         Name of the ledger configuration to load.
-    start, range:
+    start, range_span:
         Optional timespan expressions passed to
         :func:`load_candle_history` to window the data.
 
@@ -73,13 +74,13 @@ def run(
     coins = list(cfg.get("coins", {}).keys())
     history: Dict[str, pd.DataFrame] = {}
     for sym in coins:
-        history[sym] = load_candle_history(sym, start, range)
+        history[sym] = load_candle_history(sym, start, range_span)
 
     min_len = min((len(df) for df in history.values()), default=0)
     last_prices: Dict[str, float] = {sym: 0.0 for sym in coins}
 
     try:
-        for idx in range(min_len):
+        for idx in builtins.range(min_len):
             prices: Dict[str, float] = {}
             ts = None
             for sym, df in history.items():

@@ -112,7 +112,7 @@ def main() -> None:
     if args.mode == "sim":
         from systems.sim_engine import run as run_sim
 
-        run_sim(args.ledger, start=args.start, range=args.range)
+        run_sim(args.ledger, start=args.start, range_span=args.range)
     elif args.mode == "live":
         from systems.live_engine import run as run_live
 
