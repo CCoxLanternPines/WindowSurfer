@@ -66,10 +66,12 @@ def _merge_and_save(path: Path, existing: pd.DataFrame, new_frames: List[pd.Data
     return len(combined)
 
 
-def get_raw_path(tag: str, ext: str = "csv") -> Path:
-    """Return the full path to the raw-data file for a given tag."""
+def get_raw_path_for_coin(coin: str, ext: str = "csv") -> Path:
+    """Return the full path to the raw-data file for a given coin."""
     root = resolve_path("")
-    return root / "data" / "raw" / f"{tag}.{ext}"
+    raw_dir = root / "data" / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    return raw_dir / f"{coin.strip().upper()}.{ext}"
 
 
 def compute_missing_ranges(
