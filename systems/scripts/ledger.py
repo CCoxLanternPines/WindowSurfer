@@ -18,7 +18,19 @@ class Ledger:
 
     # Basic note management -------------------------------------------------
     def open_note(self, note: Dict) -> None:
-        """Register a newly opened note."""
+        """Register a newly opened note.
+
+        Notes may contain additional metadata such as:
+
+        ``p_buy``            – window position at entry
+        ``unlock_p``         – bounce threshold to re-enable buys
+        ``target_price``     – price at which the note should be sold
+        ``target_roi``       – expected ROI at target price
+        ``created_idx/ts``   – creation index or timestamp
+
+        These fields are stored verbatim and are not interpreted by the
+        ledger itself but are useful for downstream analysis and evaluation.
+        """
         self.open_notes.append(note)
 
     def close_note(self, note: Dict) -> None:
