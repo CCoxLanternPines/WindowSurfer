@@ -39,7 +39,7 @@ class Tunnel:
         self.buy_reset_triggered = False
 
     # ------------------------------------------------------------------
-    def update_window(self, price: float) -> None:
+    def update_window(self, price: float, debug: bool = False) -> None:
         self.prices.append(price)
         if len(self.prices) == 0:
             return
@@ -60,6 +60,10 @@ class Tunnel:
             if self.current_position <= self.buy_trigger_position:
                 self.can_buy = True
                 self.buy_reset_triggered = False
+                if debug:
+                    logger.debug(
+                        f"[COOLDOWN] {self.symbol}/{self.tunnel_id} buy unlocked at pos={self.current_position:.3f}"
+                    )
 
     # ------------------------------------------------------------------
     def calc_wtf_multiplier(self) -> float:
@@ -73,21 +77,45 @@ class Tunnel:
 
     # ------------------------------------------------------------------
     def check_buy_opportunity(self, price: float, debug: bool = False) -> float:
+        pos_str = f"{self.current_position:.3f}" if self.current_position is not None else "nan"
+        wtf_mult = self.calc_wtf_multiplier()
         if debug:
             logger.debug(
-                f"[BUYCHK] {self.symbol}/{self.tunnel_id} pos={self.current_position:.3f} "
+                f"[BUYCHK] {self.symbol}/{self.tunnel_id} pos={pos_str} "
                 f"buy_trig={self.buy_trigger_position:.3f} can_buy={self.can_buy} "
-                f"reset={self.buy_reset_triggered} wtf_mult={self.calc_wtf_multiplier():.2f}"
+                f"reset={self.buy_reset_triggered} wtf_mult={wtf_mult:.2f}"
             )
         if self.current_position is None:
+            if debug:
+                logger.debug(
+                    f"[BUYCHK] Skip — position undefined for {self.symbol}/{self.tunnel_id}"
+                )
             return 0.0
-        if self.can_buy and self.current_position <= self.buy_trigger_position:
-            qty = self.base_bet_fraction * self.calc_wtf_multiplier()
+        if not self.can_buy:
+            if debug:
+                logger.debug(
+                    f"[BUYCHK] Skip — cooldown active for {self.symbol}/{self.tunnel_id}"
+                )
+            return 0.0
+        if self.current_position > self.buy_trigger_position:
+            if debug:
+                logger.debug(
+                    f"[BUYCHK] Skip — above buy trigger for {self.symbol}/{self.tunnel_id}"
+                )
+            return 0.0
+        qty = self.base_bet_fraction * wtf_mult
+        if qty > 0:
+            cost = qty * price
+            if debug:
+                logger.debug(
+                    f"[BUY] {self.symbol}/{self.tunnel_id} qty={qty:.6f} cost={cost:.2f} "
+                    f"available_capital_check_passed"
+                )
             self.can_buy = False
             return qty
-        if debug and not self.can_buy:
+        if debug:
             logger.debug(
-                f"[BUYCHK] Skipped — cooldown active for {self.symbol}/{self.tunnel_id}"
+                f"[BUYCHK] Skip — qty below min order for {self.symbol}/{self.tunnel_id}"
             )
         return 0.0
 
@@ -95,9 +123,10 @@ class Tunnel:
     def check_sell_opportunities(self, notes: List, price: float, debug: bool = False) -> List[Dict]:
         if self.current_position is None:
             return []
+        pos_str = f"{self.current_position:.3f}"
         if debug:
             logger.debug(
-                f"[SELLCHK] {self.symbol}/{self.tunnel_id} pos={self.current_position:.3f} "
+                f"[SELLCHK] {self.symbol}/{self.tunnel_id} pos={pos_str} "
                 f"maturity_mult={self.sell_maturity_multiplier:.3f} min_roi={self.min_roi:.3f}"
             )
         sells: List[Dict] = []
@@ -111,10 +140,25 @@ class Tunnel:
                     note.maturity_price - note.buy_price
                 ) * self.partial_sell_midpoint
                 if price >= midpoint:
-                    sells.append({"note_idx": idx, "qty": note.qty / 2, "partial": True})
+                    sell_qty = note.qty / 2
+                    sells.append({"note_idx": idx, "qty": sell_qty, "partial": True})
+                    if debug:
+                        roi = (price - note.buy_price) / note.buy_price
+                        logger.debug(
+                            f"[SELL] {self.symbol}/{self.tunnel_id} qty={sell_qty:.6f} at price={price:.2f} roi={roi:.3f}"
+                        )
                     continue
             maturity_price = note.maturity_price * self.sell_maturity_multiplier
             roi = (price - note.buy_price) / note.buy_price
             if price >= maturity_price and roi >= self.min_roi:
-                sells.append({"note_idx": idx, "qty": note.qty, "partial": False})
+                sell_qty = note.qty
+                sells.append({"note_idx": idx, "qty": sell_qty, "partial": False})
+                if debug:
+                    logger.debug(
+                        f"[SELL] {self.symbol}/{self.tunnel_id} qty={sell_qty:.6f} at price={price:.2f} roi={roi:.3f}"
+                    )
+            elif debug:
+                logger.debug(
+                    f"[SELLCHK] Skip — below ROI/maturity for {self.symbol}/{self.tunnel_id}"
+                )
         return sells
