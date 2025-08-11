@@ -81,7 +81,27 @@ def evaluate_buy(
     base = cfg.get("investment_fraction", 0.0)
     mult = 1 + (1 - p) * (cfg.get("window_transform_multiplier", 1.0) - 1)
     size_usd = capital * base * mult
-    sz_pct = base * mult * 100
+
+    limits = runtime_state.get("limits", {})
+    min_sz = float(limits.get("min_note_size", 0.0))
+    max_sz = float(limits.get("max_note_usdt", float("inf")))
+    raw = size_usd
+    size_usd = min(size_usd, capital, max_sz)
+    if raw != size_usd:
+        addlog(
+            f"[CLAMP] size=${raw:.2f} → ${size_usd:.2f} (cap=${capital:.2f}, max=${max_sz:.2f})",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+    if size_usd < min_sz:
+        addlog(
+            f"[SKIP][{window_name} {cfg['window_size']}] size=${size_usd:.2f} < min=${min_sz:.2f}",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+        return False
+
+    sz_pct = (size_usd / capital * 100) if capital else 0.0
 
     addlog(
         f"[BUY][{window_name} {cfg['window_size']}] p={p:.3f}, base={base*100:.2f}%, mult={mult:.2f}x → size={sz_pct:.2f}% (cap=${size_usd:.2f})",

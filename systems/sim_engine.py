@@ -27,10 +27,16 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     df = fetch_candles(tag)
     total = len(df)
 
+    general = settings.get("general_settings", {})
+    limits = {
+        "min_note_size": float(general.get("minimum_note_size", 0.0)),
+        "max_note_usdt": float(general.get("max_note_usdt", float("inf"))),
+    }
     runtime_state = {
         "capital": float(settings.get("simulation_capital", 0.0)),
         "buy_unlock_p": {},
         "verbose": verbose,
+        "limits": limits,
     }
 
     ledger_obj = Ledger()
@@ -83,6 +89,13 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                     note["created_ts"] = buy_res["created_ts"]
                 ledger_obj.open_note(note)
                 runtime_state["capital"] -= size_usd
+                if runtime_state["capital"] < -1e-9:
+                    addlog(
+                        f"[BUG] capital negative after buy: ${runtime_state['capital']:.2f}",
+                        verbose_int=1,
+                        verbose_state=verbose,
+                    )
+                    runtime_state["capital"] = 0.0
                 runtime_state["buy_unlock_p"][window_name] = buy_res["unlock_p"]
 
                 m_buy = win_metrics.get(window_name)

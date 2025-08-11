@@ -33,6 +33,7 @@ def evaluate_sell(
         for n in open_notes
         if n.get("window_name") == window_name
         and price >= n.get("target_price", float("inf"))
+        and price >= n.get("entry_price", float("inf"))
     ]
 
     if not candidates:
