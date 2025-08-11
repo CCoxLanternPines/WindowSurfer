@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from systems.utils.addlog import addlog
 
@@ -54,8 +54,32 @@ def load_settings(*, reload: bool = False) -> Dict[str, Any]:
     if _SETTINGS_CACHE is None or reload:
         settings_path = resolve_path("settings/settings.json")
         with settings_path.open("r", encoding="utf-8") as fh:
-            _SETTINGS_CACHE = json.load(fh)
+            raw = fh.read()
+
+        dup_flag = False
+
+        def _convert(obj: Any, path: List[str]) -> Any:
+            nonlocal dup_flag
+            if isinstance(obj, list):
+                d: Dict[str, Any] = {}
+                seen: List[str] = []
+                for k, v in obj:
+                    if k in d and path and path[-1] == "window_settings":
+                        dup_flag = True
+                    seen.append(k)
+                    d[k] = _convert(v, path + [k])
+                return d
+            return obj
+
+        parsed = json.loads(raw, object_pairs_hook=list)
+        _SETTINGS_CACHE = _convert(parsed, [])
         _warn_deprecated(_SETTINGS_CACHE)
+        if dup_flag:
+            addlog(
+                "[WARN] window_settings contains duplicate keys; only the last occurrence is kept by JSON. Ensure unique names (e.g., minnow, fish, dolphin, whale).",
+                verbose_int=1,
+                verbose_state=True,
+            )
     return _SETTINGS_CACHE
 
 

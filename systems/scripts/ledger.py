@@ -26,6 +26,8 @@ class Ledger:
         ``unlock_p``         – bounce threshold to re-enable buys
         ``target_price``     – price at which the note should be sold
         ``target_roi``       – expected ROI at target price
+        ``window_name``      – name of the window configuration
+        ``window_size``      – size of the evaluation window
         ``created_idx/ts``   – creation index or timestamp
 
         These fields are stored verbatim and are not interpreted by the
