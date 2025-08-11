@@ -66,7 +66,7 @@ def run(
         Summary statistics containing final capital, ROI and PnL.
     """
 
-    cfg = load_runtime_config(ledger_name)
+    cfg = load_runtime_config(ledger_name, runtime_mode="sim")
     capital = float(cfg.get("capital", 0.0))
     manager = TunnelManager(cfg, capital)
 

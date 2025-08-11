@@ -6,9 +6,6 @@ import argparse
 import logging
 import re
 import sys
-from pathlib import Path
-
-from systems.scripts.path_utils import ledger_settings_path
 from typing import Optional
 
 from systems.scripts.config_loader import load_runtime_config
@@ -44,21 +41,6 @@ def _setup_logging(verbosity: int) -> None:
     logging.basicConfig(level=level, format="%(message)s")
 
 
-def _load_coin_list(ledger_name: str) -> tuple[list[str], str]:
-    """Return list of coin symbols and fiat currency for ``ledger_name``."""
-
-    path = ledger_settings_path(ledger_name)
-    if not path.exists():
-        raise FileNotFoundError(f"ledger settings not found: {path}")
-    import json
-
-    with open(path, "r", encoding="utf-8") as fh:
-        cfg = json.load(fh)
-    fiat = cfg.get("fiat", "USD")
-    coins = list(cfg.get("coins", {}).keys())
-    return coins, fiat
-
-
 def run_fetch(
     ledger_name: Optional[str],
     *,
@@ -67,12 +49,12 @@ def run_fetch(
     wallet_cache: bool = False,
 ) -> None:
     """Run fetch operations based on provided flags."""
-
     from systems.scripts.fetch_core import (
         build_wallet_cache,
         fetch_full_history,
         fetch_update_history,
     )
+    from systems.scripts.config_loader import load_runtime_config
 
     if wallet_cache:
         build_wallet_cache()
@@ -83,12 +65,19 @@ def run_fetch(
     if not ledger_name:
         raise ValueError("--ledger is required when using --full or --update")
 
-    coins, fiat = _load_coin_list(ledger_name)
-    for symbol in coins:
+    cfg = load_runtime_config(ledger_name, runtime_mode="fetch")
+    fiat = cfg.get("fiat", "USD")
+    coins_cfg = cfg.get("coins", {})
+    for symbol in coins_cfg.keys():
         if full:
-            fetch_full_history(symbol, fiat)
+            df = fetch_full_history(symbol, fiat)
+            print(f"[FETCH] {symbol}: fetched {len(df)} candles from Binance")
         if update:
             fetch_update_history(symbol, fiat)
+    if full:
+        coin_list = ", ".join(coins_cfg.keys())
+        print(f"[FETCH] Full history fetch complete for ledger '{ledger_name}' ✅")
+        print(f"[FETCH] Coins fetched: {coin_list}")
 
 
 def main() -> None:

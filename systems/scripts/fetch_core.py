@@ -35,8 +35,11 @@ def _resolve_pair(cache: Dict[str, dict], symbol: str, fiat: str) -> str:
     raise ValueError(f"pair for {symbol}/{fiat} not found in wallet cache")
 
 
-def fetch_full_history(symbol: str, fiat: str) -> None:
-    """Fetch full 1h candle history from Binance and store to Parquet."""
+def fetch_full_history(symbol: str, fiat: str) -> pd.DataFrame:
+    """Fetch full 1h candle history from Binance and store to Parquet.
+
+    Returns the fetched DataFrame for optional downstream debugging.
+    """
     markets = _load_market_cache("binance")
     pair = _resolve_pair(markets, symbol, fiat)
     exchange = ccxt.binance({"enableRateLimit": True})
@@ -57,6 +60,8 @@ def fetch_full_history(symbol: str, fiat: str) -> None:
 
     DATA_RAW.mkdir(parents=True, exist_ok=True)
     df.to_parquet(DATA_RAW / f"{symbol.upper()}.parquet", index=False)
+
+    return df
 
 
 def fetch_update_history(symbol: str, fiat: str) -> None:

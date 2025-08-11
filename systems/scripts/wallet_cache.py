@@ -16,6 +16,12 @@ _BINANCE_CACHE: Dict[str, Any] | None = None
 _KRAKEN_CACHE: Dict[str, Any] | None = None
 
 
+FIAT_ALIASES_KRAKEN = {
+    "USDC": "USD",
+    "XBT": "BTC",  # Kraken uses XBT for BTC
+}
+
+
 def _cache_path(exchange: str) -> str:
     """Return the cache file path for the given exchange."""
     base = os.path.join("data", "meta")
@@ -53,66 +59,60 @@ def load_wallet_cache() -> Dict[str, Dict[str, Any]]:
     return {"binance": _BINANCE_CACHE, "kraken": _KRAKEN_CACHE}
 
 
-def _lookup(cache: Dict[str, Any], symbol: str, fiat: str) -> Dict[str, Any]:
-    """Helper to safely extract pair information from a cache."""
-    symbol = symbol.upper()
-    fiat = fiat.upper()
-    return cache.get(symbol, {}).get(fiat, {})
-
-
 def resolve_pairs(symbol: str, fiat: str) -> Dict[str, str]:
     """Resolve trading pairs for Binance and Kraken.
 
-    Parameters
-    ----------
-    symbol: str
-        Asset symbol, e.g. ``"SOL"``.
-    fiat: str
-        Fiat symbol, e.g. ``"USDC"``.
-
-    Returns
-    -------
-    dict
-        Mapping containing ``binance`` and ``kraken`` pair identifiers.
+    Performs basic fiat alias substitution for Kraken so that ledger coins
+    denominated in USDC resolve to USD markets and handles other common
+    aliases.
     """
     caches = load_wallet_cache()
-    binance_info = _lookup(caches["binance"], symbol, fiat)
-    kraken_info = _lookup(caches["kraken"], symbol, fiat)
+    binance_cache = caches["binance"]
+    kraken_cache = caches["kraken"]
 
-    if not binance_info or not kraken_info:
-        raise ValueError(f"Pair {symbol}/{fiat} not found in wallet cache")
+    symbol = symbol.upper()
+    fiat = fiat.upper()
 
-    return {
-        "binance": binance_info.get("pair"),
-        "kraken": kraken_info.get("pair"),
-    }
+    kraken_fiat = FIAT_ALIASES_KRAKEN.get(fiat, fiat)
+    kraken_key = f"{symbol}/{kraken_fiat}"
+    if kraken_key not in kraken_cache:
+        raise ValueError(
+            f"Pair {symbol}/{fiat} (mapped to {kraken_key}) not found in Kraken wallet cache"
+        )
+
+    binance_key = f"{symbol}/{fiat}"
+    if binance_key not in binance_cache:
+        raise ValueError(f"Pair {symbol}/{fiat} not found in Binance wallet cache")
+
+    return {"binance": binance_key, "kraken": kraken_key}
 
 
 def get_exchange_precision(symbol: str, fiat: str, exchange: str) -> Dict[str, Any]:
-    """Return precision and minimum order details from the wallet cache.
-
-    Parameters
-    ----------
-    symbol: str
-        Asset symbol, e.g. ``"SOL"``.
-    fiat: str
-        Fiat symbol, e.g. ``"USDC"``.
-    exchange: str
-        ``"binance"`` or ``"kraken"``.
-    """
+    """Return precision and minimum order details from the wallet cache."""
     exchange = exchange.lower()
     caches = load_wallet_cache()
     if exchange not in caches:
         raise ValueError(f"Unsupported exchange: {exchange}")
 
-    info = _lookup(caches[exchange], symbol, fiat)
+    symbol = symbol.upper()
+    fiat = fiat.upper()
+
+    if exchange == "kraken":
+        fiat = FIAT_ALIASES_KRAKEN.get(fiat, fiat)
+        pair = f"{symbol}/{fiat}"
+    else:
+        pair = f"{symbol}/{fiat}"
+
+    info = caches[exchange].get(pair, {})
     if not info:
         raise ValueError(f"Pair {symbol}/{fiat} not found for {exchange}")
 
+    limits = info.get("limits", {})
+    precision = info.get("precision", {})
     return {
-        "min_order_fiat": info.get("min_order_fiat"),
-        "min_order_coin": info.get("min_order_coin"),
-        "price_precision": info.get("price_precision"),
-        "quantity_precision": info.get("quantity_precision"),
+        "min_order_fiat": limits.get("cost", {}).get("min"),
+        "min_order_coin": limits.get("amount", {}).get("min"),
+        "price_precision": precision.get("price"),
+        "quantity_precision": precision.get("amount"),
     }
 
