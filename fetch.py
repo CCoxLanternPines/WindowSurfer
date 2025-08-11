@@ -1,23 +1,11 @@
 import argparse
-import json
 
 from systems.scripts.fetch_core import (
     build_wallet_cache,
     fetch_full_history,
     fetch_update_history,
 )
-from systems.scripts.path_utils import ledger_settings_path
-
-
-def _load_ledger(name: str):
-    path = ledger_settings_path(name)
-    if not path.exists():
-        raise FileNotFoundError(f"ledger settings not found: {path}")
-    with open(path, "r", encoding="utf-8") as f:
-        ledger_data = json.load(f)
-    fiat = ledger_data.get("fiat")
-    coins = [{"symbol": sym, "fiat": fiat} for sym in ledger_data["coins"].keys()]
-    return coins
+from systems.scripts.config_loader import load_runtime_config
 
 
 def main() -> None:
@@ -35,14 +23,19 @@ def main() -> None:
         if not args.ledger:
             print("[ERR] --ledger is required for this command and exit.")
             return
-        coins = _load_ledger(args.ledger)
-        for coin in coins:
-            symbol = coin["symbol"]
-            fiat = coin["fiat"]
+        cfg = load_runtime_config(args.ledger, runtime_mode="fetch")
+        fiat = cfg.get("fiat", "USD")
+        coins_cfg = cfg.get("coins", {})
+        for symbol in coins_cfg.keys():
             if args.full:
-                fetch_full_history(symbol, fiat)
+                df = fetch_full_history(symbol, fiat)
+                print(f"[FETCH] {symbol}: fetched {len(df)} candles from Binance")
             if args.update:
                 fetch_update_history(symbol, fiat)
+        if args.full:
+            coin_list = ", ".join(coins_cfg.keys())
+            print(f"[FETCH] Full history fetch complete for ledger '{args.ledger}' ✅")
+            print(f"[FETCH] Coins fetched: {coin_list}")
 
 
 if __name__ == "__main__":

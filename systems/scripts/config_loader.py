@@ -68,11 +68,13 @@ def merge_settings(global_cfg: Dict[str, Any], ledger_cfg: Dict[str, Any]) -> Di
     return merged
 
 
-def load_runtime_config(ledger_name: str) -> Dict[str, Any]:
+def load_runtime_config(ledger_name: str, runtime_mode: str = "sim") -> Dict[str, Any]:
     """Load the merged runtime configuration for ``ledger_name``.
 
     The configuration is enriched with exchange pair information and order
-    precision details for each coin defined in the ledger.
+    precision details for each coin defined in the ledger.  Pair resolution is
+    skipped when running in simulation mode to avoid unnecessary wallet cache
+    lookups.
     """
     global_cfg = load_global_settings()
     ledger_cfg = load_ledger_settings(ledger_name)
@@ -81,14 +83,15 @@ def load_runtime_config(ledger_name: str) -> Dict[str, Any]:
     # Ensure wallet cache is loaded so missing files raise early.
     load_wallet_cache()
 
-    fiat = cfg.get("fiat", "USD")
-    for coin, coin_cfg in cfg.get("coins", {}).items():
-        pairs = resolve_pairs(coin, fiat)
-        binance_info = get_exchange_precision(coin, fiat, "binance")
-        kraken_info = get_exchange_precision(coin, fiat, "kraken")
+    if runtime_mode in ("live", "fetch"):
+        fiat = cfg.get("fiat", "USD")
+        for coin, coin_cfg in cfg.get("coins", {}).items():
+            pairs = resolve_pairs(coin, fiat)
+            binance_info = get_exchange_precision(coin, fiat, "binance")
+            kraken_info = get_exchange_precision(coin, fiat, "kraken")
 
-        coin_cfg["binance"] = {"pair": pairs["binance"], **binance_info}
-        coin_cfg["kraken"] = {"pair": pairs["kraken"], **kraken_info}
+            coin_cfg["binance"] = {"pair": pairs["binance"], **binance_info}
+            coin_cfg["kraken"] = {"pair": pairs["kraken"], **kraken_info}
 
     return cfg
 

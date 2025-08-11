@@ -67,7 +67,7 @@ def _fetch_close(pair: str, retries: int = 3) -> float:
 
 
 def run(ledger_name: str, *, dry_run: bool = False) -> None:
-    cfg = load_runtime_config(ledger_name)
+    cfg = load_runtime_config(ledger_name, runtime_mode="live")
     capital = float(cfg.get("capital", 0.0))
     manager = TunnelManager(cfg, capital)
 
