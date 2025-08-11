@@ -20,7 +20,7 @@ pip install -r requirements.txt
 
 ## Configuration
 - `config/global_settings.yaml`
-- `ledgers/{ledger_name}.json`
+- `ledger/settings/{ledger_name}.json`
 
 Defines coins, per-tunnel settings, and per-ledger trading rules.
 Run `fetch.py --wallet_cache` before the first sim/live run.

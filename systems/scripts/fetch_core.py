@@ -15,6 +15,7 @@ def _load_market_cache(name: str) -> Dict[str, dict]:
     """Load cached market info for an exchange."""
     path = DATA_META / f"{name}_pairs.json"
     if not path.exists():
+        print("Please run: python fetch.py --wallet_cache")
         raise FileNotFoundError(f"wallet cache missing: {path}")
     with open(path, "r", encoding="utf-8") as fh:
         return json.load(fh)
@@ -100,3 +101,10 @@ def build_wallet_cache() -> None:
 
     with open(DATA_META / "kraken_pairs.json", "w", encoding="utf-8") as fh:
         json.dump(kraken_markets, fh, indent=2)
+
+    print(
+        "[FETCH] Wallet cache built successfully → data/meta/ (Binance + Kraken) ✅"
+    )
+    print(
+        f"[FETCH] Binance markets cached: {len(binance_markets)} | Kraken markets cached: {len(kraken_markets)}"
+    )

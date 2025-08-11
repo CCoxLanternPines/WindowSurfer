@@ -1,25 +1,22 @@
 import argparse
 import json
-from pathlib import Path
 
-from systems.scripts.fetch_core import build_wallet_cache, fetch_full_history, fetch_update_history
+from systems.scripts.fetch_core import (
+    build_wallet_cache,
+    fetch_full_history,
+    fetch_update_history,
+)
+from systems.scripts.path_utils import ledger_settings_path
 
 
 def _load_ledger(name: str):
-    path = Path("data/ledgers") / f"{ledger_name}_{mode}.json"
-
+    path = ledger_settings_path(name)
     if not path.exists():
-        raise FileNotFoundError(f"ledger not found: {path}")
-    with open(path, "r", encoding="utf-8") as fh:
-        data = json.load(fh)
-    if isinstance(data, dict):
-        return list(data.items())
-    coins = []
-    for entry in data:
-        symbol = entry.get("symbol")
-        fiat = entry.get("fiat")
-        if symbol and fiat:
-            coins.append((symbol, fiat))
+        raise FileNotFoundError(f"ledger settings not found: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        ledger_data = json.load(f)
+    fiat = ledger_data.get("fiat")
+    coins = [{"symbol": sym, "fiat": fiat} for sym in ledger_data["coins"].keys()]
     return coins
 
 
@@ -36,9 +33,12 @@ def main() -> None:
 
     if args.full or args.update:
         if not args.ledger:
-            parser.error("--ledger is required for full or update fetch")
+            print("[ERR] --ledger is required for this command and exit.")
+            return
         coins = _load_ledger(args.ledger)
-        for symbol, fiat in coins:
+        for coin in coins:
+            symbol = coin["symbol"]
+            fiat = coin["fiat"]
             if args.full:
                 fetch_full_history(symbol, fiat)
             if args.update:

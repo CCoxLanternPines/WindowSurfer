@@ -1,0 +1,41 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env/
+
+# Python cache
+*.pyo
+*.pyd
+
+# Data files (runtime generated)
+data/raw/
+data/meta/
+data/temp/
+data/ledgers/
+
+# Logs
+logs/
+*.log
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Compiled extensions
+*.so
+*.pyd
+
+# Test artifacts
+.coverage
+.pytest_cache/

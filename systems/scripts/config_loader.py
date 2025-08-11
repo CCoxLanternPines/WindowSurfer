@@ -12,6 +12,8 @@ import json
 import os
 from typing import Any, Dict
 
+from systems.scripts.path_utils import ledger_settings_path
+
 try:  # pragma: no cover - optional dependency
     import yaml  # type: ignore
 except Exception:  # pragma: no cover - fallback if PyYAML is unavailable
@@ -31,10 +33,11 @@ def load_global_settings() -> Dict[str, Any]:
 
 
 def load_ledger_settings(ledger_name: str) -> Dict[str, Any]:
-    """Load ``ledgers/{ledger_name}.json`` into a dictionary."""
-    path = os.path.join("ledgers", f"{ledger_name}.json")
-    with open(path, "r", encoding="utf-8") as fh:
-        return json.load(fh)
+    path = ledger_settings_path(ledger_name)
+    if not path.exists():
+        raise FileNotFoundError(f"ledger settings not found: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:

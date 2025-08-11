@@ -7,6 +7,8 @@ import logging
 import re
 import sys
 from pathlib import Path
+
+from systems.scripts.path_utils import ledger_settings_path
 from typing import Optional
 
 from systems.scripts.config_loader import load_runtime_config
@@ -45,9 +47,9 @@ def _setup_logging(verbosity: int) -> None:
 def _load_coin_list(ledger_name: str) -> tuple[list[str], str]:
     """Return list of coin symbols and fiat currency for ``ledger_name``."""
 
-    path = Path("ledgers") / f"{ledger_name}.json"
+    path = ledger_settings_path(ledger_name)
     if not path.exists():
-        raise FileNotFoundError(f"ledger not found: {path}")
+        raise FileNotFoundError(f"ledger settings not found: {path}")
     import json
 
     with open(path, "r", encoding="utf-8") as fh:
