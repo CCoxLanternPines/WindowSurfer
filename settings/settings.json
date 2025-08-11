@@ -38,17 +38,47 @@
         }
       }
     },
-    "Goat Ledger": {
+    "default": {
       "tag": "SOLUSD",
       "wallet_code": "SOL.F",
       "kraken_name": "SOL/USD",
       "kraken_pair": "SOLUSD",
       "binance_name": "SOLUSD",
       "window_settings": {
-        "goat": {
+        "minnow": {
           "window_size": "1d",
-          "buy_trigger_position": 0.10,
-          "reset_buy_percent": 0.30,
+          "buy_trigger_position": 0.1,
+          "reset_buy_percent": 0.3,
+          "maturity_position": 1.0,
+          "max_notes_sell_per_candle": 1,
+          "investment_fraction": 0.01,
+          "window_transform_multiplier": 2.0,
+          "max_open_notes": 100
+        },
+        "fish": {
+          "window_size": "5d",
+          "buy_trigger_position": 0.1,
+          "reset_buy_percent": 0.3,
+          "maturity_position": 1.0,
+          "max_notes_sell_per_candle": 1,
+          "investment_fraction": 0.01,
+          "window_transform_multiplier": 2.0,
+          "max_open_notes": 100
+        },
+        "shark": {
+          "window_size": "10d",
+          "buy_trigger_position": 0.1,
+          "reset_buy_percent": 0.3,
+          "maturity_position": 1.0,
+          "max_notes_sell_per_candle": 1,
+          "investment_fraction": 0.01,
+          "window_transform_multiplier": 2.0,
+          "max_open_notes": 100
+        },
+        "whale": {
+          "window_size": "30d",
+          "buy_trigger_position": 0.1,
+          "reset_buy_percent": 0.3,
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
           "investment_fraction": 0.01,
