@@ -1,86 +1,57 @@
 # WindowSurfer
 
-## Project Overview
-WindowSurfer is a cryptocurrency trading simulator and live trading toolkit. It focuses on pattern-based strategies operating within "tunnel" windows derived from historical candle data. The system can run purely in simulation or attach to live data for parity testing. Strategies include:
+WindowSurfer is a position-based cryptocurrency trading toolkit. It focuses on pattern-driven strategies that act on the relative position of price inside rolling "windows" of historical candles. The system can simulate strategies on past data, tune parameters, run against fresh market data, inspect wallet balances and keep raw candle histories in sync.
 
-- **Knife Catch** – triggers near the tunnel floor when downward momentum stalls.
-- **Whale Catch** – acts on large dips in the lower tunnel region.
-- **Fish Catch** – buys moderately low within the tunnel.
+## Goals
+* Provide reproducible backtesting for window/"tunnel" strategies.
+* Mirror simulation logic in live trading for apples-to-apples comparison.
+* Maintain a ledger of trades ("notes") for later analysis and risk tracking.
 
-Each strategy places and manages trade "notes" that are tracked in a ledger to evaluate overall performance.
+## Modes
+`bot.py` is the command-line entry point. Select behaviour with `--mode`:
 
-## System Architecture
+| Mode | Purpose |
+|------|---------|
+| `sim` | Run a historical backtest using `systems/sim_engine.py`.
+| `simtune` | Optimise strategy parameters with Optuna via `systems/scripts/sim_tuner.py`.
+| `live` | Execute the same logic on fresh data at the top of every hour using `systems/live_engine.py`.
+| `wallet` | Query Kraken for balances of the configured quote asset.
+| `fetch` | Fill gaps in `data/raw/<TAG>.csv` by pulling candles from Kraken and Binance.
 
-``bot.py`` is the command line entrypoint. Depending on ``--mode`` it executes either the simulation or live engine:
-
-- ``systems/sim_engine.py`` – step-by-step simulator using historical candles.
-- ``systems/live_engine.py`` – skeleton for real-time operation.
-
-Decision logic lives under ``systems/decision_logic`` with one module per strategy. Additional support scripts provide data access and evaluations:
-
-- ``systems/scripts/get_candle_data.py`` – load individual candles.
-- ``systems/scripts/get_window_data.py`` – compute tunnel/window metrics.
-- ``systems/scripts/evaluate_buy.py`` – evaluate buy conditions and log notes.
-- ``systems/scripts/evaluate_sell.py`` – check open notes for sell triggers.
-- ``systems/scripts/ledger.py`` – RAM-based ledger for notes and summaries.
-- Utility helpers in ``systems/utils`` for path and time parsing.
-
-## How to Use
-Install dependencies from ``requirements.txt`` (pandas, tqdm, requests,
-krakenex, ccxt and pyyaml) and run ``bot.py`` with arguments:
+Examples:
 
 ```bash
-python bot.py --mode sim --window 1m --verbose 2  # uses default tag DOGEUSD
-python bot.py --mode live --tag SOLDaI --window 3mo --verbose 1 --telegram
-python bot.py --mode wallet -v
+python bot.py --mode fetch --ledger default --time 72h
+python bot.py --mode sim --ledger default -vv
+python bot.py --mode live --ledger default --telegram
+python bot.py --mode wallet --ledger default
 ```
 
-CLI arguments:
+## Architecture
+* **bot.py** – parses CLI arguments, validates asset pairs and hands off to the proper engine.
+* **systems/sim_engine.py** – iterates over historical candles, calling `evaluate_buy` and `evaluate_sell` to open or close notes and record metrics.
+* **systems/live_engine.py** – mirrors the simulation logic against the most recent candle data; either runs once with `--dry` or loops each hour.
+* **systems/fetch.py** – determines missing hours and retrieves them from Kraken or Binance.
+* **systems/scripts/** – house the buy/sell evaluators, ledger implementation and data helpers.
+* **systems/utils/** – configuration loader, logging/Telegram helpers, asset pair caching and CLI builder.
 
-- ``--mode`` – ``sim``, ``live`` or ``wallet``.
-- ``--tag`` – trading pair symbol, e.g. ``DOGEUSD`` (default: ``DOGEUSD``).
-- ``--window`` – time window for tunnel metrics such as ``1m`` or ``3mo``.
-- ``--verbose`` – verbosity level (0=silent, 1=standard, 2=debug).
-- ``--log`` – write all output to ``data/tmp/log.txt``.
-- ``--telegram`` – enable Telegram alerts (requires ``telegram.yaml``).
+Trades are stored as *notes* in a JSON ledger. Each note records entry price, window metrics and targeted exit. The ledger can be persisted for live trading or inspected after simulations.
 
-Press ``ESC`` during a simulation to abort early. The current ledger state is saved
-to ``data/tmp/ledgersimulation.json`` and a summary is printed.
+## Configuration
+* `settings/settings.json` – defines one or more ledgers. Each ledger sets a trading pair (`tag`) and a collection of `window_settings` that describe strategy windows (size, trigger position, investment fraction, etc.).
+* `telegram.yaml` – optional credentials for Telegram notifications.
+* Candle files live under `data/raw/<TAG>.csv`; live mode updates ledgers under `data/ledgers/`.
 
-## Simulation Features
-The simulator reads raw candle data from ``data/raw/<TAG>.csv`` and computes tunnel metrics for each step. For every candle tick it:
+## Logging & Alerts
+Use `--log` to write output to `data/tmp/log.txt`. Passing `--telegram` enables notifications when `telegram.yaml` is present. Verbosity is controlled with `-v`/`-vv`.
 
-1. Evaluates buy strategies with cooldown tracking.
-2. Records new notes in the ledger when a strategy triggers.
-3. Checks existing notes against sell logic.
-4. Updates the ledger with realized PnL and closed notes.
+## Installation
+```bash
+pip install -r requirements.txt
+```
 
-Results are stored in ``ledgersimulation.json`` under ``data/tmp``. Each note records its entry window position and originating strategy for later analysis.
+## Development Notes
+The project currently ships without automated tests. Simulation results are written to `data/tmp/ledgersimulation.json`. Live mode waits until the next UTC hour between iterations while maintaining ledger state.
 
-## What the System Excels At
-
-- Realistic, tick-level backtesting using actual market data.
-- Clear separation of each trading strategy.
-- Pattern-centric decisions rather than price prediction.
-- Adjustable verbosity and the ability to stop simulations early.
-
-## What It Is Not
-
-- Not a predictive AI model.
-- Does not attempt to maximize profit above structural rules.
-- Not yet hardened for long unattended deployments.
-
-## Additional Scripts and Configuration
-
-- ``systems/fetch.py`` – fetch historical candles from Kraken/Binance and merge
-  them into ``data/raw/<TAG>.csv``. Example:
-
-  ```bash
-  python -m systems.fetch --tag DOGEUSD --time 30d
-  ```
-
-- ``settings/settings.json`` – adjust strategy cooldowns, investment size and
-  other behavior. ``simulation_capital`` and ``active_strategies`` live here.
-- ``data/ledgers/<TAG>.json`` – live trading ledger persisted between runs.
-- ``telegram.yaml`` – credentials for the optional Telegram alert feature.
-
+## Disclaimer
+WindowSurfer is an experimental toolkit for research purposes. It does not guarantee profit and has not been audited for security or long-term unattended operation.
