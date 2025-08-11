@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
 
+import builtins
 import requests
 
 from .scripts.config_loader import load_runtime_config
@@ -52,7 +53,7 @@ def _wait_to_top_of_hour() -> None:
 
 
 def _fetch_close(pair: str, retries: int = 3) -> float:
-    for _ in range(retries):
+    for _ in builtins.range(retries):
         try:
             resp = requests.get(_API_BASE, params={"pair": pair, "interval": 60}, timeout=10)
             resp.raise_for_status()
