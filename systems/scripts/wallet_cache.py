@@ -36,7 +36,7 @@ def load_wallet_cache() -> Dict[str, Dict[str, Any]]:
         path = _cache_path("binance")
         if not os.path.exists(path):
             raise FileNotFoundError(
-                "Wallet cache missing, run fetch.py --wallet_cache"
+                "Wallet cache missing. Please run: python fetch.py --wallet_cache"
             )
         with open(path, "r", encoding="utf-8") as fh:
             _BINANCE_CACHE = json.load(fh)
@@ -45,7 +45,7 @@ def load_wallet_cache() -> Dict[str, Dict[str, Any]]:
         path = _cache_path("kraken")
         if not os.path.exists(path):
             raise FileNotFoundError(
-                "Wallet cache missing, run fetch.py --wallet_cache"
+                "Wallet cache missing. Please run: python fetch.py --wallet_cache"
             )
         with open(path, "r", encoding="utf-8") as fh:
             _KRAKEN_CACHE = json.load(fh)
