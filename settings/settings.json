@@ -1,11 +1,11 @@
 {
   "ledger_settings": {
     "Kris_Ledger": {
-      "tag": "DOGEUSD",
-      "wallet_code": "XXDG",
-      "kraken_name": "DOGE/USD",
-      "kraken_pair": "XXDGZUSD",
-      "binance_name": "DOGEUSDT",
+      "tag": "SOLUSDC",
+      "wallet_code": "SOL.F",
+      "kraken_name": "SOL/USDC",
+      "kraken_pair": "SOLUSDC",
+      "binance_name": "SOLUSDC",
       "window_settings": {
         "minnow": {
           "window_size": "1d",
