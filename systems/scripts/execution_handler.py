@@ -174,7 +174,7 @@ def place_order(
 def execute_buy(
     client,
     *,
-    symbol: str,
+    pair_code: str,
     price: float,
     amount_usd: float,
     ledger_name: str,
@@ -187,10 +187,25 @@ def execute_buy(
     currently unused as ``place_order`` pulls pricing from Kraken directly.
     """
 
-    _, fiat_symbol = split_tag(symbol)
+    expected_quote = "USDC" if ledger_name.upper().endswith("USDC") else "USD"
+    _, fiat_symbol = split_tag(pair_code)
+    actual_quote = fiat_symbol
+    if actual_quote != expected_quote:
+        addlog(
+            f"[ABORT][QUOTE_MISMATCH] ledger={ledger_name} expected={expected_quote} got={actual_quote} pair={pair_code}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return {
+            "error": "QUOTE_MISMATCH",
+            "expected": expected_quote,
+            "got": actual_quote,
+            "pair": pair_code,
+        }
+
     result = place_order(
         "buy",
-        symbol,
+        pair_code,
         fiat_symbol,
         amount_usd,
         ledger_name,
@@ -226,7 +241,7 @@ def process_buy_signal(
     ledger,
     t: int,
     runtime_state: dict,
-    symbol: str,
+    pair_code: str,
     price: float,
     ledger_name: str,
     wallet_code: str,
@@ -236,17 +251,17 @@ def process_buy_signal(
 
     result = execute_buy(
         None,
-        symbol=symbol,
+        pair_code=pair_code,
         price=price,
         amount_usd=buy_signal.get("size_usd", 0.0),
         ledger_name=ledger_name,
         wallet_code=wallet_code,
         verbose=verbose,
     )
-    if not result:
-        return None
+    if not result or result.get("error"):
+        return result
 
-    apply_buy_result_to_ledger(
+    note = apply_buy_result_to_ledger(
         ledger=ledger,
         window_name=buy_signal.get("window_name", ""),
         t=t,
@@ -255,11 +270,19 @@ def process_buy_signal(
         state=runtime_state,
     )
 
-    # Set rebound gate only after a confirmed buy
-    window_name = buy_signal.get("window_name")
+    window_name = note.get("window_name")
     unlock_p = buy_signal.get("unlock_p")
     if window_name and unlock_p is not None:
         runtime_state.setdefault("buy_unlock_p", {})[window_name] = unlock_p
+
+    msg = (
+        f"[BUY][EXECUTED][{window_name} {note.get('window_size')}] "
+        f"qty={note.get('entry_amount'):.6f} at ${note.get('entry_price'):.4f} "
+        f"spend=${note.get('entry_usdt'):.2f} target=${note.get('target_price'):.4f} "
+        f"p={note.get('p_buy'):.3f} note_id={note.get('id')}"
+    )
+    addlog(msg, verbose_int=1, verbose_state=verbose)
+    send_telegram_message(msg)
 
     return result
 
@@ -267,7 +290,7 @@ def process_buy_signal(
 def execute_sell(
     client,
     *,
-    symbol: str,
+    pair_code: str,
     coin_amount: float,
     price: float | None = None,
     ledger_name: str,
@@ -278,12 +301,26 @@ def execute_sell(
     ``price`` is optional and, if absent, the current live price is fetched to
     estimate USD notional.
     """
-    sell_price = price if price is not None else get_live_price(symbol)
+    sell_price = price if price is not None else get_live_price(pair_code)
     usd_amount = coin_amount * sell_price
-    _, fiat_symbol = split_tag(symbol)
+    _, fiat_symbol = split_tag(pair_code)
+    expected_quote = "USDC" if ledger_name.upper().endswith("USDC") else "USD"
+    actual_quote = fiat_symbol
+    if actual_quote != expected_quote:
+        addlog(
+            f"[ABORT][QUOTE_MISMATCH] ledger={ledger_name} expected={expected_quote} got={actual_quote} pair={pair_code}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return {
+            "error": "QUOTE_MISMATCH",
+            "expected": expected_quote,
+            "got": actual_quote,
+            "pair": pair_code,
+        }
     result = place_order(
         "sell",
-        symbol,
+        pair_code,
         fiat_symbol,
         usd_amount,
         ledger_name,

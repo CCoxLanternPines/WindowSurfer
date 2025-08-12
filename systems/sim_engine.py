@@ -40,6 +40,7 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         mode="sim",
         prev={"verbose": verbose},
     )
+    runtime_state["buy_unlock_p"] = {}
 
     ledger_obj = Ledger()
     win_metrics = {}
@@ -82,6 +83,7 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                     result=result,
                     state=runtime_state,
                 )
+                runtime_state.setdefault("buy_unlock_p", {})[window_name] = buy_res.get("unlock_p")
                 if runtime_state["capital"] < -1e-9:
                     addlog(
                         f"[BUG] capital negative after buy: ${runtime_state['capital']:.2f}",
@@ -134,19 +136,6 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                     m_sell["realized_trades"] += 1
                     m_sell["realized_roi_accum"] += roi_trade
 
-            if not sell_res.get("notes") and sell_res.get("open_notes"):
-                msg = (
-                    f"[HOLD][{window_name} {wcfg['window_size']}] price=${price:.4f} "
-                    f"open_notes={sell_res.get('open_notes')}"
-                )
-                next_price = sell_res.get("next_sell_price")
-                if next_price is not None:
-                    msg += f" next_sell=${next_price:.4f}"
-                addlog(
-                    msg,
-                    verbose_int=3,
-                    verbose_state=runtime_state.get("verbose", 0),
-                )
 
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)
