@@ -65,7 +65,6 @@ logs/
 *.feather
 
 # Secrets / creds (optional telegram file, keys)
-telegram.yaml
 *.key
 *.pem
 *.crt
