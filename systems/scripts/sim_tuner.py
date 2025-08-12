@@ -110,7 +110,7 @@ def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
                 if original_sim_loader:
                     sim_engine.load_settings = original_sim_loader
 
-            ledger_obj = Ledger.load_ledger(ledger, sim=True)
+            ledger_obj = Ledger.load_ledger(ledger, tag=tag, sim=True)
             final_price = float(fetch_candles(tag).iloc[-1]["close"])
             summary = ledger_obj.get_account_summary(final_price)
             open_value = summary.get("open_value", 0.0)

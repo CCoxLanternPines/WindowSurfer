@@ -64,6 +64,11 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     coin_amt = args.usd / price
     coin_str = _coin_label(tag)
+    path_new = resolve_path(f"data/ledgers/{args.ledger}.json")
+    legacy_path = resolve_path(f"data/ledgers/{tag}.json") if tag else None
+    if legacy_path and legacy_path.exists() and not path_new.exists():
+        legacy_path.rename(path_new)
+
     ledger = _load_ledger(args.ledger)
 
     if args.buy:
@@ -91,7 +96,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                     "timestamp": result.get("timestamp"),
                 }
             )
-            save_ledger(args.ledger, ledger)
+            save_ledger(args.ledger, ledger, tag=tag)
         addlog(
             f"[MANUAL BUY] {args.ledger} | {tag} | ${args.usd:.2f} → {coin_amt:.4f} {coin_str} @ ${price:.4f}",
             verbose_int=1,
@@ -122,7 +127,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                     "timestamp": result.get("timestamp"),
                 }
             )
-            save_ledger(args.ledger, ledger)
+            save_ledger(args.ledger, ledger, tag=tag)
         else:
             usd_total = args.usd
         addlog(

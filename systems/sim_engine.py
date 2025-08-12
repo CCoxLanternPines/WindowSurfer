@@ -234,7 +234,14 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     with json_path.open("w", encoding="utf-8") as f_json:
         json.dump(json_data, f_json, indent=2)
 
-    save_ledger(ledger_cfg["tag"], ledger_obj, sim=True, final_tick=total - 1, summary=summary)
+    save_ledger(
+        ledger,
+        ledger_obj,
+        sim=True,
+        final_tick=total - 1,
+        summary=summary,
+        tag=ledger_cfg["tag"],
+    )
     default_path = root / "data" / "tmp" / "simulation" / f"{ledger}.json"
     sim_path = root / "data" / "tmp" / f"simulation_{ledger}.json"
     if default_path.exists() and default_path != sim_path:

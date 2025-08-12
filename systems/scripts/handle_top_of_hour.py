@@ -92,7 +92,7 @@ def handle_top_of_hour(
             window_settings = ledger_cfg.get("window_settings", {})
             triggered_strategies = {wn.title(): False for wn in window_settings}
             strategy_summary: dict[str, dict] = {}
-            ledger = Ledger.load_ledger(tag=ledger_cfg["tag"])
+            ledger = Ledger.load_ledger(ledger_name, tag=ledger_cfg["tag"])
 
             snapshot = load_or_fetch_snapshot(ledger_name)
             if not snapshot:
@@ -350,7 +350,7 @@ def handle_top_of_hour(
                 metadata["last_buy_tick"] = last_buy_tick
                 metadata["last_sell_tick"] = last_sell_tick
             ledger.set_metadata(metadata)
-            save_ledger(ledger_cfg["tag"], ledger)
+            save_ledger(ledger_name, ledger, tag=ledger_cfg["tag"])
 
             usd_balance = float(balance.get(quote, 0.0))
             coin_balance = float(balance.get(wallet_code, 0.0))
