@@ -61,7 +61,7 @@ logs/
 
 # Common large artifacts
 *.parquet
-*.csv
+
 *.feather
 
 # Secrets / creds (optional telegram file, keys)
