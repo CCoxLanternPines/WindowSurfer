@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Price-target-based sell evaluation."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from systems.scripts.window_utils import get_window_bounds
 from systems.utils.addlog import addlog
@@ -17,18 +17,8 @@ def evaluate_sell(
     cfg: Dict[str, Any],
     open_notes: List[Dict[str, Any]],
     runtime_state: Dict[str, Any] | None = None,
-) -> Dict[str, Any]:
-    """Return sell candidates and next target metadata for ``window_name``.
-
-    Returns a dictionary containing:
-
-    ``notes``
-        List of notes selected for sale.
-    ``open_notes``
-        Count of currently open notes for ``window_name``.
-    ``next_sell_price``
-        Nearest target price above the current price, if any.
-    """
+) -> List[Dict[str, Any]]:
+    """Return a list of notes to sell in ``window_name`` on this candle."""
 
     verbose = 0
     if runtime_state:
@@ -37,29 +27,22 @@ def evaluate_sell(
     price = float(series.iloc[t]["close"])
     win_low, win_high = get_window_bounds(series, t, cfg["window_size"])
 
-    # Notes belonging to this window
-    notes_in_window = [
-        n for n in open_notes if n.get("window_name") == window_name
-    ]
-    open_count = len(notes_in_window)
-
-    # Determine the next target price above the current price, if any
-    next_sell_price: Optional[float] = None
-    higher_targets = [
-        n.get("target_price", float("inf"))
-        for n in notes_in_window
-        if n.get("target_price", float("inf")) > price
-    ]
-    if higher_targets:
-        next_sell_price = min(higher_targets)
-
-    # Filter notes that have reached their target price
+    # Filter notes for the current window and meeting target price
     candidates = [
         n
-        for n in notes_in_window
-        if price >= n.get("target_price", float("inf"))
+        for n in open_notes
+        if n.get("window_name") == window_name
+        and price >= n.get("target_price", float("inf"))
         and price >= n.get("entry_price", float("inf"))
     ]
+
+    if not candidates:
+        addlog(
+            f"[HOLD][{window_name} {cfg['window_size']}] price=${price:.4f} candidates=0",
+            verbose_int=3,
+            verbose_state=verbose,
+        )
+        return []
 
     def roi_now(note: Dict[str, Any]) -> float:
         buy = note.get("entry_price", 0.0)
@@ -110,9 +93,5 @@ def evaluate_sell(
             verbose_state=verbose,
         )
 
-    return {
-        "notes": selected,
-        "open_notes": open_count,
-        "next_sell_price": next_sell_price,
-    }
+    return selected
 

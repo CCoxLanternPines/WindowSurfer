@@ -71,7 +71,7 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                 )
 
             open_notes = ledger_obj.get_open_notes()
-            sell_res = evaluate_sell(
+            sell_notes = evaluate_sell(
                 ctx,
                 t,
                 df,
@@ -80,7 +80,7 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                 open_notes=open_notes,
                 runtime_state=state,
             )
-            for note in sell_res.get("notes", []):
+            for note in sell_notes:
                 result = execute_sell(
                     None,
                     pair_code=ledger_cfg["kraken_pair"],
