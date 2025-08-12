@@ -14,8 +14,8 @@ from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
-from systems.scripts.trade_apply import apply_buy_result_to_ledger, apply_sell_result_to_ledger
-from systems.scripts.execution_handler import execute_buy, execute_sell
+from systems.scripts.trade_apply import apply_sell_result_to_ledger
+from systems.scripts.execution_handler import execute_sell, process_buy_signal
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings
 
@@ -58,24 +58,17 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                 runtime_state=state,
             )
             if buy_res:
-                result = execute_buy(
-                    None,
+                process_buy_signal(
+                    buy_signal=buy_res,
+                    ledger=ledger_obj,
+                    t=t,
+                    runtime_state=state,
                     symbol=ledger_cfg["tag"],
                     price=price,
-                    amount_usd=buy_res["size_usd"],
                     ledger_name=ledger_cfg["tag"],
                     wallet_code=ledger_cfg.get("wallet_code", ""),
                     verbose=state.get("verbose", 0),
                 )
-                if result:
-                    apply_buy_result_to_ledger(
-                        ledger=ledger_obj,
-                        window_name=window_name,
-                        t=t,
-                        meta=buy_res,
-                        result=result,
-                        state=state,
-                    )
 
             open_notes = ledger_obj.get_open_notes()
             sell_notes = evaluate_sell(
@@ -111,6 +104,17 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
 def run_live(*, dry: bool = False, verbose: int = 0) -> None:
     settings = load_settings()
     runtime_states: Dict[str, Dict] = {}
+
+    # Clear any stale buy unlock gates on startup
+    for name, ledger_cfg in settings.get("ledger_settings", {}).items():
+        state = build_runtime_state(
+            settings,
+            ledger_cfg,
+            mode="live",
+            prev={"verbose": verbose},
+        )
+        state["buy_unlock_p"] = {}
+        runtime_states[name] = state
 
     if dry:
         addlog(
