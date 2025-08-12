@@ -1,0 +1,65 @@
+{
+  "open_notes": [
+    {
+      "id": "minnow-173",
+      "entry_idx": 173,
+      "entry_price": 174.78,
+      "entry_amount": 0.805214,
+      "entry_usdt": 140.73530292,
+      "window_name": "minnow",
+      "window_size": "1d",
+      "p_buy": 0.0983333333333339,
+      "target_price": 185.6,
+      "target_roi": 0.06190639661288473,
+      "unlock_p": 0.2483333333333339,
+      "created_idx": 173,
+      "created_ts": 1754978405
+    },
+    {
+      "id": "fish-173",
+      "entry_idx": 173,
+      "entry_price": 174.78,
+      "entry_amount": 1.74375796,
+      "entry_usdt": 304.77401624879997,
+      "window_name": "fish",
+      "window_size": "3d",
+      "p_buy": 0.0891912320483753,
+      "target_price": 186.83,
+      "target_roi": 0.06894381508181721,
+      "unlock_p": 0.23919123204837528,
+      "created_idx": 173,
+      "created_ts": 1754978405
+    },
+    {
+      "id": "mouse-173",
+      "entry_idx": 173,
+      "entry_price": 174.78,
+      "entry_amount": 0.805214,
+      "entry_usdt": 140.73530292,
+      "window_name": "mouse",
+      "window_size": "1d",
+      "p_buy": 0.0983333333333339,
+      "target_price": 185.6,
+      "target_roi": 0.06190639661288473,
+      "unlock_p": 0.2483333333333339,
+      "created_idx": 173,
+      "created_ts": 1754978406
+    },
+    {
+      "id": "rabbit-173",
+      "entry_idx": 173,
+      "entry_price": 174.78,
+      "entry_amount": 1.74375796,
+      "entry_usdt": 304.77401624879997,
+      "window_name": "rabbit",
+      "window_size": "3d",
+      "p_buy": 0.0891912320483753,
+      "target_price": 186.83,
+      "target_roi": 0.06894381508181721,
+      "unlock_p": 0.23919123204837528,
+      "created_idx": 173,
+      "created_ts": 1754978406
+    }
+  ],
+  "closed_notes": []
+}
