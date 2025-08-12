@@ -36,7 +36,7 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
         if df.empty:
             continue
         t = len(df) - 1
-        ledger_obj = Ledger.load_ledger(tag=ledger_cfg["tag"])
+        ledger_obj = Ledger.load_ledger(name, tag=ledger_cfg["tag"])
         prev = runtime_states.get(name, {"verbose": verbose})
         state = build_runtime_state(
             settings,
@@ -98,7 +98,7 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                         state=state,
                     )
 
-        save_ledger(ledger_cfg["tag"], ledger_obj)
+        save_ledger(name, ledger_obj, tag=ledger_cfg["tag"])
 
 
 def run_live(*, dry: bool = False, verbose: int = 0) -> None:
@@ -116,7 +116,7 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
         state["buy_unlock_p"] = {}
         runtime_states[name] = state
 
-        ledger_obj = Ledger.load_ledger(tag=ledger_cfg["tag"])
+        ledger_obj = Ledger.load_ledger(name, tag=ledger_cfg["tag"])
         open_notes = ledger_obj.get_open_notes()
         total = len(open_notes)
         per_window: Dict[str, int] = {}

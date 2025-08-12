@@ -93,24 +93,32 @@ class Ledger:
 
     # Persistence -----------------------------------------------------------
     @staticmethod
-    def load_ledger(tag: str, *, sim: bool = False) -> "Ledger":
-        """Load a ledger for ``tag`` depending on mode."""
+    def load_ledger(
+        ledger_name: str, *, tag: str | None = None, sim: bool = False
+    ) -> "Ledger":
+        """Load a ledger for ``ledger_name``.
+
+        If a legacy ledger file named after ``tag`` exists, it will be
+        migrated to the ``ledger_name`` convention on first load.
+        """
+
         root = resolve_path("")
         ledger = Ledger()
 
         if sim:
-            path = root / "data" / "tmp" / "simulation" / f"{tag}.json"
-            if path.exists():
-                with path.open("r", encoding="utf-8") as f:
-                    data = json.load(f)
-                ledger.open_notes = data.get("open_notes", [])
-                ledger.closed_notes = data.get("closed_notes", [])
-                ledger.metadata = data.get("metadata", {})
-            return ledger
+            out_dir = root / "data" / "tmp" / "simulation"
+        else:
+            out_dir = root / "data" / "ledgers"
 
-        path = root / "data" / "ledgers" / f"{tag}.json"
-        if path.exists():
-            with path.open("r", encoding="utf-8") as f:
+        out_path = out_dir / f"{ledger_name}.json"
+
+        if tag and not out_path.exists():
+            legacy_path = out_dir / f"{tag}.json"
+            if legacy_path.exists():
+                legacy_path.rename(out_path)
+
+        if out_path.exists():
+            with out_path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
             ledger.open_notes = data.get("open_notes", [])
             ledger.closed_notes = data.get("closed_notes", [])
@@ -125,6 +133,7 @@ def save_ledger(
     sim: bool = False,
     final_tick: int | None = None,
     summary: dict | None = None,
+    tag: str | None = None,
 ) -> None:
     """Persist ``ledger`` data to the canonical ledger directory."""
 
@@ -132,12 +141,16 @@ def save_ledger(
 
     if sim:
         out_dir = root / "data" / "tmp" / "simulation"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{ledger_name}.json"
     else:
         out_dir = root / "data" / "ledgers"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{ledger_name}.json"
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{ledger_name}.json"
+
+    if tag and not out_path.exists():
+        legacy_path = out_dir / f"{tag}.json"
+        if legacy_path.exists():
+            legacy_path.rename(out_path)
 
     if isinstance(ledger, Ledger):
         ledger_data = {
