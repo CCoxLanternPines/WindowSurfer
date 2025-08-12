@@ -42,9 +42,16 @@ def evaluate_buy(
     price = float(series.iloc[t]["close"])
     p = get_window_position(price, win_low, win_high)
 
+    open_notes = []
+    if ledger:
+        open_notes = [
+            n for n in ledger.get_open_notes() if n.get("window_name") == window_name
+        ]
+
     unlock_map = runtime_state.setdefault("buy_unlock_p", {})
     unlock_p = unlock_map.get(window_name)
-    if unlock_p is not None:
+    # Only enforce rebound gate if there are open notes for this window
+    if unlock_p is not None and open_notes:
         if p >= unlock_p:
             addlog(
                 f"[UNLOCK][{window_name} {cfg['window_size']}] p={p:.3f} >= unlock_p={unlock_p:.3f} → buys re-enabled",
@@ -59,12 +66,6 @@ def evaluate_buy(
                 verbose_state=verbose,
             )
             return False
-
-    open_notes = []
-    if ledger:
-        open_notes = [
-            n for n in ledger.get_open_notes() if n.get("window_name") == window_name
-        ]
     if len(open_notes) >= cfg.get("max_open_notes", 0):
         return False
 

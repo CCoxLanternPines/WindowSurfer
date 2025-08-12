@@ -10,6 +10,7 @@ from systems.scripts.kraken_utils import get_live_price
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.resolve_symbol import split_tag
 from systems.utils.snapshot import load_snapshot, prime_snapshot
+from systems.scripts.trade_apply import apply_buy_result_to_ledger
 
 
 def fetch_price_data(symbol: str) -> dict:
@@ -217,6 +218,50 @@ def execute_buy(
         "avg_price": result.get("price", 0.0),
         "timestamp": result.get("timestamp"),
     }
+
+
+def process_buy_signal(
+    *,
+    buy_signal: dict,
+    ledger,
+    t: int,
+    runtime_state: dict,
+    symbol: str,
+    price: float,
+    ledger_name: str,
+    wallet_code: str,
+    verbose: int = 0,
+):
+    """Execute a buy and record it, setting the rebound gate on success."""
+
+    result = execute_buy(
+        None,
+        symbol=symbol,
+        price=price,
+        amount_usd=buy_signal.get("size_usd", 0.0),
+        ledger_name=ledger_name,
+        wallet_code=wallet_code,
+        verbose=verbose,
+    )
+    if not result:
+        return None
+
+    apply_buy_result_to_ledger(
+        ledger=ledger,
+        window_name=buy_signal.get("window_name", ""),
+        t=t,
+        meta=buy_signal,
+        result=result,
+        state=runtime_state,
+    )
+
+    # Set rebound gate only after a confirmed buy
+    window_name = buy_signal.get("window_name")
+    unlock_p = buy_signal.get("unlock_p")
+    if window_name and unlock_p is not None:
+        runtime_state.setdefault("buy_unlock_p", {})[window_name] = unlock_p
+
+    return result
 
 
 def execute_sell(
