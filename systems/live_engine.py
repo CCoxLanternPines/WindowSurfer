@@ -98,6 +98,16 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                         state=state,
                     )
 
+            if not sell_res.get("notes") and sell_res.get("open_notes", 0):
+                msg = (
+                    f"[HOLD][{window_name} {wcfg['window_size']}] price=${price:.4f} "
+                    f"open_notes={sell_res['open_notes']}"
+                )
+                next_price = sell_res.get("next_sell_price")
+                if next_price is not None:
+                    msg += f" next_sell=${next_price:.4f}"
+                addlog(msg, verbose_int=1, verbose_state=state.get("verbose", 0))
+
         save_ledger(ledger_cfg["tag"], ledger_obj)
 
 
