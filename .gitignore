@@ -48,7 +48,6 @@ Pipfile.lock
 *.code-workspace
 
 # --- Project artifacts (do NOT version) ---
-data/raw/
 data/temp/
 data/tmp/
 data/tmp/**
