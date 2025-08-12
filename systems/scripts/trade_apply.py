@@ -44,7 +44,6 @@ def apply_buy_result_to_ledger(
     ledger.open_note(note)
     cost = result.get("filled_amount", 0.0) * result.get("avg_price", 0.0)
     state["capital"] = state.get("capital", 0.0) - cost
-    state.setdefault("buy_unlock_p", {})[window_name] = meta.get("unlock_p")
     return note
 
 

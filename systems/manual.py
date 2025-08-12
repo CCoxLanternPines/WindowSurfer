@@ -70,14 +70,14 @@ def main(argv: Optional[list[str]] = None) -> None:
         if not args.dry:
             result = execute_buy(
                 None,
-                symbol=tag,
+                pair_code=ledger_cfg["kraken_pair"],
                 wallet_code=ledger_cfg["wallet_code"],
                 price=price,
                 amount_usd=args.usd,
                 ledger_name=args.ledger,
                 verbose=args.verbose,
             )
-            if not result:
+            if not result or result.get("error"):
                 raise SystemExit("[ERROR] Buy order failed")
             coin_amt = result.get("filled_amount", coin_amt)
             price = result.get("avg_price", price)
@@ -101,13 +101,13 @@ def main(argv: Optional[list[str]] = None) -> None:
         if not args.dry:
             result = execute_sell(
                 None,
-                symbol=tag,
+                pair_code=ledger_cfg["kraken_pair"],
                 coin_amount=coin_amt,
                 price=price,
                 ledger_name=args.ledger,
                 verbose=args.verbose,
             )
-            if not result:
+            if not result or result.get("error"):
                 raise SystemExit("[ERROR] Sell order failed")
             coin_amt = result.get("filled_amount", coin_amt)
             price = result.get("avg_price", price)

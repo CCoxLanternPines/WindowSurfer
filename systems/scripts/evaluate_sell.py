@@ -69,11 +69,20 @@ def evaluate_sell(
     cap = cfg.get("max_notes_sell_per_candle", 1)
     selected = candidates[:cap]
 
-    addlog(
-        f"[MATURE][{window_name} {cfg['window_size']}] eligible={len(candidates)} sold={len(selected)} cap={cap}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
+    if candidates:
+        addlog(
+            f"[MATURE][{window_name} {cfg['window_size']}] eligible={len(candidates)} sold={len(selected)} cap={cap}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+    else:
+        msg = (
+            f"[HOLD][{window_name} {cfg['window_size']}] price=${price:.4f} "
+            f"open_notes={open_count}"
+        )
+        if next_sell_price is not None:
+            msg += f" next_sell=${next_sell_price:.4f}"
+        addlog(msg, verbose_int=1, verbose_state=verbose)
 
     maturity_pos = cfg.get("maturity_position", 1.0)
     for note in selected:

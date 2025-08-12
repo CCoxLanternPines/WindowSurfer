@@ -79,6 +79,7 @@ def handle_top_of_hour(
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
             tag = ledger_cfg["tag"]
+            pair_code = ledger_cfg.get("kraken_pair", tag)
             refresh_to_last_closed_hour(
                 settings,
                 tag,
@@ -103,7 +104,7 @@ def handle_top_of_hour(
                 continue
             balance = snapshot.get("balance", {})
 
-            price = get_live_price(kraken_pair=tag)
+            price = get_live_price(kraken_pair=pair_code)
 
             current_ts = (
                 int(tick.timestamp()) if isinstance(tick, datetime) else int(tick)
@@ -183,13 +184,13 @@ def handle_top_of_hour(
                             if invest >= min_usd and invest <= available and invest > 0:
                                 result = execute_buy(
                                     client=client,
-                                    symbol=tag,
+                                    pair_code=pair_code,
                                     price=price,
                                     amount_usd=invest,
                                     ledger_name=ledger_name,
                                     wallet_code=wallet_code,
                                 )
-                                if result:
+                                if result and not result.get("error"):
                                     note = {
                                         "entry_amount": result["filled_amount"],
                                         "entry_price": result["avg_price"],
@@ -274,10 +275,12 @@ def handle_top_of_hour(
                             continue
                         result = execute_sell(
                             client=client,
-                            symbol=tag,
+                            pair_code=pair_code,
                             coin_amount=note["entry_amount"],
                             ledger_name=ledger_name,
                         )
+                        if not result or result.get("error"):
+                            continue
                         note["exit_price"] = result["avg_price"]
                         note["exit_ts"] = result["timestamp"]
                         note["exit_tick"] = current_ts

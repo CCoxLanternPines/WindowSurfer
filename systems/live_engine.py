@@ -63,7 +63,7 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                     ledger=ledger_obj,
                     t=t,
                     runtime_state=state,
-                    symbol=ledger_cfg["tag"],
+                    pair_code=ledger_cfg["kraken_pair"],
                     price=price,
                     ledger_name=ledger_cfg["tag"],
                     wallet_code=ledger_cfg.get("wallet_code", ""),
@@ -83,13 +83,13 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
             for note in sell_res.get("notes", []):
                 result = execute_sell(
                     None,
-                    symbol=ledger_cfg["tag"],
+                    pair_code=ledger_cfg["kraken_pair"],
                     coin_amount=note.get("entry_amount", 0.0),
                     price=price,
                     ledger_name=ledger_cfg["tag"],
                     verbose=state.get("verbose", 0),
                 )
-                if result:
+                if result and not result.get("error"):
                     apply_sell_result_to_ledger(
                         ledger=ledger_obj,
                         note=note,
@@ -97,20 +97,6 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                         result=result,
                         state=state,
                     )
-
-            if not sell_res.get("notes") and sell_res.get("open_notes"):
-                msg = (
-                    f"[HOLD][{window_name} {wcfg['window_size']}] price=${price:.4f} "
-                    f"open_notes={sell_res.get('open_notes')}"
-                )
-                next_price = sell_res.get("next_sell_price")
-                if next_price is not None:
-                    msg += f" next_sell=${next_price:.4f}"
-                addlog(
-                    msg,
-                    verbose_int=3,
-                    verbose_state=state.get("verbose", 0),
-                )
 
         save_ledger(ledger_cfg["tag"], ledger_obj)
 
@@ -129,6 +115,35 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
         )
         state["buy_unlock_p"] = {}
         runtime_states[name] = state
+
+        ledger_obj = Ledger.load_ledger(tag=ledger_cfg["tag"])
+        open_notes = ledger_obj.get_open_notes()
+        total = len(open_notes)
+        per_window: Dict[str, int] = {}
+        last_ts = None
+        for n in open_notes:
+            w = n.get("window_name")
+            per_window[w] = per_window.get(w, 0) + 1
+            ts = n.get("created_ts")
+            if ts is not None and (last_ts is None or ts > last_ts):
+                last_ts = ts
+        addlog(
+            f"[LEDGER][OPEN] total={total} per-window={per_window}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        if last_ts is not None:
+            addlog(
+                f"[LEDGER][LAST_TS] {datetime.fromtimestamp(last_ts, tz=timezone.utc).isoformat()}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+        else:
+            addlog(
+                "[LEDGER][LAST_TS] none",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
 
     if dry:
         addlog(
