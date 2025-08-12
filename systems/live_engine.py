@@ -71,7 +71,7 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                 )
 
             open_notes = ledger_obj.get_open_notes()
-            sell_notes = evaluate_sell(
+            sell_res = evaluate_sell(
                 ctx,
                 t,
                 df,
@@ -80,7 +80,7 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                 open_notes=open_notes,
                 runtime_state=state,
             )
-            for note in sell_notes:
+            for note in sell_res.get("notes", []):
                 result = execute_sell(
                     None,
                     symbol=ledger_cfg["tag"],
@@ -97,6 +97,20 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                         result=result,
                         state=state,
                     )
+
+            if not sell_res.get("notes") and sell_res.get("open_notes"):
+                msg = (
+                    f"[HOLD][{window_name} {wcfg['window_size']}] price=${price:.4f} "
+                    f"open_notes={sell_res.get('open_notes')}"
+                )
+                next_price = sell_res.get("next_sell_price")
+                if next_price is not None:
+                    msg += f" next_sell=${next_price:.4f}"
+                addlog(
+                    msg,
+                    verbose_int=3,
+                    verbose_state=state.get("verbose", 0),
+                )
 
         save_ledger(ledger_cfg["tag"], ledger_obj)
 
