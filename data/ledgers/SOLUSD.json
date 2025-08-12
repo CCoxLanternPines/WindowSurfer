@@ -1,4 +1,21 @@
 {
-  "open_notes": [],
+    "open_notes": [
+    {
+      "id": "fish-173",
+      "entry_idx": 173,
+      "entry_price": 174.78,
+      "entry_amount": 1.74375796,
+      "entry_usdt": 304.77401624879997,
+      "window_name": "fish",
+      "window_size": "3d",
+      "p_buy": 0.0891912320483753,
+      "target_price": 186.83,
+      "target_roi": 0.06894381508181721,
+      "unlock_p": 0.23919123204837528,
+      "created_idx": 173,
+      "created_ts": 1754978405
+    }
+  ],
+  
   "closed_notes": []
 }
