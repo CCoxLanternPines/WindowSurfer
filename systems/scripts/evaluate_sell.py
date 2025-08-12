@@ -27,21 +27,42 @@ def evaluate_sell(
     price = float(series.iloc[t]["close"])
     win_low, win_high = get_window_bounds(series, t, cfg["window_size"])
 
-    # Filter notes for the current window and meeting target price
+    # Notes belonging to this window
+    window_notes = [n for n in open_notes if n.get("window_name") == window_name]
+    open_count = len(window_notes)
+
+    ledger = ctx.get("ledger") if ctx else None
+    closed_count = 0
+    if ledger:
+        closed_count = sum(
+            1 for n in ledger.get_closed_notes() if n.get("window_name") == window_name
+        )
+
+    future_targets = [
+        n.get("target_price", float("inf"))
+        for n in window_notes
+        if n.get("target_price", float("inf")) > price
+    ]
+    next_target = min(future_targets) if future_targets else None
+
+    # Filter notes for the current window that meet target price
     candidates = [
         n
-        for n in open_notes
-        if n.get("window_name") == window_name
-        and price >= n.get("target_price", float("inf"))
+        for n in window_notes
+        if price >= n.get("target_price", float("inf"))
         and price >= n.get("entry_price", float("inf"))
     ]
 
     if not candidates:
-        addlog(
-            f"[HOLD][{window_name} {cfg['window_size']}] price=${price:.4f} candidates=0",
-            verbose_int=3,
-            verbose_state=verbose,
+        msg = (
+            f"[HOLD][{window_name} {cfg['window_size']}] price=${price:.4f} Notes | "
+            f"Open={open_count} | Closed={closed_count} | Next="
         )
+        if next_target is not None:
+            msg += f"${next_target:.4f}"
+        else:
+            msg += "None"
+        addlog(msg, verbose_int=3, verbose_state=verbose)
         return []
 
     def roi_now(note: Dict[str, Any]) -> float:
@@ -58,14 +79,6 @@ def evaluate_sell(
             verbose_int=1,
             verbose_state=verbose,
         )
-    else:
-        msg = (
-            f"[HOLD][{window_name} {cfg['window_size']}] price=${price:.4f} "
-            f"open_notes={open_count}"
-        )
-        if next_sell_price is not None:
-            msg += f" next_sell=${next_sell_price:.4f}"
-        addlog(msg, verbose_int=1, verbose_state=verbose)
 
     maturity_pos = cfg.get("maturity_position", 1.0)
     for note in selected:
