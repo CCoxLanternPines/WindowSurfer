@@ -93,11 +93,16 @@ def send_top_hour_report(
 
     jackpot = strategy_summary.get("jackpot")
     if jackpot:
+        pool = float(jackpot.get("pool", 0.0))
+        coin_value = float(jackpot.get("coin_value", 0.0))
+        total_jackpot = pool + coin_value
         lines.append(
             " ".join(
                 [
                     "🎰 Jackpot",
-                    f"| Pool: ${jackpot.get('pool', 0.0):.2f}",
+                    f"| Pool: ${pool:.2f}",
+                    f"| Coin: ${coin_value:.2f}",
+                    f"| Total: ${total_jackpot:.2f}",
                     f"| Drips: +${jackpot.get('drips', 0.0):.2f}",
                     f"| Buys: {jackpot.get('buys', 0)}",
                     f"| Sells: {jackpot.get('sells', 0)}",
