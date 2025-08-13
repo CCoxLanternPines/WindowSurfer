@@ -41,6 +41,11 @@ def apply_buy_result_to_ledger(
     elif "created_ts" in meta:
         note["created_ts"] = meta["created_ts"]
 
+    # Merge any additional metadata (e.g. note kind)
+    for k, v in meta.items():
+        if k not in note:
+            note[k] = v
+
     ledger.open_note(note)
     cost = result.get("filled_amount", 0.0) * result.get("avg_price", 0.0)
     state["capital"] = state.get("capital", 0.0) - cost

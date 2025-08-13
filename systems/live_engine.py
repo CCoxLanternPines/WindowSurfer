@@ -16,6 +16,12 @@ from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
 from systems.scripts.trade_apply import apply_sell_result_to_ledger
 from systems.scripts.execution_handler import execute_sell, process_buy_signal
+from systems.scripts.strategy_jackpot import (
+    init_jackpot,
+    on_buy_drip,
+    maybe_periodic_jackpot_buy,
+    maybe_cashout_jackpot,
+)
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings, resolve_path
 from systems.utils.resolve_symbol import split_tag
@@ -71,7 +77,12 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
             mode="live",
             prev=prev,
         )
+        state["mode"] = "live"
         runtime_states[name] = state
+        init_jackpot(state, ledger_cfg, df)
+        j = state.get("jackpot", {})
+        if j.get("enabled"):
+            j["notes_open"] = [n for n in ledger_obj.get_open_notes() if n.get("kind") == "jackpot"]
 
         price = float(df.iloc[t]["close"])
         for window_name, wcfg in window_settings.items():
@@ -85,6 +96,7 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                 runtime_state=state,
             )
             if buy_res:
+                buy_res["size_usd"] = on_buy_drip(state, buy_res["size_usd"])
                 process_buy_signal(
                     buy_signal=buy_res,
                     ledger=ledger_obj,
@@ -123,8 +135,31 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                         t=t,
                         result=result,
                         state=state,
-                    )
+                )
 
+        ctx_j = {
+            "ledger": ledger_obj,
+            "pair_code": ledger_cfg["kraken_pair"],
+            "wallet_code": ledger_cfg.get("wallet_code", ""),
+        }
+        maybe_periodic_jackpot_buy(
+            ctx_j,
+            state,
+            t,
+            df,
+            price,
+            state.get("limits", {}),
+            ledger_cfg["tag"],
+        )
+        maybe_cashout_jackpot(
+            ctx_j,
+            state,
+            t,
+            df,
+            price,
+            state.get("limits", {}),
+            ledger_cfg["tag"],
+        )
         save_ledger(name, ledger_obj, tag=ledger_cfg["tag"])
 
 
