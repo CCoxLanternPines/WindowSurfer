@@ -3,7 +3,7 @@ from __future__ import annotations
 """Simple in-memory ledger for simulations and live trading."""
 
 import json
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from systems.utils.config import resolve_path
 
@@ -49,14 +49,24 @@ class Ledger:
         return dict(self.metadata)
 
     # Accessors -------------------------------------------------------------
-    def get_open_notes(self) -> List[Dict]:
-        return list(self.open_notes)
+    def get_open_notes(self, *, strategy: Optional[str] = None) -> List[Dict]:
+        notes = self.open_notes
+        if strategy is not None:
+            notes = [n for n in notes if n.get("strategy") == strategy]
+        return list(notes)
 
-    def get_active_notes(self) -> List[Dict]:
-        return self.get_open_notes()
+    def get_active_notes(self, *, strategy: Optional[str] = None) -> List[Dict]:
+        return self.get_open_notes(strategy=strategy)
 
-    def get_closed_notes(self) -> List[Dict]:
-        return list(self.closed_notes)
+    def get_closed_notes(self, *, strategy: Optional[str] = None) -> List[Dict]:
+        notes = self.closed_notes
+        if strategy is not None:
+            notes = [n for n in notes if n.get("strategy") == strategy]
+        return list(notes)
+
+    def get_cumulative_realized_pnl(self, *, strategy: Optional[str] = None) -> float:
+        notes = self.get_closed_notes(strategy=strategy)
+        return sum(n.get("gain", 0.0) for n in notes)
 
     def get_total_liquid_value(self, final_price: float) -> float:
         """Return all value assuming open notes liquidate at ``final_price``."""

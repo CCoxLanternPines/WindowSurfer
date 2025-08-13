@@ -35,4 +35,9 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable Telegram alerts",
     )
+    parser.add_argument(
+        "--jackpot",
+        action="store_true",
+        help="Enable jackpot DCA in simulation",
+    )
     return parser

@@ -34,6 +34,8 @@ def apply_buy_result_to_ledger(
         "target_roi": meta.get("target_roi"),
         "unlock_p": meta.get("unlock_p"),
     }
+    if "strategy" in meta:
+        note["strategy"] = meta["strategy"]
     if "created_idx" in meta:
         note["created_idx"] = meta["created_idx"]
     if result.get("timestamp") is not None:
