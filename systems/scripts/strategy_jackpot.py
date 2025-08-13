@@ -96,7 +96,8 @@ def on_buy_drip(state: Dict[str, Any], buy_usd: float) -> float:
         return buy_usd
     j["pool_usd"] = j.get("pool_usd", 0.0) + drip
     j["drips"] = j.get("drips", 0.0) + drip
-    addlog(f"[JACKPOT][DRIP] +${drip:.2f} → pool=${j['pool_usd']:.2f}")
+    if state.get("ctx", {}).get("verbosity", 0) >= 2:
+        addlog(f"[JACKPOT][DRIP] +${drip:.2f} → pool=${j['pool_usd']:.2f}")
     return buy_usd - drip
 
 
@@ -131,7 +132,7 @@ def maybe_periodic_jackpot_buy(ctx: Dict[str, Any], state: Dict[str, Any], t: in
             j["next_period_ts"] = j.get("next_period_ts", 0) + j.get("period_s", 0)
             return
         j["pool_usd"] = pool - amount_usd
-        if ctx.get("verbosity", 0) >= 3:
+        if ctx.get("verbosity", 0) >= 1:
             addlog(f"[JACKPOT][POOL_DEBIT] -${amount_usd:.2f} → pool=${j['pool_usd']:.2f}")
         mode = state.get("mode", "sim")
         ts = now_ts if now_ts else None
@@ -191,8 +192,10 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
         if ctx.get("verbosity", 0) >= 3:
             addlog("[JACKPOT][NONE_TO_SELL]")
         return
+    
     if p_global < cashout_p:
-        addlog(f"[JACKPOT][NO_TRIGGER] p={p_global:.3f} < cashout_p={cashout_p:.3f}")
+        if ctx.get("verbosity", 0) >= 2:
+            addlog(f"[JACKPOT][NO_TRIGGER] p={p_global:.3f} < cashout_p={cashout_p:.3f}")
         return
     ts = int(df.iloc[t]["timestamp"]) if "timestamp" in df.columns else None
     sold = 0
