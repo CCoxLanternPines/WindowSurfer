@@ -53,10 +53,10 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(1)
 
     for ledger_cfg in settings.get("ledger_settings", {}).values():
-        tag = ledger_cfg.get("tag", "")
-        if tag.upper() not in valid_pairs:
+        tag = ledger_cfg.get("tag")
+        if tag and tag.upper() not in valid_pairs:
             raise RuntimeError(
-                f"[ERROR] Invalid trading pair: {ledger_cfg['tag']} — Not found in Kraken altname list"
+                f"[ERROR] Invalid trading pair: {ledger_cfg.get('tag')} — Not found in Kraken altname list"
             )
 
     if mode == "wallet":
@@ -122,23 +122,34 @@ def main(argv: list[str] | None = None) -> None:
                 verbose_state=True,
             )
             sys.exit(1)
+
+        coin = args.coin.upper()
+        coin_cfg = settings.get("ledger_settings", {}).get(coin)
+        if not coin_cfg or "kraken_name" not in coin_cfg or "binance_name" not in coin_cfg:
+            addlog(
+                f"[ERROR] Missing exchange symbol mapping for coin {coin}",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            sys.exit(1)
+
         try:
             from systems.fetch import fetch_all, fetch_recent
 
             if args.all:
                 addlog(
-                    f"[BOT][FETCH][ALL] coin={args.coin} → full Binance history",
+                    f"[BOT][FETCH][ALL] coin={coin} → full Binance history",
                     verbose_int=1,
                     verbose_state=True,
                 )
-                fetch_all(args.coin)
+                fetch_all(coin)
             else:
                 addlog(
-                    f"[BOT][FETCH][RECENT] coin={args.coin} hours={args.recent}",
+                    f"[BOT][FETCH][RECENT] coin={coin} hours={args.recent}",
                     verbose_int=1,
                     verbose_state=True,
                 )
-                fetch_recent(args.coin, args.recent)
+                fetch_recent(coin, args.recent)
         except Exception as e:
             addlog(f"[ERROR] Fetch failed: {e}", verbose_int=1, verbose_state=True)
             sys.exit(1)
