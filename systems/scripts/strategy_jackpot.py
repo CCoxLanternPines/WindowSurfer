@@ -153,13 +153,19 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
     j = state.get("jackpot", {})
     if not j.get("enabled"):
         return
-    notes = list(j.get("notes_open", []))
-    if not notes:
-        return
-    p_global = _compute_global_p(j, price)
     cfg = j.get("cfg", {})
     cashout_p = float(cfg.get("cashout_p", 1.0))
+    p_global = _compute_global_p(j, price)
+    addlog(
+        f"[JACKPOT][P_DEBUG] now=${price:.2f}, low=${j.get('global_low', 0.0):.2f}, "
+        f"high=${j.get('global_high', 0.0):.2f}, p={p_global:.3f}, cashout_p={cashout_p:.3f}"
+    )
+    notes = list(j.get("notes_open", []))
+    if not notes:
+        addlog("[JACKPOT][NONE_TO_SELL]")
+        return
     if p_global < cashout_p:
+        addlog(f"[JACKPOT][NO_TRIGGER] p={p_global:.3f} < cashout_p={cashout_p:.3f}")
         return
     ts = int(df.iloc[t]["timestamp"]) if "timestamp" in df.columns else None
     sold = 0
