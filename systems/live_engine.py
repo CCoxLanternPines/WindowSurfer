@@ -6,10 +6,10 @@ import time
 from datetime import datetime, timezone
 from typing import Dict
 
+import pandas as pd
 from tqdm import tqdm
 
 from systems.fetch import fetch_recent_coin
-from systems.scripts.fetch_candles import load_coin_csv
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -17,7 +17,7 @@ from systems.scripts.runtime_state import build_runtime_state
 from systems.scripts.trade_apply import apply_sell_result_to_ledger
 from systems.scripts.execution_handler import execute_sell, process_buy_signal
 from systems.utils.addlog import addlog
-from systems.utils.config import load_settings
+from systems.utils.config import load_settings, resolve_path
 from systems.utils.resolve_symbol import split_tag
 
 
@@ -26,8 +26,9 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
         base, _ = split_tag(ledger_cfg["tag"])
         coin = base.upper()
         window_settings = ledger_cfg.get("window_settings", {})
+        raw_path = resolve_path("") / "data" / "raw" / f"{coin}.csv"
         try:
-            df = load_coin_csv(coin)
+            df = pd.read_csv(raw_path)
         except FileNotFoundError:
             addlog(
                 f"[WARN] Candle data missing for {coin}",
@@ -35,6 +36,30 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                 verbose_state=verbose,
             )
             continue
+
+        ts_col = None
+        for c in df.columns:
+            lc = str(c).lower()
+            if lc in ("timestamp", "time", "date"):
+                ts_col = c
+                break
+        if ts_col is None:
+            raise ValueError(f"No timestamp column in {raw_path}")
+
+        df[ts_col] = pd.to_numeric(df[ts_col], errors="coerce")
+        df = df.dropna(subset=[ts_col])
+
+        before = len(df)
+        df = df.sort_values(ts_col).drop_duplicates(subset=[ts_col], keep="last").reset_index(drop=True)
+        removed = before - len(df)
+
+        if not df[ts_col].is_monotonic_increasing:
+            raise ValueError(f"Candles not sorted by {ts_col}: {raw_path}")
+
+        first_ts = int(df[ts_col].iloc[0]) if len(df) else None
+        last_ts = int(df[ts_col].iloc[-1]) if len(df) else None
+        print(f"[DATA] file={raw_path} rows={len(df)} first={first_ts} last={last_ts} dups_removed={removed}")
+
         if df.empty:
             continue
         t = len(df) - 1
