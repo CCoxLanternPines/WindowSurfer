@@ -66,8 +66,6 @@ def evaluate_buy(
                 verbose_state=verbose,
             )
             return False
-    if len(open_notes) >= cfg.get("max_open_notes", 0):
-        return False
 
     trigger = cfg.get("buy_trigger_position", 0.0)
     if p > trigger:
@@ -80,8 +78,7 @@ def evaluate_buy(
 
     capital = runtime_state.get("capital", 0.0)
     base = cfg.get("investment_fraction", 0.0)
-    mult = 1 + (1 - p) * (cfg.get("window_transform_multiplier", 1.0) - 1)
-    size_usd = capital * base * mult
+    size_usd = capital * base
 
     limits = runtime_state.get("limits", {})
     min_sz = float(limits.get("min_note_size", 0.0))
@@ -105,7 +102,7 @@ def evaluate_buy(
     sz_pct = (size_usd / capital * 100) if capital else 0.0
 
     addlog(
-        f"[BUY][{window_name} {cfg['window_size']}] p={p:.3f}, base={base*100:.2f}%, mult={mult:.2f}x → size={sz_pct:.2f}% (cap=${size_usd:.2f})",
+        f"[BUY][{window_name} {cfg['window_size']}] p={p:.3f}, base={base*100:.2f}% → size={sz_pct:.2f}% (cap=${size_usd:.2f})",
         verbose_int=1,
         verbose_state=verbose,
     )
