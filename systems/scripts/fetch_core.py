@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
@@ -26,40 +29,102 @@ def _fetch_kraken(symbol: str, start_ms: int, end_ms: int) -> List[List]:
 
 
 
+def _iso(ms: int) -> str:
+    try:
+        return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S%z"
+        )
+    except Exception:
+        return str(ms)
+
+
+def _vprint(enabled: bool, msg: str):
+    if enabled:
+        print(msg)
+
+
 def _fetch_binance(symbol: str, start_ms: int, end_ms: int) -> List[List]:
+    """
+    Forward pagination (old -> new) with page-by-page debug and simple retries.
+    Returns a list of [ts, open, high, low, close, volume] rows.
+    """
     exchange = ccxt.binance({"enableRateLimit": True})
-    limit = 1000
     rows: List[List] = []
-    current_end = end_ms
-    safety_empty = 0  # stop if we see consecutive empties
+    limit = 1000
+    page_idx = 0
+    verbose = os.environ.get("FETCH_DEBUG", "0") == "1"
+    MAX_EMPTY_RETRY = 3
+    PARTIAL_RETRY_ON_LEN_LT = limit  # retry once if page smaller than limit
+    SLEEP_ON_RETRY_SEC = 0.5
 
-    while current_end >= start_ms:
-        since = max(start_ms, current_end - limit * 3600000)
+    since = start_ms
+    last_progress_ts: int | None = None
 
-        chunk = exchange.fetch_ohlcv(symbol, timeframe="1h", since=since, limit=limit) or []
-        # filter to the requested window (ms)
-        filtered = [r for r in chunk if r and since <= r[0] <= current_end]
+    while since <= end_ms:
+        page = (
+            exchange.fetch_ohlcv(symbol, timeframe="1h", since=since, limit=limit)
+            or []
+        )
+        page_len = len(page)
 
-        if not filtered:
-            safety_empty += 1
-            if safety_empty >= 2:
-                addlog(
-                    f"[INFO] Binance history floor reached or no more data for {symbol}",
-                    verbose_int=2,
-                    verbose_state=True,
-                )
-            if current_end <= start_ms or safety_empty >= 2:
-                break
-            current_end = max(start_ms, since - 3600000)
-            continue
+        empty_retries = 0
+        while page_len == 0 and empty_retries < MAX_EMPTY_RETRY:
+            _vprint(
+                verbose,
+                f"[FETCH][BINANCE] page={page_idx} since={since} EMPTY (retry {empty_retries+1}/{MAX_EMPTY_RETRY})",
+            )
+            time.sleep(SLEEP_ON_RETRY_SEC)
+            page = (
+                exchange.fetch_ohlcv(symbol, timeframe="1h", since=since, limit=limit)
+                or []
+            )
+            page_len = len(page)
+            empty_retries += 1
 
-        safety_empty = 0
-        rows.extend(filtered)
-
-        earliest = filtered[0][0]
-        if earliest <= start_ms:
+        if page_len == 0:
+            _vprint(
+                verbose, f"[FETCH][BINANCE] floor or no data at since={since} → stop"
+            )
             break
-        current_end = earliest - 3600000
+
+        did_partial_retry = False
+        if page_len < PARTIAL_RETRY_ON_LEN_LT:
+            _vprint(
+                verbose,
+                f"[FETCH][BINANCE] page={page_idx} got {page_len}/{limit} rows → partial, retrying once",
+            )
+            time.sleep(SLEEP_ON_RETRY_SEC)
+            page2 = (
+                exchange.fetch_ohlcv(symbol, timeframe="1h", since=since, limit=limit)
+                or []
+            )
+            if len(page2) > page_len:
+                page = page2
+                page_len = len(page)
+                did_partial_retry = True
+
+        first_ts = page[0][0]
+        last_ts = page[-1][0]
+        filtered = [r for r in page if start_ms <= r[0] <= end_ms]
+        rows.extend(filtered)
+        page_idx += 1
+
+        _vprint(
+            verbose,
+            f"[FETCH][BINANCE] page={page_idx:05d} since={since} "
+            f"first={_iso(first_ts)} last={_iso(last_ts)} rows={page_len} total={len(rows)}"
+            f"{' (partial→retry improved)' if did_partial_retry else ''}",
+        )
+
+        next_since = last_ts + 1
+        if last_progress_ts is not None and next_since <= last_progress_ts:
+            _vprint(
+                verbose,
+                f"[FETCH][BINANCE] no progress (next_since={next_since} <= last_progress={last_progress_ts}) → stop",
+            )
+            break
+        last_progress_ts = next_since
+        since = next_since
 
     return rows
 
