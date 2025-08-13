@@ -20,7 +20,12 @@ def main(argv: list[str] | None = None) -> None:
             action.choices = list(action.choices) + ["fetch"]
             break
     parser.add_argument("--coin", required=False, help="Coin ticker for fetch mode")
-    parser.add_argument("--recent", action="store_true", help="Fetch last 720h of candles")
+    parser.add_argument(
+        "--all", action="store_true", help="Fetch full Binance history for coin"
+    )
+    parser.add_argument(
+        "--recent", type=int, help="Fetch recent N hours for coin"
+    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -96,17 +101,44 @@ def main(argv: list[str] | None = None) -> None:
             verbose=args.verbose,
         )
     elif mode == "fetch":
-        if not args.recent or not args.coin:
+        if not args.coin:
             addlog(
-                "Error: --recent and --coin are required for fetch mode",
+                "Error: --coin is required for fetch mode",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            sys.exit(1)
+        if args.all and args.recent is not None:
+            addlog(
+                "Error: --all and --recent are mutually exclusive",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            sys.exit(1)
+        if not args.all and args.recent is None:
+            addlog(
+                "Error: either --all or --recent is required",
                 verbose_int=1,
                 verbose_state=True,
             )
             sys.exit(1)
         try:
-            from systems.fetch import fetch_recent_coin
+            from systems.fetch import fetch_all, fetch_recent
 
-            fetch_recent_coin(args.coin)
+            if args.all:
+                addlog(
+                    f"[BOT][FETCH][ALL] coin={args.coin} → full Binance history",
+                    verbose_int=1,
+                    verbose_state=True,
+                )
+                fetch_all(args.coin)
+            else:
+                addlog(
+                    f"[BOT][FETCH][RECENT] coin={args.coin} hours={args.recent}",
+                    verbose_int=1,
+                    verbose_state=True,
+                )
+                fetch_recent(args.coin, args.recent)
         except Exception as e:
             addlog(f"[ERROR] Fetch failed: {e}", verbose_int=1, verbose_state=True)
             sys.exit(1)
