@@ -19,7 +19,8 @@ def main(argv: list[str] | None = None) -> None:
         if action.dest == "mode" and action.choices is not None:
             action.choices = list(action.choices) + ["fetch"]
             break
-    parser.add_argument("--time", required=False, help="Time window (e.g. 120h)")
+    parser.add_argument("--coin", required=False, help="Coin ticker for fetch mode")
+    parser.add_argument("--recent", action="store_true", help="Fetch last 720h of candles")
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -95,18 +96,17 @@ def main(argv: list[str] | None = None) -> None:
             verbose=args.verbose,
         )
     elif mode == "fetch":
-        if not args.ledger:
-            addlog("Error: --ledger is required for fetch mode", verbose_int=1, verbose_state=verbose)
-            sys.exit(1)
-        time_window = args.time if args.time else "48h"
-        try:
-            from systems.fetch import fetch_missing_candles
-
-            fetch_missing_candles(
-                ledger=args.ledger,
-                relative_window=time_window,
-                verbose=args.verbose,
+        if not args.recent or not args.coin:
+            addlog(
+                "Error: --recent and --coin are required for fetch mode",
+                verbose_int=1,
+                verbose_state=True,
             )
+            sys.exit(1)
+        try:
+            from systems.fetch import fetch_recent_coin
+
+            fetch_recent_coin(args.coin)
         except Exception as e:
             addlog(f"[ERROR] Fetch failed: {e}", verbose_int=1, verbose_state=True)
             sys.exit(1)
