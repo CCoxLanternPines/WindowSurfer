@@ -165,6 +165,11 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
     sold = 0
     total_gain = 0.0
     for note in notes:
+        if note.get("kind") != "jackpot":
+            addlog(
+                f"[JACKPOT][DEBUG] skip note id={note.get('id')} kind={note.get('kind')}"
+            )
+            continue
         mode = state.get("mode", "sim")
         if mode == "live":
             result = execute_sell(
