@@ -22,13 +22,13 @@ from systems.utils.config import load_settings
 
 def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None:
     for name, ledger_cfg in settings.get("ledger_settings", {}).items():
-        tag = ledger_cfg.get("tag", "").upper()
+        coin = ledger_cfg.get("kraken_name", "").split("/")[0].upper()
         window_settings = ledger_cfg.get("window_settings", {})
         try:
-            df = fetch_candles(tag)
+            df = fetch_candles(coin)
         except FileNotFoundError:
             addlog(
-                f"[WARN] Candle data missing for {tag}",
+                f"[WARN] Candle data missing for {coin}",
                 verbose_int=1,
                 verbose_state=verbose,
             )
