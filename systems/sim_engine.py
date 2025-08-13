@@ -21,6 +21,7 @@ from systems.scripts.trade_apply import (
     paper_execute_buy,
     paper_execute_sell,
 )
+from systems.scripts import strategy_jackpot
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
 from systems.utils.resolve_symbol import split_tag
@@ -73,6 +74,14 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     runtime_state["buy_unlock_p"] = {}
 
     ledger_obj = Ledger()
+    jp_cfg = settings.get("jackpot", {})
+    runtime_state.setdefault("jackpot", {})
+    tag = ledger_cfg.get("tag", "")
+    first_ts = int(df[ts_col].iloc[0]) if len(df) else 0
+    if jp_cfg.get("enabled", False):
+        runtime_state["jackpot"][tag] = strategy_jackpot.init_state(
+            tag, ledger_obj, jp_cfg, first_ts
+        )
     win_metrics = {}
     for wname, wcfg in window_settings.items():
         win_metrics[wname] = {
@@ -89,45 +98,11 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
 
     for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
         price = float(df.iloc[t]["close"])
+        ts = int(df.iloc[t]["timestamp"]) if "timestamp" in df.columns else 0
 
+        # Normal sells
         for window_name, wcfg in window_settings.items():
             ctx = {"ledger": ledger_obj}
-            buy_res = evaluate_buy(
-                ctx,
-                t,
-                df,
-                window_name=window_name,
-                cfg=wcfg,
-                runtime_state=runtime_state,
-            )
-            if buy_res:
-                ts = None
-                if "timestamp" in df.columns:
-                    ts = int(df.iloc[t]["timestamp"])
-                result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
-                note = apply_buy_result_to_ledger(
-                    ledger=ledger_obj,
-                    window_name=window_name,
-                    t=t,
-                    meta=buy_res,
-                    result=result,
-                    state=runtime_state,
-                )
-                runtime_state.setdefault("buy_unlock_p", {})[window_name] = buy_res.get("unlock_p")
-                if runtime_state["capital"] < -1e-9:
-                    addlog(
-                        f"[BUG] capital negative after buy: ${runtime_state['capital']:.2f}",
-                        verbose_int=1,
-                        verbose_state=verbose,
-                    )
-                    runtime_state["capital"] = 0.0
-
-                m_buy = win_metrics.get(window_name)
-                if m_buy is not None:
-                    cost = result["filled_amount"] * result["avg_price"]
-                    m_buy["buys"] += 1
-                    m_buy["gross_invested"] += cost
-
             open_notes = ledger_obj.get_open_notes()
             sell_res = evaluate_sell(
                 ctx,
@@ -154,9 +129,6 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                 sell_notes = []
 
             for note in sell_notes:
-                ts = None
-                if "timestamp" in df.columns:
-                    ts = int(df.iloc[t]["timestamp"])
                 result = paper_execute_sell(price, note.get("entry_amount", 0.0), timestamp=ts)
                 apply_sell_result_to_ledger(
                     ledger=ledger_obj,
@@ -180,6 +152,109 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                     m_sell["realized_proceeds"] += proceeds
                     m_sell["realized_trades"] += 1
                     m_sell["realized_roi_accum"] += roi_trade
+
+        # Jackpot evaluation
+        jp_state = runtime_state.get("jackpot", {}).get(tag)
+        if jp_cfg.get("enabled") and jp_state:
+            jp_state["ATH"], jp_state["ATL"] = strategy_jackpot.update_reference_levels(
+                df.iloc[: t + 1]
+            )
+            signals = strategy_jackpot.evaluate_jackpot(
+                jp_state,
+                price=price,
+                now_ts=ts,
+                ledger_view=ledger_obj,
+                cfg=jp_cfg,
+            )
+            fills: list[dict] = []
+            for sig in signals:
+                if sig.get("action") == "sell_all":
+                    notes = [
+                        n for n in ledger_obj.get_open_notes() if n.get("window_name") == "jackpot"
+                    ]
+                    total_qty = 0.0
+                    for n in list(notes):
+                        qty = n.get("entry_amount", 0.0)
+                        total_qty += qty
+                        result = paper_execute_sell(price, qty, timestamp=ts)
+                        apply_sell_result_to_ledger(
+                            ledger=ledger_obj,
+                            note=n,
+                            t=t,
+                            result=result,
+                            state=runtime_state,
+                        )
+                    realized_cum = sum(
+                        n.get("gain", 0.0) for n in ledger_obj.get_closed_notes()
+                    )
+                    fills.append(
+                        {
+                            "action": "sell_all",
+                            "qty": total_qty,
+                            "price": price,
+                            "realized_cum": realized_cum,
+                        }
+                    )
+                elif sig.get("action") == "buy":
+                    usd = sig.get("usd", 0.0)
+                    result = paper_execute_buy(price, usd, timestamp=ts)
+                    note = apply_buy_result_to_ledger(
+                        ledger=ledger_obj,
+                        window_name="jackpot",
+                        t=t,
+                        meta={"window_name": "jackpot", "strategy": "jackpot"},
+                        result=result,
+                        state=runtime_state,
+                    )
+                    note["strategy"] = "jackpot"
+                    fills.append(
+                        {
+                            "action": "buy",
+                            "qty": result.get("filled_amount", 0.0),
+                            "usd": usd,
+                            "price": price,
+                            "pos": sig.get("pos", 0.0),
+                            "multiplier": sig.get("multiplier", 1.0),
+                        }
+                    )
+            if fills:
+                strategy_jackpot.apply_fills(jp_state, fills, ts)
+
+        # Normal buys
+        for window_name, wcfg in window_settings.items():
+            ctx = {"ledger": ledger_obj}
+            buy_res = evaluate_buy(
+                ctx,
+                t,
+                df,
+                window_name=window_name,
+                cfg=wcfg,
+                runtime_state=runtime_state,
+            )
+            if buy_res:
+                result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
+                note = apply_buy_result_to_ledger(
+                    ledger=ledger_obj,
+                    window_name=window_name,
+                    t=t,
+                    meta=buy_res,
+                    result=result,
+                    state=runtime_state,
+                )
+                runtime_state.setdefault("buy_unlock_p", {})[window_name] = buy_res.get("unlock_p")
+                if runtime_state["capital"] < -1e-9:
+                    addlog(
+                        f"[BUG] capital negative after buy: ${runtime_state['capital']:.2f}",
+                        verbose_int=1,
+                        verbose_state=verbose,
+                    )
+                    runtime_state["capital"] = 0.0
+
+                m_buy = win_metrics.get(window_name)
+                if m_buy is not None:
+                    cost = result["filled_amount"] * result["avg_price"]
+                    m_buy["buys"] += 1
+                    m_buy["gross_invested"] += cost
 
 
     final_price = float(df.iloc[-1]["close"]) if total else 0.0

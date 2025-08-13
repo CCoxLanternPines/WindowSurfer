@@ -15,7 +15,12 @@ from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
 from systems.scripts.trade_apply import apply_sell_result_to_ledger
-from systems.scripts.execution_handler import execute_sell, process_buy_signal
+from systems.scripts.execution_handler import (
+    execute_sell,
+    execute_buy,
+    process_buy_signal,
+)
+from systems.scripts import strategy_jackpot
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings, resolve_path
 from systems.utils.resolve_symbol import split_tag
@@ -74,29 +79,11 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
         runtime_states[name] = state
 
         price = float(df.iloc[t]["close"])
+        now_ts = int(df.iloc[t][ts_col]) if ts_col else 0
+
+        # Normal sells
         for window_name, wcfg in window_settings.items():
             ctx = {"ledger": ledger_obj}
-            buy_res = evaluate_buy(
-                ctx,
-                t,
-                df,
-                window_name=window_name,
-                cfg=wcfg,
-                runtime_state=state,
-            )
-            if buy_res:
-                process_buy_signal(
-                    buy_signal=buy_res,
-                    ledger=ledger_obj,
-                    t=t,
-                    runtime_state=state,
-                    pair_code=ledger_cfg["kraken_pair"],
-                    price=price,
-                    ledger_name=ledger_cfg["tag"],
-                    wallet_code=ledger_cfg.get("wallet_code", ""),
-                    verbose=state.get("verbose", 0),
-                )
-
             open_notes = ledger_obj.get_open_notes()
             sell_notes = evaluate_sell(
                 ctx,
@@ -125,6 +112,113 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                         state=state,
                     )
 
+        # Jackpot evaluation
+        jp_cfg = settings.get("jackpot", {})
+        jp_state = state.get("jackpot", {}).get(ledger_cfg["tag"])
+        if jp_cfg.get("enabled") and jp_state:
+            jp_state["ATH"], jp_state["ATL"] = strategy_jackpot.update_reference_levels(df)
+            signals = strategy_jackpot.evaluate_jackpot(
+                jp_state,
+                price=price,
+                now_ts=now_ts,
+                ledger_view=ledger_obj,
+                cfg=jp_cfg,
+            )
+            fills: list[dict] = []
+            for sig in signals:
+                if sig.get("action") == "sell_all":
+                    notes = [
+                        n for n in ledger_obj.get_open_notes() if n.get("window_name") == "jackpot"
+                    ]
+                    total_qty = 0.0
+                    for n in list(notes):
+                        qty = n.get("entry_amount", 0.0)
+                        total_qty += qty
+                        result = execute_sell(
+                            None,
+                            pair_code=ledger_cfg["kraken_pair"],
+                            coin_amount=qty,
+                            price=price,
+                            ledger_name=ledger_cfg["tag"],
+                            verbose=state.get("verbose", 0),
+                        )
+                        if result and not result.get("error"):
+                            apply_sell_result_to_ledger(
+                                ledger=ledger_obj,
+                                note=n,
+                                t=t,
+                                result=result,
+                                state=state,
+                            )
+                    realized_cum = sum(
+                        n.get("gain", 0.0) for n in ledger_obj.get_closed_notes()
+                    )
+                    fills.append(
+                        {
+                            "action": "sell_all",
+                            "qty": total_qty,
+                            "price": price,
+                            "realized_cum": realized_cum,
+                        }
+                    )
+                elif sig.get("action") == "buy":
+                    usd = sig.get("usd", 0.0)
+                    result = execute_buy(
+                        None,
+                        pair_code=ledger_cfg["kraken_pair"],
+                        price=price,
+                        amount_usd=usd,
+                        ledger_name=ledger_cfg["tag"],
+                        wallet_code=ledger_cfg.get("wallet_code", ""),
+                        verbose=state.get("verbose", 0),
+                    )
+                    if result and not result.get("error"):
+                        note = apply_buy_result_to_ledger(
+                            ledger=ledger_obj,
+                            window_name="jackpot",
+                            t=t,
+                            meta={"window_name": "jackpot", "strategy": "jackpot"},
+                            result=result,
+                            state=state,
+                        )
+                        note["strategy"] = "jackpot"
+                        fills.append(
+                            {
+                                "action": "buy",
+                                "qty": result.get("filled_amount", 0.0),
+                                "usd": usd,
+                                "price": result.get("avg_price", price),
+                                "pos": sig.get("pos", 0.0),
+                                "multiplier": sig.get("multiplier", 1.0),
+                            }
+                        )
+            if fills:
+                strategy_jackpot.apply_fills(jp_state, fills, now_ts)
+
+        # Normal buys
+        for window_name, wcfg in window_settings.items():
+            ctx = {"ledger": ledger_obj}
+            buy_res = evaluate_buy(
+                ctx,
+                t,
+                df,
+                window_name=window_name,
+                cfg=wcfg,
+                runtime_state=state,
+            )
+            if buy_res:
+                process_buy_signal(
+                    buy_signal=buy_res,
+                    ledger=ledger_obj,
+                    t=t,
+                    runtime_state=state,
+                    pair_code=ledger_cfg["kraken_pair"],
+                    price=price,
+                    ledger_name=ledger_cfg["tag"],
+                    wallet_code=ledger_cfg.get("wallet_code", ""),
+                    verbose=state.get("verbose", 0),
+                )
+
         save_ledger(name, ledger_obj, tag=ledger_cfg["tag"])
 
 
@@ -141,6 +235,8 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
             prev={"verbose": verbose},
         )
         state["buy_unlock_p"] = {}
+        jp_cfg = settings.get("jackpot", {})
+        state.setdefault("jackpot", {})
         runtime_states[name] = state
 
         ledger_obj = Ledger.load_ledger(name, tag=ledger_cfg["tag"])
@@ -170,6 +266,12 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
                 "[LEDGER][LAST_TS] none",
                 verbose_int=1,
                 verbose_state=verbose,
+            )
+
+        if jp_cfg.get("enabled", False):
+            now_ts = last_ts if last_ts is not None else int(datetime.utcnow().timestamp())
+            state["jackpot"][ledger_cfg["tag"]] = strategy_jackpot.init_state(
+                ledger_cfg["tag"], ledger_obj, jp_cfg, now_ts
             )
 
     if dry:

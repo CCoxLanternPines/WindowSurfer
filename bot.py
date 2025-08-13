@@ -1,4 +1,7 @@
-"""Command line entry point for WindowSurfer."""
+"""Command line entry point for WindowSurfer.
+
+Includes Jackpot strategy integration via simulation and live engines.
+"""
 
 from __future__ import annotations
 

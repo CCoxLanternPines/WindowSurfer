@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List
 
-from systems.utils.addlog import addlog, send_telegram_message
+from systems.utils.logger import jp_info, jp_debug, jp_trace
+from systems.utils.telegram import notify_telegram
 from systems.utils.timeparse import parse_duration_to_hours
 
 
@@ -23,7 +24,7 @@ def init_state(tag: str, ledger, settings: Dict, now_ts: int) -> dict:
     """Initialise jackpot state structure."""
     cfg = JackpotConfig(**settings)
     period_h = parse_duration_to_hours(cfg.drip_period_hours)
-    addlog(
+    jp_info(
         (
             "[JACKPOT][INIT] enabled={enabled} start={start:.0%} take={take:.0%} "
             "period={period}h base=${base:.2f} mult_max={mult:.2f}"
@@ -34,9 +35,7 @@ def init_state(tag: str, ledger, settings: Dict, now_ts: int) -> dict:
             period=period_h,
             base=cfg.base_drip_usd,
             mult=cfg.multiplier_max,
-        ),
-        verbose_int=1,
-        verbose_state=1,
+        )
     )
     return {
         "tag": tag,
@@ -65,16 +64,11 @@ def evaluate_jackpot(state: dict, price: float, now_ts: int, ledger_view, cfg: D
     if not cfg.get("enabled"):
         return signals
 
-    verbose = state.get("verbose", 0)
     ath = state.get("ATH", 0.0)
     atl = state.get("ATL", 0.0)
     start_line = ath * cfg.get("start_level_frac", 0.5)
     if start_line == atl:
-        addlog(
-            "[JACKPOT][SKIP] reason=degenerate_levels S==ATL",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
+        jp_debug("[JACKPOT][SKIP] reason=degenerate_levels S==ATL")
         return signals
 
     take_line = ath * cfg.get("take_profit_frac", 0.75)
@@ -83,11 +77,7 @@ def evaluate_jackpot(state: dict, price: float, now_ts: int, ledger_view, cfg: D
         if qty > 0:
             signals.append({"action": "sell_all", "qty": qty})
         else:
-            addlog(
-                "[JACKPOT][EXIT] gate_open but no_inventory",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
+            jp_debug("[JACKPOT][EXIT] gate_open but no_inventory")
         return signals
 
     if price > start_line:
@@ -105,46 +95,31 @@ def evaluate_jackpot(state: dict, price: float, now_ts: int, ledger_view, cfg: D
     realized = sum(n.get("gain", 0.0) for n in closed)
     budget_left = realized - state.get("total_contributed_usd", 0.0)
 
-    if verbose >= 2:
-        addlog(
-            (
-                "[JACKPOT][ELIGIBLE] price=${p:.4f} ≤ start=${s:.4f} pos={pos:.2f} "
-                "mult={m:.2f} desired=${d:.2f} budget=${b:.2f}"
-            ).format(
-                p=price, s=start_line, pos=pos, m=mult, d=desired, b=budget_left
-            ),
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        addlog(
-            f"[JACKPOT][CADENCE] last={last_age_h:.1f}h ≥ period={period_h}h",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
+    jp_debug(
+        (
+            "[JACKPOT][ELIGIBLE] price=${p:.4f} ≤ start=${s:.4f} pos={pos:.2f} "
+            "mult={m:.2f} desired=${d:.2f} budget=${b:.2f}"
+        ).format(p=price, s=start_line, pos=pos, m=mult, d=desired, b=budget_left)
+    )
+    jp_debug(f"[JACKPOT][CADENCE] last={last_age_h:.1f}h ≥ period={period_h}h")
 
     if budget_left <= 0:
-        addlog(
+        jp_debug(
             (
                 "[JACKPOT][SKIP] reason=no_budget contributed=${c:.2f} "
                 "realized=${r:.2f}"
-            ).format(
-                c=state.get("total_contributed_usd", 0.0), r=realized
-            ),
-            verbose_int=2,
-            verbose_state=verbose,
+            ).format(c=state.get("total_contributed_usd", 0.0), r=realized)
         )
         return signals
 
     usd = min(desired, budget_left)
     min_order = state.get("min_order_usd", 0.0)
     if usd < min_order:
-        addlog(
+        jp_debug(
             (
                 "[JACKPOT][SKIP] reason=min_order desired=${d:.2f} budget=${b:.2f} "
                 "min=${m:.2f}"
-            ).format(d=desired, b=budget_left, m=min_order),
-            verbose_int=2,
-            verbose_state=verbose,
+            ).format(d=desired, b=budget_left, m=min_order)
         )
         return signals
 
@@ -161,6 +136,26 @@ def evaluate_jackpot(state: dict, price: float, now_ts: int, ledger_view, cfg: D
             "pos": pos,
             "multiplier": mult,
         }
+    )
+    avg_entry = state.get("avg_entry_price")
+    contrib_total = state.get("total_contributed_usd", 0.0)
+    inv_qty = state.get("inventory_qty", 0.0)
+    next_in_h = max(period_h - last_age_h, 0.0)
+    jp_trace(
+        (
+            "[JACKPOT][STATE] ATH=${ath:.4f} ATL=${atl:.4f} start=${start:.4f} "
+            "take=${take:.4f} contrib=${c:.2f} inv_qty={q:.8f} avg=${avg:.4f} "
+            "next_in={n:.1f}h"
+        ).format(
+            ath=ath,
+            atl=atl,
+            start=start_line,
+            take=take_line,
+            c=contrib_total,
+            q=inv_qty,
+            avg=avg_entry or 0,
+            n=next_in_h,
+        )
     )
     return signals
 
@@ -181,20 +176,14 @@ def apply_fills(state: dict, fills: List[dict], now_ts: int) -> None:
             state["avg_entry_price"] = total_cost / new_qty if new_qty else 0.0
             state["total_contributed_usd"] += usd
             state["last_drip_ts"] = now_ts
-            addlog(
-                f"[JACKPOT][BUY] qty={qty:.8f} usd=${usd:.2f} price=${price:.4f}",
-                verbose_int=1,
-                verbose_state=state.get("verbose", 0),
-            )
-            addlog(
+            jp_info(f"[JACKPOT][BUY] qty={qty:.8f} usd=${usd:.2f} price=${price:.4f}")
+            jp_info(
                 (
                     "[JACKPOT][ADDED] +${usd:.2f} → contributed=${c:.2f} "
                     "inv_qty={q:.8f}"
-                ).format(usd=usd, c=state["total_contributed_usd"], q=new_qty),
-                verbose_int=1,
-                verbose_state=state.get("verbose", 0),
+                ).format(usd=usd, c=state["total_contributed_usd"], q=new_qty)
             )
-            send_telegram_message(
+            notify_telegram(
                 (
                     "🚰 JACKPOT DRIP\n+${usd:.2f} at ${price:.4f}  (pos {pos:.2f}, mult {mult:.2f})\n"
                     "Contributed: ${c:.2f} | Inv: {q:.6f}"
@@ -213,23 +202,19 @@ def apply_fills(state: dict, fills: List[dict], now_ts: int) -> None:
             proceeds = qty * price
             state["inventory_qty"] = 0.0
             state["avg_entry_price"] = 0.0
-            addlog(
+            jp_info(
                 (
                     "[JACKPOT REACHED!!!] SELL_ALL qty={q:.8f} price=${p:.4f} "
                     "proceeds=${pr:.2f}"
-                ).format(q=qty, p=price, pr=proceeds),
-                verbose_int=1,
-                verbose_state=state.get("verbose", 0),
+                ).format(q=qty, p=price, pr=proceeds)
             )
-            addlog(
+            jp_info(
                 (
                     "[JACKPOT REACHED!!!] TOTAL contributed=${c:.2f} "
                     "realized_pnl_cum=${r:.2f}"
-                ).format(c=state.get("total_contributed_usd", 0.0), r=f.get("realized_cum", 0.0)),
-                verbose_int=1,
-                verbose_state=state.get("verbose", 0),
+                ).format(c=state.get("total_contributed_usd", 0.0), r=f.get("realized_cum", 0.0))
             )
-            send_telegram_message(
+            notify_telegram(
                 (
                     "🎰 JACKPOT REACHED!!!\nSold {q:.6f} at ${p:.4f}  → Proceeds: ${pr:.2f}\n"
                     "Contributed total: ${c:.2f}\nRealized PnL (cum): ${r:.2f}"
