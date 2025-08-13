@@ -24,6 +24,11 @@ def main(argv: list[str] | None = None) -> None:
         "--all", action="store_true", help="Fetch full Binance history for coin"
     )
     parser.add_argument(
+        "--full-history",
+        action="store_true",
+        help="Fetch full history into a separate *_full.csv file",
+    )
+    parser.add_argument(
         "--recent", type=int, help="Fetch recent N hours for coin"
     )
 
@@ -108,24 +113,24 @@ def main(argv: list[str] | None = None) -> None:
                 verbose_state=True,
             )
             sys.exit(1)
-        if args.all and args.recent is not None:
+        if sum([bool(args.all), bool(args.full_history), args.recent is not None]) != 1:
             addlog(
-                "Error: --all and --recent are mutually exclusive",
-                verbose_int=1,
-                verbose_state=True,
-            )
-            sys.exit(1)
-        if not args.all and args.recent is None:
-            addlog(
-                "Error: either --all or --recent is required",
+                "Error: specify exactly one of --all, --recent, or --full-history",
                 verbose_int=1,
                 verbose_state=True,
             )
             sys.exit(1)
         try:
-            from systems.fetch import fetch_all, fetch_recent
+            from systems.fetch import fetch_all, fetch_recent, fetch_full_history
 
-            if args.all:
+            if args.full_history:
+                addlog(
+                    f"[BOT][FETCH][FULL] coin={args.coin}",
+                    verbose_int=1,
+                    verbose_state=True,
+                )
+                fetch_full_history(args.coin)
+            elif args.all:
                 addlog(
                     f"[BOT][FETCH][ALL] coin={args.coin} → full Binance history",
                     verbose_int=1,

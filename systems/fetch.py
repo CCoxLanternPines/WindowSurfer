@@ -75,6 +75,26 @@ def fetch_all(coin: str) -> int:
     return rows
 
 
+def fetch_full_history(coin: str) -> int:
+    """Fetch full history and store under ``data/raw/<COIN>_full.csv``."""
+
+    coin = coin.upper()
+    _, binance_symbol = resolve_ccxt_symbols_by_coin(coin)
+
+    end_ts = int(time.time() // 3600 * 3600)
+    all_df = fetch_binance_range(binance_symbol, 0, end_ts)
+    rows = len(all_df)
+
+    addlog(
+        f"[FETCH][FULL] coin={coin} rows={rows}",
+        verbose_int=1,
+        verbose_state=True,
+    )
+    csv_path = get_coin_raw_path(f"{coin}_full")
+    _write_clean_csv(csv_path, [all_df])
+    return rows
+
+
 def fetch_recent(coin: str, hours: int) -> int:
     """Fetch the last ``hours`` candles for ``coin`` and merge with existing data."""
 
@@ -112,16 +132,21 @@ def main(argv: list[str] | None = None) -> None:
         "--all", action="store_true", help="Fetch full Binance history"
     )
     parser.add_argument(
+        "--full-history",
+        action="store_true",
+        help="Fetch full history to a separate *_full.csv file",
+    )
+    parser.add_argument(
         "--recent", type=int, help="Fetch recent N hours from Kraken"
     )
     args = parser.parse_args(argv)
 
-    if args.all and args.recent is not None:
-        parser.error("--all and --recent cannot be used together")
-    if not args.all and args.recent is None:
-        parser.error("--all or --recent is required")
+    if sum([bool(args.all), bool(args.full_history), args.recent is not None]) != 1:
+        parser.error("Specify exactly one of --all, --recent or --full-history")
 
-    if args.all:
+    if args.full_history:
+        fetch_full_history(args.coin)
+    elif args.all:
         fetch_all(args.coin)
     else:
         fetch_recent(args.coin, args.recent)
