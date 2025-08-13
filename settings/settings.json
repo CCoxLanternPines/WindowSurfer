@@ -13,7 +13,7 @@
           "reset_buy_percent": 0.5,
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.1,
+          "investment_fraction": 0.1
         },
         "fish": {
           "window_size": "2d",
@@ -21,7 +21,7 @@
           "reset_buy_percent": 0.5,
           "maturity_position": 1.5,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.15,
+          "investment_fraction": 0.15
         }
       }
     },
@@ -33,20 +33,20 @@
       "binance_name": "SOLUSDC",
       "window_settings": {
         "mouse": {
-          "window_size": "1d",
+         "window_size": "12h",
           "buy_trigger_position": 0.1,
-          "reset_buy_percent": 0.15,
+          "reset_buy_percent": 0.5,
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.15,
+          "investment_fraction": 0.1
         },
         "rabbit": {
-          "window_size": "3d",
+          "window_size": "2d",
           "buy_trigger_position": 0.1,
-          "reset_buy_percent": 0.15,
-          "maturity_position": 1.0,
+          "reset_buy_percent": 0.5,
+          "maturity_position": 1.5,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.2,
+          "investment_fraction": 0.15
         }
       }
     }
