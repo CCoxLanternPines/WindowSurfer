@@ -14,8 +14,6 @@
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
           "investment_fraction": 0.1,
-          "window_transform_multiplier": 1,
-          "max_open_notes": 100
         },
         "fish": {
           "window_size": "2d",
@@ -24,8 +22,6 @@
           "maturity_position": 1.5,
           "max_notes_sell_per_candle": 1,
           "investment_fraction": 0.15,
-          "window_transform_multiplier": 1,
-          "max_open_notes": 100
         }
       }
     },
@@ -43,8 +39,6 @@
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
           "investment_fraction": 0.15,
-          "window_transform_multiplier": 1,
-          "max_open_notes": 100
         },
         "rabbit": {
           "window_size": "3d",
@@ -53,8 +47,6 @@
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
           "investment_fraction": 0.2,
-          "window_transform_multiplier": 2,
-          "max_open_notes": 100
         }
       }
     }

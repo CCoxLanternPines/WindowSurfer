@@ -63,29 +63,27 @@ def evaluate_trade(
         if tick - cooldown_tracker.get(name, float("-inf")) < adjusted_cd:
             return sim_capital, True
 
-        open_for_window = [n for n in ledger.get_active_notes() if n["window"] == name]
-        if len(open_for_window) < cfg.get("max_open_notes", 0):
-            base_note_count = sim_capital * cfg.get("investment_fraction", 0)
-            adjusted_note_count = base_note_count * trade_params["buy_multiplier"]
-            invest = min(adjusted_note_count, max_note_usdt)
-            if invest >= min_note_usdt and invest <= sim_capital:
-                amount = invest / current_price
-                note = {
-                    "window": name,
-                    "entry_tick": tick,
-                    "buy_tick": tick,
-                    "entry_price": current_price,
-                    "entry_amount": amount,
-                    "status": "Open",
-                }
-                ledger.open_note(note)
-                sim_capital -= invest
-                cooldown_tracker[name] = tick
-                addlog(
-                    f"[BUY] {name} tick {tick} price={current_price:.6f}",
-                    verbose_int=2,
-                    verbose_state=verbose,
-                )
+        base_note_count = sim_capital * cfg.get("investment_fraction", 0)
+        adjusted_note_count = base_note_count * trade_params["buy_multiplier"]
+        invest = min(adjusted_note_count, max_note_usdt)
+        if invest >= min_note_usdt and invest <= sim_capital:
+            amount = invest / current_price
+            note = {
+                "window": name,
+                "entry_tick": tick,
+                "buy_tick": tick,
+                "entry_price": current_price,
+                "entry_amount": amount,
+                "status": "Open",
+            }
+            ledger.open_note(note)
+            sim_capital -= invest
+            cooldown_tracker[name] = tick
+            addlog(
+                f"[BUY] {name} tick {tick} price={current_price:.6f}",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
         return sim_capital, False
 
     if trade_type == "sell":

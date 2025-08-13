@@ -167,49 +167,43 @@ def handle_top_of_hour(
                     )
                     last_buy = last_buy_tick.get(window_name, float("-inf"))
                     if dry_run or current_ts - last_buy >= buy_cd:
-                        open_for_window = [
-                            n
-                            for n in ledger.get_active_notes()
-                            if n.get("window") == window_name
-                        ]
-                        if len(open_for_window) < window_cfg.get("max_open_notes", 0):
-                            available = float(balance.get(quote, 0.0))
-                            base_invest = available * window_cfg.get(
-                                "investment_fraction", 0
+                        available = float(balance.get(quote, 0.0))
+                        base_invest = available * window_cfg.get(
+                            "investment_fraction", 0
+                        )
+                        adjusted_invest = base_invest * trade["buy_multiplier"]
+                        max_usd = general_cfg.get("max_note_usdt", adjusted_invest)
+                        min_usd = general_cfg.get("minimum_note_size", 0.0)
+                        invest = min(adjusted_invest, max_usd)
+                        if invest >= min_usd and invest <= available and invest > 0:
+                            result = execute_buy(
+                                client=client,
+                                pair_code=pair_code,
+                                price=price,
+                                amount_usd=invest,
+                                ledger_name=ledger_name,
+                                wallet_code=wallet_code,
                             )
-                            adjusted_invest = base_invest * trade["buy_multiplier"]
-                            max_usd = general_cfg.get("max_note_usdt", adjusted_invest)
-                            min_usd = general_cfg.get("minimum_note_size", 0.0)
-                            invest = min(adjusted_invest, max_usd)
-                            if invest >= min_usd and invest <= available and invest > 0:
-                                result = execute_buy(
-                                    client=client,
-                                    pair_code=pair_code,
-                                    price=price,
-                                    amount_usd=invest,
-                                    ledger_name=ledger_name,
-                                    wallet_code=wallet_code,
+                            if result and not result.get("error"):
+                                note = {
+                                    "entry_amount": result["filled_amount"],
+                                    "entry_price": result["avg_price"],
+                                    "entry_ts": result["timestamp"],
+                                    "entry_tick": current_ts,
+                                    "window": window_name,
+                                    "status": "Open",
+                                }
+                                ledger.open_note(note)
+                                if not dry_run:
+                                    last_buy_tick[window_name] = current_ts
+                                buy_count += 1
+                                msg = (
+                                    f"[LIVE][BUY] {ledger_name} | {tag} | "
+                                    f"{result['filled_amount']:.4f} {wallet_code} @ "
+                                    f"${result['avg_price']:.3f}"
                                 )
-                                if result and not result.get("error"):
-                                    note = {
-                                        "entry_amount": result["filled_amount"],
-                                        "entry_price": result["avg_price"],
-                                        "entry_ts": result["timestamp"],
-                                        "entry_tick": current_ts,
-                                        "window": window_name,
-                                        "status": "Open",
-                                    }
-                                    ledger.open_note(note)
-                                    if not dry_run:
-                                        last_buy_tick[window_name] = current_ts
-                                    buy_count += 1
-                                    msg = (
-                                        f"[LIVE][BUY] {ledger_name} | {tag} | "
-                                        f"{result['filled_amount']:.4f} {wallet_code} @ "
-                                        f"${result['avg_price']:.3f}"
-                                    )
-                                    addlog(msg)
-                                    send_telegram_message(msg)
+                                addlog(msg)
+                                send_telegram_message(msg)
                     else:
                         reasons = []
                         if not dry_run and current_ts - last_buy < buy_cd:
