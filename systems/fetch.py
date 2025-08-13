@@ -15,24 +15,44 @@ import pandas as pd
 
 from systems.utils.addlog import addlog
 from systems.utils.config import resolve_ccxt_symbols_by_coin
-from systems.scripts.fetch_candles import load_coin_csv
 from systems.scripts.fetch_core import (
-    COLUMNS,
     fetch_binance_range,
     fetch_kraken_range,
     get_coin_raw_path,
 )
 
 
-def _save_df(coin: str, df: pd.DataFrame) -> int:
-    """Save ``df`` to the canonical raw path for ``coin``."""
+def _write_clean_csv(csv_path: str, frames):
+    """Merge frames, normalize timestamp, drop open candle, sort ascending, dedupe on timestamp."""
+    now_ms = int(time.time() * 1000)
+    df = pd.concat(frames, ignore_index=True)
 
-    path = get_coin_raw_path(coin)
-    tmp = path.with_suffix(".tmp")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(tmp, index=False)
-    tmp.replace(path)
-    return len(df)
+    # Normalize timestamp column name + type
+    ts_col = None
+    for c in df.columns:
+        lc = str(c).lower()
+        if lc in ("timestamp", "time", "date"):
+            ts_col = c
+            break
+    if ts_col is None:
+        raise ValueError(f"No timestamp-like column in fetched frames for {csv_path}")
+
+    if ts_col != "timestamp":
+        df.rename(columns={ts_col: "timestamp"}, inplace=True)
+
+    df["timestamp"] = pd.to_numeric(df["timestamp"], errors="coerce")
+    df = df.dropna(subset=["timestamp"])
+
+    # Drop the currently building 1h candle (anything within the last hour)
+    df = df[df["timestamp"] <= now_ms - 3600000]
+
+    # Sort ascending + dedupe on timestamp
+    before = len(df)
+    df = df.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="last").reset_index(drop=True)
+    removed = before - len(df)
+
+    df.to_csv(csv_path, index=False)
+    print(f"[FETCH][WRITE] path={csv_path} rows={len(df)} dups_removed={removed}")
 
 
 def fetch_all(coin: str) -> int:
@@ -50,7 +70,9 @@ def fetch_all(coin: str) -> int:
         verbose_int=1,
         verbose_state=True,
     )
-    return _save_df(coin, all_df)
+    csv_path = get_coin_raw_path(coin)
+    _write_clean_csv(csv_path, [all_df])
+    return rows
 
 
 def fetch_recent(coin: str, hours: int) -> int:
@@ -71,15 +93,10 @@ def fetch_recent(coin: str, hours: int) -> int:
         verbose_state=True,
     )
 
-    try:
-        existing = load_coin_csv(coin)
-    except FileNotFoundError:
-        existing = pd.DataFrame(columns=COLUMNS)
-
-    merged = pd.concat([existing, recent], ignore_index=True)
-    merged = merged.drop_duplicates(subset="timestamp").sort_values("timestamp")
-
-    return _save_df(coin, merged)
+    csv_path = get_coin_raw_path(coin)
+    existing = pd.read_csv(csv_path)
+    _write_clean_csv(csv_path, [existing, recent])
+    return len(recent)
 
 
 def fetch_recent_coin(coin: str) -> int:

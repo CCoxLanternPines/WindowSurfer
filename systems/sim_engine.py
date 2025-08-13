@@ -8,9 +8,9 @@ from datetime import datetime
 import csv
 import json
 
+import pandas as pd
 from tqdm import tqdm
 
-from systems.scripts.fetch_candles import load_coin_csv
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -33,7 +33,35 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     coin = base.upper()
     window_settings = ledger_cfg.get("window_settings", {})
 
-    df = load_coin_csv(coin)
+    raw_path = resolve_path("") / "data" / "raw" / f"{coin}.csv"
+    df = pd.read_csv(raw_path)
+
+    # Normalize + guard
+    ts_col = None
+    for c in df.columns:
+        lc = str(c).lower()
+        if lc in ("timestamp", "time", "date"):
+            ts_col = c
+            break
+    if ts_col is None:
+        raise ValueError(f"No timestamp column in {raw_path}")
+
+    df[ts_col] = pd.to_numeric(df[ts_col], errors="coerce")
+    df = df.dropna(subset=[ts_col])
+
+    before = len(df)
+    df = df.sort_values(ts_col).drop_duplicates(subset=[ts_col], keep="last").reset_index(drop=True)
+    removed = before - len(df)
+
+    # Optional hard check
+    if not df[ts_col].is_monotonic_increasing:
+        raise ValueError(f"Candles not sorted by {ts_col}: {raw_path}")
+
+    # Log one line so we always know what we ran on
+    first_ts = int(df[ts_col].iloc[0]) if len(df) else None
+    last_ts = int(df[ts_col].iloc[-1]) if len(df) else None
+    print(f"[DATA] file={raw_path} rows={len(df)} first={first_ts} last={last_ts} dups_removed={removed}")
+
     total = len(df)
 
     runtime_state = build_runtime_state(
