@@ -55,5 +55,13 @@
     "max_note_usdt": 1000.0,
     "minimum_note_size": 10
   },
-  "simulation_capital": 1000
+  "simulation_capital": 1000,
+  "jackpot": {
+    "enabled": true,
+    "start_level_frac": 0.50,
+    "take_profit_frac": 0.75,
+    "drip_period_hours": "7d",
+    "base_drip_usd": 10,
+    "multiplier_max": 5.0
+  }
 }
