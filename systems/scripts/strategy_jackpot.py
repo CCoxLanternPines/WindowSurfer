@@ -183,6 +183,15 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
     sold = 0
     total_gain = 0.0
     for note in notes:
+        # Skip notes that are too small to sell
+        value = note.get("entry_amount", 0.0) * price
+        min_size = float(limits.get("min_note_size", 0.0))
+        if value < min_size:
+            addlog(
+                f"[JACKPOT][SKIP_MIN] id={note.get('id')} value=${value:.2f} min=${min_size:.2f}"
+            )
+            continue
+
         mode = state.get("mode", "sim")
         if mode == "live":
             result = execute_sell(
