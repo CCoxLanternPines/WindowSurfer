@@ -280,9 +280,13 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         verbose_state=verbose,
     )
     j = runtime_state.get("jackpot", {})
+    coin_value = sum(
+        n.get("entry_amount", 0.0) * final_price for n in j.get("notes_open", [])
+    )
+    jackpot_total = j.get("pool_usd", 0.0) + coin_value
     if j.get("enabled"):
         addlog(
-            f"[REPORT][JACKPOT] drips=${j.get('drips',0.0):.2f} buys={j.get('buys',0)} sells={j.get('sells',0)} realized_pnl=${j.get('realized_pnl',0.0):.2f} pool_left=${j.get('pool_usd',0.0):.2f}",
+            f"[REPORT][JACKPOT] drips=${j.get('drips',0.0):.2f} buys={j.get('buys',0)} sells={j.get('sells',0)} realized_pnl=${j.get('realized_pnl',0.0):.2f} pool_left=${j.get('pool_usd',0.0):.2f} coin_value={coin_value:.2f} total={jackpot_total:.2f}",
             verbose_int=1,
             verbose_state=verbose,
         )
@@ -320,9 +324,11 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         writer.writerows(rows)
         if j.get("enabled"):
             f_csv.write("\n")
-            f_csv.write("jackpot_drips,jackpot_buys,jackpot_sells,jackpot_realized_pnl,jackpot_pool_left\n")
             f_csv.write(
-                f"{j.get('drips',0.0)},{j.get('buys',0)},{j.get('sells',0)},{j.get('realized_pnl',0.0)},{j.get('pool_usd',0.0)}\n"
+                "jackpot_drips,jackpot_buys,jackpot_sells,jackpot_realized_pnl,jackpot_pool_left,jackpot_coin_value,jackpot_total\n"
+            )
+            f_csv.write(
+                f"{j.get('drips',0.0)},{j.get('buys',0)},{j.get('sells',0)},{j.get('realized_pnl',0.0)},{j.get('pool_usd',0.0)},{coin_value},{jackpot_total}\n"
             )
     json_data = {
         "windows": rows,
@@ -339,6 +345,8 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
             "sells": j.get("sells", 0),
             "realized_pnl": j.get("realized_pnl", 0.0),
             "pool_left": j.get("pool_usd", 0.0),
+            "coin_value": coin_value,
+            "total": jackpot_total,
         }
     with json_path.open("w", encoding="utf-8") as f_json:
         json.dump(json_data, f_json, indent=2)
