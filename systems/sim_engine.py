@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from systems.scripts.fetch_candles import fetch_candles
 from systems.scripts.ledger import Ledger, save_ledger
+from systems.scripts.jackpot_manager import JackpotManager, BuyQuote, ExitAll
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
@@ -34,6 +35,8 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
 
     df = fetch_candles(coin)
     total = len(df)
+    ath_from_data = float(df["close"].max()) if total else 0.0
+    min_from_data = float(df["close"].min()) if total else 0.0
 
     runtime_state = build_runtime_state(
         settings,
@@ -44,6 +47,12 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     runtime_state["buy_unlock_p"] = {}
 
     ledger_obj = Ledger()
+    jackpot_cfg = settings.get("general_settings", {}).get("jackpot_settings", {})
+    jm: JackpotManager | None = None
+    prev_realized = 0.0
+    if jackpot_cfg.get("enable"):
+        start_ts = int(df.iloc[0]["timestamp"]) if "timestamp" in df.columns else 0
+        jm = JackpotManager(jackpot_cfg, start_ts, ath_from_data, min_from_data)
     win_metrics = {}
     for wname, wcfg in window_settings.items():
         win_metrics[wname] = {
@@ -137,6 +146,45 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                     m_sell["realized_trades"] += 1
                     m_sell["realized_roi_accum"] += roi_trade
 
+        if jm:
+            realized_total = ledger_obj.get_cumulative_realized_pnl()
+            realized_delta = realized_total - prev_realized
+            prev_realized = realized_total
+            ts_now = int(df.iloc[t]["timestamp"]) if "timestamp" in df.columns else t
+            wallet_quote_available = runtime_state["capital"]
+            open_value = sum(
+                n.get("entry_amount", 0.0) * price for n in ledger_obj.get_open_notes()
+            )
+            wallet_total_quote = wallet_quote_available + open_value
+            act = jm.on_tick(
+                ts_now,
+                price,
+                realized_delta,
+                wallet_quote_available,
+                wallet_total_quote,
+            )
+            if isinstance(act, BuyQuote):
+                result = paper_execute_buy(price, act.amount_quote, timestamp=ts_now)
+                apply_buy_result_to_ledger(
+                    ledger=ledger_obj,
+                    window_name="jackpot",
+                    t=t,
+                    meta={"window_name": "jackpot", "window_size": "jackpot", "strategy": "jackpot"},
+                    result=result,
+                    state=runtime_state,
+                )
+            elif isinstance(act, ExitAll):
+                notes = ledger_obj.get_open_notes(strategy="jackpot")
+                for note in notes:
+                    result = paper_execute_sell(price, note.get("entry_amount", 0.0), timestamp=ts_now)
+                    apply_sell_result_to_ledger(
+                        ledger=ledger_obj,
+                        note=note,
+                        t=t,
+                        result=result,
+                        state=runtime_state,
+                    )
+
 
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)
@@ -197,6 +245,13 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         verbose_int=1,
         verbose_state=verbose,
     )
+    if jm:
+        snap = jm.snapshot()
+        addlog(
+            f"[JACKPOT][SUMMARY] bank_in=${snap['bank_in']:.2f} bank_spent=${snap['bank_spent']:.2f} qty={snap['qty']:.6f} avg_cost=${snap['avg_cost']:.4f} exit_value={0 if snap['exit_value'] is None else snap['exit_value']:.2f} realized_from_exit={0 if snap['realized_from_exit'] is None else snap['realized_from_exit']:.2f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
 
     root = resolve_path("")
     logs_dir = root / "logs"

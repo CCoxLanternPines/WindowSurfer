@@ -81,6 +81,8 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if mode == "sim":
+        if args.jackpot:
+            settings.setdefault("general_settings", {}).setdefault("jackpot_settings", {})["enable"] = True
         if not args.ledger:
             addlog("Error: --ledger is required for sim mode")
             sys.exit(1)

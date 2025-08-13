@@ -36,9 +36,17 @@ def main(argv: list[str] | None = None) -> None:
         required=False,
         help="Time window (e.g. 120h)",
     )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Fetch full available history",
+    )
     args = parser.parse_args(argv)
     if not args.ledger:
         parser.error("--ledger is required")
+    if args.full:
+        fetch_missing_candles(args.ledger, verbose=args.verbose, full=True)
+        return
 
     time_window = args.time if args.time else "48h"
     verbose = args.verbose
@@ -227,7 +235,11 @@ def fetch_recent(ledger: str, verbose: int = 1) -> None:
 
 
 def fetch_missing_candles(
-    ledger: str, relative_window: str = "48h", verbose: int = 1
+    ledger: str,
+    relative_window: str = "48h",
+    verbose: int = 1,
+    *,
+    full: bool = False,
 ) -> None:
     ledger_cfg = load_ledger_config(ledger)
     tag = ledger_cfg["tag"].upper()
@@ -242,9 +254,13 @@ def fetch_missing_candles(
         )
         raise RuntimeError("Missing exchange symbols")
 
-    start_ts, end_ts = parse_relative_time(relative_window)
-    start_ts = int(start_ts // 3600 * 3600)
-    end_ts = int(end_ts // 3600 * 3600)
+    if full:
+        start_ts = 0
+        end_ts = int(datetime.now(timezone.utc).timestamp())
+    else:
+        start_ts, end_ts = parse_relative_time(relative_window)
+        start_ts = int(start_ts // 3600 * 3600)
+        end_ts = int(end_ts // 3600 * 3600)
     interval_ms = 3_600_000
     out_path = get_raw_path(coin)
     existing = _load_existing(out_path)
