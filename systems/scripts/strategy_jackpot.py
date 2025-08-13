@@ -37,6 +37,18 @@ def _parse_period(period: str) -> int:
 def _compute_global_p(jstate: Dict[str, Any], price: float) -> float:
     low = float(jstate.get("global_low", 0.0))
     high = float(jstate.get("global_high", 0.0))
+    if price > high:
+        addlog(
+            f"[JACKPOT][STALE_BOUNDS] current_high={price:.2f} global_high={high:.2f}"
+        )
+        jstate["global_high"] = price
+        high = price
+    elif price < low:
+        addlog(
+            f"[JACKPOT][STALE_BOUNDS] current_low={price:.2f} global_low={low:.2f}"
+        )
+        jstate["global_low"] = price
+        low = price
     if high == low:
         return 0.0
     p = (price - low) / (high - low)
@@ -153,23 +165,40 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
     j = state.get("jackpot", {})
     if not j.get("enabled"):
         return
-    notes = list(j.get("notes_open", []))
-    if not notes:
-        return
-    p_global = _compute_global_p(j, price)
     cfg = j.get("cfg", {})
     cashout_p = float(cfg.get("cashout_p", 1.0))
+    p_global = _compute_global_p(j, price)
+    addlog(
+        f"[JACKPOT][P_DEBUG] now=${price:.2f}, low=${j.get('global_low', 0.0):.2f}, "
+        f"high=${j.get('global_high', 0.0):.2f}, p={p_global:.3f}, cashout_p={cashout_p:.3f}"
+    )
+    notes = list(j.get("notes_open", []))
+    if not notes:
+        addlog("[JACKPOT][NONE_TO_SELL]")
+        return
     if p_global < cashout_p:
+        addlog(f"[JACKPOT][NO_TRIGGER] p={p_global:.3f} < cashout_p={cashout_p:.3f}")
         return
     ts = int(df.iloc[t]["timestamp"]) if "timestamp" in df.columns else None
     sold = 0
     total_gain = 0.0
     for note in notes:
+        # Ensure we only process jackpot notes
         if note.get("kind") != "jackpot":
             addlog(
                 f"[JACKPOT][DEBUG] skip note id={note.get('id')} kind={note.get('kind')}"
             )
             continue
+
+        # Skip notes that are too small to sell
+        value = note.get("entry_amount", 0.0) * price
+        min_size = float(limits.get("min_note_size", 0.0))
+        if value < min_size:
+            addlog(
+                f"[JACKPOT][SKIP_MIN] id={note.get('id')} value=${value:.2f} min=${min_size:.2f}"
+            )
+            continue
+
         mode = state.get("mode", "sim")
         if mode == "live":
             result = execute_sell(
@@ -190,6 +219,12 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
             t=t,
             result=result,
             state=state,
+        )
+        qty = result.get("filled_amount", note.get("entry_amount", 0.0))
+        exit_price = note.get("exit_price", result.get("avg_price", 0.0))
+        addlog(
+            f"[JACKPOT][SELL] id={note.get('id')} qty={qty:.8f} "
+            f"price={exit_price:.2f} pnl=${note.get('gain', 0.0):.2f}]"
         )
         total_gain += note.get("gain", 0.0)
         sold += 1
