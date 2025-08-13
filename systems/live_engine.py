@@ -23,9 +23,10 @@ from systems.utils.config import load_settings
 def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None:
     for name, ledger_cfg in settings.get("ledger_settings", {}).items():
         tag = ledger_cfg.get("tag", "").upper()
+        coin = ledger_cfg.get("coin", "").upper()
         window_settings = ledger_cfg.get("window_settings", {})
         try:
-            df = fetch_candles(tag)
+            df = fetch_candles(coin)
         except FileNotFoundError:
             addlog(
                 f"[WARN] Candle data missing for {tag}",
@@ -155,6 +156,7 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
             refresh_to_last_closed_hour(
                 settings,
                 ledger_cfg["tag"],
+                coin=ledger_cfg.get("coin"),
                 exchange="kraken",
                 lookback_hours=72,
                 verbose=1,
@@ -186,6 +188,7 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
             refresh_to_last_closed_hour(
                 settings,
                 ledger_cfg["tag"],
+                coin=ledger_cfg.get("coin"),
                 exchange="kraken",
                 lookback_hours=72,
                 verbose=1,

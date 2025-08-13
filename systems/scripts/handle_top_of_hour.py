@@ -79,10 +79,12 @@ def handle_top_of_hour(
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
             tag = ledger_cfg["tag"]
+            coin = ledger_cfg.get("coin", tag)
             pair_code = ledger_cfg.get("kraken_pair", tag)
             refresh_to_last_closed_hour(
                 settings,
                 tag,
+                coin=coin,
                 exchange="kraken",
                 lookback_hours=72,
                 verbose=verbose,
@@ -126,7 +128,7 @@ def handle_top_of_hour(
                 sell_count = 0
 
                 try:
-                    df = pd.read_csv(root / "data" / "raw" / f"{tag}.csv")
+                    df = pd.read_csv(root / "data" / "raw" / f"{coin.upper()}.csv")
                 except Exception:
                     df = None
 

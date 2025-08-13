@@ -2,6 +2,7 @@
   "ledger_settings": {
     "Kris_Ledger": {
       "tag": "SOLUSD",
+      "coin": "SOL",
       "wallet_code": "SOL.F",
       "kraken_name": "SOL/USD",
       "kraken_pair": "SOLUSD",
@@ -31,6 +32,7 @@
     },
     "Travis_Ledger": {
       "tag": "SOLUSDC",
+      "coin": "SOL",
       "wallet_code": "SOL.F",
       "kraken_name": "SOL/USDC",
       "kraken_pair": "SOLUSDC",

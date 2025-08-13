@@ -45,6 +45,7 @@ def main(argv: list[str] | None = None) -> None:
 
     ledger_cfg = load_ledger_config(args.ledger)
     tag = ledger_cfg["tag"].upper()
+    coin = ledger_cfg.get("coin", tag).upper()
     kraken_symbol = ledger_cfg.get("kraken_name")
     binance_symbol = ledger_cfg.get("binance_name")
     if not kraken_symbol or not binance_symbol:
@@ -59,7 +60,7 @@ def main(argv: list[str] | None = None) -> None:
     start_ts = int(start_ts // 3600 * 3600)
     end_ts = int(end_ts // 3600 * 3600)
     interval_ms = 3_600_000
-    out_path = get_raw_path(tag)
+    out_path = get_raw_path(coin)
     existing = _load_existing(out_path)
     gaps = compute_missing_ranges(existing, start_ts, end_ts, interval_ms)
 
@@ -145,11 +146,92 @@ def main(argv: list[str] | None = None) -> None:
         )
 
 
+def fetch_all(ledger: str, verbose: int = 1) -> None:
+    """Fetch full history from Binance and overwrite raw file."""
+    ledger_cfg = load_ledger_config(ledger)
+    coin = ledger_cfg.get("coin", "").upper()
+    binance_symbol = ledger_cfg.get("binance_name")
+    if not binance_symbol:
+        addlog(
+            f"[ERROR] Missing binance_name in settings for ledger {ledger}",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        raise RuntimeError("Missing binance symbol")
+    end_ts = int(datetime.now(timezone.utc).timestamp())
+    start_ts = 0
+    df = fetch_range("binance", binance_symbol, start_ts, end_ts)
+    path = get_raw_path(coin)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if df.empty:
+        addlog(
+            "[WARN] No candles fetched from Binance",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        path.write_text("", encoding="utf-8")
+        return
+    _merge_and_save(path, pd.DataFrame(columns=COLUMNS), [df])
+    addlog(
+        f"[FETCH-ALL] Saved {len(df)} candles from Binance to {path}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+
+
+def fetch_recent(ledger: str, verbose: int = 1) -> None:
+    """Fetch last 720 Kraken candles and append to raw file."""
+    ledger_cfg = load_ledger_config(ledger)
+    coin = ledger_cfg.get("coin", "").upper()
+    kraken_symbol = ledger_cfg.get("kraken_name")
+    if not kraken_symbol:
+        addlog(
+            f"[ERROR] Missing kraken_name in settings for ledger {ledger}",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        raise RuntimeError("Missing kraken symbol")
+    path = get_raw_path(coin)
+    if not path.exists():
+        addlog(
+            f"[ERROR] Missing candle file for {coin}. Run fetch --all first",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        raise FileNotFoundError(f"{path} not found")
+    existing = _load_existing(path)
+    if existing.empty:
+        addlog(
+            f"[ERROR] Candle file empty for {coin}. Run fetch --all first",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        raise FileNotFoundError("Raw file empty")
+    now = datetime.now(timezone.utc)
+    last_closed = int((now.timestamp() // 3600 - 1) * 3600)
+    start_ts = last_closed - 719 * 3600
+    df = fetch_range("kraken", kraken_symbol, start_ts, last_closed)
+    if df.empty:
+        addlog(
+            "[INFO] No new candles fetched from Kraken",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return
+    total = _merge_and_save(path, existing, [df])
+    addlog(
+        f"[FETCH-RECENT] Appended {len(df)} candles → {total} total rows",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+
+
 def fetch_missing_candles(
     ledger: str, relative_window: str = "48h", verbose: int = 1
 ) -> None:
     ledger_cfg = load_ledger_config(ledger)
     tag = ledger_cfg["tag"].upper()
+    coin = ledger_cfg.get("coin", tag).upper()
     kraken_symbol = ledger_cfg.get("kraken_name")
     binance_symbol = ledger_cfg.get("binance_name")
     if not kraken_symbol or not binance_symbol:
@@ -164,7 +246,7 @@ def fetch_missing_candles(
     start_ts = int(start_ts // 3600 * 3600)
     end_ts = int(end_ts // 3600 * 3600)
     interval_ms = 3_600_000
-    out_path = get_raw_path(tag)
+    out_path = get_raw_path(coin)
     existing = _load_existing(out_path)
     gaps = compute_missing_ranges(existing, start_ts, end_ts, interval_ms)
 

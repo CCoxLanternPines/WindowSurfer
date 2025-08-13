@@ -26,15 +26,16 @@ def refresh_to_last_closed_hour(
     settings,
     tag: str,
     *,
+    coin: str | None = None,
     exchange: str = "kraken",
     lookback_hours: int = 72,
     verbose: int = 1,
 ) -> None:
-    """Ensure ``data/raw/{tag}.csv`` has candles up to the last closed hour."""
+    """Ensure ``data/raw/{coin or tag}.csv`` has candles up to the last closed hour."""
 
     kraken_sym, _ = resolve_ccxt_symbols(settings, tag)
 
-    path = get_raw_path(tag, ext="csv")
+    path = get_raw_path((coin or tag), ext="csv")
     existing = _load_existing(path)
 
     now = datetime.now(timezone.utc)

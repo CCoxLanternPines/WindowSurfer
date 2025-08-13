@@ -20,6 +20,8 @@ def main(argv: list[str] | None = None) -> None:
             action.choices = list(action.choices) + ["fetch"]
             break
     parser.add_argument("--time", required=False, help="Time window (e.g. 120h)")
+    parser.add_argument("--all", action="store_true", help="Fetch full history from Binance")
+    parser.add_argument("--recent", action="store_true", help="Fetch last 720 candles from Kraken")
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -98,15 +100,24 @@ def main(argv: list[str] | None = None) -> None:
         if not args.ledger:
             addlog("Error: --ledger is required for fetch mode", verbose_int=1, verbose_state=verbose)
             sys.exit(1)
-        time_window = args.time if args.time else "48h"
         try:
-            from systems.fetch import fetch_missing_candles
+            if args.all:
+                from systems.fetch import fetch_all
 
-            fetch_missing_candles(
-                ledger=args.ledger,
-                relative_window=time_window,
-                verbose=args.verbose,
-            )
+                fetch_all(args.ledger, verbose=args.verbose)
+            elif args.recent:
+                from systems.fetch import fetch_recent
+
+                fetch_recent(args.ledger, verbose=args.verbose)
+            else:
+                time_window = args.time if args.time else "48h"
+                from systems.fetch import fetch_missing_candles
+
+                fetch_missing_candles(
+                    ledger=args.ledger,
+                    relative_window=time_window,
+                    verbose=args.verbose,
+                )
         except Exception as e:
             addlog(f"[ERROR] Fetch failed: {e}", verbose_int=1, verbose_state=True)
             sys.exit(1)
