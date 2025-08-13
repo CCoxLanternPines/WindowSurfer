@@ -29,6 +29,7 @@ def apply_buy_result_to_ledger(
         "entry_usdt": result.get("filled_amount", 0.0) * result.get("avg_price", 0.0),
         "window_name": meta.get("window_name"),
         "window_size": meta.get("window_size"),
+        "strategy": meta.get("strategy", meta.get("window_name")),
         "p_buy": meta.get("p_buy"),
         "target_price": meta.get("target_price"),
         "target_roi": meta.get("target_roi"),

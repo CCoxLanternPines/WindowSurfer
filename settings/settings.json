@@ -13,7 +13,7 @@
           "reset_buy_percent": 0.5,
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.1,
+          "investment_fraction": 0.1
         },
         "fish": {
           "window_size": "2d",
@@ -21,7 +21,7 @@
           "reset_buy_percent": 0.5,
           "maturity_position": 1.5,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.15,
+          "investment_fraction": 0.15
         }
       }
     },
@@ -38,7 +38,7 @@
           "reset_buy_percent": 0.15,
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.15,
+          "investment_fraction": 0.15
         },
         "rabbit": {
           "window_size": "3d",
@@ -46,7 +46,7 @@
           "reset_buy_percent": 0.15,
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.2,
+          "investment_fraction": 0.2
         }
       }
     }

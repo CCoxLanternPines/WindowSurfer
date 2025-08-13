@@ -34,6 +34,11 @@ class Ledger:
         These fields are stored verbatim and are not interpreted by the
         ledger itself but are useful for downstream analysis and evaluation.
         """
+        if "strategy" not in note:
+            if "window_name" in note:
+                note["strategy"] = note["window_name"]
+            elif "id" in note and "-" in note["id"]:
+                note["strategy"] = note["id"].split("-", 1)[0]
         self.open_notes.append(note)
 
     def close_note(self, note: Dict) -> None:

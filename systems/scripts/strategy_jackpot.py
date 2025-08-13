@@ -148,7 +148,7 @@ def evaluate_sell(state: Dict, price: float, cfg: Dict) -> Optional[Dict]:
 # ---------------------------------------------------------------------------
 
 
-def apply_fills(state: Dict, fills: list[Dict], ledger=None) -> None:
+def apply_fills(state: Dict, fills: list[Dict], ledger=None, runtime_state: Dict | None = None) -> None:
     for fill in fills:
         ftype = fill.get("type")
         if ftype == "BUY":
@@ -163,7 +163,21 @@ def apply_fills(state: Dict, fills: list[Dict], ledger=None) -> None:
             state["avg_entry_price"] = total_cost / inv if inv > 0 else None
             state["total_contributed_usd"] = state.get("total_contributed_usd", 0.0) + usd
             state["last_drip_ts"] = fill.get("timestamp")
+            if runtime_state is not None:
+                runtime_state["capital"] = runtime_state.get("capital", 0.0) - usd
             if ledger is not None:
+                ts = fill.get("timestamp")
+                note = {
+                    "id": f"jackpot-{ts}",
+                    "strategy": "jackpot",
+                    "entry_idx": ts,
+                    "entry_price": price,
+                    "entry_amount": qty,
+                    "entry_usdt": usd,
+                }
+                if ts is not None:
+                    note["created_ts"] = ts
+                ledger.open_note(note)
                 ledger.record_trade(
                     {
                         "strategy": "jackpot",
@@ -182,7 +196,21 @@ def apply_fills(state: Dict, fills: list[Dict], ledger=None) -> None:
             state["realized_pnl"] = state.get("realized_pnl", 0.0) + pnl
             state["inventory_qty"] = 0.0
             state["avg_entry_price"] = None
+            if runtime_state is not None:
+                runtime_state["capital"] = runtime_state.get("capital", 0.0) + price * qty
             if ledger is not None:
+                ts = fill.get("timestamp")
+                open_notes = [n for n in ledger.get_open_notes() if n.get("strategy") == "jackpot"]
+                for note in open_notes:
+                    entry_usdt = note.get("entry_usdt", 0.0)
+                    entry_amt = note.get("entry_amount", 0.0)
+                    exit_usdt = entry_amt * price
+                    note["exit_price"] = price
+                    note["exit_usdt"] = exit_usdt
+                    note["exit_ts"] = ts
+                    note["gain"] = exit_usdt - entry_usdt
+                    note["gain_pct"] = (note["gain"] / entry_usdt) if entry_usdt else 0.0
+                    ledger.close_note(note)
                 ledger.record_trade(
                     {
                         "strategy": "jackpot",
@@ -191,7 +219,7 @@ def apply_fills(state: Dict, fills: list[Dict], ledger=None) -> None:
                         "usd": price * qty,
                         "price": price,
                         "cost": avg * qty,
-                        "timestamp": fill.get("timestamp"),
+                        "timestamp": ts,
                     }
                 )
             # total_contributed_usd intentionally not reset
