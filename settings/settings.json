@@ -51,6 +51,21 @@
       }
     }
   },
+  "jackpot": {
+    "enabled": true,
+    "start_level_frac": 0.50,
+    "take_profit_frac": 0.75,
+    "exit_on_new_ath": true,
+    "drip_period_hours": 168,
+    "base_drip_usd": 10.0,
+    "multiplier_floor": 2.0,
+    "invest_only_from_realized_profits": true,
+    "profit_invest_fraction": 1.0,
+    "min_order_usd": 5.0,
+    "fee_bps": 10,
+    "ath_scope": "dataset",
+    "fetch_full_history": false
+  },
   "general_settings": {
     "max_note_usdt": 1000.0,
     "minimum_note_size": 10

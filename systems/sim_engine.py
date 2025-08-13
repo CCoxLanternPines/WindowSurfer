@@ -21,10 +21,29 @@ from systems.scripts.trade_apply import (
     paper_execute_buy,
     paper_execute_sell,
 )
+from systems.scripts import strategy_jackpot
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
 from systems.utils.resolve_symbol import split_tag
 
+
+def _format_jackpot_state(state, price, now_ts, cfg):
+    ath = state.get("ath_price") or 0.0
+    atl = state.get("atl_price") or 0.0
+    _, pos = strategy_jackpot.eligibility(
+        price, ath, atl, cfg.get("start_level_frac", 0.5)
+    )
+    mult = 1.0 + pos * (cfg.get("multiplier_floor", 1.0) - 1.0)
+    last_drip_ts = state.get("last_drip_ts")
+    period = cfg.get("drip_period_hours", 0.0)
+    if last_drip_ts is None:
+        next_drip = 0.0
+    else:
+        next_drip = max(0.0, period - (now_ts - last_drip_ts) / 3600)
+    return (
+        f"[JACKPOT][STATE] ath=${ath:.2f} atl=${atl:.2f} pos={pos:.2f} mult={mult:.2f} "
+        f"total_contributed=${state.get('total_contributed_usd',0.0):.2f} next_drip_in={int(next_drip)}h"
+    )
 
 def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     settings = load_settings()
@@ -73,6 +92,11 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     runtime_state["buy_unlock_p"] = {}
 
     ledger_obj = Ledger()
+    jackpot_cfg = settings.get("jackpot", {})
+    jackpot_state = None
+    if jackpot_cfg.get("enabled"):
+        first_ts = int(df.iloc[0]["timestamp"]) if "timestamp" in df.columns and len(df) else 0
+        jackpot_state = strategy_jackpot.init_state(ledger_cfg.get("tag", ""), ledger_obj, jackpot_cfg, first_ts)
     win_metrics = {}
     for wname, wcfg in window_settings.items():
         win_metrics[wname] = {
@@ -89,6 +113,47 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
 
     for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
         price = float(df.iloc[t]["close"])
+
+        if jackpot_cfg.get("enabled") and jackpot_state is not None:
+            ath, atl = strategy_jackpot.update_reference_levels(
+                df.iloc[: t + 1], jackpot_cfg.get("ath_scope", "dataset")
+            )
+            jackpot_state["ath_price"], jackpot_state["atl_price"] = ath, atl
+            realized = sum(n.get("gain", 0.0) for n in ledger_obj.get_closed_notes())
+            realized += jackpot_state.get("realized_pnl", 0.0)
+            now_ts = int(df.iloc[t]["timestamp"]) if "timestamp" in df.columns else t
+            sell_sig = strategy_jackpot.evaluate_sell(jackpot_state, price, jackpot_cfg)
+            if sell_sig:
+                result = paper_execute_sell(price, sell_sig.get("qty", 0.0), timestamp=now_ts)
+                strategy_jackpot.apply_fills(
+                    jackpot_state,
+                    [
+                        {
+                            **sell_sig,
+                            "price": result.get("avg_price", price),
+                            "usd": result.get("avg_price", price) * result.get("filled_amount", 0.0),
+                            "timestamp": now_ts,
+                        }
+                    ],
+                    ledger=ledger_obj,
+                )
+            else:
+                buy_sig = strategy_jackpot.evaluate_buy(
+                    jackpot_state, price, now_ts, realized, jackpot_cfg
+                )
+                if buy_sig:
+                    result = paper_execute_buy(price, buy_sig.get("usd", 0.0), timestamp=now_ts)
+                    strategy_jackpot.apply_fills(
+                        jackpot_state,
+                        [
+                            {
+                                **buy_sig,
+                                "price": result.get("avg_price", price),
+                                "timestamp": now_ts,
+                            }
+                        ],
+                        ledger=ledger_obj,
+                    )
 
         for window_name, wcfg in window_settings.items():
             ctx = {"ledger": ledger_obj}
@@ -183,6 +248,7 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
 
 
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
+    final_ts = int(df.iloc[-1]["timestamp"]) if "timestamp" in df.columns and total else 0
     summary = ledger_obj.get_account_summary(final_price)
 
     open_value_by_window = defaultdict(float)
@@ -192,6 +258,30 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         open_value_by_window[w] += qty * final_price
 
     wallet_cash = runtime_state["capital"]
+
+    jackpot_open_value = 0.0
+    jackpot_metrics = {
+        "buys": 0,
+        "sells": 0,
+        "realized_cost": 0.0,
+        "realized_proceeds": 0.0,
+        "roi_accum": 0.0,
+    }
+    if jackpot_cfg.get("enabled") and jackpot_state is not None:
+        jackpot_open_value = jackpot_state.get("inventory_qty", 0.0) * final_price
+        j_trades = ledger_obj.get_trades("jackpot")
+        for t in j_trades:
+            if t.get("event") == "buy":
+                jackpot_metrics["buys"] += 1
+            elif t.get("event") == "sell_all":
+                jackpot_metrics["sells"] += 1
+                cost = t.get("cost", 0.0)
+                proceeds = t.get("usd", 0.0)
+                jackpot_metrics["realized_cost"] += cost
+                jackpot_metrics["realized_proceeds"] += proceeds
+                if cost > 0:
+                    jackpot_metrics["roi_accum"] += (proceeds - cost) / cost
+
     rows = []
     for w, m in win_metrics.items():
         realized_roi = (
@@ -228,8 +318,31 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                 "window_total_at_liq": total_value_at_liq,
             }
         )
+    if jackpot_cfg.get("enabled") and jackpot_state is not None:
+        realized_cost = jackpot_metrics["realized_cost"]
+        realized_proceeds = jackpot_metrics["realized_proceeds"]
+        realized_pnl = realized_proceeds - realized_cost
+        realized_roi = (
+            (realized_proceeds / realized_cost - 1.0) if realized_cost > 0 else 0.0
+        )
+        avg_trade_roi = (
+            jackpot_metrics["roi_accum"] / jackpot_metrics["sells"]
+            if jackpot_metrics["sells"] > 0
+            else 0.0
+        )
+        total_at_liq = realized_proceeds + jackpot_open_value
+        addlog(
+            f"[REPORT][jackpot] buys={jackpot_metrics['buys']} sells={jackpot_metrics['sells']} realized_pnl=${realized_pnl:.2f} realized_roi={(realized_roi*100):.2f}% avg_trade_roi={(avg_trade_roi*100):.2f}% open_notes_value=${jackpot_open_value:.2f} window_total_at_liq=${total_at_liq:.2f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        addlog(
+            _format_jackpot_state(jackpot_state, final_price, final_ts, jackpot_cfg),
+            verbose_int=3,
+            verbose_state=verbose,
+        )
 
-    global_open_value = sum(open_value_by_window.values())
+    global_open_value = sum(open_value_by_window.values()) + jackpot_open_value
     global_total_at_liq = wallet_cash + global_open_value
     addlog(
         f"[REPORT][GLOBAL] cash=${wallet_cash:.2f} open_value=${global_open_value:.2f} total_at_liq=${global_total_at_liq:.2f}",

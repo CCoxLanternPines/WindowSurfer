@@ -15,6 +15,7 @@ class Ledger:
         self.open_notes: List[Dict] = []
         self.closed_notes: List[Dict] = []
         self.metadata: Dict = {}
+        self.trades: List[Dict] = []
 
     # Basic note management -------------------------------------------------
     def open_note(self, note: Dict) -> None:
@@ -57,6 +58,27 @@ class Ledger:
 
     def get_closed_notes(self) -> List[Dict]:
         return list(self.closed_notes)
+
+    def record_trade(self, trade: Dict) -> None:
+        """Append a trade event to the ledger.
+
+        Events are arbitrary dictionaries but should at minimum contain
+        ``strategy`` and ``event`` fields so they can be filtered for
+        reporting. The ledger does not interpret these values.
+        """
+
+        self.trades.append(trade)
+
+    def get_trades(self, strategy: str | None = None) -> List[Dict]:
+        """Return recorded trade events.
+
+        When ``strategy`` is provided only trades matching that strategy
+        name are returned.
+        """
+
+        if strategy is None:
+            return list(self.trades)
+        return [t for t in self.trades if t.get("strategy") == strategy]
 
     def get_total_liquid_value(self, final_price: float) -> float:
         """Return all value assuming open notes liquidate at ``final_price``."""
@@ -123,6 +145,7 @@ class Ledger:
             ledger.open_notes = data.get("open_notes", [])
             ledger.closed_notes = data.get("closed_notes", [])
             ledger.metadata = data.get("metadata", {})
+            ledger.trades = data.get("trades", [])
         return ledger
 
 
@@ -156,6 +179,7 @@ def save_ledger(
         ledger_data = {
             "open_notes": ledger.get_open_notes(),
             "closed_notes": ledger.get_closed_notes(),
+            "trades": ledger.get_trades(),
         }
 
         if final_tick is not None:
