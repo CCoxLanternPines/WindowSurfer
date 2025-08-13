@@ -148,7 +148,7 @@ def evaluate_sell(state: Dict, price: float, cfg: Dict) -> Optional[Dict]:
 # ---------------------------------------------------------------------------
 
 
-def apply_fills(state: Dict, fills: list[Dict]) -> None:
+def apply_fills(state: Dict, fills: list[Dict], ledger=None) -> None:
     for fill in fills:
         ftype = fill.get("type")
         if ftype == "BUY":
@@ -163,6 +163,17 @@ def apply_fills(state: Dict, fills: list[Dict]) -> None:
             state["avg_entry_price"] = total_cost / inv if inv > 0 else None
             state["total_contributed_usd"] = state.get("total_contributed_usd", 0.0) + usd
             state["last_drip_ts"] = fill.get("timestamp")
+            if ledger is not None:
+                ledger.record_trade(
+                    {
+                        "strategy": "jackpot",
+                        "event": "buy",
+                        "qty": qty,
+                        "usd": usd,
+                        "price": price,
+                        "timestamp": fill.get("timestamp"),
+                    }
+                )
         elif ftype == "SELL_ALL":
             qty = float(fill.get("qty", 0.0))
             price = float(fill.get("price", 0.0))
@@ -171,4 +182,16 @@ def apply_fills(state: Dict, fills: list[Dict]) -> None:
             state["realized_pnl"] = state.get("realized_pnl", 0.0) + pnl
             state["inventory_qty"] = 0.0
             state["avg_entry_price"] = None
+            if ledger is not None:
+                ledger.record_trade(
+                    {
+                        "strategy": "jackpot",
+                        "event": "sell_all",
+                        "qty": qty,
+                        "usd": price * qty,
+                        "price": price,
+                        "cost": avg * qty,
+                        "timestamp": fill.get("timestamp"),
+                    }
+                )
             # total_contributed_usd intentionally not reset
