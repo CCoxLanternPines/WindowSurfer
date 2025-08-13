@@ -110,7 +110,22 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                 open_notes=open_notes,
                 runtime_state=runtime_state,
             )
-            for note in sell_res.get("notes", []):
+
+            if __debug__ and not runtime_state.get("_sell_shape_logged"):
+                if isinstance(sell_res, list):
+                    addlog("[SIM] evaluate_sell returned list", verbose_int=2, verbose_state=verbose)
+                elif isinstance(sell_res, dict):
+                    addlog("[SIM] evaluate_sell returned dict", verbose_int=2, verbose_state=verbose)
+                runtime_state["_sell_shape_logged"] = True
+
+            if isinstance(sell_res, list):
+                sell_notes = sell_res
+            elif isinstance(sell_res, dict):
+                sell_notes = sell_res.get("notes", [])
+            else:
+                sell_notes = []
+
+            for note in sell_notes:
                 ts = None
                 if "timestamp" in df.columns:
                     ts = int(df.iloc[t]["timestamp"])
