@@ -182,6 +182,7 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
     ts = int(df.iloc[t]["timestamp"]) if "timestamp" in df.columns else None
     sold = 0
     total_gain = 0.0
+    total_usd = 0.0
     for note in notes:
         # Ensure we only process jackpot notes
         if note.get("kind") != "jackpot":
@@ -220,6 +221,10 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
             result=result,
             state=state,
         )
+        exit_usd = note.get(
+            "exit_usdt", result.get("filled_amount", 0.0) * result.get("avg_price", 0.0)
+        )
+        total_usd += exit_usd
         qty = result.get("filled_amount", note.get("entry_amount", 0.0))
         exit_price = note.get("exit_price", result.get("avg_price", 0.0))
         addlog(
@@ -232,6 +237,7 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
     if sold:
         j["sells"] = j.get("sells", 0) + sold
         j["realized_pnl"] = j.get("realized_pnl", 0.0) + total_gain
+        j["pool_usd"] = j.get("pool_usd", 0.0) + total_usd
         msg = f"[JACKPOT][CASHOUT] sold {sold} notes @ p={p_global:.3f} gain=${total_gain:.2f}"
         addlog(msg)
         send_telegram_message(f"🎰 {msg}")
