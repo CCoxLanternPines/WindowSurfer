@@ -186,6 +186,12 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
             result=result,
             state=state,
         )
+        qty = result.get("filled_amount", note.get("entry_amount", 0.0))
+        exit_price = note.get("exit_price", result.get("avg_price", 0.0))
+        addlog(
+            f"[JACKPOT][SELL] id={note.get('id')} qty={qty:.8f} "
+            f"price={exit_price:.2f} pnl=${note.get('gain', 0.0):.2f}]"
+        )
         total_gain += note.get("gain", 0.0)
         sold += 1
         j["notes_open"].remove(note)
