@@ -28,10 +28,10 @@ from systems.utils.config import load_settings, load_ledger_config, resolve_path
 def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
-    coin = ledger_cfg.get("kraken_name", "").split("/")[0].upper()
+    tag = ledger_cfg.get("tag", "").upper()
     window_settings = ledger_cfg.get("window_settings", {})
 
-    df = fetch_candles(coin)
+    df = fetch_candles(tag)
     total = len(df)
 
     runtime_state = build_runtime_state(
@@ -55,7 +55,7 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
             "realized_trades": 0,
             "realized_roi_accum": 0.0,
         }
-    addlog(f"[SIM] Starting simulation for {coin}", verbose_int=1, verbose_state=verbose)
+    addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
 
     for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
         price = float(df.iloc[t]["close"])

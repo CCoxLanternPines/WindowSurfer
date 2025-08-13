@@ -38,30 +38,6 @@ def _fetch_binance(symbol: str, start_ms: int, end_ms: int) -> List[List]:
     return rows
 
 
-def _to_df(rows: List[List], start_ts: int, end_ts: int) -> pd.DataFrame:
-    df = pd.DataFrame(rows, columns=COLUMNS)
-    if not df.empty:
-        df["timestamp"] = (
-            pd.to_datetime(df["timestamp"], unit="ms", utc=True).astype("int64")
-            // 1_000_000_000
-        )
-        df["timestamp"] = (df["timestamp"] // 3600) * 3600
-        df = df[(df["timestamp"] >= start_ts) & (df["timestamp"] <= end_ts)]
-        df[COLUMNS] = df[COLUMNS].apply(pd.to_numeric, errors="coerce")
-        df = df.dropna(subset=["timestamp"])
-    return df
-
-
-def fetch_kraken_range(symbol: str, start_ts: int, end_ts: int) -> pd.DataFrame:
-    rows = _fetch_kraken(symbol, int(start_ts * 1000), int(end_ts * 1000))
-    return _to_df(rows, start_ts, end_ts)
-
-
-def fetch_binance_range(symbol: str, start_ts: int, end_ts: int) -> pd.DataFrame:
-    rows = _fetch_binance(symbol, int(start_ts * 1000), int(end_ts * 1000))
-    return _to_df(rows, start_ts, end_ts)
-
-
 def _load_existing(path: Path) -> pd.DataFrame:
     if path.exists():
         df = pd.read_csv(path)
@@ -128,8 +104,24 @@ def fetch_range(
     exchange_name: str, tag: str, start_ts: int, end_ts: int
 ) -> pd.DataFrame:
     """Fetch candles for ``tag`` on ``exchange_name`` within [start_ts, end_ts]."""
+    start_ms = int(start_ts * 1000)
+    end_ms = int(end_ts * 1000)
+
     if exchange_name.lower() == "kraken":
-        return fetch_kraken_range(tag, start_ts, end_ts)
-    if exchange_name.lower() == "binance":
-        return fetch_binance_range(tag, start_ts, end_ts)
-    raise ValueError(f"Unknown exchange '{exchange_name}'")
+        rows = _fetch_kraken(tag, start_ms, end_ms)
+    elif exchange_name.lower() == "binance":
+        rows = _fetch_binance(tag, start_ms, end_ms)
+    else:
+        raise ValueError(f"Unknown exchange '{exchange_name}'")
+
+    df = pd.DataFrame(rows, columns=COLUMNS)
+    if not df.empty:
+        df["timestamp"] = (
+            pd.to_datetime(df["timestamp"], unit="ms", utc=True).astype("int64")
+            // 1_000_000_000
+        )
+        df["timestamp"] = (df["timestamp"] // 3600) * 3600
+        df = df[(df["timestamp"] >= start_ts) & (df["timestamp"] <= end_ts)]
+        df[COLUMNS] = df[COLUMNS].apply(pd.to_numeric, errors="coerce")
+        df = df.dropna(subset=["timestamp"])
+    return df
