@@ -29,9 +29,10 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
     tag = ledger_cfg.get("tag", "").upper()
+    coin = ledger_cfg.get("coin", "").upper()
     window_settings = ledger_cfg.get("window_settings", {})
 
-    df = fetch_candles(tag)
+    df = fetch_candles(coin)
     total = len(df)
 
     runtime_state = build_runtime_state(
