@@ -183,6 +183,13 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
     sold = 0
     total_gain = 0.0
     for note in notes:
+        # Ensure we only process jackpot notes
+        if note.get("kind") != "jackpot":
+            addlog(
+                f"[JACKPOT][DEBUG] skip note id={note.get('id')} kind={note.get('kind')}"
+            )
+            continue
+
         # Skip notes that are too small to sell
         value = note.get("entry_amount", 0.0) * price
         min_size = float(limits.get("min_note_size", 0.0))
