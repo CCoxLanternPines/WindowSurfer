@@ -211,6 +211,20 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
             ledger_cfg["tag"],
         )
 
+        j = runtime_state.get("jackpot", {})
+        if j.get("enabled"):
+            notes = [n for n in j.get("notes_open", []) if n.get("kind") == "jackpot"]
+            coin_value = sum(n.get("entry_amount", 0.0) for n in notes) * price
+            pool_usd = j.get("pool_usd", 0.0)
+            total_val = pool_usd + coin_value
+            addlog(
+                f"[JACKPOT][AUDIT] pool_usd=${pool_usd:.2f} "
+                f"coin_value=${coin_value:.2f} total=${total_val:.2f} "
+                f"open_notes={len(notes)}",
+                verbose_int=3,
+                verbose_state=verbose,
+            )
+
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)
 
