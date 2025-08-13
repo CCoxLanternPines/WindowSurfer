@@ -25,22 +25,42 @@ def _fetch_kraken(symbol: str, start_ms: int, end_ms: int) -> List[List]:
     return [row for row in ohlcv if row and start_ms <= row[0] <= end_ms]
 
 
+
 def _fetch_binance(symbol: str, start_ms: int, end_ms: int) -> List[List]:
     exchange = ccxt.binance({"enableRateLimit": True})
     limit = 1000
     rows: List[List] = []
     current_end = end_ms
+    safety_empty = 0  # stop if we see consecutive empties
+
     while current_end >= start_ms:
         since = max(start_ms, current_end - limit * 3600000)
-        chunk = exchange.fetch_ohlcv(symbol, timeframe="1h", since=since, limit=limit)
-        if not chunk:
-            break
+
+        chunk = exchange.fetch_ohlcv(symbol, timeframe="1h", since=since, limit=limit) or []
+        # filter to the requested window (ms)
         filtered = [r for r in chunk if r and since <= r[0] <= current_end]
+
+        if not filtered:
+            safety_empty += 1
+            if safety_empty >= 2:
+                addlog(
+                    f"[INFO] Binance history floor reached or no more data for {symbol}",
+                    verbose_int=2,
+                    verbose_state=True,
+                )
+            if current_end <= start_ms or safety_empty >= 2:
+                break
+            current_end = max(start_ms, since - 3600000)
+            continue
+
+        safety_empty = 0
         rows.extend(filtered)
+
         earliest = filtered[0][0]
         if earliest <= start_ms:
             break
         current_end = earliest - 3600000
+
     return rows
 
 
