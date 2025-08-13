@@ -10,7 +10,7 @@ import json
 
 from tqdm import tqdm
 
-from systems.scripts.fetch_candles import fetch_candles
+from systems.scripts.fetch_candles import load_coin_csv
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -23,15 +23,17 @@ from systems.scripts.trade_apply import (
 )
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
+from systems.utils.resolve_symbol import split_tag
 
 
 def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
-    tag = ledger_cfg.get("tag", "").upper()
+    base, _ = split_tag(ledger_cfg["tag"])
+    coin = base.upper()
     window_settings = ledger_cfg.get("window_settings", {})
 
-    df = fetch_candles(tag)
+    df = load_coin_csv(coin)
     total = len(df)
 
     runtime_state = build_runtime_state(
@@ -55,7 +57,7 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
             "realized_trades": 0,
             "realized_roi_accum": 0.0,
         }
-    addlog(f"[SIM] Starting simulation for {tag}", verbose_int=1, verbose_state=verbose)
+    addlog(f"[SIM] Starting simulation for {coin}", verbose_int=1, verbose_state=verbose)
 
     for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
         price = float(df.iloc[t]["close"])

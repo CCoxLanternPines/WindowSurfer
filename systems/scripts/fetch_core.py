@@ -12,6 +12,12 @@ from systems.utils.addlog import addlog
 COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
 
 
+def get_coin_raw_path(coin: str, ext: str = "csv") -> Path:
+    """Return the raw-data path for a given ``coin``."""
+    root = resolve_path("")
+    return root / "data" / "raw" / f"{coin.upper()}.{ext}"
+
+
 def _fetch_kraken(symbol: str, start_ms: int, end_ms: int) -> List[List]:
     exchange = ccxt.kraken({"enableRateLimit": True})
     limit = min(720, int((end_ms - start_ms) // 3600000) + 1)
@@ -36,6 +42,63 @@ def _fetch_binance(symbol: str, start_ms: int, end_ms: int) -> List[List]:
             break
         current_end = earliest - 3600000
     return rows
+
+
+def _to_df(rows: List[List], start_ts: int, end_ts: int) -> pd.DataFrame:
+    df = pd.DataFrame(rows, columns=COLUMNS)
+    if not df.empty:
+        df["timestamp"] = (
+            pd.to_datetime(df["timestamp"], unit="ms", utc=True).astype("int64")
+            // 1_000_000_000
+        )
+        df["timestamp"] = (df["timestamp"] // 3600) * 3600
+        df = df[(df["timestamp"] >= start_ts) & (df["timestamp"] <= end_ts)]
+        df[COLUMNS] = df[COLUMNS].apply(pd.to_numeric, errors="coerce")
+        df = df.dropna(subset=["timestamp"])
+    return df
+
+
+def fetch_kraken_range(symbol: str, start_ts: int, end_ts: int) -> pd.DataFrame:
+    rows = _fetch_kraken(symbol, int(start_ts * 1000), int(end_ts * 1000))
+    return _to_df(rows, start_ts, end_ts)
+
+
+def fetch_binance_range(symbol: str, start_ts: int, end_ts: int) -> pd.DataFrame:
+    rows = _fetch_binance(symbol, int(start_ts * 1000), int(end_ts * 1000))
+    return _to_df(rows, start_ts, end_ts)
+
+
+def fetch_last_720_kraken(symbol: str, end_ts: int) -> pd.DataFrame:
+    """Return the last 720 hourly candles from Kraken for ``symbol``."""
+    start_ts = end_ts - 719 * 3600
+    return fetch_kraken_range(symbol, start_ts, end_ts)
+
+
+def heal_recent(existing: pd.DataFrame, recent: pd.DataFrame) -> tuple[pd.DataFrame, int, int, int]:
+    """Merge ``recent`` candles into ``existing`` and report stats.
+
+    Returns
+    -------
+    tuple[pd.DataFrame, int, int, int]
+        ``(merged_df, appended, deduped, gaps)`` where ``gaps`` is the
+        number of missing hourly candles in the latest 720-window.
+    """
+
+    combined = pd.concat([existing, recent], ignore_index=True)
+    before = len(combined)
+    combined = combined.drop_duplicates(subset="timestamp").sort_values("timestamp")
+    appended = len(combined) - len(existing)
+    dedup = before - len(combined)
+
+    gaps = 0
+    if not recent.empty:
+        end_ts = int(recent["timestamp"].max())
+        start_ts = end_ts - 719 * 3600
+        window = combined[combined["timestamp"] >= start_ts]
+        expected = set(range(start_ts, end_ts + 3600, 3600))
+        gaps = len(expected - set(window["timestamp"].astype(int)))
+
+    return combined, appended, dedup, gaps
 
 
 def _load_existing(path: Path) -> pd.DataFrame:
@@ -104,24 +167,8 @@ def fetch_range(
     exchange_name: str, tag: str, start_ts: int, end_ts: int
 ) -> pd.DataFrame:
     """Fetch candles for ``tag`` on ``exchange_name`` within [start_ts, end_ts]."""
-    start_ms = int(start_ts * 1000)
-    end_ms = int(end_ts * 1000)
-
     if exchange_name.lower() == "kraken":
-        rows = _fetch_kraken(tag, start_ms, end_ms)
-    elif exchange_name.lower() == "binance":
-        rows = _fetch_binance(tag, start_ms, end_ms)
-    else:
-        raise ValueError(f"Unknown exchange '{exchange_name}'")
-
-    df = pd.DataFrame(rows, columns=COLUMNS)
-    if not df.empty:
-        df["timestamp"] = (
-            pd.to_datetime(df["timestamp"], unit="ms", utc=True).astype("int64")
-            // 1_000_000_000
-        )
-        df["timestamp"] = (df["timestamp"] // 3600) * 3600
-        df = df[(df["timestamp"] >= start_ts) & (df["timestamp"] <= end_ts)]
-        df[COLUMNS] = df[COLUMNS].apply(pd.to_numeric, errors="coerce")
-        df = df.dropna(subset=["timestamp"])
-    return df
+        return fetch_kraken_range(tag, start_ts, end_ts)
+    if exchange_name.lower() == "binance":
+        return fetch_binance_range(tag, start_ts, end_ts)
+    raise ValueError(f"Unknown exchange '{exchange_name}'")

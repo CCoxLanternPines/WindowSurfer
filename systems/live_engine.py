@@ -8,8 +8,8 @@ from typing import Dict
 
 from tqdm import tqdm
 
-from systems.scripts.fetch_candles import fetch_candles
-from systems.scripts.candle_refresh import refresh_to_last_closed_hour
+from systems.fetch import fetch_recent_coin
+from systems.scripts.fetch_candles import load_coin_csv
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -18,17 +18,19 @@ from systems.scripts.trade_apply import apply_sell_result_to_ledger
 from systems.scripts.execution_handler import execute_sell, process_buy_signal
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings
+from systems.utils.resolve_symbol import split_tag
 
 
 def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None:
     for name, ledger_cfg in settings.get("ledger_settings", {}).items():
-        tag = ledger_cfg.get("tag", "").upper()
+        base, _ = split_tag(ledger_cfg["tag"])
+        coin = base.upper()
         window_settings = ledger_cfg.get("window_settings", {})
         try:
-            df = fetch_candles(tag)
+            df = load_coin_csv(coin)
         except FileNotFoundError:
             addlog(
-                f"[WARN] Candle data missing for {tag}",
+                f"[WARN] Candle data missing for {coin}",
                 verbose_int=1,
                 verbose_state=verbose,
             )
@@ -147,18 +149,13 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
 
     if dry:
         addlog(
-            "[LIVE] Refreshing candles from Kraken...",
+            "[LIVE] Refreshing candles (recent 720 via Kraken)...",
             verbose_int=1,
             verbose_state=verbose,
         )
         for ledger_cfg in settings.get("ledger_settings", {}).values():
-            refresh_to_last_closed_hour(
-                settings,
-                ledger_cfg["tag"],
-                exchange="kraken",
-                lookback_hours=72,
-                verbose=1,
-            )
+            base, _ = split_tag(ledger_cfg["tag"])
+            fetch_recent_coin(base)
         _run_iteration(settings, runtime_states, dry=dry, verbose=verbose)
         return
 
@@ -178,17 +175,12 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
                 time.sleep(1)
                 pbar.update(1)
         addlog(
-            "[LIVE] Refreshing candles from Kraken...",
+            "[LIVE] Refreshing candles (recent 720 via Kraken)...",
             verbose_int=1,
             verbose_state=verbose,
         )
         for ledger_cfg in settings.get("ledger_settings", {}).values():
-            refresh_to_last_closed_hour(
-                settings,
-                ledger_cfg["tag"],
-                exchange="kraken",
-                lookback_hours=72,
-                verbose=1,
-            )
+            base, _ = split_tag(ledger_cfg["tag"])
+            fetch_recent_coin(base)
         addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
         _run_iteration(settings, runtime_states, dry=dry, verbose=verbose)

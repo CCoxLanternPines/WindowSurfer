@@ -12,7 +12,7 @@ from typing import Any, Dict
 import optuna
 
 from systems.sim_engine import run_simulation
-from systems.scripts.fetch_candles import fetch_candles
+from systems.scripts.fetch_candles import load_coin_csv
 from systems.scripts.ledger import Ledger
 from systems.utils.addlog import addlog
 from systems.utils.config import (
@@ -20,6 +20,7 @@ from systems.utils.config import (
     load_settings,
     resolve_path,
 )
+from systems.utils.resolve_symbol import split_tag
 
 
 def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
@@ -111,7 +112,8 @@ def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
                     sim_engine.load_settings = original_sim_loader
 
             ledger_obj = Ledger.load_ledger(ledger, tag=tag, sim=True)
-            final_price = float(fetch_candles(tag).iloc[-1]["close"])
+            base, _ = split_tag(tag)
+            final_price = float(load_coin_csv(base).iloc[-1]["close"])
             summary = ledger_obj.get_account_summary(final_price)
             open_value = summary.get("open_value", 0.0)
             realized_gain = summary.get("realized_gain", 0.0)
