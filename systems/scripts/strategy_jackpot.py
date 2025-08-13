@@ -37,6 +37,18 @@ def _parse_period(period: str) -> int:
 def _compute_global_p(jstate: Dict[str, Any], price: float) -> float:
     low = float(jstate.get("global_low", 0.0))
     high = float(jstate.get("global_high", 0.0))
+    if price > high:
+        addlog(
+            f"[JACKPOT][STALE_BOUNDS] current_high={price:.2f} global_high={high:.2f}"
+        )
+        jstate["global_high"] = price
+        high = price
+    elif price < low:
+        addlog(
+            f"[JACKPOT][STALE_BOUNDS] current_low={price:.2f} global_low={low:.2f}"
+        )
+        jstate["global_low"] = price
+        low = price
     if high == low:
         return 0.0
     p = (price - low) / (high - low)
