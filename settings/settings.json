@@ -6,6 +6,15 @@
       "kraken_name": "SOL/USD",
       "kraken_pair": "SOLUSD",
       "binance_name": "SOLUSDT",
+      "jackpot": {
+        "enabled": true,
+        "period": "1w",
+        "drip_fraction": 0.005,
+        "trigger_p": 0.50,
+        "cashout_p": 0.70,
+        "depth_scale": 2.0,
+        "min_usd": 10.0
+      },
       "window_settings": {
         "minnow": {
           "window_size": "12h",
@@ -31,6 +40,15 @@
       "kraken_name": "SOL/USDC",
       "kraken_pair": "SOLUSDC",
       "binance_name": "SOLUSDC",
+      "jackpot": {
+        "enabled": true,
+        "period": "1w",
+        "drip_fraction": 0.005,
+        "trigger_p": 0.50,
+        "cashout_p": 0.70,
+        "depth_scale": 2.0,
+        "min_usd": 10.0
+      },
       "window_settings": {
         "mouse": {
          "window_size": "12h",

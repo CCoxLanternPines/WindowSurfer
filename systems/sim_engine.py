@@ -21,6 +21,12 @@ from systems.scripts.trade_apply import (
     paper_execute_buy,
     paper_execute_sell,
 )
+from systems.scripts.strategy_jackpot import (
+    init_jackpot,
+    on_buy_drip,
+    maybe_periodic_jackpot_buy,
+    maybe_cashout_jackpot,
+)
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
 from systems.utils.resolve_symbol import split_tag
@@ -70,7 +76,9 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         mode="sim",
         prev={"verbose": verbose},
     )
+    runtime_state["mode"] = "sim"
     runtime_state["buy_unlock_p"] = {}
+    init_jackpot(runtime_state, ledger_cfg, df)
 
     ledger_obj = Ledger()
     win_metrics = {}
@@ -105,6 +113,10 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                 if "timestamp" in df.columns:
                     ts = int(df.iloc[t]["timestamp"])
                 result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
+                net_usd = on_buy_drip(runtime_state, buy_res["size_usd"])
+                if buy_res["size_usd"] > 0 and net_usd < buy_res["size_usd"]:
+                    factor = net_usd / buy_res["size_usd"]
+                    result["filled_amount"] *= factor
                 note = apply_buy_result_to_ledger(
                     ledger=ledger_obj,
                     window_name=window_name,
@@ -180,7 +192,24 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                     m_sell["realized_proceeds"] += proceeds
                     m_sell["realized_trades"] += 1
                     m_sell["realized_roi_accum"] += roi_trade
-
+        maybe_periodic_jackpot_buy(
+            {"ledger": ledger_obj},
+            runtime_state,
+            t,
+            df,
+            price,
+            runtime_state.get("limits", {}),
+            ledger_cfg["tag"],
+        )
+        maybe_cashout_jackpot(
+            {"ledger": ledger_obj},
+            runtime_state,
+            t,
+            df,
+            price,
+            runtime_state.get("limits", {}),
+            ledger_cfg["tag"],
+        )
 
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)
@@ -236,6 +265,13 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         verbose_int=1,
         verbose_state=verbose,
     )
+    j = runtime_state.get("jackpot", {})
+    if j.get("enabled"):
+        addlog(
+            f"[REPORT][JACKPOT] drips=${j.get('drips',0.0):.2f} buys={j.get('buys',0)} sells={j.get('sells',0)} realized_pnl=${j.get('realized_pnl',0.0):.2f} pool_left=${j.get('pool_usd',0.0):.2f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
     addlog(
         f"Final Value (USD): ${summary['total_value']:.2f}",
         verbose_int=1,
@@ -268,6 +304,12 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         )
         writer.writeheader()
         writer.writerows(rows)
+        if j.get("enabled"):
+            f_csv.write("\n")
+            f_csv.write("jackpot_drips,jackpot_buys,jackpot_sells,jackpot_realized_pnl,jackpot_pool_left\n")
+            f_csv.write(
+                f"{j.get('drips',0.0)},{j.get('buys',0)},{j.get('sells',0)},{j.get('realized_pnl',0.0)},{j.get('pool_usd',0.0)}\n"
+            )
     json_data = {
         "windows": rows,
         "global": {
@@ -276,6 +318,14 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
             "total_at_liq": global_total_at_liq,
         },
     }
+    if j.get("enabled"):
+        json_data["jackpot"] = {
+            "drips": j.get("drips", 0.0),
+            "buys": j.get("buys", 0),
+            "sells": j.get("sells", 0),
+            "realized_pnl": j.get("realized_pnl", 0.0),
+            "pool_left": j.get("pool_usd", 0.0),
+        }
     with json_path.open("w", encoding="utf-8") as f_json:
         json.dump(json_data, f_json, indent=2)
 

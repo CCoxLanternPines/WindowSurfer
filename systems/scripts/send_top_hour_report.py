@@ -68,6 +68,8 @@ def send_top_hour_report(
     lines = [f"🕒 {ct_now} CT | Ledger: {ledger_name}", ""]
 
     for name, data in strategy_summary.items():
+        if name == "jackpot":
+            continue
         strat_name = name.title()
         if not strat_name.lower().endswith("catch"):
             strat_name += " Catch"
@@ -85,6 +87,20 @@ def send_top_hour_report(
                     f"| Open: {open_n}",
                     f"| ROI: {roi:+.1f}%",
                     f"| 💵 Total: ${total:+.2f}",
+                ]
+            )
+        )
+
+    jackpot = strategy_summary.get("jackpot")
+    if jackpot:
+        lines.append(
+            " ".join(
+                [
+                    "🎰 Jackpot",
+                    f"| Pool: ${jackpot.get('pool', 0.0):.2f}",
+                    f"| Drips: +${jackpot.get('drips', 0.0):.2f}",
+                    f"| Buys: {jackpot.get('buys', 0)}",
+                    f"| Sells: {jackpot.get('sells', 0)}",
                 ]
             )
         )
