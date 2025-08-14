@@ -9,7 +9,7 @@ from typing import Dict
 import pandas as pd
 from tqdm import tqdm
 
-from systems.fetch import fetch_recent_coin
+from systems.scripts.candle_refresh import refresh_to_last_closed_hour
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -215,8 +215,11 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
             verbose_state=verbose,
         )
         for ledger_cfg in settings.get("ledger_settings", {}).values():
-            base, _ = split_tag(ledger_cfg["tag"])
-            fetch_recent_coin(base)
+            refresh_to_last_closed_hour(
+                settings,
+                ledger_cfg["tag"],
+                lookback_hours=720,
+            )
         _run_iteration(settings, runtime_states, dry=dry, verbose=verbose)
         return
 
@@ -241,7 +244,10 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
             verbose_state=verbose,
         )
         for ledger_cfg in settings.get("ledger_settings", {}).values():
-            base, _ = split_tag(ledger_cfg["tag"])
-            fetch_recent_coin(base)
+            refresh_to_last_closed_hour(
+                settings,
+                ledger_cfg["tag"],
+                lookback_hours=720,
+            )
         addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
         _run_iteration(settings, runtime_states, dry=dry, verbose=verbose)

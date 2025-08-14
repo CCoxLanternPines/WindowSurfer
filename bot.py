@@ -16,13 +16,6 @@ from systems.utils.cli import build_parser
 
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
-    parser.add_argument("--coin", required=False, help="Coin ticker for fetch mode")
-    parser.add_argument(
-        "--all", action="store_true", help="Fetch full Binance history for coin"
-    )
-    parser.add_argument(
-        "--recent", type=int, help="Fetch recent N hours for coin"
-    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -57,7 +50,7 @@ def main(argv: list[str] | None = None) -> None:
             )
 
     if mode == "fetch":
-        run_fetch(args.coin, fetch_all=args.all, recent=args.recent)
+        run_fetch(args.ledger, lookback=args.time)
     elif mode == "sim":
         if not args.ledger:
             addlog("Error: --ledger is required for sim mode")
