@@ -10,7 +10,7 @@ from systems.scripts.kraken_utils import get_live_price
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.resolve_symbol import split_tag
 from systems.utils.snapshot import load_snapshot, prime_snapshot
-from systems.scripts.trade_apply import apply_buy_result_to_ledger
+from systems.scripts.trade_apply import apply_buy
 
 
 def fetch_price_data(symbol: str) -> dict:
@@ -261,7 +261,7 @@ def process_buy_signal(
     if not result or result.get("error"):
         return result
 
-    note = apply_buy_result_to_ledger(
+    note = apply_buy(
         ledger=ledger,
         window_name=buy_signal.get("window_name", ""),
         t=t,

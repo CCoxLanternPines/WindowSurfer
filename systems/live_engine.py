@@ -10,11 +10,11 @@ import pandas as pd
 from tqdm import tqdm
 
 from systems.scripts.candle_refresh import refresh_to_last_closed_hour
-from systems.scripts.ledger import Ledger, save_ledger
+from systems.scripts.ledger import load_ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
-from systems.scripts.trade_apply import apply_sell_result_to_ledger
+from systems.scripts.trade_apply import apply_sell
 from systems.scripts.execution_handler import execute_sell, process_buy_signal
 from systems.scripts.strategy_jackpot import (
     init_jackpot,
@@ -69,7 +69,7 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
         if df.empty:
             continue
         t = len(df) - 1
-        ledger_obj = Ledger.load_ledger(name, tag=ledger_cfg["tag"])
+        ledger_obj = load_ledger(name, tag=ledger_cfg["tag"])
         prev = runtime_states.get(name, {"verbose": verbose})
         state = build_runtime_state(
             settings,
@@ -129,7 +129,7 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
                     verbose=state.get("verbose", 0),
                 )
                 if result and not result.get("error"):
-                    apply_sell_result_to_ledger(
+                    apply_sell(
                         ledger=ledger_obj,
                         note=note,
                         t=t,
@@ -179,7 +179,7 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
         state["buy_unlock_p"] = {}
         runtime_states[name] = state
 
-        ledger_obj = Ledger.load_ledger(name, tag=ledger_cfg["tag"])
+        ledger_obj = load_ledger(name, tag=ledger_cfg["tag"])
         open_notes = ledger_obj.get_open_notes()
         total = len(open_notes)
         per_window: Dict[str, int] = {}

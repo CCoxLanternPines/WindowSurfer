@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from systems.utils.addlog import addlog
 from systems.utils.resolve_symbol import split_tag
-from .ledger import init_ledger
+from .ledger import resolve_ledger_config
 from .kraken_utils import get_kraken_balance
 
 
 def show_wallet(ledger: str | None, verbose: int = 0) -> None:
     """Display Kraken wallet balances for the given ledger."""
 
-    ledger_cfg = init_ledger(ledger)
+    ledger_cfg = resolve_ledger_config(ledger)
     _, quote_asset = split_tag(ledger_cfg["tag"])
     balances = get_kraken_balance(quote_asset, verbose)
 

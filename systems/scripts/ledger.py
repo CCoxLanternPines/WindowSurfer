@@ -126,6 +126,14 @@ class Ledger:
         return ledger
 
 
+def load_ledger(
+    ledger_name: str, *, tag: str | None = None, sim: bool = False
+) -> "Ledger":
+    """Public wrapper to load a ledger from disk."""
+
+    return Ledger.load_ledger(ledger_name, tag=tag, sim=sim)
+
+
 def save_ledger(
     ledger_name: str,
     ledger: "Ledger" | dict,
@@ -176,12 +184,24 @@ def save_ledger(
     with out_path.open("w", encoding="utf-8") as f:
         json.dump(ledger_data, f, indent=2)
 
+def init_ledger(
+    ledger_name: str,
+    *,
+    tag: str | None = None,
+    sim: bool = False,
+) -> Ledger:
+    """Load ``ledger_name`` and ensure its file exists on disk."""
 
-def init_ledger(ledger_name: str | None) -> Dict:
-    """Return the ledger configuration for ``ledger_name``.
+    ledger = load_ledger(ledger_name, tag=tag, sim=sim)
+    save_ledger(ledger_name, ledger, tag=tag, sim=sim)
+    return ledger
+
+
+def resolve_ledger_config(ledger_name: str | None) -> Dict:
+    """Return configuration dictionary for ``ledger_name``.
 
     If ``ledger_name`` is ``None``, the first ledger defined in settings is
-    returned. Mirrors previous inline logic in ``bot.py``.
+    returned. Mirrors previous inline logic previously in ``bot.py``.
     """
 
     settings = load_settings()

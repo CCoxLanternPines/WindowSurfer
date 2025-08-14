@@ -13,7 +13,7 @@ import optuna
 
 from systems.sim_engine import run_simulation
 from systems.scripts.fetch_candles import load_coin_csv
-from systems.scripts.ledger import Ledger
+from systems.scripts.ledger import load_ledger
 from systems.utils.addlog import addlog
 from systems.utils.config import (
     load_ledger_config,
@@ -111,7 +111,7 @@ def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
                 if original_sim_loader:
                     sim_engine.load_settings = original_sim_loader
 
-            ledger_obj = Ledger.load_ledger(ledger, tag=tag, sim=True)
+            ledger_obj = load_ledger(ledger, tag=tag, sim=True)
             base, _ = split_tag(tag)
             final_price = float(load_coin_csv(base).iloc[-1]["close"])
             summary = ledger_obj.get_account_summary(final_price)

@@ -18,7 +18,8 @@ from systems.scripts.execution_handler import (
     execute_sell,
     load_or_fetch_snapshot,
 )
-from systems.scripts.ledger import Ledger, save_ledger
+from systems.scripts.ledger import load_ledger, save_ledger
+from systems.scripts.trade_apply import apply_buy, apply_sell
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.config import resolve_path
@@ -92,7 +93,7 @@ def handle_top_of_hour(
             window_settings = ledger_cfg.get("window_settings", {})
             triggered_strategies = {wn.title(): False for wn in window_settings}
             strategy_summary: dict[str, dict] = {}
-            ledger = Ledger.load_ledger(ledger_name, tag=ledger_cfg["tag"])
+            ledger = load_ledger(ledger_name, tag=ledger_cfg["tag"])
 
             snapshot = load_or_fetch_snapshot(ledger_name)
             if not snapshot:
@@ -185,15 +186,14 @@ def handle_top_of_hour(
                                 wallet_code=wallet_code,
                             )
                             if result and not result.get("error"):
-                                note = {
-                                    "entry_amount": result["filled_amount"],
-                                    "entry_price": result["avg_price"],
-                                    "entry_ts": result["timestamp"],
-                                    "entry_tick": current_ts,
-                                    "window": window_name,
-                                    "status": "Open",
-                                }
-                                ledger.open_note(note)
+                                apply_buy(
+                                    ledger=ledger,
+                                    window_name=window_name,
+                                    t=current_ts,
+                                    meta={"window_name": window_name, "window_size": window_cfg.get("window_size")},
+                                    result=result,
+                                    state={},
+                                )
                                 if not dry_run:
                                     last_buy_tick[window_name] = current_ts
                                 buy_count += 1
@@ -275,15 +275,13 @@ def handle_top_of_hour(
                         )
                         if not result or result.get("error"):
                             continue
-                        note["exit_price"] = result["avg_price"]
-                        note["exit_ts"] = result["timestamp"]
-                        note["exit_tick"] = current_ts
-                        gain = (note["exit_price"] - note["entry_price"]) * note["entry_amount"]
-                        note["gain"] = gain
-                        base = note["entry_price"] * note["entry_amount"] or 1
-                        note["gain_pct"] = gain / base
-                        note["status"] = "Closed"
-                        ledger.close_note(note)
+                        apply_sell(
+                            ledger=ledger,
+                            note=note,
+                            t=current_ts,
+                            result=result,
+                            state={},
+                        )
                         if not dry_run:
                             last_sell_tick[window_name] = current_ts
                         sell_count += 1

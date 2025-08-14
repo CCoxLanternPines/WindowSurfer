@@ -8,8 +8,8 @@ from systems.utils.addlog import addlog, send_telegram_message
 from systems.scripts.trade_apply import (
     paper_execute_buy,
     paper_execute_sell,
-    apply_buy_result_to_ledger,
-    apply_sell_result_to_ledger,
+    apply_buy,
+    apply_sell,
 )
 from systems.scripts.execution_handler import execute_buy, execute_sell
 
@@ -148,7 +148,7 @@ def maybe_periodic_jackpot_buy(ctx: Dict[str, Any], state: Dict[str, Any], t: in
                 verbose=state.get("verbose", 0),
             )
             if result and not result.get("error"):
-                note = apply_buy_result_to_ledger(
+                note = apply_buy(
                     ledger=ctx["ledger"],
                     window_name="jackpot",
                     t=t,
@@ -158,7 +158,7 @@ def maybe_periodic_jackpot_buy(ctx: Dict[str, Any], state: Dict[str, Any], t: in
                 )
         else:
             result = paper_execute_buy(price, amount_usd, timestamp=ts)
-            note = apply_buy_result_to_ledger(
+            note = apply_buy(
                 ledger=ctx["ledger"],
                 window_name="jackpot",
                 t=t,
@@ -231,7 +231,7 @@ def maybe_cashout_jackpot(ctx: Dict[str, Any], state: Dict[str, Any], t: int, df
                 continue
         else:
             result = paper_execute_sell(price, note.get("entry_amount", 0.0), timestamp=ts)
-        apply_sell_result_to_ledger(
+        apply_sell(
             ledger=ctx["ledger"],
             note=note,
             t=t,
