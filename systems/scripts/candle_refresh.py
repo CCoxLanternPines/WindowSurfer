@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Utilities to refresh missing hourly candles before live runs."""
+"""Legacy utilities for refreshing candles (live mode deprecated)."""
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -92,41 +92,9 @@ def refresh_to_last_closed_hour(
     lookback_hours: int = 72,
     verbose: int = 1,
 ) -> None:
-    """Ensure ``data/raw/{tag}.csv`` has candles up to the last closed hour."""
+    """Deprecated helper retained for legacy scripts."""
 
-    kraken_sym, _ = resolve_ccxt_symbols(settings, tag)
-
-    path = get_raw_path(tag, ext="csv")
-    existing = _load_existing(path)
-
-    now = datetime.now(timezone.utc)
-    last_closed = int((now.timestamp() // 3600 - 1) * 3600)
-    start_ts = last_closed - lookback_hours * 3600
-    if not existing.empty:
-        latest_ts = int(existing["timestamp"].max())
-        start_ts = max(start_ts, latest_ts - 6 * 3600)
-
-    missing = compute_missing_ranges(existing, start_ts, last_closed, 3600 * 1000)
-
-    frames: List[pd.DataFrame] = []
-    for s, e in missing:
-        if e < s:
-            continue
-        df = fetch_candles(kraken_sym, s, e, exchange)
-        if not df.empty:
-            frames.append(df)
-
-    if frames:
-        count = _merge_and_save(path, existing, frames)
-        addlog(
-            f"[FETCH][LIVE] {tag} merged → {count} rows",
-            verbose_int=verbose,
-            verbose_state=True,
-        )
-    else:
-        addlog(
-            f"[FETCH][LIVE] {tag} up-to-date (<= {last_closed})",
-            verbose_int=verbose,
-            verbose_state=True,
-        )
+    raise RuntimeError(
+        "refresh_to_last_closed_hour is deprecated; use hard_refresh_live_720 from candle_cache"
+    )
 
