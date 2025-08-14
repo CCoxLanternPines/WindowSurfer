@@ -4,18 +4,21 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict
 
 import pandas as pd
 from tqdm import tqdm
 
-from systems.scripts.candle_cache import (
-    tag_from_symbol,
+from systems.utils.resolve_symbol import (
+    to_tag,
+    resolve_ccxt_symbols,
     live_path_csv,
-    load_sim_for_high_low,
-    hard_refresh_live_720,
-    last_closed_hour_ts,
     sim_path_csv,
+)
+from systems.scripts.candle_cache import (
+    refresh_live_kraken_720,
+    load_sim_for_high_low,
 )
 from systems.scripts.ledger import load_ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
@@ -33,29 +36,57 @@ from systems.utils.addlog import addlog
 from systems.utils.config import load_settings
 
 
-def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None:
-    tag_cache: Dict[str, pd.DataFrame] = {}
-    hist_cache: Dict[str, tuple[float, float]] = {}
+def _run_iteration(
+    settings,
+    runtime_states,
+    hist_cache,
+    *,
+    ledger_filter: str | None,
+    verbose: int,
+) -> None:
     for name, ledger_cfg in settings.get("ledger_settings", {}).items():
-        symbol = ledger_cfg["kraken_name"]
-        tag = tag_from_symbol(symbol)
+        if ledger_filter and name != ledger_filter:
+            continue
+        kraken_symbol, _ = resolve_ccxt_symbols(settings, name)
+        tag = to_tag(kraken_symbol)
         window_settings = ledger_cfg.get("window_settings", {})
-        if tag not in tag_cache:
-            end_ts = last_closed_hour_ts(int(time.time()))
-            iso = datetime.fromtimestamp(end_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            print(f"[LIVE][REFRESH] symbol={symbol} tag={tag} window=720h end={iso}")
-            hard_refresh_live_720(symbol)
-            df_live = pd.read_csv(live_path_csv(tag))
-            hist_low, hist_high = load_sim_for_high_low(tag)
+        refresh_live_kraken_720(kraken_symbol)
+        live_file = live_path_csv(tag)
+        if not Path(live_file).exists():
             print(
-                f"[LIVE][STATS] hist_low={hist_low:.2f} hist_high={hist_high:.2f} source={sim_path_csv(tag)}"
+                f"[ERROR] Missing data file: {live_file}. Run: python bot.py --mode fetch --ledger {name}"
             )
-            tag_cache[tag] = df_live
-            hist_cache[tag] = (hist_low, hist_high)
-        df = tag_cache[tag]
-        hist_low, hist_high = hist_cache[tag]
+            raise SystemExit(1)
+        df = pd.read_csv(live_file)
+        ts_col = next(
+            (c for c in df.columns if str(c).lower() in ("timestamp", "time", "date")),
+            None,
+        )
+        if ts_col is None:
+            print(f"[ERROR] Missing timestamp column in {live_file}")
+            raise SystemExit(1)
+        df[ts_col] = pd.to_numeric(df[ts_col], errors="coerce")
+        df = df.dropna(subset=[ts_col])
         if df.empty:
             continue
+        last_ts = int(df[ts_col].iloc[-1])
+        last_iso = datetime.fromtimestamp(last_ts, tz=timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        print(f"[DATA][LIVE] file={live_file} rows={len(df)} last={last_iso}")
+        if tag not in hist_cache:
+            sim_file = sim_path_csv(tag)
+            if not Path(sim_file).exists():
+                print(
+                    f"[ERROR] Missing data file: {sim_file}. Run: python bot.py --mode fetch --ledger {name}"
+                )
+                raise SystemExit(1)
+            hist_low, hist_high = load_sim_for_high_low(tag)
+            hist_cache[tag] = (hist_low, hist_high)
+            print(
+                f"[STATS][LIVE] hist_low={hist_low:.2f} hist_high={hist_high:.2f} from={sim_file}"
+            )
+        hist_low, hist_high = hist_cache[tag]
         t = len(df) - 1
         ledger_obj = load_ledger(name, tag=ledger_cfg["tag"])
         prev = runtime_states.get(name, {"verbose": verbose})
@@ -154,12 +185,15 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
         save_ledger(name, ledger_obj, tag=ledger_cfg["tag"])
 
 
-def run_live(*, dry: bool = False, verbose: int = 0) -> None:
+def run_live(*, ledger: str | None = None, dry: bool = False, verbose: int = 0) -> None:
     settings = load_settings()
     runtime_states: Dict[str, Dict] = {}
+    hist_cache: Dict[str, tuple[float, float]] = {}
 
     # Clear any stale buy unlock gates on startup
     for name, ledger_cfg in settings.get("ledger_settings", {}).items():
+        if ledger and name != ledger:
+            continue
         state = build_runtime_state(
             settings,
             ledger_cfg,
@@ -199,7 +233,13 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
             )
 
     if dry:
-        _run_iteration(settings, runtime_states, dry=dry, verbose=verbose)
+        _run_iteration(
+            settings,
+            runtime_states,
+            hist_cache,
+            ledger_filter=ledger,
+            verbose=verbose,
+        )
         return
 
     while True:
@@ -218,4 +258,10 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
                 time.sleep(1)
                 pbar.update(1)
         addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
-        _run_iteration(settings, runtime_states, dry=dry, verbose=verbose)
+        _run_iteration(
+            settings,
+            runtime_states,
+            hist_cache,
+            ledger_filter=ledger,
+            verbose=verbose,
+        )

@@ -95,6 +95,6 @@ def refresh_to_last_closed_hour(
     """Deprecated helper retained for legacy scripts."""
 
     raise RuntimeError(
-        "refresh_to_last_closed_hour is deprecated; use hard_refresh_live_720 from candle_cache"
+        "refresh_to_last_closed_hour is deprecated; use refresh_live_kraken_720 from candle_cache"
     )
 
