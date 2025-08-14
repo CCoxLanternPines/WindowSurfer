@@ -87,7 +87,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    csv_path = pathlib.Path("data/raw") / f"{args.tag}.csv"
+    csv_path = pathlib.Path("data/sim") / f"{args.tag}.csv"
     df = pd.read_csv(csv_path)
     df = standardize_columns(df)
 
