@@ -11,7 +11,7 @@ import pandas as pd
 
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
-from systems.scripts.get_window_data import get_wave_window_data_df
+from systems.scripts.data_loader import get_window_data
 from systems.scripts.kraken_utils import get_live_price
 from systems.scripts.execution_handler import (
     execute_buy,
@@ -25,7 +25,7 @@ from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.config import resolve_path
 from systems.utils.top_hour_report import format_top_of_hour_report
 from systems.utils.resolve_symbol import split_tag
-from systems.scripts.window_position_tools import get_trade_params
+from systems.scripts.window_utils import get_trade_params
 from systems.scripts.candle_refresh import refresh_to_last_closed_hour
 
 
@@ -131,7 +131,7 @@ def handle_top_of_hour(
                 except Exception:
                     df = None
 
-                wave = get_wave_window_data_df(
+                wave = get_window_data(
                     df,
                     window=window_cfg["window_size"],
                     candle_offset=0,
@@ -428,7 +428,7 @@ def handle_top_of_hour(
     price = float(candle.get("close", 0.0))
 
     for name, cfg in windows.items():
-        wave = get_wave_window_data_df(
+        wave = get_window_data(
             df,
             window=cfg["window_size"],
             candle_offset=offset,

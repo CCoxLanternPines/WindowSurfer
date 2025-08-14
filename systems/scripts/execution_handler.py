@@ -5,7 +5,7 @@ import hmac
 import base64
 from urllib.parse import urlencode
 
-from systems.scripts.kraken_auth import load_kraken_keys
+from systems.scripts.kraken_utils import load_kraken_keys
 from systems.scripts.kraken_utils import get_live_price
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.resolve_symbol import split_tag

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
-from systems.scripts.window_position_tools import get_trade_params
+from systems.scripts.window_utils import get_trade_params
 from systems.utils.addlog import addlog
 from systems.scripts.trade_apply import apply_buy, apply_sell
 

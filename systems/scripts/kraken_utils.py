@@ -1,11 +1,32 @@
 import requests
+from pathlib import Path
+import yaml
 
-from systems.scripts.kraken_auth import load_kraken_keys
 from systems.utils.addlog import addlog
 from systems.utils.price_fetcher import get_price
 from systems.utils.snapshot import load_snapshot, prime_snapshot
 
 KRAKEN_API_URL = "https://api.kraken.com"
+
+
+# --- Authentication -------------------------------------------------------
+
+def load_kraken_keys(path: str = "kraken.yaml") -> tuple[str, str]:
+    """Load Kraken API key and secret from local YAML file."""
+    file = Path(path)
+    if not file.exists():
+        raise FileNotFoundError("Missing kraken.yaml in project root")
+
+    with file.open("r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    kraken = data.get("kraken")
+    if not kraken or "api_key" not in kraken or "api_secret" not in kraken:
+        raise ValueError(
+            "Malformed kraken.yaml: missing 'kraken.api_key' or 'api_secret'"
+        )
+
+    return kraken["api_key"], kraken["api_secret"]
 
 
 def get_live_price(kraken_pair: str) -> float:
