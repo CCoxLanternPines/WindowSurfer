@@ -9,7 +9,14 @@ from typing import Dict
 import pandas as pd
 from tqdm import tqdm
 
-from systems.scripts.candle_refresh import refresh_to_last_closed_hour
+from systems.scripts.candle_cache import (
+    tag_from_symbol,
+    live_path_csv,
+    load_sim_for_high_low,
+    hard_refresh_live_720,
+    last_closed_hour_ts,
+    sim_path_csv,
+)
 from systems.scripts.ledger import load_ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -23,49 +30,30 @@ from systems.scripts.strategy_jackpot import (
     maybe_cashout_jackpot,
 )
 from systems.utils.addlog import addlog
-from systems.utils.config import load_settings, resolve_path
-from systems.utils.resolve_symbol import split_tag
+from systems.utils.config import load_settings
 
 
 def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None:
+    tag_cache: Dict[str, pd.DataFrame] = {}
+    hist_cache: Dict[str, tuple[float, float]] = {}
     for name, ledger_cfg in settings.get("ledger_settings", {}).items():
-        base, _ = split_tag(ledger_cfg["tag"])
-        coin = base.upper()
+        symbol = ledger_cfg["kraken_name"]
+        tag = tag_from_symbol(symbol)
         window_settings = ledger_cfg.get("window_settings", {})
-        raw_path = resolve_path("") / "data" / "raw" / f"{coin}.csv"
-        try:
-            df = pd.read_csv(raw_path)
-        except FileNotFoundError:
-            addlog(
-                f"[WARN] Candle data missing for {coin}",
-                verbose_int=1,
-                verbose_state=verbose,
+        if tag not in tag_cache:
+            end_ts = last_closed_hour_ts(int(time.time()))
+            iso = datetime.fromtimestamp(end_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            print(f"[LIVE][REFRESH] symbol={symbol} tag={tag} window=720h end={iso}")
+            hard_refresh_live_720(symbol)
+            df_live = pd.read_csv(live_path_csv(tag))
+            hist_low, hist_high = load_sim_for_high_low(tag)
+            print(
+                f"[LIVE][STATS] hist_low={hist_low:.2f} hist_high={hist_high:.2f} source={sim_path_csv(tag)}"
             )
-            continue
-
-        ts_col = None
-        for c in df.columns:
-            lc = str(c).lower()
-            if lc in ("timestamp", "time", "date"):
-                ts_col = c
-                break
-        if ts_col is None:
-            raise ValueError(f"No timestamp column in {raw_path}")
-
-        df[ts_col] = pd.to_numeric(df[ts_col], errors="coerce")
-        df = df.dropna(subset=[ts_col])
-
-        before = len(df)
-        df = df.sort_values(ts_col).drop_duplicates(subset=[ts_col], keep="last").reset_index(drop=True)
-        removed = before - len(df)
-
-        if not df[ts_col].is_monotonic_increasing:
-            raise ValueError(f"Candles not sorted by {ts_col}: {raw_path}")
-
-        first_ts = int(df[ts_col].iloc[0]) if len(df) else None
-        last_ts = int(df[ts_col].iloc[-1]) if len(df) else None
-        print(f"[DATA] file={raw_path} rows={len(df)} first={first_ts} last={last_ts} dups_removed={removed}")
-
+            tag_cache[tag] = df_live
+            hist_cache[tag] = (hist_low, hist_high)
+        df = tag_cache[tag]
+        hist_low, hist_high = hist_cache[tag]
         if df.empty:
             continue
         t = len(df) - 1
@@ -78,6 +66,8 @@ def _run_iteration(settings, runtime_states, *, dry: bool, verbose: int) -> None
             prev=prev,
         )
         state["mode"] = "live"
+        state["hist_low"] = hist_low
+        state["hist_high"] = hist_high
         runtime_states[name] = state
         init_jackpot(state, ledger_cfg, df)
         j = state.get("jackpot", {})
@@ -209,17 +199,6 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
             )
 
     if dry:
-        addlog(
-            "[LIVE] Refreshing candles (recent 720 via Kraken)...",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-        for ledger_cfg in settings.get("ledger_settings", {}).values():
-            refresh_to_last_closed_hour(
-                settings,
-                ledger_cfg["tag"],
-                lookback_hours=720,
-            )
         _run_iteration(settings, runtime_states, dry=dry, verbose=verbose)
         return
 
@@ -238,16 +217,5 @@ def run_live(*, dry: bool = False, verbose: int = 0) -> None:
             for _ in range(remaining):
                 time.sleep(1)
                 pbar.update(1)
-        addlog(
-            "[LIVE] Refreshing candles (recent 720 via Kraken)...",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-        for ledger_cfg in settings.get("ledger_settings", {}).values():
-            refresh_to_last_closed_hour(
-                settings,
-                ledger_cfg["tag"],
-                lookback_hours=720,
-            )
         addlog("[LIVE] Running top of hour", verbose_int=1, verbose_state=verbose)
         _run_iteration(settings, runtime_states, dry=dry, verbose=verbose)

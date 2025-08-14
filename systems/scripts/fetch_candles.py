@@ -106,6 +106,12 @@ def _rows_to_df(rows: List[List], start_ts: int, end_ts: int) -> pd.DataFrame:
     return df
 
 
+def fetch_kraken_range(symbol: str, start_ts: int, end_ts: int) -> pd.DataFrame:
+    """Fetch Kraken candles between ``start_ts`` and ``end_ts`` (seconds)."""
+    rows = _fetch_kraken(symbol, int(start_ts * 1000), int(end_ts * 1000))
+    return _rows_to_df(rows, start_ts, end_ts)
+
+
 def fetch_candles(symbol: str, start: int, end: int, source: str) -> pd.DataFrame:
     """Fetch candles for ``symbol`` between ``start`` and ``end`` from ``source``.
 

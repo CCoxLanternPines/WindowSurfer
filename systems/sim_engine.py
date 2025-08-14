@@ -28,8 +28,11 @@ from systems.scripts.strategy_jackpot import (
     maybe_cashout_jackpot,
 )
 from systems.utils.addlog import addlog
+from pathlib import Path
+
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
 from systems.utils.resolve_symbol import split_tag
+from systems.scripts.candle_cache import tag_from_symbol, sim_path_csv
 
 
 def run_simulation(*, ledger: str, verbose: int = 0) -> None:
@@ -39,8 +42,14 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     coin = base.upper()
     window_settings = ledger_cfg.get("window_settings", {})
 
-    raw_path = resolve_path("") / "data" / "raw" / f"{coin}.csv"
-    df = pd.read_csv(raw_path)
+    kraken_name = ledger_cfg.get("kraken_name", base)
+    tag = tag_from_symbol(kraken_name)
+    csv_path = sim_path_csv(tag)
+    if not Path(csv_path).exists():
+        raise FileNotFoundError(
+            f"Missing SIM data for {tag}; run the SIM fetch command to generate {csv_path}"
+        )
+    df = pd.read_csv(csv_path)
 
     # Normalize + guard
     ts_col = None
