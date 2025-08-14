@@ -9,10 +9,10 @@
       "jackpot": {
         "enabled": true,
         "period": "1m",
-        "drip_fraction": 0.004,
-        "trigger_p": 0.95,
-        "cashout_p": 0.80,
-        "depth_scale": 4.0,
+        "drip_fraction": 0.02,
+        "cashout_p": 0.90,
+        "trigger_p": 0.75,
+        "depth_scale": 5.0,
         "min_usd": 1.0
       },
       "window_settings": {
@@ -43,28 +43,28 @@
       "jackpot": {
         "enabled": true,
         "period": "1m",
-        "drip_fraction": 0.005,
-        "trigger_p": 0.50,
-        "cashout_p": 0.70,
-        "depth_scale": 2.0,
+        "drip_fraction": 0.02,
+        "cashout_p": 0.90,
+        "trigger_p": 0.75,
+        "depth_scale": 5.0,
         "min_usd": 1.0
       },
       "window_settings": {
         "mouse": {
-         "window_size": "12h",
+          "window_size": "12h",
           "buy_trigger_position": 0.1,
           "reset_buy_percent": 0.5,
           "maturity_position": 1.0,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.1
+          "investment_fraction": 0.125
         },
         "rabbit": {
           "window_size": "2d",
           "buy_trigger_position": 0.1,
           "reset_buy_percent": 0.5,
-          "maturity_position": 1.5,
+          "maturity_position": 1,
           "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.15
+          "investment_fraction": 0.25
         }
       }
     }
