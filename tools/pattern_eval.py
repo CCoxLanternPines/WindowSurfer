@@ -23,7 +23,7 @@ def load_signal_modules(mod_dir: Path) -> List[Dict]:
     modules: List[Dict] = []
     if not mod_dir.exists():
         return modules
-    for path in mod_dir.glob("*.py"):
+    for path in sorted(mod_dir.glob("*.py")):
         spec = importlib.util.spec_from_file_location(path.stem, path)
         module = importlib.util.module_from_spec(spec)
         try:
