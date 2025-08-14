@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
-from systems.scripts.window_position_tools import get_trade_params
+from systems.scripts.window_utils import get_trade_params
 from systems.utils.addlog import addlog
+from systems.scripts.trade_apply import apply_buy, apply_sell
 
 
 def evaluate_trade(
@@ -68,16 +69,25 @@ def evaluate_trade(
         invest = min(adjusted_note_count, max_note_usdt)
         if invest >= min_note_usdt and invest <= sim_capital:
             amount = invest / current_price
-            note = {
-                "window": name,
-                "entry_tick": tick,
-                "buy_tick": tick,
-                "entry_price": current_price,
-                "entry_amount": amount,
-                "status": "Open",
+            result = {
+                "filled_amount": amount,
+                "avg_price": current_price,
+                "timestamp": tick,
             }
-            ledger.open_note(note)
-            sim_capital -= invest
+            meta = {
+                "window_name": name,
+                "window_size": cfg.get("window_size"),
+            }
+            state = {"capital": sim_capital}
+            apply_buy(
+                ledger=ledger,
+                window_name=name,
+                t=tick,
+                meta=meta,
+                result=result,
+                state=state,
+            )
+            sim_capital = state.get("capital", sim_capital)
             cooldown_tracker[name] = tick
             addlog(
                 f"[BUY] {name} tick {tick} price={current_price:.6f}",
@@ -147,8 +157,14 @@ def evaluate_trade(
 
         closed: List[Dict] = []
         for note in to_close:
-            ledger.close_note(note)
-            sim_capital += note["entry_amount"] * current_price
+            res = {
+                "filled_amount": note.get("entry_amount", 0.0),
+                "avg_price": current_price,
+                "timestamp": tick,
+            }
+            state = {"capital": sim_capital}
+            apply_sell(ledger=ledger, note=note, t=tick, result=res, state=state)
+            sim_capital = state.get("capital", sim_capital)
             closed.append(note)
         return sim_capital, closed, roi_skipped
 

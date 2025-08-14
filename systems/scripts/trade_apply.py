@@ -12,7 +12,7 @@ def paper_execute_sell(price: float, coin_amount: float, *, timestamp: Optional[
     return {"filled_amount": coin_amount, "avg_price": price, "timestamp": timestamp}
 
 
-def apply_buy_result_to_ledger(
+def apply_buy(
     *,
     ledger,
     window_name: str,
@@ -52,7 +52,7 @@ def apply_buy_result_to_ledger(
     return note
 
 
-def apply_sell_result_to_ledger(
+def apply_sell(
     *,
     ledger,
     note: Dict[str, Any],

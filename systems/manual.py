@@ -2,7 +2,6 @@ from __future__ import annotations
 
 """Command-line tool to place manual Kraken buy/sell test orders."""
 
-import json
 from typing import Optional
 
 from systems.utils.config import load_settings, resolve_path
@@ -10,15 +9,7 @@ from systems.utils.addlog import addlog
 from systems.scripts.kraken_utils import ensure_snapshot, get_live_price
 from systems.utils.cli import build_parser
 from systems.scripts.execution_handler import execute_buy, execute_sell
-from systems.scripts.ledger import save_ledger
-
-
-def _load_ledger(ledger_name: str) -> dict:
-    path = resolve_path(f"data/ledgers/{ledger_name}.json")
-    if path.exists():
-        with path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    return {"trades": []}
+from systems.scripts.ledger import load_ledger, save_ledger
 def _coin_label(tag: str) -> str:
     for suffix in ["USD", "USDT", "USDC", "EUR", "GBP", "DAI"]:
         if tag.endswith(suffix):
@@ -69,7 +60,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     if legacy_path and legacy_path.exists() and not path_new.exists():
         legacy_path.rename(path_new)
 
-    ledger = _load_ledger(args.ledger)
+    ledger = load_ledger(args.ledger, tag=tag)
+    metadata = ledger.get_metadata()
 
     if args.buy:
         if not args.dry:
@@ -86,7 +78,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                 raise SystemExit("[ERROR] Buy order failed")
             coin_amt = result.get("filled_amount", coin_amt)
             price = result.get("avg_price", price)
-            ledger.setdefault("trades", []).append(
+            metadata.setdefault("trades", []).append(
                 {
                     "action": "buy",
                     "symbol": tag,
@@ -96,6 +88,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                     "timestamp": result.get("timestamp"),
                 }
             )
+            ledger.set_metadata(metadata)
             save_ledger(args.ledger, ledger, tag=tag)
         addlog(
             f"[MANUAL BUY] {args.ledger} | {tag} | ${args.usd:.2f} → {coin_amt:.4f} {coin_str} @ ${price:.4f}",
@@ -117,7 +110,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             coin_amt = result.get("filled_amount", coin_amt)
             price = result.get("avg_price", price)
             usd_total = coin_amt * price
-            ledger.setdefault("trades", []).append(
+            metadata.setdefault("trades", []).append(
                 {
                     "action": "sell",
                     "symbol": tag,
@@ -127,6 +120,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                     "timestamp": result.get("timestamp"),
                 }
             )
+            ledger.set_metadata(metadata)
             save_ledger(args.ledger, ledger, tag=tag)
         else:
             usd_total = args.usd

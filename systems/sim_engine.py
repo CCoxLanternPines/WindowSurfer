@@ -16,8 +16,8 @@ from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
 from systems.scripts.trade_apply import (
-    apply_buy_result_to_ledger,
-    apply_sell_result_to_ledger,
+    apply_buy,
+    apply_sell,
     paper_execute_buy,
     paper_execute_sell,
 )
@@ -117,7 +117,7 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                 if buy_res["size_usd"] > 0 and net_usd < buy_res["size_usd"]:
                     factor = net_usd / buy_res["size_usd"]
                     result["filled_amount"] *= factor
-                note = apply_buy_result_to_ledger(
+                note = apply_buy(
                     ledger=ledger_obj,
                     window_name=window_name,
                     t=t,
@@ -170,7 +170,7 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                 if "timestamp" in df.columns:
                     ts = int(df.iloc[t]["timestamp"])
                 result = paper_execute_sell(price, note.get("entry_amount", 0.0), timestamp=ts)
-                apply_sell_result_to_ledger(
+                apply_sell(
                     ledger=ledger_obj,
                     note=note,
                     t=t,

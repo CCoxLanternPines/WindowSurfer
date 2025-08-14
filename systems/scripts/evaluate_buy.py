@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, Any
 
-from systems.scripts.window_utils import get_window_bounds, get_window_position
+from systems.scripts.window_utils import get_window_bounds, check_buy_conditions
 from systems.utils.addlog import addlog
 
 
@@ -38,9 +38,9 @@ def evaluate_buy(
     ledger = ctx.get("ledger")
     verbose = runtime_state.get("verbose", 0)
 
+    candle = series.iloc[t]
     win_low, win_high = get_window_bounds(series, t, cfg["window_size"])
-    price = float(series.iloc[t]["close"])
-    p = get_window_position(price, win_low, win_high)
+    window_data = {"low": win_low, "high": win_high}
 
     open_notes = []
     if ledger:
@@ -48,32 +48,19 @@ def evaluate_buy(
             n for n in ledger.get_open_notes() if n.get("window_name") == window_name
         ]
 
-    unlock_map = runtime_state.setdefault("buy_unlock_p", {})
-    unlock_p = unlock_map.get(window_name)
-    # Only enforce rebound gate if there are open notes for this window
-    if unlock_p is not None and open_notes:
-        if p >= unlock_p:
-            addlog(
-                f"[UNLOCK][{window_name} {cfg['window_size']}] p={p:.3f} >= unlock_p={unlock_p:.3f} → buys re-enabled",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-            unlock_map.pop(window_name, None)
-        else:
-            addlog(
-                f"[GATE][{window_name} {cfg['window_size']}] buy blocked; p={p:.3f} < unlock_p={unlock_p:.3f}",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-            return False
+    ledger_state = {
+        "open_notes": open_notes,
+        "buy_unlock_p": runtime_state.setdefault("buy_unlock_p", {}),
+        "verbose": verbose,
+    }
 
-    trigger = cfg.get("buy_trigger_position", 0.0)
-    if p > trigger:
-        addlog(
-            f"[SKIP][{window_name} {cfg['window_size']}] p={p:.3f} > buy_trigger={trigger:.3f}",
-            verbose_int=3,
-            verbose_state=verbose,
-        )
+    ok, meta = check_buy_conditions(
+        candle,
+        window_data,
+        {**cfg, "window_name": window_name},
+        ledger_state,
+    )
+    if not ok:
         return False
 
     capital = runtime_state.get("capital", 0.0)
@@ -102,26 +89,18 @@ def evaluate_buy(
     sz_pct = (size_usd / capital * 100) if capital else 0.0
 
     addlog(
-        f"[BUY][{window_name} {cfg['window_size']}] p={p:.3f}, base={base*100:.2f}% → size={sz_pct:.2f}% (cap=${size_usd:.2f})",
+        f"[BUY][{window_name} {cfg['window_size']}] p={meta['p_buy']:.3f}, base={base*100:.2f}% → size={sz_pct:.2f}% (cap=${size_usd:.2f})",
         verbose_int=1,
         verbose_state=verbose,
     )
-
-    unlock_p = min(1.0, p + cfg.get("reset_buy_percent", 0.0))
-    p_target = cfg.get("maturity_position", 1.0)
-    price_target = win_low + p_target * (win_high - win_low)
-    roi_target = (price_target - price) / price if price else 0.0
 
     result = {
         "size_usd": size_usd,
         "window_name": window_name,
         "window_size": cfg["window_size"],
-        "p_buy": p,
-        "target_price": price_target,
-        "target_roi": roi_target,
-        "unlock_p": unlock_p,
+        **meta,
     }
     if "timestamp" in series.columns:
-        result["created_ts"] = int(series.iloc[t]["timestamp"])
+        result["created_ts"] = int(candle["timestamp"])
     result["created_idx"] = t
     return result
