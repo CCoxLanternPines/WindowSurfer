@@ -37,9 +37,10 @@ from systems.utils.resolve_symbol import (
     to_tag,
     sim_path_csv,
 )
+from systems.utils.time import parse_cutoff
 
 
-def run_simulation(*, ledger: str, verbose: int = 0) -> None:
+def run_simulation(*, ledger: str, verbose: int = 0, time_window: str | None = None) -> None:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
     base, _ = split_tag(ledger_cfg["tag"])
@@ -91,8 +92,43 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         else "n/a"
     )
     print(
-        f"[DATA][SIM] file={csv_path} rows={len(df)} first={first_iso} last={last_iso} dups_removed={removed}"
+        f"[DATA] file={csv_path} rows={len(df)} first={first_iso} last={last_iso} dups_removed={removed}"
     )
+
+    now = datetime.now(tz=timezone.utc)
+    cutoff_ts = None
+    start_from = "full"
+    if time_window:
+        try:
+            delta = parse_cutoff(time_window)
+            candidate_cutoff = now.timestamp() - delta.total_seconds()
+        except Exception:
+            try:
+                dt = datetime.fromisoformat(time_window.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                else:
+                    dt = dt.astimezone(timezone.utc)
+                candidate_cutoff = dt.timestamp()
+            except Exception as exc:
+                print(f"[ERROR] Invalid --time value: {time_window}")
+                raise SystemExit(1) from exc
+        if first_ts is not None and candidate_cutoff < first_ts:
+            print("[SIM][TIME] cutoff before first candle -> using full history.")
+        else:
+            cutoff_ts = candidate_cutoff
+            start_from = datetime.fromtimestamp(
+                cutoff_ts, tz=timezone.utc
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    print(f"[SIM][TIME] mode=sim start_from={start_from} now_utc={now_iso}")
+    if cutoff_ts is not None:
+        df = df[df[ts_col] >= cutoff_ts].reset_index(drop=True)
+        rows_after = len(df)
+        print(f"[SIM][TIME] applied cutoff={start_from} rows_after={rows_after}")
+        if rows_after == 0:
+            print("[ABORT][SIM][TIME] No candles ≥ cutoff")
+            return
 
     total = len(df)
 

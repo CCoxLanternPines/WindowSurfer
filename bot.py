@@ -16,6 +16,10 @@ from systems.utils.cli import build_parser
 
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
+    parser.add_argument(
+        "--time",
+        help="Optional start time for simulation (e.g. '3m' or '2023-01-01')",
+    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -55,7 +59,11 @@ def main(argv: list[str] | None = None) -> None:
         if not args.ledger:
             addlog("Error: --ledger is required for sim mode")
             sys.exit(1)
-        run_simulation(ledger=args.ledger, verbose=args.verbose)
+        run_simulation(
+            ledger=args.ledger,
+            verbose=args.verbose,
+            time_window=args.time,
+        )
     elif mode == "live":
         run_live(
             ledger=args.ledger,
