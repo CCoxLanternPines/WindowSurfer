@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Dict, List
 
-from systems.utils.config import resolve_path
+from systems.utils.config import resolve_path, load_settings, load_ledger_config
 
 
 class Ledger:
@@ -175,3 +175,16 @@ def save_ledger(
 
     with out_path.open("w", encoding="utf-8") as f:
         json.dump(ledger_data, f, indent=2)
+
+
+def init_ledger(ledger_name: str | None) -> Dict:
+    """Return the ledger configuration for ``ledger_name``.
+
+    If ``ledger_name`` is ``None``, the first ledger defined in settings is
+    returned. Mirrors previous inline logic in ``bot.py``.
+    """
+
+    settings = load_settings()
+    if ledger_name:
+        return load_ledger_config(ledger_name)
+    return next(iter(settings.get("ledger_settings", {}).values()))

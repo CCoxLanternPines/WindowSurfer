@@ -6,8 +6,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="WindowSurfer command line interface")
     parser.add_argument(
         "--mode",
-        choices=["sim", "simtune", "live", "wallet"],
-        help="Execution mode: sim, simtune, live, or wallet",
+        choices=["fetch", "sim", "live", "wallet"],
+        help="Execution mode: fetch, sim, live, or wallet",
     )
     parser.add_argument(
         "--ledger",

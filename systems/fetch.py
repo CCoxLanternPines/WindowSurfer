@@ -105,6 +105,53 @@ def fetch_recent_coin(coin: str) -> int:
     return fetch_recent(coin, 720)
 
 
+def run_fetch(coin: str | None, *, fetch_all: bool, recent: int | None) -> None:
+    """CLI helper for fetching candle data.
+
+    Parameters mirror the command line flags and validation mirrors the
+    previous inline logic in ``bot.py``.
+    """
+
+    if not coin:
+        addlog(
+            "Error: --coin is required for fetch mode",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        raise SystemExit(1)
+
+    if fetch_all and recent is not None:
+        addlog(
+            "Error: --all and --recent are mutually exclusive",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        raise SystemExit(1)
+
+    if not fetch_all and recent is None:
+        addlog(
+            "Error: either --all or --recent is required",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        raise SystemExit(1)
+
+    if fetch_all:
+        addlog(
+            f"[BOT][FETCH][ALL] coin={coin} → full Binance history",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        fetch_all(coin)
+    else:
+        addlog(
+            f"[BOT][FETCH][RECENT] coin={coin} hours={recent}",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        fetch_recent(coin, recent)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Fetch candles for a coin")
     parser.add_argument("--coin", required=True, help="Base currency ticker")

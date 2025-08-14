@@ -5,20 +5,17 @@ from __future__ import annotations
 import sys
 from systems.utils.asset_pairs import load_asset_pairs
 
+from systems.fetch import run_fetch
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
+from systems.scripts.wallet import show_wallet
 from systems.utils.addlog import init_logger, addlog
-from systems.utils.resolve_symbol import split_tag
-from systems.utils.config import load_settings, load_ledger_config
+from systems.utils.config import load_settings
 from systems.utils.cli import build_parser
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
-    for action in parser._actions:
-        if action.dest == "mode" and action.choices is not None:
-            action.choices = list(action.choices) + ["fetch"]
-            break
     parser.add_argument("--coin", required=False, help="Coin ticker for fetch mode")
     parser.add_argument(
         "--all", action="store_true", help="Fetch full Binance history for coin"
@@ -56,100 +53,25 @@ def main(argv: list[str] | None = None) -> None:
         tag = ledger_cfg.get("tag", "")
         if tag.upper() not in valid_pairs:
             raise RuntimeError(
-                f"[ERROR] Invalid trading pair: {ledger_cfg['tag']} — Not found in Kraken altname list"
+                f"[ERROR] Invalid trading pair: {ledger_cfg['tag']} — Not found in Kraken altname list",
             )
 
-    if mode == "wallet":
-        from systems.scripts.kraken_utils import get_kraken_balance
-
-        if args.ledger:
-            ledger_cfg = load_ledger_config(args.ledger)
-        else:
-            ledger_cfg = next(iter(settings.get("ledger_settings", {}).values()))
-
-        _, quote_asset = split_tag(ledger_cfg["tag"])
-        balances = get_kraken_balance(quote_asset, verbose)
-
-        if verbose >= 1:
-            addlog("[WALLET] Kraken Balance", verbose_int=1, verbose_state=verbose)
-            addlog(str(balances), verbose_int=2, verbose_state=verbose)
-            for asset, amount in balances.items():
-                val = float(amount)
-                if val == 0:
-                    continue
-                fmt = f"{val:.2f}" if val > 1 else f"{val:.6f}"
-                if asset.upper() == quote_asset.upper():
-                    addlog(f"{asset}: ${fmt}", verbose_int=1, verbose_state=verbose)
-                else:
-                    addlog(f"{asset}: {fmt}", verbose_int=1, verbose_state=verbose)
-        return
-
-    if mode == "sim":
+    if mode == "fetch":
+        run_fetch(args.coin, fetch_all=args.all, recent=args.recent)
+    elif mode == "sim":
         if not args.ledger:
             addlog("Error: --ledger is required for sim mode")
             sys.exit(1)
         run_simulation(ledger=args.ledger, verbose=args.verbose)
-    elif mode == "simtune":
-        if not args.ledger:
-            addlog("Error: --ledger is required for simtune mode")
-            sys.exit(1)
-        from systems.scripts.sim_tuner import run_sim_tuner
-        run_sim_tuner(ledger=args.ledger, verbose=args.verbose)
     elif mode == "live":
         run_live(
             dry=args.dry,
             verbose=args.verbose,
         )
-    elif mode == "fetch":
-        if not args.coin:
-            addlog(
-                "Error: --coin is required for fetch mode",
-                verbose_int=1,
-                verbose_state=True,
-            )
-            sys.exit(1)
-        if args.all and args.recent is not None:
-            addlog(
-                "Error: --all and --recent are mutually exclusive",
-                verbose_int=1,
-                verbose_state=True,
-            )
-            sys.exit(1)
-        if not args.all and args.recent is None:
-            addlog(
-                "Error: either --all or --recent is required",
-                verbose_int=1,
-                verbose_state=True,
-            )
-            sys.exit(1)
-        try:
-            from systems.fetch import fetch_all, fetch_recent
-
-            if args.all:
-                addlog(
-                    f"[BOT][FETCH][ALL] coin={args.coin} → full Binance history",
-                    verbose_int=1,
-                    verbose_state=True,
-                )
-                fetch_all(args.coin)
-            else:
-                addlog(
-                    f"[BOT][FETCH][RECENT] coin={args.coin} hours={args.recent}",
-                    verbose_int=1,
-                    verbose_state=True,
-                )
-                fetch_recent(args.coin, args.recent)
-        except Exception as e:
-            addlog(f"[ERROR] Fetch failed: {e}", verbose_int=1, verbose_state=True)
-            sys.exit(1)
-        sys.exit(0)
+    elif mode == "wallet":
+        show_wallet(args.ledger, verbose)
     else:
-        addlog(
-            "Error: --mode must be either 'sim', 'simtune', 'live', 'wallet', or 'fetch'",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-        sys.exit(1)
+        parser.error(f"Unknown mode: {args.mode}")
 
 
 if __name__ == "__main__":
