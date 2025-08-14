@@ -50,7 +50,7 @@ def main(argv: list[str] | None = None) -> None:
             )
 
     if mode == "fetch":
-        run_fetch(args.ledger, lookback=args.time)
+        run_fetch(args.ledger)
     elif mode == "sim":
         if not args.ledger:
             addlog("Error: --ledger is required for sim mode")

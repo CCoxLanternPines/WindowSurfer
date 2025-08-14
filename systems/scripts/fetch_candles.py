@@ -137,6 +137,23 @@ def fetch_candles(symbol: str, start: int, end: int, source: str) -> pd.DataFram
     return _rows_to_df(rows, start, end)
 
 
+def fetch_binance_full_history_1h(symbol: str) -> pd.DataFrame:
+    """Return all available Binance 1h candles for ``symbol``."""
+    now = int(time.time())
+    end_ts = (now // 3600 - 1) * 3600
+    rows = _fetch_binance(symbol, 0, end_ts * 1000)
+    return _rows_to_df(rows, 0, end_ts)
+
+
+def fetch_kraken_last_n_hours_1h(symbol: str, n: int = 720) -> pd.DataFrame:
+    """Return up to ``n`` latest Kraken 1h candles for ``symbol``."""
+    now = int(time.time())
+    end_ts = (now // 3600 - 1) * 3600
+    start_ts = end_ts - (n - 1) * 3600
+    rows = _fetch_kraken(symbol, start_ts * 1000, end_ts * 1000)
+    return _rows_to_df(rows, start_ts, end_ts)
+
+
 def load_coin_csv(coin: str) -> pd.DataFrame:
     """Load historical candles for ``coin`` from ``data/raw``."""
 
