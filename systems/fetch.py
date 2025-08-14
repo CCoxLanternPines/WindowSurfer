@@ -11,8 +11,12 @@ if __package__ is None or __package__ == "":
 
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings
-from systems.utils.resolve_symbol import resolve_ccxt_symbols
-from systems.scripts.candle_cache import tag_from_symbol, live_path_csv, sim_path_csv
+from systems.utils.resolve_symbol import (
+    resolve_ccxt_symbols,
+    to_tag,
+    live_path_csv,
+    sim_path_csv,
+)
 from systems.scripts.fetch_candles import (
     fetch_binance_full_history_1h,
     fetch_kraken_last_n_hours_1h,
@@ -57,7 +61,7 @@ def run_fetch(ledger: str | None) -> None:
         )
         raise SystemExit(1)
 
-    tag = tag_from_symbol(kraken_symbol)
+    tag = to_tag(kraken_symbol)
 
     # Binance full history -> SIM
     df_sim = fetch_binance_full_history_1h(binance_symbol)

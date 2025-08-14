@@ -58,6 +58,7 @@ def main(argv: list[str] | None = None) -> None:
         run_simulation(ledger=args.ledger, verbose=args.verbose)
     elif mode == "live":
         run_live(
+            ledger=args.ledger,
             dry=args.dry,
             verbose=args.verbose,
         )

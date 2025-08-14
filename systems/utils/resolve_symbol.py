@@ -34,6 +34,21 @@ def resolve_ccxt_symbols(settings: dict, ledger: str) -> tuple[str, str]:
     return cfg.get("kraken_name", ""), cfg.get("binance_name", "")
 
 
+def to_tag(symbol: str) -> str:
+    """Normalize exchange symbol to uppercase tag without separators."""
+    return symbol.replace("/", "").replace(" ", "").upper()
+
+
+def sim_path_csv(tag: str) -> str:
+    """Return canonical SIM CSV path for ``tag``."""
+    return f"data/sim/{tag}_1h.csv"
+
+
+def live_path_csv(tag: str) -> str:
+    """Return canonical LIVE CSV path for ``tag``."""
+    return f"data/live/{tag}_1h.csv"
+
+
 def split_tag(tag: str) -> tuple[str, str]:
     """Return base symbol and Kraken quote asset code for ``tag``.
 

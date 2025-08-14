@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import shutil
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 import csv
 import json
 
@@ -31,8 +31,12 @@ from systems.utils.addlog import addlog
 from pathlib import Path
 
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
-from systems.utils.resolve_symbol import split_tag
-from systems.scripts.candle_cache import tag_from_symbol, sim_path_csv
+from systems.utils.resolve_symbol import (
+    split_tag,
+    resolve_ccxt_symbols,
+    to_tag,
+    sim_path_csv,
+)
 
 
 def run_simulation(*, ledger: str, verbose: int = 0) -> None:
@@ -42,13 +46,14 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     coin = base.upper()
     window_settings = ledger_cfg.get("window_settings", {})
 
-    kraken_name = ledger_cfg.get("kraken_name", base)
-    tag = tag_from_symbol(kraken_name)
+    kraken_symbol, _ = resolve_ccxt_symbols(settings, ledger)
+    tag = to_tag(kraken_symbol)
     csv_path = sim_path_csv(tag)
     if not Path(csv_path).exists():
-        raise FileNotFoundError(
-            f"Missing SIM data for {tag}; run the SIM fetch command to generate {csv_path}"
+        print(
+            f"[ERROR] Missing data file: {csv_path}. Run: python bot.py --mode fetch --ledger {ledger}"
         )
+        raise SystemExit(1)
     df = pd.read_csv(csv_path)
 
     # Normalize + guard
@@ -59,7 +64,7 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
             ts_col = c
             break
     if ts_col is None:
-        raise ValueError(f"No timestamp column in {raw_path}")
+        raise ValueError(f"No timestamp column in {csv_path}")
 
     df[ts_col] = pd.to_numeric(df[ts_col], errors="coerce")
     df = df.dropna(subset=[ts_col])
@@ -70,12 +75,24 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
 
     # Optional hard check
     if not df[ts_col].is_monotonic_increasing:
-        raise ValueError(f"Candles not sorted by {ts_col}: {raw_path}")
+        raise ValueError(f"Candles not sorted by {ts_col}: {csv_path}")
 
     # Log one line so we always know what we ran on
     first_ts = int(df[ts_col].iloc[0]) if len(df) else None
     last_ts = int(df[ts_col].iloc[-1]) if len(df) else None
-    print(f"[DATA] file={raw_path} rows={len(df)} first={first_ts} last={last_ts} dups_removed={removed}")
+    first_iso = (
+        datetime.fromtimestamp(first_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        if first_ts is not None
+        else "n/a"
+    )
+    last_iso = (
+        datetime.fromtimestamp(last_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        if last_ts is not None
+        else "n/a"
+    )
+    print(
+        f"[DATA][SIM] file={csv_path} rows={len(df)} first={first_iso} last={last_iso} dups_removed={removed}"
+    )
 
     total = len(df)
 
