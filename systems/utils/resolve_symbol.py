@@ -25,6 +25,15 @@ def resolve_symbol(tag: str) -> dict:
     }
 
 
+def resolve_ccxt_symbols(settings: dict, ledger: str) -> tuple[str, str]:
+    """Return Kraken and Binance symbols for ``ledger`` from ``settings``."""
+    ledgers = settings.get("ledger_settings", {})
+    if ledger not in ledgers:
+        raise ValueError(f"Ledger '{ledger}' not found in settings")
+    cfg = ledgers[ledger]
+    return cfg.get("kraken_name", ""), cfg.get("binance_name", "")
+
+
 def split_tag(tag: str) -> tuple[str, str]:
     """Return base symbol and Kraken quote asset code for ``tag``.
 

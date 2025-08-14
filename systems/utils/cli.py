@@ -14,10 +14,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Ledger name defined in settings.json",
     )
     parser.add_argument(
-        "--time",
-        help="Lookback window for fetch mode (e.g., 72h)",
-    )
-    parser.add_argument(
         "--dry",
         action="store_true",
         help="Run live mode once immediately and exit",
