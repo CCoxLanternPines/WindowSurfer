@@ -20,6 +20,12 @@ def main(argv: list[str] | None = None) -> None:
         "--time",
         help="Optional start time for simulation (e.g. '3m' or '2023-01-01')",
     )
+    parser.add_argument(
+        "--viz",
+        action="store_true",
+        default=False,
+        help="Show a plot of price with buy/sell events after --mode sim",
+    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -32,6 +38,8 @@ def main(argv: list[str] | None = None) -> None:
 
     mode = args.mode.lower()
     verbose = args.verbose
+    if mode != "sim" and args.viz:
+        addlog("[VIZ] Ignored: visualization only runs after --mode sim")
 
     settings = load_settings()
 
@@ -59,11 +67,21 @@ def main(argv: list[str] | None = None) -> None:
         if not args.ledger:
             addlog("Error: --ledger is required for sim mode")
             sys.exit(1)
-        run_simulation(
+        result = run_simulation(
             ledger=args.ledger,
             verbose=args.verbose,
             time_window=args.time,
         )
+        if args.viz and result:
+            from systems.scripts.visualize import plot_trades
+
+            plot_trades(
+                result["candles"],
+                result["events"],
+                out_path="data/tmp/sim_plot.png",
+                show=True,
+            )
+            print("Saved plot → data/tmp/sim_plot.png")
     elif mode == "live":
         run_live(
             ledger=args.ledger,

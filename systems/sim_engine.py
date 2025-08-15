@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 from collections import defaultdict
 from datetime import datetime, timezone
+from typing import Dict, List
 import csv
 import json
 
@@ -40,7 +41,9 @@ from systems.utils.resolve_symbol import (
 from systems.utils.time import parse_cutoff
 
 
-def run_simulation(*, ledger: str, verbose: int = 0, time_window: str | None = None) -> None:
+def run_simulation(
+    *, ledger: str, verbose: int = 0, time_window: str | None = None
+) -> Dict[str, object] | None:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
     base, _ = split_tag(ledger_cfg["tag"])
@@ -128,7 +131,7 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_window: str | None = N
         print(f"[SIM][TIME] applied cutoff={start_from} rows_after={rows_after}")
         if rows_after == 0:
             print("[ABORT][SIM][TIME] No candles ≥ cutoff")
-            return
+            return None
 
     total = len(df)
 
@@ -143,6 +146,7 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_window: str | None = N
     init_jackpot(runtime_state, ledger_cfg, df)
 
     ledger_obj = Ledger()
+    events: List[Dict[str, object]] = []
     win_metrics = {}
     for wname, wcfg in window_settings.items():
         win_metrics[wname] = {
@@ -202,6 +206,16 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_window: str | None = N
                     m_buy["buys"] += 1
                     m_buy["gross_invested"] += cost
 
+                events.append(
+                    {
+                        "type": "buy",
+                        "time": df.iloc[t][ts_col],
+                        "price": price,
+                        "window": window_name,
+                        "note_id": note.get("id"),
+                    }
+                )
+
             open_notes = ledger_obj.get_open_notes()
             sell_res = evaluate_sell(
                 ctx,
@@ -254,6 +268,16 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_window: str | None = N
                     m_sell["realized_proceeds"] += proceeds
                     m_sell["realized_trades"] += 1
                     m_sell["realized_roi_accum"] += roi_trade
+
+                events.append(
+                    {
+                        "type": "sell",
+                        "time": df.iloc[t][ts_col],
+                        "price": price,
+                        "window": w,
+                        "note_id": note.get("id"),
+                    }
+                )
         ctx_j = {
             "ledger": ledger_obj,
             "verbosity": runtime_state.get("verbose", 0),
@@ -416,3 +440,6 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_window: str | None = N
     if default_path.exists() and default_path != sim_path:
         sim_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(default_path, sim_path)
+
+    candles_df = df.rename(columns={ts_col: "time"})
+    return {"ledger": ledger_obj, "candles": candles_df, "events": events}
