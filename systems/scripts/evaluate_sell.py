@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-"""Pressure-based sell evaluator."""
+"""Pressure-based sell evaluator with rich logging and gated strategy knobs."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 import math
+import os
 import pandas as pd
 
 from systems.utils.addlog import addlog
@@ -12,12 +13,12 @@ from systems.utils.addlog import addlog
 # --- tuning constants -----------------------------------------------------
 
 PRESSURE_WINDOWS = [
-    ("3m", 0.20),
-    ("1m", 0.20),
-    ("2w", 0.15),
-    ("1w", 0.15),
-    ("3d", 0.15),
     ("1d", 0.15),
+    ("3d", 0.15),
+    ("1w", 0.15),
+    ("2w", 0.15),
+    ("1m", 0.20),
+    ("3m", 0.20),
 ]
 
 NORM_N = 10.0
@@ -26,6 +27,9 @@ NORM_A = 100.0
 NORM_R = 0.10
 
 LOSS_CAP = -0.05
+
+
+# ---------------------------------------------------------------------------
 
 
 def _clamp01(x: float) -> float:
@@ -76,7 +80,7 @@ def _window_scores(series: pd.DataFrame, t: int) -> Dict[str, Dict[str, float]]:
     return scores
 
 
-def _compute_pressures(series: pd.DataFrame, t: int) -> tuple[float, Dict[str, Dict[str, float]]]:
+def _compute_pressures(series: pd.DataFrame, t: int) -> Tuple[float, Dict[str, Dict[str, float]]]:
     scores = _window_scores(series, t)
     sp = 0.0
     for span, weight in PRESSURE_WINDOWS:
@@ -84,7 +88,11 @@ def _compute_pressures(series: pd.DataFrame, t: int) -> tuple[float, Dict[str, D
     return sp, scores
 
 
-def _compute_sp_load(notes, price_now: float, t: int) -> float:
+def _compute_sp_load(
+    notes, price_now: float, t: int
+) -> Tuple[float, int, float, float, float, float, float, float]:
+    """Return load and its components."""
+
     N = len(notes)
     val = 0.0
     ages = []
@@ -107,7 +115,34 @@ def _compute_sp_load(notes, price_now: float, t: int) -> float:
     A_norm = min(1.0, avg_age / NORM_A)
     R_norm = min(1.0, avg_roi_pos / NORM_R)
     load = 0.35 * N_norm + 0.35 * V_norm + 0.15 * A_norm + 0.15 * R_norm
-    return _clamp01(load)
+    return _clamp01(load), N, val, avg_age, N_norm, V_norm, A_norm, R_norm
+
+
+def _compute_regime(series: pd.DataFrame, t: int) -> Tuple[str, float, float, float, float]:
+    def _slope(bars: int) -> float:
+        idx = max(0, t - bars)
+        past = float(series.iloc[idx]["close"])
+        now = float(series.iloc[t]["close"])
+        return (now - past) / max(past, 1e-9)
+
+    b1 = _span_to_bars(series, "1d")
+    b3 = _span_to_bars(series, "3d")
+    b7 = _span_to_bars(series, "1w")
+    s1 = _slope(b1)
+    s3 = _slope(b3)
+    s7 = _slope(b7)
+
+    start = max(0, t - b7 + 1)
+    window = series.iloc[start : t + 1]["close"].pct_change().dropna()
+    vol = float(window.std()) if not window.empty else 0.0
+
+    if s1 > 0 and s3 > 0 and s7 > 0:
+        regime = "Bull"
+    elif s1 < 0 and s3 < 0 and s7 < 0:
+        regime = "Bear"
+    else:
+        regime = "Chop"
+    return regime, s1, s3, s7, vol
 
 
 def _blend_slope(series: pd.DataFrame, t: int) -> float:
@@ -136,18 +171,38 @@ def evaluate_sell(
 ) -> List[Dict[str, Any]]:
     """Return a list of notes to sell in ``window_name`` on this candle."""
 
+    env = os.environ
+    LOG = env.get("WS_LOG_DECISIONS") == "1"
+    PRESSURE_MODEL = env.get("WS_PRESSURE_MODEL") == "1"
+    REGIME_LOG = env.get("WS_REGIME_LOG") == "1"
+    REGIME_SELL_MULT = env.get("WS_REGIME_SELL_MULT") == "1"
+
     verbose = 0
     if runtime_state:
         verbose = runtime_state.get("verbose", 0)
 
     sp_price, scores = _compute_pressures(series, t)
+    if not PRESSURE_MODEL:
+        sp_price = scores.get("1d", {}).get("height", 0.0)
+
     price_now = float(series.iloc[t]["close"])
 
     notes = [n for n in open_notes if n.get("window_name") == window_name]
-    sp_load = _compute_sp_load(notes, price_now, t)
+    sp_load, N, val, avg_age, N_norm, V_norm, A_norm, R_norm = _compute_sp_load(
+        notes, price_now, t
+    )
     sp_total = _clamp01(0.6 * sp_price + 0.4 * sp_load)
 
-    N = len(notes)
+    regime, s1, s3, s7, vol = "None", 0.0, 0.0, 0.0, 0.0
+    reg_mult = 1.0
+    if REGIME_LOG or REGIME_SELL_MULT:
+        regime, s1, s3, s7, vol = _compute_regime(series, t)
+        mult_map = {"Bull": 0.8, "Bear": 1.2, "Chop": 1.0}
+        reg_mult = mult_map.get(regime, 1.0)
+
+    if REGIME_SELL_MULT:
+        sp_total = _clamp01(sp_total * reg_mult)
+
     cap = int(cfg.get("max_notes_sell_per_candle", 1))
 
     slope = _blend_slope(series, t)
@@ -188,14 +243,62 @@ def evaluate_sell(
         if r < 0 and (sp_total < 0.75 or len(selected) >= want):
             continue
         selected.append(note)
+        if LOG and LOSS_CAP < r < 0:
+            addlog(
+                f"[LOSS_OK] note={note.get('id')} roi={r:.3f}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
         if len(selected) >= want:
             break
 
-    addlog(
-        f"[MATURE][{window_name} {cfg['window_size']}] sp={sp_total:.3f} sold={len(selected)}/{N} cap={cap}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
+    next_loss = 0.0
+    for note in sorted_notes[len(selected):]:
+        r = roi(note)
+        if r < 0:
+            next_loss = r
+            break
+
+    if LOG and REGIME_LOG:
+        addlog(
+            f"[REGIME] t={t} slopes(1d,3d,1w)=({s1:+.2f},{s3:+.2f},{s7:+.2f}) vol_1w={vol:.3f} → {regime}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+
+    if LOG:
+        addlog(
+            f"[SELL?][{window_name} {cfg['window_size']}] t={t} px={price_now:.4f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        addlog(
+            f"SP={sp_total:.3f}|SP_price={sp_price:.3f} SP_load={sp_load:.3f}  N={N} V=${val:.0f} age_avg={avg_age:.0f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        addlog(
+            f"reg={regime} mult={reg_mult:.2f} want={want} cap={cap}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        addlog(
+            "sorted_by=(roi,val,age) loss_cap=-5%",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        addlog(
+            f"selected={len(selected)}/{N} next_loss_min={next_loss:.3f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+
+        addlog(
+            f"[SP_LOAD] N={N_norm:.2f} V={V_norm:.2f} A={A_norm:.2f} R={R_norm:.2f}",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
 
     return selected
+
 
