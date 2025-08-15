@@ -51,7 +51,9 @@ def evaluate_buy(
     limits = runtime_state.get("limits", {})
     min_sz = float(limits.get("min_note_size", 0.0))
     max_sz = float(limits.get("max_note_usdt", float("inf")))
-    size_usd = min(raw, capital, max_sz)
+    size_clamped = min(raw, capital, max_sz)
+    too_small = size_clamped < min_sz or size_clamped <= 0.0
+    size_usd = max(min_sz, size_clamped)
 
     gap_key = f"last_buy_idx::{window_name}"
     last_idx = int(runtime_state.get(gap_key, -1))
@@ -63,7 +65,7 @@ def evaluate_buy(
         reason = "trend=DOWN"
     elif not gap_ok:
         reason = "cooldown"
-    elif size_usd < min_sz or size_usd <= 0.0:
+    elif too_small:
         reason = "too_small"
     else:
         reason = "ok"
@@ -77,8 +79,14 @@ def evaluate_buy(
             decision["created_ts"] = int(series.iloc[t]["timestamp"])
         runtime_state[gap_key] = t
 
+    log_msg = (
+        f"[BUY?][{window_name} {cfg['window_size']}] t={t} px={price:.4f} "
+        f"slope={slope:.4f} trend={trend} mult={mult:.2f} gap_ok={gap_ok} "
+        f"size_raw=${raw:.2f} clamp(min={min_sz},max={max_sz})→${size_usd:.2f} "
+        f"decision={'BUY' if decision else 'SKIP'} reason={reason}"
+    )
     addlog(
-        f"[BUY?][{window_name} {cfg['window_size']}] t={t} px={price:.4f} slope={slope:.4f} trend={trend} mult={mult:.2f} gap_ok={gap_ok} size_raw=${raw:.2f} clamp(min={min_sz},max={max_sz})→${size_usd:.2f} decision={'BUY' if decision else 'SKIP'} reason={reason}",
+        log_msg,
         verbose_int=1,
         verbose_state=verbose,
     )

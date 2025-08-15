@@ -93,8 +93,14 @@ def evaluate_sell(
     top_roi = roi(sorted_notes[0]) if sorted_notes else 0.0
     min_roi_sel = min((roi(n) for n in selected), default=0.0)
 
+    log_msg = (
+        f"[SELL?][{window_name} {cfg['window_size']}] t={t} px={price:.4f} "
+        f"slope={slope:.4f} trend={trend} N={N} f_sell={f_sell:.2f} "
+        f"want={want} cap={cap} selected={len(selected)}/{N} "
+        f"loss_cap={LOSS_CAP} top_roi={top_roi:.3f} min_roi_sel={min_roi_sel:.3f}"
+    )
     addlog(
-        f"[SELL?][{window_name} {cfg['window_size']}] t={t} px={price:.4f} slope={slope:.4f} trend={trend} N={N} f_sell={f_sell:.2f} want={want} cap={cap} selected={len(selected)}/{N} loss_cap={LOSS_CAP} top_roi={top_roi:.3f} min_roi_sel={min_roi_sel:.3f}",
+        log_msg,
         verbose_int=1,
         verbose_state=verbose,
     )
