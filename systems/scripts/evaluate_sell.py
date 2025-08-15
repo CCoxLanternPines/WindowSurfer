@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 from systems.utils.addlog import addlog
 
 # ==== DOWNTREND SELL ACCELERATION (adjust here; no settings changes) ==========
+
 CONSENSUS_WINDOWS = [
     ("D",  "1d",  0.80),
     ("W",  "7d",  0.90),
@@ -14,6 +15,7 @@ CONSENSUS_WINDOWS = [
     ("Q", "90d",  0.50),
 ]
 TURN_EMA_FRAC     = 0.20
+
 
 TOP_Q             = 0.98     # normal sell threshold (TopScore percentile)
 LOOKBACK_FOR_Q    = "180d"
@@ -27,6 +29,8 @@ HIGHER_POS_MAX    = -0.10    # or avg position <= this
 BOUNCE_SELL_MIN_AGE = 6      # bars since buy
 MIN_ROI_DOWN        = 0.003  # ≥0.3% ROI to bounce-sell
 # ============================================================================
+
+
 
 
 def _parse_span_seconds(s: str) -> int:

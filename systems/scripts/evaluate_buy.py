@@ -39,7 +39,6 @@ COOLDOWN_MOVE_FRAC = 0.22
 # Target construction weights (handed to sell via note["target_price"])
 ALPHA_H_TOP = 0.80
 BETA_H_TOP  = 0.60
-# ==============================================================================
 
 
 def _parse_span_seconds(s: str) -> int:
