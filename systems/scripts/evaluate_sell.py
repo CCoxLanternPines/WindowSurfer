@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from systems.utils.addlog import addlog
+import numpy as np
 
 # ==== DOWNTREND SELL ACCELERATION (adjust here; no settings changes) ==========
 
@@ -77,29 +78,36 @@ def _consensus(series, t: int):
     feats = []
     for _, span_str, w in CONSENSUS_WINDOWS:
         bars = _bars_for_span(series, span_str)
-        if t+1 >= bars:
-            f=_window_features(series,t,bars); f["span_str"]=span_str; f["bars"]=bars; f["weight"]=w; feats.append(f)
-    if not feats: return 0.0, 0.0, [], False, False
-    bottom = sum(f["weight"]*max(-f["pos"],0.0) for f in feats)
-    top    = sum(f["weight"]*max( f["pos"],0.0) for f in feats)
-    turning_up   = feats[0]["slope"] > 0.0
+        if t + 1 >= bars:
+            f = _window_features(series, t, bars)
+            f["span_str"] = span_str
+            f["bars"] = bars
+            f["weight"] = w
+            feats.append(f)
+    if not feats:
+        return 0.0, 0.0, [], False, False
+    bottom = sum(f["weight"] * max(-f["pos"], 0.0) for f in feats)
+    top = sum(f["weight"] * max(f["pos"], 0.0) for f in feats)
+    turning_up = feats[0]["slope"] > 0.0
     turning_down = not turning_up
     return bottom, top, feats, turning_up, turning_down
 
 
-def _score_cache(rs: dict) -> dict:
-    key="consensus_cache_sell"
-    if key not in rs: rs[key]={"bottom":[], "top":[]}
-    return rs[key]
-
-
-def _bars_for_lookback(series, lookback_str: str) -> int:
-    return _bars_for_span(series, lookback_str)
+def _precompute_consensus_scores(series, windows, turn_ema_frac):
+    """Precompute bottom/top consensus scores for the full series."""
+    N = len(series)
+    bottom = np.zeros(N, dtype=float)
+    top = np.zeros(N, dtype=float)
+    for i in range(N):
+        b, u, _f, _tu, _td = _consensus(series, i)
+        bottom[i] = b
+        top[i] = u
+    return bottom, top
 
 
 def _percentile(values, q: float) -> float:
-    import numpy as np
-    if not values: return 0.0
+    if values is None or len(values) == 0:
+        return 0.0
     return float(np.quantile(np.array(values, dtype=float), q))
 
 
@@ -149,23 +157,53 @@ def evaluate_sell(
 
     # --- consensus at current bar ---
     runtime_state = ctx.get("runtime_state", runtime_state if runtime_state is not None else {})
-    bottom, top, feats, _turn_up, turning_down = _consensus(series, t)
-    cache = _score_cache(runtime_state)
-    cache["top"].append(top)
+    pre = runtime_state.setdefault("precomp", {})
+    last_ts = int(series["timestamp"].iat[-1]) if "timestamp" in series else t
+    key = f"{len(series)}::{last_ts}"
+    bottom_arr = pre.get("bottom")
+    top_arr = pre.get("top")
+    lb = pre.get("lb_bars")
+    if bottom_arr is None or top_arr is None:
+        bottom_arr, top_arr = _precompute_consensus_scores(series, CONSENSUS_WINDOWS, TURN_EMA_FRAC)
+        lb = _bars_for_span(series, LOOKBACK_FOR_Q)
+        pre.update({"bottom": bottom_arr, "top": top_arr, "lb_bars": lb, "key": key})
+    else:
+        old_len = len(bottom_arr)
+        if len(series) > old_len:
+            new_b = []
+            new_t = []
+            for idx in range(old_len, len(series)):
+                b, u, _f, _tu, _td = _consensus(series, idx)
+                new_b.append(b)
+                new_t.append(u)
+            pre["bottom"] = bottom_arr = np.append(bottom_arr, new_b)
+            pre["top"] = top_arr = np.append(top_arr, new_t)
+            lb = _bars_for_span(series, LOOKBACK_FOR_Q)
+            pre["lb_bars"] = lb
+        elif pre.get("key") != key:
+            bottom_arr, top_arr = _precompute_consensus_scores(series, CONSENSUS_WINDOWS, TURN_EMA_FRAC)
+            lb = _bars_for_span(series, LOOKBACK_FOR_Q)
+            pre.update({"bottom": bottom_arr, "top": top_arr, "lb_bars": lb})
+        pre["key"] = key
 
-    lb = _bars_for_lookback(series, LOOKBACK_FOR_Q)
-    thresh_normal = _percentile(cache["top"][-lb:], TOP_Q) if lb>0 else _percentile(cache["top"], TOP_Q)
+    lb = pre["lb_bars"]
+    min_warm = max(lb, _bars_for_span(series, "30d")) // 4
+    if t < min_warm:
+        return []
 
+    top = float(pre["top"][t])
+    start = max(0, t - lb + 1)
+    thresh_normal = _percentile(pre["top"][start : t + 1], TOP_Q)
+    thresh_down = _percentile(pre["top"][start : t + 1], DOWNTREND_TOP_Q)
+    _, _, feats, _turn_up, turning_down = _consensus(series, t)
     # downtrend flag from higher frames
-    higher = feats[1:] if len(feats)>1 else []
+    higher = feats[1:] if len(feats) > 1 else []
     is_downtrend = False
     if higher:
         wsum = sum(f["weight"] for f in higher) or 1.0
-        w_slope = sum(f["weight"]*f["slope"] for f in higher)/wsum
-        w_pos   = sum(f["weight"]*f["pos"]   for f in higher)/wsum
+        w_slope = sum(f["weight"] * f["slope"] for f in higher) / wsum
+        w_pos = sum(f["weight"] * f["pos"] for f in higher) / wsum
         is_downtrend = (w_slope <= -HIGHER_TREND_MIN) or (w_pos <= HIGHER_POS_MAX)
-
-    thresh_down = _percentile(cache["top"][-lb:], DOWNTREND_TOP_Q) if lb>0 else _percentile(cache["top"], DOWNTREND_TOP_Q)
 
     state = {
         "sell_count": 0,
