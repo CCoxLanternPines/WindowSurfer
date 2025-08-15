@@ -1,145 +1,129 @@
 from __future__ import annotations
 
-"""Position-based buy evaluation."""
+"""Pressure-based buy evaluator."""
 
-from typing import Dict, Any
+from typing import Any, Dict
+import math
+import pandas as pd
 
 from systems.utils.addlog import addlog
 
-# ==== CONSENSUS TUNING (adjust here; no settings changes) =====================
 
-# Rebalance: less D dominance; W/M carry more veto power during downtrends.
-CONSENSUS_WINDOWS = [
-    ("D",  "1d",  0.90),
-    ("W",  "7d",  0.90),
-    ("M", "30d",  0.70),
-    ("Q", "90d",  0.50),
+# --- tuning constants -----------------------------------------------------
+
+PRESSURE_WINDOWS = [
+    ("3m", 0.20),
+    ("1m", 0.20),
+    ("2w", 0.15),
+    ("1w", 0.15),
+    ("3d", 0.15),
+    ("1d", 0.15),
 ]
 
-# Buy needs stronger consensus again (prevents over-laddering in dumps).
-BOTTOM_Q = 0.82
-TOP_Q    = 0.98            # not used here, kept for symmetry
-LOOKBACK_FOR_Q = "150d"    # steadier threshold than 120d but still adaptive
+MIN_GAP_BARS = 12
 
-# Slightly smoother turn; avoids catching first bounce of a falling knife.
-TURN_EMA_FRAC = 0.15
+NORM_N = 10.0
+NORM_V = 5_000.0
+NORM_A = 100.0
+NORM_R = 0.10
 
-# (Targets aren’t used here; left for parity with sell file.)
-ALPHA_H_TOP = 0.80
-BETA_H_TOP  = 0.60
-
-# Space buys more: require a bigger move from last buy before another entry.
-COOLDOWN_MOVE_FRAC = 0.22
-# ==============================================================================
+BP_SIG_CENTER = 0.40
+BP_SIG_WIDTH = 0.12
 
 
+def _clamp01(x: float) -> float:
+    return max(0.0, min(1.0, x))
 
 
-
-def _parse_span_seconds(s: str) -> int:
-    # supports “Xm”, “Xh”, “Xd”, “Xw”; lower/upper case
-    n = int("".join(ch for ch in s if ch.isdigit()))
-    u = "".join(ch for ch in s if ch.isalpha()).lower()
-    mult = {"m":60, "h":3600, "d":86400, "w":604800}[u]
-    return n * mult
+def _sigmoid(x: float) -> float:
+    return 1.0 / (1.0 + math.exp(-x))
 
 
-def _detect_step_seconds(series) -> int:
-    # assumes monotonically increasing; uses median diff for robustness
-    import numpy as np
-
-    ts = series["timestamp"].to_numpy()
-    if ts.size < 3:
-        return 3600
-    diffs = np.diff(ts[-200:]) if ts.size > 200 else np.diff(ts)
-    return int(np.median(diffs)) or 3600
-
-
-def _bars_for_span(series, span_str: str) -> int:
-    step = _detect_step_seconds(series)
-    return max(2, _parse_span_seconds(span_str) // step)
-
-
-def _window_features(series, t: int, bars: int) -> dict:
-    """Return low/high/mid/width/pos/slope/vol/hTop/hBot at index t for a window size in bars."""
-    import numpy as np
-    import pandas as pd
-
-    lo = max(0, t - bars + 1)
-    window = series.iloc[lo:t+1]
-    if window.shape[0] < 2:
-        px = float(series.iloc[t]["close"])
-        return dict(low=px, high=px, mid=px, width=1e-9, pos=0.0, slope=0.0, vol=0.0, hTop=0.0, hBot=0.0)
-    price = window["close"].to_numpy()
-    low, high = float(price.min()), float(price.max())
-    width = max(high - low, 1e-9)
-    mid = (low + high) / 2.0
-    pos = (float(price[-1]) - mid) / (width/2.0)
-    pos = min(1.0, max(-1.0, pos))
-    # slope: EMA of deltas over ~10% of bars
-    span = max(2, int(bars * TURN_EMA_FRAC))
-    deltas = pd.Series(price).diff().fillna(0.0)
-    slope = float(deltas.ewm(span=span, adjust=False).mean().iloc[-1]) / width
-    # volatility proxy: median abs deviation over window, scaled by price
-    med = float(pd.Series(price).median())
-    mad = float((pd.Series(price) - med).abs().median())
-    vol = mad / max(med, 1e-9)
-    now = float(price[-1])
-    hTop = max(high - now, 0.0) / max(now, 1e-9)
-    hBot = max(now - low, 0.0) / max(now, 1e-9)
-    return dict(low=low, high=high, mid=mid, width=width, pos=pos, slope=slope, vol=vol, hTop=hTop, hBot=hBot)
+def _span_to_bars(series: pd.DataFrame, span: str) -> int:
+    if not span:
+        return 1
+    try:
+        value = int(span[:-1])
+    except ValueError:
+        return 1
+    unit = span[-1].lower()
+    if "timestamp" in series.columns and len(series) >= 2:
+        step = int(series.iloc[1]["timestamp"]) - int(series.iloc[0]["timestamp"])
+        if step <= 0:
+            step = 3600
+    else:
+        step = 3600
+    if unit == "m":
+        factor = 30 * 24 * 3600
+    elif unit == "w":
+        factor = 7 * 24 * 3600
+    elif unit == "d":
+        factor = 24 * 3600
+    elif unit == "h":
+        factor = 3600
+    else:
+        factor = 0
+    bars = int(round((value * factor) / step))
+    return max(1, bars)
 
 
-def _consensus(series, t: int):
-    """Compute BottomScore, TopScore, feature dicts per window, and turning flags."""
-    # determine bars for each configured span (drop windows that don’t fit)
-    spans = []
-    for _, span_str, w in CONSENSUS_WINDOWS:
-        bars = _bars_for_span(series, span_str)
-        if t+1 >= bars:
-            spans.append((span_str, bars, w))
-    # compute features
-    feats = []
-    for span_str, bars, w in spans:
-        f = _window_features(series, t, bars)
-        f["span_str"], f["bars"], f["weight"] = span_str, bars, w
-        feats.append(f)
-    if not feats:
-        return 0.0, 0.0, [], False, False
-
-    # first window is the trigger frame
-    f0 = feats[0]
-    bottom = sum(f["weight"] * max(-f["pos"], 0.0) for f in feats)
-    top    = sum(f["weight"] * max( f["pos"], 0.0) for f in feats)
-    turning_up   = f0["slope"] > 0.0
-    turning_down = f0["slope"] <= 0.0
-    return bottom, top, feats, turning_up, turning_down
+def _window_scores(series: pd.DataFrame, t: int) -> Dict[str, Dict[str, float]]:
+    scores: Dict[str, Dict[str, float]] = {}
+    close_now = float(series.iloc[t]["close"])
+    for span, _ in PRESSURE_WINDOWS:
+        bars = _span_to_bars(series, span)
+        start = max(0, t - bars + 1)
+        window = series.iloc[start : t + 1]
+        low = float(window["close"].min())
+        high = float(window["close"].max())
+        width = max(high - low, 1e-9)
+        depth = (high - close_now) / width
+        height = (close_now - low) / width
+        scores[span] = {"depth": depth, "height": height}
+    return scores
 
 
-def _score_cache(state: dict) -> dict:
-    """Stateful rolling cache to compute percentiles without recomputing full history."""
-    key = "consensus_cache"
-    if key not in state:
-        state[key] = {"bottom": [], "top": [], "ts": []}
-    return state[key]
+def _compute_pressures(series: pd.DataFrame, t: int) -> tuple[float, float, Dict[str, Dict[str, float]]]:
+    scores = _window_scores(series, t)
+    bp = 0.0
+    sp = 0.0
+    for span, weight in PRESSURE_WINDOWS:
+        sc = scores.get(span, {})
+        bp += weight * sc.get("depth", 0.0)
+        sp += weight * sc.get("height", 0.0)
+    return bp, sp, scores
 
 
-def _bars_for_lookback(series, lookback_str: str) -> int:
-    return _bars_for_span(series, lookback_str)
-
-
-def _percentile(values, q: float) -> float:
-    import numpy as np
-
-    if not values:
-        return float("inf") if q >= 0.5 else float("-inf")
-    return float(np.quantile(np.array(values), q))
+def _compute_sp_load(notes, price_now: float, t: int) -> float:
+    N = len(notes)
+    val = 0.0
+    ages = []
+    rois = []
+    for n in notes:
+        qty = n.get("entry_amount")
+        if qty is not None:
+            val += float(qty) * price_now
+        else:
+            val += float(n.get("entry_usd", 0.0))
+        created = n.get("created_idx", t)
+        ages.append(t - created)
+        buy = n.get("entry_price", 0.0)
+        if buy:
+            rois.append(max((price_now - buy) / buy, 0.0))
+    avg_age = sum(ages) / N if N else 0.0
+    avg_roi_pos = sum(rois) / N if N else 0.0
+    N_norm = min(1.0, N / NORM_N)
+    V_norm = min(1.0, val / NORM_V)
+    A_norm = min(1.0, avg_age / NORM_A)
+    R_norm = min(1.0, avg_roi_pos / NORM_R)
+    load = 0.35 * N_norm + 0.35 * V_norm + 0.15 * A_norm + 0.15 * R_norm
+    return _clamp01(load)
 
 
 def evaluate_buy(
     ctx: Dict[str, Any],
     t: int,
-    series,
+    series: pd.DataFrame,
     *,
     window_name: str,
     cfg: Dict[str, Any],
@@ -148,45 +132,38 @@ def evaluate_buy(
     """Return sizing and metadata for a buy signal in ``window_name``."""
 
     verbose = runtime_state.get("verbose", 0)
-    candle = series.iloc[t]
 
-    bottom, top, feats, turning_up, _turning_down = _consensus(series, t)
+    bp_price, sp_price, scores = _compute_pressures(series, t)
+    close_now = float(series.iloc[t]["close"])
 
-    runtime_state = ctx.get("runtime_state", runtime_state)
-    cache = _score_cache(runtime_state)
-    cache["bottom"].append(bottom)
-    cache["top"].append(top)
-    if "timestamp" in series.columns:
-        cache["ts"].append(int(series.iloc[t]["timestamp"]))
+    ledger = ctx.get("ledger")
+    notes = []
+    if ledger is not None:
+        notes = ledger.get_open_notes()
+    sp_load = _compute_sp_load(notes, close_now, t)
+    sp_total = _clamp01(0.6 * sp_price + 0.4 * sp_load)
 
-    lb = _bars_for_lookback(series, LOOKBACK_FOR_Q)
-    bottom_hist = cache["bottom"][-lb:] if lb > 0 else cache["bottom"]
-    thresh_buy = _percentile(bottom_hist, BOTTOM_Q)
-
-    last_buy_idx = runtime_state.get(f"last_buy_idx::{window_name}")
-    ok_move = True
-    if last_buy_idx is not None:
-        f0 = feats[0] if feats else {"width": 0.0}
-        moved = abs(float(series.iloc[t]["close"]) - float(series.iloc[last_buy_idx]["close"]))
-        ok_move = moved >= COOLDOWN_MOVE_FRAC * max(f0.get("width", 0.0), 1e-9)
-
-    addlog(
-        f"[BUY?][{window_name} {cfg['window_size']}] bottom={bottom:.3f} ≥ {thresh_buy:.3f} turn↑={turning_up}",
-        verbose_int=3,
-        verbose_state=ctx.get("verbose"),
+    short_height = 0.5 * (
+        scores.get("1d", {}).get("height", 0.0)
+        + scores.get("3d", {}).get("height", 0.0)
     )
 
-    should_buy = (bottom >= thresh_buy) and turning_up and ok_move
-    if not should_buy:
+    if short_height > 0.65 and sp_total > 0.6:
+        addlog(
+            f"[GATE][{window_name} {cfg['window_size']}] short_h={short_height:.3f} sp={sp_total:.3f}",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
         return False
 
-    capital = runtime_state.get("capital", 0.0)
-    base = cfg.get("investment_fraction", 0.0)
-    size_usd = capital * base
-
+    capital = float(runtime_state.get("capital", 0.0))
     limits = runtime_state.get("limits", {})
     min_sz = float(limits.get("min_note_size", 0.0))
     max_sz = float(limits.get("max_note_usdt", float("inf")))
+
+    base = float(cfg.get("investment_fraction", 0.0))
+    m_buy = _sigmoid((bp_price - BP_SIG_CENTER) / BP_SIG_WIDTH)
+    size_usd = capital * base * m_buy
     raw = size_usd
     size_usd = min(size_usd, capital, max_sz)
     if raw != size_usd:
@@ -195,51 +172,28 @@ def evaluate_buy(
             verbose_int=2,
             verbose_state=verbose,
         )
-    if size_usd < min_sz:
-        addlog(
-            f"[SKIP][{window_name} {cfg['window_size']}] size=${size_usd:.2f} < min=${min_sz:.2f}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        return False
 
-    sz_pct = (size_usd / capital * 100) if capital else 0.0
+    last_key = f"last_buy_idx::{window_name}"
+    last_idx = int(runtime_state.get(last_key, -1))
+    cooldown_ok = (t - last_idx) >= MIN_GAP_BARS
 
-    price_now = float(series.iloc[t]["close"])
-    if feats:
-        f0 = feats[0]
-        bigger = [f for f in feats[1:]]
-        hTop_big = (sum(f["hTop"] for f in bigger) / len(bigger)) if bigger else f0["hTop"]
-        expected_up = ALPHA_H_TOP * f0["hTop"] + BETA_H_TOP * hTop_big
-        vol_clip = min(1.3, max(0.7, f0["vol"] / (1e-9 + f0["vol"])))
-        target_roi = expected_up * vol_clip
-        target_price = price_now * (1.0 + max(0.0, target_roi))
-    else:
-        target_price = price_now * 1.02
-
-    meta = {
-        "consensus_bottom": bottom,
-        "consensus_top": top,
-        "turning_up": turning_up,
-        "target_price": float(target_price),
-    }
+    decision: Dict[str, Any] | bool = False
+    if cooldown_ok and size_usd >= min_sz and size_usd > 0.0:
+        decision = {
+            "size_usd": size_usd,
+            "window_name": window_name,
+            "window_size": cfg["window_size"],
+            "created_idx": t,
+        }
+        if "timestamp" in series.columns:
+            decision["created_ts"] = int(series.iloc[t]["timestamp"])
+        runtime_state[last_key] = t
 
     addlog(
-        f"[BUY][{window_name} {cfg['window_size']}] bottom={bottom:.3f}, base={base*100:.2f}% → size={sz_pct:.2f}% (cap=${size_usd:.2f})",
+        f"[{ 'BUY' if decision else 'SKIP' }][{window_name} {cfg['window_size']}] bp={bp_price:.3f} sp={sp_total:.3f} size=${size_usd:.2f}",
         verbose_int=1,
         verbose_state=verbose,
     )
 
-    result = {
-        "size_usd": size_usd,
-        "window_name": window_name,
-        "window_size": cfg["window_size"],
-        **meta,
-    }
-    if "timestamp" in series.columns:
-        result["created_ts"] = int(candle["timestamp"])
-    result["created_idx"] = t
+    return decision
 
-    runtime_state[f"last_buy_idx::{window_name}"] = t
-
-    return result
