@@ -8,31 +8,32 @@ from systems.utils.addlog import addlog
 
 # ==== CONSENSUS TUNING (adjust here; no settings changes) =====================
 
-# Windows used for consensus. We compute min/max/mid/pos/slope at each.
-# Span strings are parsed against the candle interval detected from the series.
+# Rebalance: less D dominance; W/M carry more veto power during downtrends.
 CONSENSUS_WINDOWS = [
-    ("D",  "1d",  1.00),   # weight
-    ("W",  "7d",  0.70),
-    ("M", "30d",  0.50),
-    ("Q", "90d",  0.40),
+    ("D",  "1d",  0.90),
+    ("W",  "7d",  0.90),
+    ("M", "30d",  0.70),
+    ("Q", "90d",  0.50),
 ]
 
-# Percentile thresholds (computed from rolling history of scores)
-BOTTOM_Q = 0.85     # buy threshold
-TOP_Q    = 0.85     # sell threshold
-LOOKBACK_FOR_Q = "90d"    # window to compute percentiles over (rolling)
+# Buy needs stronger consensus again (prevents over-laddering in dumps).
+BOTTOM_Q = 0.82
+TOP_Q    = 0.98            # not used here, kept for symmetry
+LOOKBACK_FOR_Q = "150d"    # steadier threshold than 120d but still adaptive
 
-# Turning filter on smallest frame (first entry in CONSENSUS_WINDOWS)
-TURN_EMA_FRAC = 0.10  # slope EMA span = frac * bars_in_window
+# Slightly smoother turn; avoids catching first bounce of a falling knife.
+TURN_EMA_FRAC = 0.15
 
-# Target construction for sells (attached to note at buy time)
-ALPHA_H_TOP = 0.60    # weight for day headroom
-BETA_H_TOP  = 0.40    # weight for week/month headroom (averaged)
+# (Targets aren’t used here; left for parity with sell file.)
+ALPHA_H_TOP = 0.80
+BETA_H_TOP  = 0.60
 
-# Safety
-COOLDOWN_MOVE_FRAC = 0.25  # price must move this fraction of day width from last buy
-
+# Space buys more: require a bigger move from last buy before another entry.
+COOLDOWN_MOVE_FRAC = 0.22
 # ==============================================================================
+
+
+
 
 
 def _parse_span_seconds(s: str) -> int:
