@@ -1,45 +1,70 @@
 from __future__ import annotations
 
-"""Pressure-based buy evaluator."""
+"""Buy evaluator with pluggable strategies."""
+
+# ==== PUBLIC VARS (SELF-CONTAINED BUY) ====
+# Per-window base sizing (fraction of available capital).
+# If a window is not listed, fall back to BUY_BASE_FRACTION_DEFAULT.
+BUY_BASE_FRACTION_DEFAULT = 0.08
+BUY_BASE_FRACTION_BY_WINDOW = {
+    "minnow": 0.08,  # 12h
+    "fish":   0.16,  # 2d
+}
+
+# Global note size limits (USD) — ignore settings.json
+MIN_NOTE_SIZE_USD = 10.0
+MAX_NOTE_USD      = 200.0
+
+# Optional cash floor: skip buys if capital below this
+CASH_FLOOR_USD    = 350.0
+
+# Slope gating (simple strat)
+LOOKBACK     = 50
+UP_TH        = +0.025
+DOWN_TH      = -0.005
+FLAT_BUY_MULT= 0.20
+UP_BUY_MULT  = 0.45
+MIN_GAP_BARS = 24
+# ==========================================
+
+# ==== PUBLIC VARS (choose the buy strategy) ====
+BUY_STRAT = "slope"      # options: "slope", "pressure"
+# pressure knobs
+BUY_WEIGHTS = {"3m": 1.0, "1m": 1.0, "2w": 0.8, "1w": 0.8, "3d": 0.6, "1d": 0.6}
+BUY_THRESHOLD_FLAT = 0.50  # min buy pressure in flat
+BUY_THRESHOLD_UP   = 0.30  # min buy pressure in up
+# ===============================================
 
 from typing import Any, Dict
-import math
 import pandas as pd
 
 from systems.utils.addlog import addlog
 
+# ---------------------------------------------------------------------------
+# Helpers
 
-# --- tuning constants -----------------------------------------------------
-
-PRESSURE_WINDOWS = [
-    ("3m", 0.20),
-    ("1m", 0.20),
-    ("2w", 0.15),
-    ("1w", 0.15),
-    ("3d", 0.15),
-    ("1d", 0.15),
-]
-
-MIN_GAP_BARS = 12
-
-NORM_N = 10.0
-NORM_V = 5_000.0
-NORM_A = 100.0
-NORM_R = 0.10
-
-BP_SIG_CENTER = 0.40
-BP_SIG_WIDTH = 0.12
-
-
-def _clamp01(x: float) -> float:
-    return max(0.0, min(1.0, x))
-
-
-def _sigmoid(x: float) -> float:
-    return 1.0 / (1.0 + math.exp(-x))
-
+def trend_from_slope(
+    series: pd.DataFrame,
+    t: int,
+    lookback: int,
+    up_th: float,
+    down_th: float,
+) -> tuple[float, str]:
+    """Return (slope, trend) based on ``lookback`` bars."""
+    idx = max(0, t - lookback)
+    close_then = float(series.iloc[idx]["close"])
+    close_now = float(series.iloc[t]["close"])
+    slope = (close_now - close_then) / max(close_then, 1e-9)
+    if slope >= up_th:
+        trend = "UP"
+    elif slope <= down_th:
+        trend = "DOWN"
+    else:
+        trend = "FLAT"
+    return slope, trend
 
 def _span_to_bars(series: pd.DataFrame, span: str) -> int:
+    """Convert a timespan string like '1w' to bar count for ``series``."""
     if not span:
         return 1
     try:
@@ -66,59 +91,20 @@ def _span_to_bars(series: pd.DataFrame, span: str) -> int:
     bars = int(round((value * factor) / step))
     return max(1, bars)
 
+def _window_pos(series: pd.DataFrame, t: int, span: str) -> float:
+    """Return position within the span: negative = below center, positive above."""
+    bars = _span_to_bars(series, span)
+    start = max(0, t - bars + 1)
+    window = series.iloc[start : t + 1]
+    low = float(window["close"].min())
+    high = float(window["close"].max())
+    center = 0.5 * (low + high)
+    width = max(high - low, 1e-9)
+    price_now = float(series.iloc[t]["close"])
+    return (price_now - center) / width
 
-def _window_scores(series: pd.DataFrame, t: int) -> Dict[str, Dict[str, float]]:
-    scores: Dict[str, Dict[str, float]] = {}
-    close_now = float(series.iloc[t]["close"])
-    for span, _ in PRESSURE_WINDOWS:
-        bars = _span_to_bars(series, span)
-        start = max(0, t - bars + 1)
-        window = series.iloc[start : t + 1]
-        low = float(window["close"].min())
-        high = float(window["close"].max())
-        width = max(high - low, 1e-9)
-        depth = (high - close_now) / width
-        height = (close_now - low) / width
-        scores[span] = {"depth": depth, "height": height}
-    return scores
-
-
-def _compute_pressures(series: pd.DataFrame, t: int) -> tuple[float, float, Dict[str, Dict[str, float]]]:
-    scores = _window_scores(series, t)
-    bp = 0.0
-    sp = 0.0
-    for span, weight in PRESSURE_WINDOWS:
-        sc = scores.get(span, {})
-        bp += weight * sc.get("depth", 0.0)
-        sp += weight * sc.get("height", 0.0)
-    return bp, sp, scores
-
-
-def _compute_sp_load(notes, price_now: float, t: int) -> float:
-    N = len(notes)
-    val = 0.0
-    ages = []
-    rois = []
-    for n in notes:
-        qty = n.get("entry_amount")
-        if qty is not None:
-            val += float(qty) * price_now
-        else:
-            val += float(n.get("entry_usd", 0.0))
-        created = n.get("created_idx", t)
-        ages.append(t - created)
-        buy = n.get("entry_price", 0.0)
-        if buy:
-            rois.append(max((price_now - buy) / buy, 0.0))
-    avg_age = sum(ages) / N if N else 0.0
-    avg_roi_pos = sum(rois) / N if N else 0.0
-    N_norm = min(1.0, N / NORM_N)
-    V_norm = min(1.0, val / NORM_V)
-    A_norm = min(1.0, avg_age / NORM_A)
-    R_norm = min(1.0, avg_roi_pos / NORM_R)
-    load = 0.35 * N_norm + 0.35 * V_norm + 0.15 * A_norm + 0.15 * R_norm
-    return _clamp01(load)
-
+# ---------------------------------------------------------------------------
+# Strategy router
 
 def evaluate_buy(
     ctx: Dict[str, Any],
@@ -132,53 +118,60 @@ def evaluate_buy(
     """Return sizing and metadata for a buy signal in ``window_name``."""
 
     verbose = runtime_state.get("verbose", 0)
-
-    bp_price, sp_price, scores = _compute_pressures(series, t)
-    close_now = float(series.iloc[t]["close"])
-
-    ledger = ctx.get("ledger")
-    notes = []
-    if ledger is not None:
-        notes = ledger.get_open_notes()
-    sp_load = _compute_sp_load(notes, close_now, t)
-    sp_total = _clamp01(0.6 * sp_price + 0.4 * sp_load)
-
-    short_height = 0.5 * (
-        scores.get("1d", {}).get("height", 0.0)
-        + scores.get("3d", {}).get("height", 0.0)
-    )
-
-    if short_height > 0.65 and sp_total > 0.6:
-        addlog(
-            f"[GATE][{window_name} {cfg['window_size']}] short_h={short_height:.3f} sp={sp_total:.3f}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        return False
-
     capital = float(runtime_state.get("capital", 0.0))
-    limits = runtime_state.get("limits", {})
-    min_sz = float(limits.get("min_note_size", 0.0))
-    max_sz = float(limits.get("max_note_usdt", float("inf")))
 
-    base = float(cfg.get("investment_fraction", 0.0))
-    m_buy = _sigmoid((bp_price - BP_SIG_CENTER) / BP_SIG_WIDTH)
-    size_usd = capital * base * m_buy
-    raw = size_usd
-    size_usd = min(size_usd, capital, max_sz)
-    if raw != size_usd:
-        addlog(
-            f"[CLAMP] size=${raw:.2f} → ${size_usd:.2f} (cap=${capital:.2f}, max=${max_sz:.2f})",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
+    price_now = float(series.iloc[t]["close"])
+    slope, trend = trend_from_slope(series, t, LOOKBACK, UP_TH, DOWN_TH)
+    base_frac = BUY_BASE_FRACTION_BY_WINDOW.get(window_name, BUY_BASE_FRACTION_DEFAULT)
 
     last_key = f"last_buy_idx::{window_name}"
     last_idx = int(runtime_state.get(last_key, -1))
     cooldown_ok = (t - last_idx) >= MIN_GAP_BARS
 
     decision: Dict[str, Any] | bool = False
-    if cooldown_ok and size_usd >= min_sz and size_usd > 0.0:
+    size_usd = 0.0
+    score = slope
+    label = "slope"
+    mult = 0.0
+
+    if BUY_STRAT == "slope":
+        if trend != "DOWN":
+            mult = FLAT_BUY_MULT if trend == "FLAT" else UP_BUY_MULT
+    elif BUY_STRAT == "pressure":
+        bp = 0.0
+        total_w = 0.0
+        for span, weight in BUY_WEIGHTS.items():
+            pos = _window_pos(series, t, span)
+            s = max(0.0, -pos)
+            bp += weight * s
+            total_w += weight
+        BP = bp / total_w if total_w else 0.0
+        label = "bp"
+        score = BP
+        if trend != "DOWN":
+            if (trend == "FLAT" and BP >= BUY_THRESHOLD_FLAT) or (
+                trend == "UP" and BP >= BUY_THRESHOLD_UP
+            ):
+                mult = BP
+        # if DOWN or thresholds not met, mult remains 0
+    else:
+        raise ValueError(f"unknown BUY_STRAT {BUY_STRAT}")
+
+    raw = capital * base_frac * mult
+    size_usd = min(raw, MAX_NOTE_USD, capital)
+    if raw != size_usd and raw > 0:
+        addlog(
+            f"[CLAMP] size=${raw:.2f} → ${size_usd:.2f} (cap=${capital:.2f}, max=${MAX_NOTE_USD:.2f})",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+
+    if (
+        cooldown_ok
+        and capital >= CASH_FLOOR_USD
+        and size_usd >= MIN_NOTE_SIZE_USD
+        and size_usd > 0.0
+    ):
         decision = {
             "size_usd": size_usd,
             "window_name": window_name,
@@ -190,10 +183,9 @@ def evaluate_buy(
         runtime_state[last_key] = t
 
     addlog(
-        f"[{ 'BUY' if decision else 'SKIP' }][{window_name} {cfg['window_size']}] bp={bp_price:.3f} sp={sp_total:.3f} size=${size_usd:.2f}",
+        f"[{ 'BUY' if decision else 'SKIP' }][{window_name} {cfg['window_size']}] strat={BUY_STRAT} slope={slope:.3f} {label}={score:.3f} trend={trend} size=${size_usd:.2f}",
         verbose_int=1,
         verbose_state=verbose,
     )
 
     return decision
-
