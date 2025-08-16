@@ -16,22 +16,32 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     """Run a simple simulation over SOLUSD candles."""
     csv_path = Path("data/sim/SOLUSD.csv")
     df = pd.read_csv(csv_path)
-    df.columns = [c.lower().strip() for c in df.columns]
-    rename_map = {
-        "c": "close",
-        "close_price": "close",
-        "o": "open",
-        "h": "high",
-        "l": "low",
-        "v": "volume",
-        "t": "timestamp",
-    }
-    df.rename(columns=rename_map, inplace=True)
+    df.columns = [str(c).lower().strip() for c in df.columns]
 
-    required_cols = {"timestamp", "open", "high", "low", "close"}
-    missing = required_cols - set(df.columns)
+    aliases = {
+        "timestamp": ["timestamp", "time", "date"],
+        "open": ["open", "o"],
+        "high": ["high", "h"],
+        "low": ["low", "l"],
+        "close": ["close", "c", "close_price"],
+        "volume": ["volume", "v"],
+    }
+
+    resolved = {}
+    for target, opts in aliases.items():
+        for col in opts:
+            if col in df.columns:
+                resolved[col] = target
+                break
+
+    missing = [t for t in aliases.keys() if t not in resolved.values()]
     if missing:
-        raise ValueError(f"Missing required candle columns: {sorted(missing)}")
+        raise ValueError(
+            "Missing required candle columns: "
+            f"{missing}. Found columns: {list(df.columns)}"
+        )
+
+    df = df.rename(columns=resolved)[list(aliases.keys())]
 
     if timeframe == "1m":
         cutoff = datetime.now(tz=timezone.utc) - timedelta(days=30)
