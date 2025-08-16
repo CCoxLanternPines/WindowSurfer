@@ -2,6 +2,8 @@ from __future__ import annotations
 
 """Very small historical simulation engine."""
 
+import csv
+import os
 import re
 from datetime import timedelta
 
@@ -23,12 +25,12 @@ LOCAL_WINDOW = 12       # lookback for local high/low
 VOL_MULT = 1.5          # min volume spike multiple
 REVERSAL_PCT = 0.01     # 1% move to confirm reversal
 
-# Future trend prediction knobs
-SLOPE_THRESHOLD = 0.0       # minimum slope magnitude for signal
-VOLATILITY_THRESHOLD = 0.02 # min % range of trailing window
-VOLUME_THRESHOLD = 1.5      # volume spike multiple vs avg
-CONFIDENCE_THRESHOLD = 0.6  # min confidence for filtered accuracy
-LOOKAHEAD_HOURS = 24        # prediction horizon
+# Rule-based prediction knobs
+SLOPE_THRESHOLD = 0.0       # slope > this = up
+VOLATILITY_MAX = 0.02       # filter noisy/flat boxes
+RANGE_MIN = 0.01            # must have enough range to matter
+
+FEATURES_CSV = "data/window_features.csv"
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
@@ -88,6 +90,21 @@ def detect_reversals(df: pd.DataFrame) -> list[tuple[int, float, str]]:
     return reversals
 
 
+def rule_predict(features: dict[str, float]) -> int:
+    """Classify window direction using simple thresholds."""
+    if (
+        features.get("volatility", 0.0) > VOLATILITY_MAX
+        or features.get("range", 0.0) < RANGE_MIN
+    ):
+        return 0
+    slope = features.get("slope", 0.0)
+    if slope > SLOPE_THRESHOLD:
+        return 1
+    if slope < -SLOPE_THRESHOLD:
+        return -1
+    return 0
+
+
 def run_simulation(*, timeframe: str = "1m") -> None:
     """Run a simple simulation over SOLUSD candles."""
     file_path = "data/sim/SOLUSD_1h.csv"
@@ -126,16 +143,19 @@ def run_simulation(*, timeframe: str = "1m") -> None:
                 zorder=5,
             )
 
-    predictions: list[dict[str, float | str]] = []
     bars: list[tuple[int, int, float]] = []
-    arrows: list[tuple[int, float, str, float]] = []
+    markers: list[tuple[int, float, int]] = []  # (start_idx, price, prediction)
+    last_features: dict[str, float] | None = None
+    results: list[tuple[int, int]] = []  # (pred, actual)
 
-    for start in range(0, len(df) - WINDOW_SIZE - LOOKAHEAD_HOURS, STEP_SIZE):
+    os.makedirs(os.path.dirname(FEATURES_CSV), exist_ok=True)
+
+    for start in range(0, len(df) - WINDOW_SIZE, STEP_SIZE):
         end = start + WINDOW_SIZE
         sub = df.iloc[start:end]
+
         low = float(sub["low"].min()) if "low" in sub else float(sub["close"].min())
         high = float(sub["high"].max()) if "high" in sub else float(sub["close"].max())
-
         rect = patches.Rectangle(
             (start, low),
             WINDOW_SIZE,
@@ -148,48 +168,61 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         level = float(df.iloc[start]["close"])
         bars.append((start, end, level))
 
-        # --- Feature extraction at window entry ---
-        slope_window = df["close"].iloc[max(0, start - SLOPE_WINDOW + 1) : start + 1]
-        x = np.arange(len(slope_window))
-        slope = float(np.polyfit(x, slope_window, 1)[0]) if len(slope_window) > 1 else 0.0
+        pred: int | None = None
+        if last_features is not None:
+            pred = rule_predict(last_features)
+            markers.append((start, level, pred))
 
-        vol_window = df.iloc[max(0, start - SLOPE_WINDOW + 1) : start + 1]
-        volatility = 0.0
-        if len(vol_window):
-            vol_high = float(vol_window["high"].max()) if "high" in vol_window else float(vol_window["close"].max())
-            vol_low = float(vol_window["low"].min()) if "low" in vol_window else float(vol_window["close"].min())
-            volatility = (vol_high - vol_low) / level if level else 0.0
-            vol_avg = float(vol_window["volume"].mean())
+        closes = sub["close"].values
+        x = np.arange(len(closes))
+        slope = float(np.polyfit(x, closes, 1)[0]) if len(closes) > 1 else 0.0
+        volatility = float(np.std(closes)) if len(closes) else 0.0
+        rng = high - low
+        vol_mean = float(sub["volume"].mean()) if "volume" in sub else 0.0
+        mid = len(sub) // 2
+        early = float(sub["volume"].iloc[:mid].mean()) if mid and "volume" in sub else 0.0
+        late = float(sub["volume"].iloc[mid:].mean()) if mid and "volume" in sub else 0.0
+        volume_skew = ((late - early) / early) if early else 0.0
+        exit_price = float(sub.iloc[-1]["close"])
+        exit_vs_entry = (exit_price - level) / level if level else 0.0
+
+        actual = 1 if slope > 0 else -1 if slope < 0 else 0
+        if pred is not None:
+            results.append((pred, actual))
+            pred_str = {1: "UP", -1: "DOWN", 0: "FLAT"}[pred]
+            act_str = {1: "UP", -1: "DOWN", 0: "FLAT"}[actual]
+            print(f"start={start} predicted {pred_str} actual {act_str}")
+
+        next_sub = df.iloc[end : end + WINDOW_SIZE]
+        if len(next_sub) == WINDOW_SIZE:
+            next_closes = next_sub["close"].values
+            x_next = np.arange(len(next_closes))
+            next_slope = (
+                float(np.polyfit(x_next, next_closes, 1)[0])
+                if len(next_closes) > 1
+                else 0.0
+            )
+            label = 1 if next_slope > 0 else -1 if next_slope < 0 else 0
         else:
-            vol_avg = 0.0
-        volume = float(df.iloc[start]["volume"]) if "volume" in df else 0.0
-        volume_delta = (volume / vol_avg) if vol_avg else 0.0
+            label = 0
 
-        position = (level - low) / (high - low) if high > low else 0.5
+        features = {
+            "slope": slope,
+            "volatility": volatility,
+            "range": rng,
+            "volume_mean": vol_mean,
+            "volume_skew": volume_skew,
+            "exit_vs_entry": exit_vs_entry,
+            "label": label,
+        }
+        file_exists = os.path.exists(FEATURES_CSV)
+        with open(FEATURES_CSV, "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=features.keys())
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(features)
 
-        # --- Prediction rule ---
-        direction = "UP" if slope >= 0 else "DOWN"
-        slope_pass = abs(slope) >= SLOPE_THRESHOLD if SLOPE_THRESHOLD > 0 else True
-        vol_pass = volatility >= VOLATILITY_THRESHOLD if VOLATILITY_THRESHOLD > 0 else True
-        volm_pass = volume_delta >= VOLUME_THRESHOLD if VOLUME_THRESHOLD > 0 else True
-        confidence = (int(slope_pass) + int(vol_pass) + int(volm_pass)) / 3.0
-
-        future_idx = start + LOOKAHEAD_HOURS
-        future_price = float(df.iloc[future_idx]["close"])
-        actual = "UP" if future_price > level else "DOWN"
-
-        predictions.append(
-            {
-                "predicted": direction,
-                "actual": actual,
-                "confidence": confidence,
-                "slope": slope,
-                "volatility": volatility,
-                "volume_delta": volume_delta,
-                "position": position,
-            }
-        )
-        arrows.append((start, level, direction, confidence))
+        last_features = {k: v for k, v in features.items() if k != "label"}
 
     ax1.plot([], [], color=BAR_COLOR, alpha=BAR_ALPHA, linewidth=1.5, label="Window Entry")
     for start, end, level in bars:
@@ -202,11 +235,13 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             alpha=BAR_ALPHA,
         )
 
-    for idx, price, direction, conf in arrows:
-        marker = "^" if direction == "UP" else "v"
-        color = "green" if direction == "UP" else "red"
-        alpha = 1.0 if conf >= CONFIDENCE_THRESHOLD else 0.3
-        ax1.scatter(idx, price, marker=marker, color=color, alpha=alpha, zorder=5)
+    for idx, price, pred in markers:
+        if pred > 0:
+            ax1.scatter(idx, price, marker="^", color="green", zorder=5)
+        elif pred < 0:
+            ax1.scatter(idx, price, marker="v", color="red", zorder=5)
+        else:
+            ax1.scatter(idx, price, marker="o", color="gray", zorder=5)
 
     ax1.set_title("Rolling Window Box Visualization")
     ax1.set_xlabel("Candles (Index)")
@@ -214,16 +249,10 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     ax1.legend(loc="upper left")
     ax1.grid(True)
 
-    total = len(predictions)
-    correct = sum(1 for p in predictions if p["predicted"] == p["actual"])
-    raw_acc = 100 * correct / total if total else 0.0
-    filt = [p for p in predictions if p["confidence"] >= CONFIDENCE_THRESHOLD]
-    filt_total = len(filt)
-    filt_correct = sum(1 for p in filt if p["predicted"] == p["actual"])
-    filt_acc = 100 * filt_correct / filt_total if filt_total else 0.0
-    print(
-        f"Raw Accuracy: {raw_acc:.2f}% | Filtered Accuracy: {filt_acc:.2f}% ({filt_total}/{total})"
-    )
+    made = sum(1 for p, _ in results if p != 0)
+    correct = sum(1 for p, a in results if p != 0 and p == a)
+    acc = 100 * correct / made if made else 0.0
+    print(f"Predictions made: {made} Correct: {correct} Accuracy: {acc:.2f}%")
 
     plt.show()
 
