@@ -26,9 +26,9 @@ VOL_MULT = 1.5          # min volume spike multiple
 REVERSAL_PCT = 0.01     # 1% move to confirm reversal
 
 # Rule-based prediction knobs
-SLOPE_THRESHOLD = 0.0       # slope > this = up
-VOLATILITY_MAX = 0.02       # filter noisy/flat boxes
-RANGE_MIN = 0.01            # must have enough range to matter
+SLOPE_THRESHOLD = 0.3       # slope > this = up
+VOLATILITY_MAX = 24       # filter noisy/flat boxes
+RANGE_MIN = 0.08           # must have enough range to matter
 
 FEATURES_CSV = "data/window_features.csv"
 
