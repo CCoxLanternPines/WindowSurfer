@@ -13,17 +13,21 @@ def forecast_slope_segment(
     m: float,
     b: float,
     bottom_window: int,
+    anchor_val: float | None = None,
 ) -> np.ndarray:
-    """Project slope line forward ``bottom_window`` steps with bias.
+    """Project slope forward ``bottom_window`` steps with bias adjustment.
 
-    The projection starts from the current slope fit (``m`` and ``b``), then
-    applies a simple bias based on recent volume change and breakout distance.
+    If ``anchor_val`` is provided, the forecast is shifted so its first value
+    starts from ``anchor_val`` instead of the raw intercept, ensuring continuity
+    across segments.
     """
-    # Base projection
+
     x_future = np.arange(bottom_window)
+
+    # Base projection
     y_future = m * x_future + b
 
-    # Feature signals
+    # Bias: volume + breakout distance
     recent_vol = df["volume"].iloc[start_idx:end_idx]
     volume_change = (
         recent_vol.iloc[-1] - recent_vol.iloc[0]
@@ -32,9 +36,13 @@ def forecast_slope_segment(
     last_fit = m * (len(recent_vol) - 1) + b
     breakout_dist = last_close - last_fit
 
-    # Bias adjustment (tunable weights)
     k1, k2 = 0.2, 0.3
     adj = k1 * volume_change - k2 * breakout_dist
-
     y_future = y_future + adj
+
+    # Anchor continuity
+    if anchor_val is not None:
+        offset = anchor_val - y_future[0]
+        y_future = y_future + offset
+
     return y_future

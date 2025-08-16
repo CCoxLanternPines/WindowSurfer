@@ -64,7 +64,6 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     # Stepwise slope calculation
     slopes = [np.nan] * len(df)
     slope_angles = [np.nan] * len(df)
-    forecast_vals = [np.nan] * len(df)
     last_value = df["close"].iloc[0]
 
     for i in range(0, len(df), BOTTOM_WINDOW):
@@ -78,18 +77,49 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             last_value = fitted[-1]
             slope_val = np.tanh(m)
             slope_angles[i:end] = [slope_val] * len(y)
-
-            future = forecast_slope_segment(df, i, end, m, b, BOTTOM_WINDOW)
-            for j, val in enumerate(future):
-                if end + j < len(df):
-                    forecast_vals[end + j] = val
         else:
             slopes[i:end] = [last_value] * len(y)
             slope_angles[i:end] = [0] * len(y)
 
     df["bottom_slope"] = slopes
     df["slope_angle"] = slope_angles
+
+    # Forecast slope with anchoring between segments
+    forecast_vals = [np.nan] * len(df)
+    last_anchor: float | None = None
+    forecast_errors = []
+
+    for i in range(0, len(df), BOTTOM_WINDOW):
+        end = min(i + BOTTOM_WINDOW, len(df))
+        y = df["close"].iloc[i:end].values
+        x = np.arange(len(y))
+        if len(y) > 1:
+            m, b = np.polyfit(x, y, 1)
+
+            # Forecast forward and anchor to previous segment
+            future = forecast_slope_segment(
+                df, i, end, m, b, BOTTOM_WINDOW, anchor_val=last_anchor
+            )
+
+            for j, val in enumerate(future):
+                if end + j < len(df):
+                    forecast_vals[end + j] = val
+
+            # Update anchor for continuity
+            last_anchor = future[-1]
+
+            # Log error: forecast endpoint vs. actual slope endpoint
+            actual_end = df["bottom_slope"].iloc[end - 1]
+            forecast_end = future[-1]
+            err = forecast_end - actual_end
+            forecast_errors.append(err)
+
     df["forecast_slope"] = forecast_vals
+
+    # After loop: print summary accuracy
+    if forecast_errors:
+        avg_err = sum(abs(e) for e in forecast_errors) / len(forecast_errors)
+        print(f"[SIM] Forecast average error = {avg_err:.2f}")
 
     state: Dict[str, Any] = {}
     for _, candle in df.iterrows():
