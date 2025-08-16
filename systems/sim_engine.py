@@ -27,12 +27,12 @@ WEIGHT_VOLATILITY = 0.08
 CONFIDENCE_THRESHOLD = 0.1  # only use forecasts above this
 
 # Control line thresholds
-ENTRY_THRESHOLD = 0.2
+ENTRY_THRESHOLD = 0.3
 EXIT_THRESHOLD = 0.03
 
 # Pressure bias defaults
-PRESSURE_LOOKBACK = 200  # candles
-PRESSURE_SCALE = 0.5
+PRESSURE_LOOKBACK = 400  # candles
+PRESSURE_SCALE = 1
 ENABLE_PRESSURE_BIAS = True
 
 
