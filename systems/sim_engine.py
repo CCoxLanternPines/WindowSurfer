@@ -26,6 +26,10 @@ WEIGHT_VOLATILITY = 0.08
 # Forecast confidence threshold
 CONFIDENCE_THRESHOLD = 0.2  # only use forecasts above this
 
+# Control line thresholds
+ENTRY_THRESHOLD = 0.6
+EXIT_THRESHOLD = 0.3
+
 
 def parse_timeframe(tf: str) -> timedelta | None:
     match = re.match(r"(\d+)([dhmw])", tf)
@@ -224,6 +228,48 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     df["forecast_angle"] = forecast_angles
     df["confidence"] = forecast_confidences
 
+    # --- Control Line Generation ---
+    control_line: list[int] = []
+    signal_counts = {1: 0, 0: 0, -1: 0}
+    for conf in df["confidence"]:
+        if conf >= ENTRY_THRESHOLD:
+            control_line.append(1)
+            signal_counts[1] += 1
+        elif conf <= EXIT_THRESHOLD:
+            control_line.append(-1)
+            signal_counts[-1] += 1
+        else:
+            control_line.append(0)
+            signal_counts[0] += 1
+
+    if control_line and control_line[-1] == 1:
+        control_line[-1] = -1
+        signal_counts[1] -= 1
+        signal_counts[-1] += 1
+
+    df["control_line"] = control_line
+
+    total_signals = len([s for s in control_line if s != 0])
+    correct_signals = 0
+    weighted_correct = 0.0
+    total_signal_conf = 0.0
+    for idx, signal in enumerate(control_line):
+        if signal == 0:
+            continue
+        actual_sign = np.sign(df["slope_angle"].iloc[idx])
+        conf = df["confidence"].iloc[idx]
+        if signal == actual_sign:
+            correct_signals += 1
+            weighted_correct += conf
+        total_signal_conf += conf
+
+    raw_signal_acc = (
+        (correct_signals / total_signals * 100) if total_signals else 0
+    )
+    weighted_signal_acc = (
+        (weighted_correct / total_signal_conf * 100) if total_signal_conf else 0
+    )
+
     raw_acc = (total_correct / total_forecasts * 100) if total_forecasts else 0
     raw_weighted = (total_weighted / total_conf * 100) if total_conf else 0
     filt_acc = (correct_filtered / total_filtered * 100) if total_filtered else 0
@@ -237,12 +283,19 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         f"[SIM] Forecasts: {total_forecasts}, Used: {total_filtered}, Skipped: {total_forecasts - total_filtered}"
     )
 
+    print(
+        f"[SIM] Control Line Accuracy: {raw_signal_acc:.2f}% | Weighted: {weighted_signal_acc:.2f}%"
+    )
+    print(
+        f"[SIM] Signal Counts -> +1: {signal_counts[1]}, 0: {signal_counts[0]}, -1: {signal_counts[-1]}"
+    )
+
     state: Dict[str, Any] = {}
     for _, candle in df.iterrows():
         evaluate_buy.evaluate_buy(candle.to_dict(), state)
         evaluate_sell.evaluate_sell(candle.to_dict(), state)
 
-    fig, ax1 = plt.subplots(figsize=(12, 6))
+    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(12, 6))
     ax1.plot(df["candle_index"], df["close"], label="Close Price", color="blue")
     ax1.plot(
         df["candle_index"],
@@ -253,8 +306,16 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         drawstyle="steps-post",
     )
     ax1.set_ylabel("Price")
-    ax1.set_xlabel("Candles (Index)")
     ax1.legend(loc="upper left")
+
+    ax2.step(
+        df["candle_index"], df["control_line"], where="mid", color="red"
+    )
+    ax2.set_ylim(-1.2, 1.2)
+    ax2.set_yticks([-1, 0, 1])
+    ax2.set_yticklabels(["Dump (-1)", "Neutral (0)", "Hold (+1)"])
+    ax2.set_xlabel("Candles (Index)")
+    ax2.set_title("Control Line (Exit Oracle)")
 
     # Plot forecast arrows and anchor dots
     price_scale = df["close"].std() * 0.5
@@ -281,6 +342,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         )
         ax1.scatter(anchor_x, anchor_y, color="red")
 
-    plt.title("SOLUSD Discovery Simulation")
-    plt.grid(True)
+    fig.suptitle("SOLUSD Discovery Simulation")
+    ax1.grid(True)
+    ax2.grid(True)
     plt.show()
