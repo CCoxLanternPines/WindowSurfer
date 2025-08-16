@@ -231,21 +231,6 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     df["forecast_angle"] = forecast_angles
     df["confidence"] = forecast_confidences
 
-
-    # --- Generate buys on upward forecast arrows ---
-    buy_points = []
-    for start in range(0, len(df), BOTTOM_WINDOW):
-        anchor_x = df["candle_index"].iloc[start]
-        anchor_y = df["close"].iloc[start]
-        forecast = df["forecast_angle"].iloc[start]
-        conf = df["confidence"].iloc[start]
-
-        if np.isnan(forecast) or conf < CONFIDENCE_THRESHOLD:
-            continue
-
-        if forecast > 0:  # upward forecast = buy
-            buy_points.append((anchor_x, anchor_y))
-
     # --- Control Line Generation ---
     control_line: list[float] = []
     signal_counts: Dict[float, int] = {}
@@ -264,6 +249,16 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         signal_counts[val] = signal_counts.get(val, 0) + 1
 
     df["control_line"] = control_line
+
+    # --- Generate buys when control line = +1 at start of window ---
+    buy_points = []
+    for start in range(0, len(df), BOTTOM_WINDOW):
+        anchor_x = df["candle_index"].iloc[start]
+        anchor_y = df["close"].iloc[start]
+        control_val = df["control_line"].iloc[start]
+
+        if control_val == 1.0:
+            buy_points.append((anchor_x, anchor_y))
 
     total_signals = len([s for s in control_line if s != 0])
     correct_signals = 0
