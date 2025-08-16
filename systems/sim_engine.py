@@ -24,11 +24,11 @@ WEIGHT_VOLUME = 0.2
 WEIGHT_VOLATILITY = 0.08
 
 # Forecast confidence threshold
-CONFIDENCE_THRESHOLD = 0.2  # only use forecasts above this
+CONFIDENCE_THRESHOLD = 0.1  # only use forecasts above this
 
 # Control line thresholds
-ENTRY_THRESHOLD = 0.6
-EXIT_THRESHOLD = 0.3
+ENTRY_THRESHOLD = 0.2
+EXIT_THRESHOLD = .1
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
