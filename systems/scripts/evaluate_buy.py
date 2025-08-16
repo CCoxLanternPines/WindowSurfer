@@ -7,4 +7,8 @@ from typing import Any, Dict
 
 def evaluate_buy(candle: Dict[str, Any], state: Dict[str, Any]) -> bool:
     """Return ``False`` to indicate no buy action."""
-    return False
+    buys = state.setdefault("buys", [])
+    buy_triggered = False
+    if buy_triggered:
+        buys.append(candle["candle_index"])
+    return buy_triggered
