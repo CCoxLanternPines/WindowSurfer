@@ -24,8 +24,8 @@ STRONG_MOVE_THRESHOLD = 0.20  # 20% move is considered strong
 
 # Prediction filters
 SLOPE_THRESHOLD = 0.50
-VOLATILITY_MAX = 10.0
-RANGE_MIN = 0.1
+VOLATILITY_MAX = 5.0
+RANGE_MIN = 0.05
 VOLUME_SKEW_BIAS = 0.2
 
 COLOR_MAP = {
@@ -43,6 +43,7 @@ FEATURES_CSV = "data/window_features.csv"
 SLOPE_SKIPS = 0
 VOLATILITY_SKIPS = 0
 RANGE_SKIPS = 0
+SKEW_HITS = 0
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
@@ -63,29 +64,31 @@ def parse_timeframe(tf: str) -> timedelta | None:
 
 def rule_predict(features: dict[str, float]) -> int:
     """Classify next window move with multi-feature rules."""
-    global SLOPE_SKIPS, VOLATILITY_SKIPS, RANGE_SKIPS
+    global SLOPE_SKIPS, VOLATILITY_SKIPS, RANGE_SKIPS, SKEW_HITS
 
     slope = features.get("slope", 0.0)
     volatility = features.get("volatility", 0.0)
     rng = features.get("range", 0.0)
 
-    if abs(slope) < SLOPE_THRESHOLD:
+    # Scale slope requirement based on volatility
+    scale = volatility / VOLATILITY_MAX if VOLATILITY_MAX else 1.0
+    scaled_threshold = SLOPE_THRESHOLD * scale
+    if abs(slope) < scaled_threshold:
         SLOPE_SKIPS += 1
-        return 0
-    if volatility > VOLATILITY_MAX:
-        VOLATILITY_SKIPS += 1
         return 0
     if rng < RANGE_MIN:
         RANGE_SKIPS += 1
         return 0
 
-    pct = features.get("pct_change", 0.0)
-    volume_skew = features.get("volume_skew", 0.0)
+    skew = features.get("volume_skew", 0.0)
+    if skew > VOLUME_SKEW_BIAS and slope > 0:
+        SKEW_HITS += 1
+        return 1
+    if skew < -VOLUME_SKEW_BIAS and slope < 0:
+        SKEW_HITS += 1
+        return -1
 
-    if volume_skew > VOLUME_SKEW_BIAS and slope > 0:
-        pct = abs(pct)
-    elif volume_skew < -VOLUME_SKEW_BIAS and slope < 0:
-        pct = -abs(pct)
+    pct = features.get("pct_change", 0.0)
 
     if pct >= STRONG_MOVE_THRESHOLD:
         return 2
@@ -244,7 +247,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         f"Predictions made: {made} Correct: {correct} Accuracy: {acc:.2f}% Weighted: {w_acc:.2f}%"
     )
     print(
-        f"Skipped: slope={SLOPE_SKIPS} volatility={VOLATILITY_SKIPS} range={RANGE_SKIPS}"
+        f"Skipped: slope={SLOPE_SKIPS} volatility={VOLATILITY_SKIPS} range={RANGE_SKIPS} skew_hits={SKEW_HITS}"
     )
 
     plt.show()
