@@ -1,0 +1,1719 @@
+[SIM] Starting simulation for SOLUSD
+[SKIP][minnow 1d] p=0.750 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.7800 candidates=0
+[SKIP][fish 3d] p=0.750 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.7800 candidates=0
+[SKIP][shark 1w] p=0.750 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.7800 candidates=0
+[SKIP][whale 2w] p=0.750 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.7800 candidates=0
+[SKIP][minnow 1d] p=0.636 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.8000 candidates=0
+[SKIP][fish 3d] p=0.636 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.8000 candidates=0
+[SKIP][shark 1w] p=0.636 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.8000 candidates=0
+[SKIP][whale 2w] p=0.636 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.8000 candidates=0
+[SKIP][minnow 1d] p=0.783 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.8400 candidates=0
+[SKIP][fish 3d] p=0.783 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.8400 candidates=0
+[SKIP][shark 1w] p=0.783 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.8400 candidates=0
+[SKIP][whale 2w] p=0.783 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.8400 candidates=0
+[SKIP][minnow 1d] p=0.667 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.8200 candidates=0
+[SKIP][fish 3d] p=0.667 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.8200 candidates=0
+[SKIP][shark 1w] p=0.667 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.8200 candidates=0
+[SKIP][whale 2w] p=0.667 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.8200 candidates=0
+[SKIP][minnow 1d] p=0.222 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.6900 candidates=0
+[SKIP][fish 3d] p=0.222 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.6900 candidates=0
+[SKIP][shark 1w] p=0.222 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.6900 candidates=0
+[SKIP][whale 2w] p=0.222 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.6900 candidates=0
+[SKIP][minnow 1d] p=0.107 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.6500 candidates=0
+[SKIP][fish 3d] p=0.107 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.6500 candidates=0
+[SKIP][shark 1w] p=0.107 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.6500 candidates=0
+[CLAMP] size=$1287.50 → $1000.00 (cap=$1000.00, max=$1000.00)
+[BUY][whale 2w] p=0.107, base=35.00%, mult=3.68x → size=100.00% (cap=$1000.00)
+[HOLD][whale 2w] price=$20.6500 candidates=0
+[SKIP][minnow 1d] p=0.069 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.6300 candidates=0
+[SKIP][fish 3d] size=$0.00 < min=$10.00
+[HOLD][fish 3d] price=$20.6300 candidates=0
+[SKIP][shark 1w] size=$0.00 < min=$10.00
+[HOLD][shark 1w] price=$20.6300 candidates=0
+[GATE][whale 2w] buy blocked; p=0.069 < unlock_p=0.307
+[HOLD][whale 2w] price=$20.6300 candidates=0
+[SKIP][minnow 1d] p=0.103 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.6400 candidates=0
+[SKIP][fish 3d] p=0.103 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.6400 candidates=0
+[SKIP][shark 1w] p=0.103 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.6400 candidates=0
+[GATE][whale 2w] buy blocked; p=0.103 < unlock_p=0.307
+[HOLD][whale 2w] price=$20.6400 candidates=0
+[SKIP][minnow 1d] p=0.345 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.7100 candidates=0
+[SKIP][fish 3d] p=0.345 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.7100 candidates=0
+[SKIP][shark 1w] p=0.345 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.7100 candidates=0
+[UNLOCK][whale 2w] p=0.345 >= unlock_p=0.307 → buys re-enabled
+[SKIP][whale 2w] p=0.345 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.7100 candidates=0
+[SKIP][minnow 1d] p=0.241 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.6800 candidates=0
+[SKIP][fish 3d] p=0.241 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.6800 candidates=0
+[SKIP][shark 1w] p=0.241 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.6800 candidates=0
+[SKIP][whale 2w] p=0.241 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.6800 candidates=0
+[SKIP][minnow 1d] p=0.552 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.7700 candidates=0
+[SKIP][fish 3d] p=0.552 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.7700 candidates=0
+[SKIP][shark 1w] p=0.552 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.7700 candidates=0
+[SKIP][whale 2w] p=0.552 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.7700 candidates=0
+[SKIP][minnow 1d] p=0.586 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.7800 candidates=0
+[SKIP][fish 3d] p=0.586 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.7800 candidates=0
+[SKIP][shark 1w] p=0.586 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.7800 candidates=0
+[SKIP][whale 2w] p=0.586 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.7800 candidates=0
+[SKIP][minnow 1d] p=0.655 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.8000 candidates=0
+[SKIP][fish 3d] p=0.655 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.8000 candidates=0
+[SKIP][shark 1w] p=0.655 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.8000 candidates=0
+[SKIP][whale 2w] p=0.655 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.8000 candidates=0
+[SKIP][minnow 1d] p=0.414 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.7300 candidates=0
+[SKIP][fish 3d] p=0.414 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.7300 candidates=0
+[SKIP][shark 1w] p=0.414 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.7300 candidates=0
+[SKIP][whale 2w] p=0.414 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.7300 candidates=0
+[SKIP][minnow 1d] p=0.448 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.7400 candidates=0
+[SKIP][fish 3d] p=0.448 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.7400 candidates=0
+[SKIP][shark 1w] p=0.448 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.7400 candidates=0
+[SKIP][whale 2w] p=0.448 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.7400 candidates=0
+[SKIP][minnow 1d] p=0.609 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.8900 candidates=0
+[SKIP][fish 3d] p=0.609 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.8900 candidates=0
+[SKIP][shark 1w] p=0.609 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.8900 candidates=0
+[SKIP][whale 2w] p=0.609 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.8900 candidates=0
+[SKIP][minnow 1d] p=0.413 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.8000 candidates=0
+[SKIP][fish 3d] p=0.413 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.8000 candidates=0
+[SKIP][shark 1w] p=0.413 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.8000 candidates=0
+[SKIP][whale 2w] p=0.413 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.8000 candidates=0
+[SKIP][minnow 1d] p=0.239 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.7200 candidates=0
+[SKIP][fish 3d] p=0.239 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.7200 candidates=0
+[SKIP][shark 1w] p=0.239 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.7200 candidates=0
+[SKIP][whale 2w] p=0.239 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.7200 candidates=0
+[SKIP][minnow 1d] p=0.377 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.6900 candidates=0
+[SKIP][fish 3d] p=0.377 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.6900 candidates=0
+[SKIP][shark 1w] p=0.377 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.6900 candidates=0
+[SKIP][whale 2w] p=0.377 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.6900 candidates=0
+[SKIP][minnow 1d] p=0.129 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.3300 candidates=0
+[SKIP][fish 3d] p=0.129 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.3300 candidates=0
+[SKIP][shark 1w] p=0.129 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.3300 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$20.3300 candidates=0
+[SKIP][minnow 1d] size=$0.00 < min=$10.00
+[HOLD][minnow 1d] price=$19.6900 candidates=0
+[SKIP][fish 3d] size=$0.00 < min=$10.00
+[HOLD][fish 3d] price=$19.6900 candidates=0
+[SKIP][shark 1w] size=$0.00 < min=$10.00
+[HOLD][shark 1w] price=$19.6900 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.6900 candidates=0
+[SKIP][minnow 1d] p=0.268 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8700 candidates=0
+[SKIP][fish 3d] p=0.268 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8700 candidates=0
+[SKIP][shark 1w] p=0.268 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8700 candidates=0
+[SKIP][whale 2w] p=0.268 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8700 candidates=0
+[SKIP][minnow 1d] p=0.280 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8900 candidates=0
+[SKIP][fish 3d] p=0.280 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8900 candidates=0
+[SKIP][shark 1w] p=0.280 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8900 candidates=0
+[SKIP][whale 2w] p=0.280 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8900 candidates=0
+[SKIP][minnow 1d] p=0.244 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8300 candidates=0
+[SKIP][fish 3d] p=0.244 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8300 candidates=0
+[SKIP][shark 1w] p=0.244 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8300 candidates=0
+[SKIP][whale 2w] p=0.244 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8300 candidates=0
+[SKIP][minnow 1d] p=0.128 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6400 candidates=0
+[SKIP][fish 3d] p=0.128 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6400 candidates=0
+[SKIP][shark 1w] p=0.128 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6400 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.6400 candidates=0
+[SKIP][minnow 1d] p=0.159 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6900 candidates=0
+[SKIP][fish 3d] p=0.159 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6900 candidates=0
+[SKIP][shark 1w] p=0.159 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6900 candidates=0
+[SKIP][whale 2w] p=0.159 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6900 candidates=0
+[SKIP][minnow 1d] p=0.220 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7900 candidates=0
+[SKIP][fish 3d] p=0.220 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7900 candidates=0
+[SKIP][shark 1w] p=0.220 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7900 candidates=0
+[SKIP][whale 2w] p=0.220 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7900 candidates=0
+[SKIP][minnow 1d] p=0.189 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7400 candidates=0
+[SKIP][fish 3d] p=0.189 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7400 candidates=0
+[SKIP][shark 1w] p=0.189 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7400 candidates=0
+[SKIP][whale 2w] p=0.189 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7400 candidates=0
+[SKIP][minnow 1d] p=0.274 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8800 candidates=0
+[SKIP][fish 3d] p=0.274 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8800 candidates=0
+[SKIP][shark 1w] p=0.274 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8800 candidates=0
+[SKIP][whale 2w] p=0.274 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8800 candidates=0
+[SKIP][minnow 1d] p=0.207 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7700 candidates=0
+[SKIP][fish 3d] p=0.207 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7700 candidates=0
+[SKIP][shark 1w] p=0.207 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7700 candidates=0
+[SKIP][whale 2w] p=0.207 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7700 candidates=0
+[SKIP][minnow 1d] p=0.256 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8500 candidates=0
+[SKIP][fish 3d] p=0.256 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8500 candidates=0
+[SKIP][shark 1w] p=0.256 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8500 candidates=0
+[SKIP][whale 2w] p=0.256 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8500 candidates=0
+[SKIP][minnow 1d] p=0.280 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8900 candidates=0
+[SKIP][fish 3d] p=0.280 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8900 candidates=0
+[SKIP][shark 1w] p=0.280 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8900 candidates=0
+[SKIP][whale 2w] p=0.280 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8900 candidates=0
+[SKIP][minnow 1d] p=0.262 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8600 candidates=0
+[SKIP][fish 3d] p=0.262 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8600 candidates=0
+[SKIP][shark 1w] p=0.262 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8600 candidates=0
+[SKIP][whale 2w] p=0.262 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8600 candidates=0
+[SKIP][minnow 1d] p=0.268 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8700 candidates=0
+[SKIP][fish 3d] p=0.268 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8700 candidates=0
+[SKIP][shark 1w] p=0.268 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8700 candidates=0
+[SKIP][whale 2w] p=0.268 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8700 candidates=0
+[SKIP][minnow 1d] p=0.232 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8100 candidates=0
+[SKIP][fish 3d] p=0.232 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8100 candidates=0
+[SKIP][shark 1w] p=0.232 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8100 candidates=0
+[SKIP][whale 2w] p=0.232 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8100 candidates=0
+[SKIP][minnow 1d] p=0.226 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8000 candidates=0
+[SKIP][fish 3d] p=0.226 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8000 candidates=0
+[SKIP][shark 1w] p=0.226 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8000 candidates=0
+[SKIP][whale 2w] p=0.226 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8000 candidates=0
+[SKIP][minnow 1d] p=0.220 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7900 candidates=0
+[SKIP][fish 3d] p=0.220 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7900 candidates=0
+[SKIP][shark 1w] p=0.220 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7900 candidates=0
+[SKIP][whale 2w] p=0.220 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7900 candidates=0
+[SKIP][minnow 1d] p=0.250 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8400 candidates=0
+[SKIP][fish 3d] p=0.250 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8400 candidates=0
+[SKIP][shark 1w] p=0.250 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8400 candidates=0
+[SKIP][whale 2w] p=0.250 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8400 candidates=0
+[SKIP][minnow 1d] p=0.213 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7800 candidates=0
+[SKIP][fish 3d] p=0.213 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7800 candidates=0
+[SKIP][shark 1w] p=0.213 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7800 candidates=0
+[SKIP][whale 2w] p=0.213 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7800 candidates=0
+[SKIP][minnow 1d] p=0.279 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8400 candidates=0
+[SKIP][fish 3d] p=0.250 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8400 candidates=0
+[SKIP][shark 1w] p=0.250 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8400 candidates=0
+[SKIP][whale 2w] p=0.250 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8400 candidates=0
+[SKIP][minnow 1d] p=0.281 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8200 candidates=0
+[SKIP][fish 3d] p=0.238 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8200 candidates=0
+[SKIP][shark 1w] p=0.238 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8200 candidates=0
+[SKIP][whale 2w] p=0.238 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8200 candidates=0
+[SKIP][minnow 1d] p=0.191 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6800 candidates=0
+[SKIP][fish 3d] p=0.152 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6800 candidates=0
+[SKIP][shark 1w] p=0.152 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6800 candidates=0
+[SKIP][whale 2w] p=0.152 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6800 candidates=0
+[SKIP][minnow 1d] p=0.071 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3800 candidates=0
+[SKIP][fish 3d] size=$0.00 < min=$10.00
+[HOLD][fish 3d] price=$19.3800 candidates=0
+[SKIP][shark 1w] size=$0.00 < min=$10.00
+[HOLD][shark 1w] price=$19.3800 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.3800 candidates=0
+[SKIP][minnow 1d] p=0.104 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3900 candidates=0
+[SKIP][fish 3d] size=$0.00 < min=$10.00
+[HOLD][fish 3d] price=$19.3900 candidates=0
+[SKIP][shark 1w] size=$0.00 < min=$10.00
+[HOLD][shark 1w] price=$19.3900 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.3900 candidates=0
+[SKIP][minnow 1d] p=0.068 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3300 candidates=0
+[SKIP][fish 3d] size=$0.00 < min=$10.00
+[HOLD][fish 3d] price=$19.3300 candidates=0
+[SKIP][shark 1w] size=$0.00 < min=$10.00
+[HOLD][shark 1w] price=$19.3300 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.3300 candidates=0
+[SKIP][minnow 1d] p=0.090 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.1100 candidates=0
+[SKIP][fish 3d] size=$0.00 < min=$10.00
+[HOLD][fish 3d] price=$19.1100 candidates=0
+[SKIP][shark 1w] size=$0.00 < min=$10.00
+[HOLD][shark 1w] price=$19.1100 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.1100 candidates=0
+[SKIP][minnow 1d] p=0.286 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.2800 candidates=0
+[SKIP][fish 3d] p=0.127 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.2800 candidates=0
+[SKIP][shark 1w] p=0.127 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.2800 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.2800 candidates=0
+[SKIP][minnow 1d] p=0.275 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.2700 candidates=0
+[SKIP][fish 3d] p=0.122 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.2700 candidates=0
+[SKIP][shark 1w] p=0.122 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.2700 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.2700 candidates=0
+[SKIP][minnow 1d] p=0.330 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3200 candidates=0
+[SKIP][fish 3d] p=0.146 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3200 candidates=0
+[SKIP][shark 1w] p=0.146 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3200 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.3200 candidates=0
+[SKIP][minnow 1d] p=0.275 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.2700 candidates=0
+[SKIP][fish 3d] p=0.122 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.2700 candidates=0
+[SKIP][shark 1w] p=0.122 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.2700 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.2700 candidates=0
+[SKIP][minnow 1d] p=0.264 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.2600 candidates=0
+[SKIP][fish 3d] p=0.117 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.2600 candidates=0
+[SKIP][shark 1w] p=0.117 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.2600 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.2600 candidates=0
+[SKIP][minnow 1d] p=0.341 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3300 candidates=0
+[SKIP][fish 3d] p=0.151 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3300 candidates=0
+[SKIP][shark 1w] p=0.151 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3300 candidates=0
+[SKIP][whale 2w] p=0.151 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3300 candidates=0
+[SKIP][minnow 1d] p=0.407 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3900 candidates=0
+[SKIP][fish 3d] p=0.180 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3900 candidates=0
+[SKIP][shark 1w] p=0.180 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3900 candidates=0
+[SKIP][whale 2w] p=0.180 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3900 candidates=0
+[SKIP][minnow 1d] p=0.462 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4400 candidates=0
+[SKIP][fish 3d] p=0.205 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4400 candidates=0
+[SKIP][shark 1w] p=0.205 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4400 candidates=0
+[SKIP][whale 2w] p=0.205 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4400 candidates=0
+[SKIP][minnow 1d] p=0.473 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4500 candidates=0
+[SKIP][fish 3d] p=0.210 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4500 candidates=0
+[SKIP][shark 1w] p=0.210 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4500 candidates=0
+[SKIP][whale 2w] p=0.210 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4500 candidates=0
+[SKIP][minnow 1d] p=0.604 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5700 candidates=0
+[SKIP][fish 3d] p=0.268 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5700 candidates=0
+[SKIP][shark 1w] p=0.268 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5700 candidates=0
+[SKIP][whale 2w] p=0.268 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5700 candidates=0
+[SKIP][minnow 1d] p=0.604 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5700 candidates=0
+[SKIP][fish 3d] p=0.268 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5700 candidates=0
+[SKIP][shark 1w] p=0.268 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5700 candidates=0
+[SKIP][whale 2w] p=0.268 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5700 candidates=0
+[SKIP][minnow 1d] p=0.571 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5400 candidates=0
+[SKIP][fish 3d] p=0.254 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5400 candidates=0
+[SKIP][shark 1w] p=0.254 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5400 candidates=0
+[SKIP][whale 2w] p=0.254 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5400 candidates=0
+[SKIP][minnow 1d] p=0.495 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4700 candidates=0
+[SKIP][fish 3d] p=0.220 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4700 candidates=0
+[SKIP][shark 1w] p=0.220 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4700 candidates=0
+[SKIP][whale 2w] p=0.220 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4700 candidates=0
+[SKIP][minnow 1d] p=0.615 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5800 candidates=0
+[SKIP][fish 3d] p=0.273 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5800 candidates=0
+[SKIP][shark 1w] p=0.273 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5800 candidates=0
+[SKIP][whale 2w] p=0.273 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5800 candidates=0
+[SKIP][minnow 1d] p=0.549 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5200 candidates=0
+[SKIP][fish 3d] p=0.244 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5200 candidates=0
+[SKIP][shark 1w] p=0.244 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5200 candidates=0
+[SKIP][whale 2w] p=0.244 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5200 candidates=0
+[SKIP][minnow 1d] p=0.637 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6000 candidates=0
+[SKIP][fish 3d] p=0.283 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6000 candidates=0
+[SKIP][shark 1w] p=0.283 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6000 candidates=0
+[SKIP][whale 2w] p=0.283 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6000 candidates=0
+[SKIP][minnow 1d] p=0.593 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5600 candidates=0
+[SKIP][fish 3d] p=0.263 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5600 candidates=0
+[SKIP][shark 1w] p=0.263 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5600 candidates=0
+[SKIP][whale 2w] p=0.263 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5600 candidates=0
+[SKIP][minnow 1d] p=0.604 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5700 candidates=0
+[SKIP][fish 3d] p=0.268 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5700 candidates=0
+[SKIP][shark 1w] p=0.268 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5700 candidates=0
+[SKIP][whale 2w] p=0.268 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5700 candidates=0
+[SKIP][minnow 1d] p=0.663 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5500 candidates=0
+[SKIP][fish 3d] p=0.259 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5500 candidates=0
+[SKIP][shark 1w] p=0.259 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5500 candidates=0
+[SKIP][whale 2w] p=0.259 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5500 candidates=0
+[SKIP][minnow 1d] p=0.647 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4600 candidates=0
+[SKIP][fish 3d] p=0.215 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4600 candidates=0
+[SKIP][shark 1w] p=0.215 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4600 candidates=0
+[SKIP][whale 2w] p=0.215 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4600 candidates=0
+[SKIP][minnow 1d] p=0.719 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4800 candidates=0
+[SKIP][fish 3d] p=0.224 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4800 candidates=0
+[SKIP][shark 1w] p=0.224 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4800 candidates=0
+[SKIP][whale 2w] p=0.224 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4800 candidates=0
+[SKIP][minnow 1d] p=0.806 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5600 candidates=0
+[SKIP][fish 3d] p=0.263 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5600 candidates=0
+[SKIP][shark 1w] p=0.263 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5600 candidates=0
+[SKIP][whale 2w] p=0.263 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5600 candidates=0
+[SKIP][minnow 1d] p=0.687 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4800 candidates=0
+[SKIP][fish 3d] p=0.224 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4800 candidates=0
+[SKIP][shark 1w] p=0.224 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4800 candidates=0
+[SKIP][whale 2w] p=0.224 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4800 candidates=0
+[SKIP][minnow 1d] p=0.311 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.2700 candidates=0
+[SKIP][fish 3d] p=0.122 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.2700 candidates=0
+[SKIP][shark 1w] p=0.122 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.2700 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.2700 candidates=0
+[SKIP][minnow 1d] p=0.250 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.2700 candidates=0
+[SKIP][fish 3d] p=0.122 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.2700 candidates=0
+[SKIP][shark 1w] p=0.122 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.2700 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.2700 candidates=0
+[SKIP][minnow 1d] p=0.500 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4100 candidates=0
+[SKIP][fish 3d] p=0.190 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4100 candidates=0
+[SKIP][shark 1w] p=0.190 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4100 candidates=0
+[SKIP][whale 2w] p=0.190 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4100 candidates=0
+[SKIP][minnow 1d] p=0.589 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4600 candidates=0
+[SKIP][fish 3d] p=0.215 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4600 candidates=0
+[SKIP][shark 1w] p=0.215 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4600 candidates=0
+[SKIP][whale 2w] p=0.215 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4600 candidates=0
+[SKIP][minnow 1d] p=0.589 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4600 candidates=0
+[SKIP][fish 3d] p=0.215 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4600 candidates=0
+[SKIP][shark 1w] p=0.215 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4600 candidates=0
+[SKIP][whale 2w] p=0.215 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4600 candidates=0
+[SKIP][minnow 1d] p=0.661 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5000 candidates=0
+[SKIP][fish 3d] p=0.234 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5000 candidates=0
+[SKIP][shark 1w] p=0.234 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5000 candidates=0
+[SKIP][whale 2w] p=0.234 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5000 candidates=0
+[SKIP][minnow 1d] p=0.661 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5000 candidates=0
+[SKIP][fish 3d] p=0.234 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5000 candidates=0
+[SKIP][shark 1w] p=0.234 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5000 candidates=0
+[SKIP][whale 2w] p=0.234 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5000 candidates=0
+[SKIP][minnow 1d] p=0.821 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5900 candidates=0
+[SKIP][fish 3d] p=0.278 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5900 candidates=0
+[SKIP][shark 1w] p=0.278 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5900 candidates=0
+[SKIP][whale 2w] p=0.278 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5900 candidates=0
+[SKIP][minnow 1d] p=0.679 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5100 candidates=0
+[SKIP][fish 3d] p=0.239 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5100 candidates=0
+[SKIP][shark 1w] p=0.239 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5100 candidates=0
+[SKIP][whale 2w] p=0.239 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5100 candidates=0
+[SKIP][minnow 1d] p=0.696 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5200 candidates=0
+[SKIP][fish 3d] p=0.244 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5200 candidates=0
+[SKIP][shark 1w] p=0.244 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5200 candidates=0
+[SKIP][whale 2w] p=0.244 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5200 candidates=0
+[SKIP][minnow 1d] p=0.893 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6300 candidates=0
+[SKIP][fish 3d] p=0.298 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6300 candidates=0
+[SKIP][shark 1w] p=0.298 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6300 candidates=0
+[SKIP][whale 2w] p=0.298 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6300 candidates=0
+[SKIP][minnow 1d] p=0.696 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5200 candidates=0
+[SKIP][fish 3d] p=0.244 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5200 candidates=0
+[SKIP][shark 1w] p=0.244 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5200 candidates=0
+[SKIP][whale 2w] p=0.244 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5200 candidates=0
+[SKIP][minnow 1d] p=0.804 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5800 candidates=0
+[SKIP][fish 3d] p=0.273 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5800 candidates=0
+[SKIP][shark 1w] p=0.273 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5800 candidates=0
+[SKIP][whale 2w] p=0.273 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5800 candidates=0
+[SKIP][minnow 1d] p=0.786 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5700 candidates=0
+[SKIP][fish 3d] p=0.268 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5700 candidates=0
+[SKIP][shark 1w] p=0.268 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5700 candidates=0
+[SKIP][whale 2w] p=0.268 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5700 candidates=0
+[SKIP][minnow 1d] p=0.696 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5200 candidates=0
+[SKIP][fish 3d] p=0.244 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5200 candidates=0
+[SKIP][shark 1w] p=0.244 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5200 candidates=0
+[SKIP][whale 2w] p=0.244 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5200 candidates=0
+[SKIP][minnow 1d] p=0.554 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4400 candidates=0
+[SKIP][fish 3d] p=0.205 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4400 candidates=0
+[SKIP][shark 1w] p=0.205 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4400 candidates=0
+[SKIP][whale 2w] p=0.205 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4400 candidates=0
+[SKIP][minnow 1d] p=0.518 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4200 candidates=0
+[SKIP][fish 3d] p=0.195 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4200 candidates=0
+[SKIP][shark 1w] p=0.195 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4200 candidates=0
+[SKIP][whale 2w] p=0.195 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4200 candidates=0
+[SKIP][minnow 1d] p=0.518 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4200 candidates=0
+[SKIP][fish 3d] p=0.195 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4200 candidates=0
+[SKIP][shark 1w] p=0.195 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4200 candidates=0
+[SKIP][whale 2w] p=0.195 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4200 candidates=0
+[SKIP][minnow 1d] p=0.518 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4200 candidates=0
+[SKIP][fish 3d] p=0.213 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4200 candidates=0
+[SKIP][shark 1w] p=0.195 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4200 candidates=0
+[SKIP][whale 2w] p=0.195 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4200 candidates=0
+[SKIP][minnow 1d] p=0.464 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3900 candidates=0
+[SKIP][fish 3d] p=0.206 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3900 candidates=0
+[SKIP][shark 1w] p=0.180 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3900 candidates=0
+[SKIP][whale 2w] p=0.180 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3900 candidates=0
+[SKIP][minnow 1d] p=0.464 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3900 candidates=0
+[SKIP][fish 3d] p=0.215 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3900 candidates=0
+[SKIP][shark 1w] p=0.180 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3900 candidates=0
+[SKIP][whale 2w] p=0.180 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3900 candidates=0
+[SKIP][minnow 1d] p=0.464 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3900 candidates=0
+[SKIP][fish 3d] p=0.222 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3900 candidates=0
+[SKIP][shark 1w] p=0.180 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3900 candidates=0
+[SKIP][whale 2w] p=0.180 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3900 candidates=0
+[SKIP][minnow 1d] p=0.389 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3400 candidates=0
+[SKIP][fish 3d] p=0.242 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3400 candidates=0
+[SKIP][shark 1w] p=0.156 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3400 candidates=0
+[SKIP][whale 2w] p=0.156 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3400 candidates=0
+[SKIP][minnow 1d] p=0.389 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3400 candidates=0
+[SKIP][fish 3d] p=0.320 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3400 candidates=0
+[SKIP][shark 1w] p=0.156 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3400 candidates=0
+[SKIP][whale 2w] p=0.156 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3400 candidates=0
+[SKIP][minnow 1d] p=0.519 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4100 candidates=0
+[SKIP][fish 3d] p=0.390 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4100 candidates=0
+[SKIP][shark 1w] p=0.190 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4100 candidates=0
+[SKIP][whale 2w] p=0.190 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4100 candidates=0
+[SKIP][minnow 1d] p=0.455 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4300 candidates=0
+[SKIP][fish 3d] p=0.451 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4300 candidates=0
+[SKIP][shark 1w] p=0.200 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4300 candidates=0
+[SKIP][whale 2w] p=0.200 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4300 candidates=0
+[SKIP][minnow 1d] p=0.568 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4800 candidates=0
+[SKIP][fish 3d] p=0.505 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4800 candidates=0
+[SKIP][shark 1w] p=0.224 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4800 candidates=0
+[SKIP][whale 2w] p=0.224 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4800 candidates=0
+[SKIP][minnow 1d] p=0.750 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5600 candidates=0
+[SKIP][fish 3d] p=0.593 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5600 candidates=0
+[SKIP][shark 1w] p=0.263 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5600 candidates=0
+[SKIP][whale 2w] p=0.263 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5600 candidates=0
+[SKIP][minnow 1d] p=0.500 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4500 candidates=0
+[SKIP][fish 3d] p=0.473 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4500 candidates=0
+[SKIP][shark 1w] p=0.210 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4500 candidates=0
+[SKIP][whale 2w] p=0.210 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4500 candidates=0
+[SKIP][minnow 1d] p=0.636 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5100 candidates=0
+[SKIP][fish 3d] p=0.538 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5100 candidates=0
+[SKIP][shark 1w] p=0.239 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5100 candidates=0
+[SKIP][whale 2w] p=0.239 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5100 candidates=0
+[SKIP][minnow 1d] p=0.773 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5700 candidates=0
+[SKIP][fish 3d] p=0.604 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5700 candidates=0
+[SKIP][shark 1w] p=0.268 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5700 candidates=0
+[SKIP][whale 2w] p=0.268 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5700 candidates=0
+[SKIP][minnow 1d] p=0.769 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7300 candidates=0
+[SKIP][fish 3d] p=0.780 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7300 candidates=0
+[SKIP][shark 1w] p=0.346 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7300 candidates=0
+[SKIP][whale 2w] p=0.346 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7300 candidates=0
+[SKIP][minnow 1d] p=0.677 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6700 candidates=0
+[SKIP][fish 3d] p=0.714 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6700 candidates=0
+[SKIP][shark 1w] p=0.317 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6700 candidates=0
+[SKIP][whale 2w] p=0.317 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6700 candidates=0
+[SKIP][minnow 1d] p=0.892 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8100 candidates=0
+[SKIP][fish 3d] p=0.868 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8100 candidates=0
+[SKIP][shark 1w] p=0.385 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8100 candidates=0
+[SKIP][whale 2w] p=0.385 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8100 candidates=0
+[SKIP][minnow 1d] p=0.646 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7600 candidates=0
+[SKIP][fish 3d] p=0.718 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7600 candidates=0
+[SKIP][shark 1w] p=0.361 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7600 candidates=0
+[SKIP][whale 2w] p=0.361 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7600 candidates=0
+[SKIP][minnow 1d] p=0.695 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8000 candidates=0
+[SKIP][fish 3d] p=0.757 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8000 candidates=0
+[SKIP][shark 1w] p=0.380 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8000 candidates=0
+[SKIP][whale 2w] p=0.380 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8000 candidates=0
+[SKIP][minnow 1d] p=0.524 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6600 candidates=0
+[SKIP][fish 3d] p=0.621 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6600 candidates=0
+[SKIP][shark 1w] p=0.312 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6600 candidates=0
+[SKIP][whale 2w] p=0.312 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6600 candidates=0
+[SKIP][minnow 1d] p=0.634 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7500 candidates=0
+[SKIP][fish 3d] p=0.709 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7500 candidates=0
+[SKIP][shark 1w] p=0.356 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7500 candidates=0
+[SKIP][whale 2w] p=0.356 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7500 candidates=0
+[SKIP][minnow 1d] p=0.671 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7800 candidates=0
+[SKIP][fish 3d] p=0.738 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7800 candidates=0
+[SKIP][shark 1w] p=0.371 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7800 candidates=0
+[SKIP][whale 2w] p=0.371 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7800 candidates=0
+[SKIP][minnow 1d] p=0.720 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8200 candidates=0
+[SKIP][fish 3d] p=0.777 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8200 candidates=0
+[SKIP][shark 1w] p=0.390 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8200 candidates=0
+[SKIP][whale 2w] p=0.390 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8200 candidates=0
+[SKIP][minnow 1d] p=0.671 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7800 candidates=0
+[SKIP][fish 3d] p=0.738 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7800 candidates=0
+[SKIP][shark 1w] p=0.371 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7800 candidates=0
+[SKIP][whale 2w] p=0.371 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7800 candidates=0
+[SKIP][minnow 1d] p=0.598 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7200 candidates=0
+[SKIP][fish 3d] p=0.680 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7200 candidates=0
+[SKIP][shark 1w] p=0.341 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7200 candidates=0
+[SKIP][whale 2w] p=0.341 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7200 candidates=0
+[SKIP][minnow 1d] p=0.427 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5800 candidates=0
+[SKIP][fish 3d] p=0.544 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5800 candidates=0
+[SKIP][shark 1w] p=0.273 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5800 candidates=0
+[SKIP][whale 2w] p=0.273 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5800 candidates=0
+[SKIP][minnow 1d] p=0.256 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4400 candidates=0
+[SKIP][fish 3d] p=0.408 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4400 candidates=0
+[SKIP][shark 1w] p=0.205 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4400 candidates=0
+[SKIP][whale 2w] p=0.205 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4400 candidates=0
+[SKIP][minnow 1d] p=0.390 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5500 candidates=0
+[SKIP][fish 3d] p=0.515 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5500 candidates=0
+[SKIP][shark 1w] p=0.259 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5500 candidates=0
+[SKIP][whale 2w] p=0.259 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5500 candidates=0
+[SKIP][minnow 1d] p=0.305 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4800 candidates=0
+[SKIP][fish 3d] p=0.447 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4800 candidates=0
+[SKIP][shark 1w] p=0.224 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4800 candidates=0
+[SKIP][whale 2w] p=0.224 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4800 candidates=0
+[SKIP][minnow 1d] p=0.220 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4100 candidates=0
+[SKIP][fish 3d] p=0.379 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4100 candidates=0
+[SKIP][shark 1w] p=0.190 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4100 candidates=0
+[SKIP][whale 2w] p=0.190 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4100 candidates=0
+[SKIP][minnow 1d] p=0.244 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4300 candidates=0
+[SKIP][fish 3d] p=0.398 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4300 candidates=0
+[SKIP][shark 1w] p=0.200 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4300 candidates=0
+[SKIP][whale 2w] p=0.200 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4300 candidates=0
+[SKIP][minnow 1d] p=0.232 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4200 candidates=0
+[SKIP][fish 3d] p=0.351 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4200 candidates=0
+[SKIP][shark 1w] p=0.195 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4200 candidates=0
+[SKIP][whale 2w] p=0.195 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4200 candidates=0
+[SKIP][minnow 1d] p=0.256 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4400 candidates=0
+[SKIP][fish 3d] p=0.337 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4400 candidates=0
+[SKIP][shark 1w] p=0.205 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4400 candidates=0
+[SKIP][whale 2w] p=0.205 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4400 candidates=0
+[SKIP][minnow 1d] p=0.244 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4300 candidates=0
+[SKIP][fish 3d] p=0.326 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4300 candidates=0
+[SKIP][shark 1w] p=0.200 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4300 candidates=0
+[SKIP][whale 2w] p=0.200 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4300 candidates=0
+[SKIP][minnow 1d] p=0.256 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4400 candidates=0
+[SKIP][fish 3d] p=0.337 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4400 candidates=0
+[SKIP][shark 1w] p=0.205 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4400 candidates=0
+[SKIP][whale 2w] p=0.205 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4400 candidates=0
+[SKIP][minnow 1d] p=0.100 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.2400 candidates=0
+[SKIP][fish 3d] p=0.120 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.2400 candidates=0
+[SKIP][shark 1w] p=0.107 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.2400 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.2400 candidates=0
+[SKIP][minnow 1d] p=0.211 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3400 candidates=0
+[SKIP][fish 3d] p=0.228 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3400 candidates=0
+[SKIP][shark 1w] p=0.156 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3400 candidates=0
+[SKIP][whale 2w] p=0.156 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3400 candidates=0
+[SKIP][minnow 1d] p=0.411 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5200 candidates=0
+[SKIP][fish 3d] p=0.424 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5200 candidates=0
+[SKIP][shark 1w] p=0.244 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5200 candidates=0
+[SKIP][whale 2w] p=0.244 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5200 candidates=0
+[SKIP][minnow 1d] p=0.211 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3400 candidates=0
+[SKIP][fish 3d] p=0.228 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3400 candidates=0
+[SKIP][shark 1w] p=0.156 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3400 candidates=0
+[SKIP][whale 2w] p=0.156 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3400 candidates=0
+[SKIP][minnow 1d] p=0.167 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3000 candidates=0
+[SKIP][fish 3d] p=0.185 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3000 candidates=0
+[SKIP][shark 1w] p=0.137 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3000 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.3000 candidates=0
+[SKIP][minnow 1d] size=$0.00 < min=$10.00
+[HOLD][minnow 1d] price=$19.1700 candidates=0
+[SKIP][fish 3d] size=$0.00 < min=$10.00
+[HOLD][fish 3d] price=$19.1700 candidates=0
+[SKIP][shark 1w] size=$0.00 < min=$10.00
+[HOLD][shark 1w] price=$19.1700 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.1700 candidates=0
+[SKIP][minnow 1d] p=0.212 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.2100 candidates=0
+[SKIP][fish 3d] p=0.176 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.2100 candidates=0
+[SKIP][shark 1w] size=$0.00 < min=$10.00
+[HOLD][shark 1w] price=$19.2100 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.2100 candidates=0
+[SKIP][minnow 1d] p=0.306 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.2900 candidates=0
+[SKIP][fish 3d] p=0.255 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.2900 candidates=0
+[SKIP][shark 1w] p=0.132 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.2900 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.2900 candidates=0
+[SKIP][minnow 1d] p=0.306 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.2900 candidates=0
+[SKIP][fish 3d] p=0.255 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.2900 candidates=0
+[SKIP][shark 1w] p=0.132 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.2900 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.2900 candidates=0
+[SKIP][minnow 1d] p=0.259 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.2500 candidates=0
+[SKIP][fish 3d] p=0.216 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.2500 candidates=0
+[SKIP][shark 1w] p=0.112 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.2500 candidates=0
+[SKIP][whale 2w] size=$0.00 < min=$10.00
+[HOLD][whale 2w] price=$19.2500 candidates=0
+[SKIP][minnow 1d] p=0.435 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4000 candidates=0
+[SKIP][fish 3d] p=0.363 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4000 candidates=0
+[SKIP][shark 1w] p=0.185 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4000 candidates=0
+[SKIP][whale 2w] p=0.185 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4000 candidates=0
+[SKIP][minnow 1d] p=0.422 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3800 candidates=0
+[SKIP][fish 3d] p=0.343 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3800 candidates=0
+[SKIP][shark 1w] p=0.176 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3800 candidates=0
+[SKIP][whale 2w] p=0.176 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3800 candidates=0
+[SKIP][minnow 1d] p=0.588 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5000 candidates=0
+[SKIP][fish 3d] p=0.461 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5000 candidates=0
+[SKIP][shark 1w] p=0.234 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5000 candidates=0
+[SKIP][whale 2w] p=0.234 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5000 candidates=0
+[SKIP][minnow 1d] p=0.704 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5300 candidates=0
+[SKIP][fish 3d] p=0.490 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5300 candidates=0
+[SKIP][shark 1w] p=0.249 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5300 candidates=0
+[SKIP][whale 2w] p=0.249 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5300 candidates=0
+[SKIP][minnow 1d] p=0.839 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5500 candidates=0
+[SKIP][fish 3d] p=0.510 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5500 candidates=0
+[SKIP][shark 1w] p=0.259 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5500 candidates=0
+[SKIP][whale 2w] p=0.259 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5500 candidates=0
+[SKIP][minnow 1d] p=0.930 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6900 candidates=0
+[SKIP][fish 3d] p=0.647 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6900 candidates=0
+[SKIP][shark 1w] p=0.327 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6900 candidates=0
+[SKIP][whale 2w] p=0.327 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6900 candidates=0
+[SKIP][minnow 1d] p=0.959 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.9600 candidates=0
+[SKIP][fish 3d] p=0.912 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.9600 candidates=0
+[SKIP][shark 1w] p=0.459 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.9600 candidates=0
+[SKIP][whale 2w] p=0.459 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.9600 candidates=0
+[SKIP][minnow 1d] p=0.797 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.1300 candidates=0
+[SKIP][fish 3d] p=0.797 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.1300 candidates=0
+[SKIP][shark 1w] p=0.541 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.1300 candidates=0
+[SKIP][whale 2w] p=0.541 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.1300 candidates=0
+[SKIP][minnow 1d] p=0.879 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.4100 candidates=0
+[SKIP][fish 3d] p=0.879 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.4100 candidates=0
+[SKIP][shark 1w] p=0.678 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.4100 candidates=0
+[SKIP][whale 2w] p=0.678 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.4100 candidates=0
+[SKIP][minnow 1d] p=0.822 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.3200 candidates=0
+[SKIP][fish 3d] p=0.822 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.3200 candidates=0
+[SKIP][shark 1w] p=0.634 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.3200 candidates=0
+[SKIP][whale 2w] p=0.634 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.3200 candidates=0
+[SKIP][minnow 1d] p=0.866 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.3900 candidates=0
+[SKIP][fish 3d] p=0.866 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.3900 candidates=0
+[SKIP][shark 1w] p=0.668 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.3900 candidates=0
+[SKIP][whale 2w] p=0.668 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.3900 candidates=0
+[SKIP][minnow 1d] p=0.822 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.3200 candidates=0
+[SKIP][fish 3d] p=0.822 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.3200 candidates=0
+[SKIP][shark 1w] p=0.634 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.3200 candidates=0
+[SKIP][whale 2w] p=0.634 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.3200 candidates=0
+[SKIP][minnow 1d] p=0.764 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.2300 candidates=0
+[SKIP][fish 3d] p=0.764 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.2300 candidates=0
+[SKIP][shark 1w] p=0.590 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.2300 candidates=0
+[SKIP][whale 2w] p=0.590 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.2300 candidates=0
+[SKIP][minnow 1d] p=0.726 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.1700 candidates=0
+[SKIP][fish 3d] p=0.726 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.1700 candidates=0
+[SKIP][shark 1w] p=0.561 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.1700 candidates=0
+[SKIP][whale 2w] p=0.561 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.1700 candidates=0
+[SKIP][minnow 1d] p=0.796 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.2800 candidates=0
+[SKIP][fish 3d] p=0.796 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.2800 candidates=0
+[SKIP][shark 1w] p=0.615 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.2800 candidates=0
+[SKIP][whale 2w] p=0.615 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.2800 candidates=0
+[SKIP][minnow 1d] p=0.758 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.2200 candidates=0
+[SKIP][fish 3d] p=0.758 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.2200 candidates=0
+[SKIP][shark 1w] p=0.585 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.2200 candidates=0
+[SKIP][whale 2w] p=0.585 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.2200 candidates=0
+[SKIP][minnow 1d] p=0.783 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.2600 candidates=0
+[SKIP][fish 3d] p=0.783 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.2600 candidates=0
+[SKIP][shark 1w] p=0.605 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.2600 candidates=0
+[SKIP][whale 2w] p=0.605 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.2600 candidates=0
+[SKIP][minnow 1d] p=0.739 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.1900 candidates=0
+[SKIP][fish 3d] p=0.739 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.1900 candidates=0
+[SKIP][shark 1w] p=0.571 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.1900 candidates=0
+[SKIP][whale 2w] p=0.571 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.1900 candidates=0
+[SKIP][minnow 1d] p=0.771 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.2400 candidates=0
+[SKIP][fish 3d] p=0.771 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.2400 candidates=0
+[SKIP][shark 1w] p=0.595 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.2400 candidates=0
+[SKIP][whale 2w] p=0.595 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.2400 candidates=0
+[SKIP][minnow 1d] p=0.771 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.2400 candidates=0
+[SKIP][fish 3d] p=0.771 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.2400 candidates=0
+[SKIP][shark 1w] p=0.595 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.2400 candidates=0
+[SKIP][whale 2w] p=0.595 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.2400 candidates=0
+[SKIP][minnow 1d] p=0.669 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.1400 candidates=0
+[SKIP][fish 3d] p=0.707 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.1400 candidates=0
+[SKIP][shark 1w] p=0.546 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.1400 candidates=0
+[SKIP][whale 2w] p=0.546 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.1400 candidates=0
+[SKIP][minnow 1d] p=0.594 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.0400 candidates=0
+[SKIP][fish 3d] p=0.643 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.0400 candidates=0
+[SKIP][shark 1w] p=0.498 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.0400 candidates=0
+[SKIP][whale 2w] p=0.498 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.0400 candidates=0
+[SKIP][minnow 1d] p=0.428 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8100 candidates=0
+[SKIP][fish 3d] p=0.497 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8100 candidates=0
+[SKIP][shark 1w] p=0.385 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8100 candidates=0
+[SKIP][whale 2w] p=0.385 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8100 candidates=0
+[SKIP][minnow 1d] p=0.412 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8000 candidates=0
+[SKIP][fish 3d] p=0.490 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8000 candidates=0
+[SKIP][shark 1w] p=0.380 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8000 candidates=0
+[SKIP][whale 2w] p=0.380 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8000 candidates=0
+[SKIP][minnow 1d] p=0.363 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7400 candidates=0
+[SKIP][fish 3d] p=0.452 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7400 candidates=0
+[SKIP][shark 1w] p=0.351 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7400 candidates=0
+[SKIP][whale 2w] p=0.351 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7400 candidates=0
+[SKIP][minnow 1d] p=0.344 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7800 candidates=0
+[SKIP][fish 3d] p=0.478 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7800 candidates=0
+[SKIP][shark 1w] p=0.371 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7800 candidates=0
+[SKIP][whale 2w] p=0.371 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7800 candidates=0
+[SKIP][minnow 1d] p=0.278 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7700 candidates=0
+[SKIP][fish 3d] p=0.471 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7700 candidates=0
+[SKIP][shark 1w] p=0.366 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7700 candidates=0
+[SKIP][whale 2w] p=0.366 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7700 candidates=0
+[SKIP][minnow 1d] p=0.243 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7300 candidates=0
+[SKIP][fish 3d] p=0.446 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7300 candidates=0
+[SKIP][shark 1w] p=0.346 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7300 candidates=0
+[SKIP][whale 2w] p=0.346 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7300 candidates=0
+[SKIP][minnow 1d] p=0.243 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7600 candidates=0
+[SKIP][fish 3d] p=0.465 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7600 candidates=0
+[SKIP][shark 1w] p=0.361 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7600 candidates=0
+[SKIP][whale 2w] p=0.361 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7600 candidates=0
+[SKIP][minnow 1d] p=0.218 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8100 candidates=0
+[SKIP][fish 3d] p=0.497 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8100 candidates=0
+[SKIP][shark 1w] p=0.385 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8100 candidates=0
+[SKIP][whale 2w] p=0.385 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8100 candidates=0
+[SKIP][minnow 1d] size=$0.00 < min=$10.00
+[HOLD][minnow 1d] price=$19.6000 candidates=0
+[SKIP][fish 3d] p=0.363 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6000 candidates=0
+[SKIP][shark 1w] p=0.283 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6000 candidates=0
+[SKIP][whale 2w] p=0.283 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6000 candidates=0
+[SKIP][minnow 1d] p=0.079 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4400 candidates=0
+[SKIP][fish 3d] p=0.261 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4400 candidates=0
+[SKIP][shark 1w] p=0.205 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4400 candidates=0
+[SKIP][whale 2w] p=0.205 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4400 candidates=0
+[SKIP][minnow 1d] p=0.167 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3800 candidates=0
+[SKIP][fish 3d] p=0.223 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3800 candidates=0
+[SKIP][shark 1w] p=0.176 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3800 candidates=0
+[SKIP][whale 2w] p=0.176 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3800 candidates=0
+[SKIP][minnow 1d] p=0.154 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3400 candidates=0
+[SKIP][fish 3d] p=0.197 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3400 candidates=0
+[SKIP][shark 1w] p=0.156 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3400 candidates=0
+[SKIP][whale 2w] p=0.156 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3400 candidates=0
+[SKIP][minnow 1d] p=0.402 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6500 candidates=0
+[SKIP][fish 3d] p=0.395 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6500 candidates=0
+[SKIP][shark 1w] p=0.307 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6500 candidates=0
+[SKIP][whale 2w] p=0.307 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6500 candidates=0
+[SKIP][minnow 1d] p=0.236 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4400 candidates=0
+[SKIP][fish 3d] p=0.261 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4400 candidates=0
+[SKIP][shark 1w] p=0.205 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4400 candidates=0
+[SKIP][whale 2w] p=0.205 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4400 candidates=0
+[SKIP][minnow 1d] p=0.264 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4700 candidates=0
+[SKIP][fish 3d] p=0.280 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4700 candidates=0
+[SKIP][shark 1w] p=0.220 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4700 candidates=0
+[SKIP][whale 2w] p=0.220 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4700 candidates=0
+[SKIP][minnow 1d] p=0.328 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5500 candidates=0
+[SKIP][fish 3d] p=0.331 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5500 candidates=0
+[SKIP][shark 1w] p=0.259 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5500 candidates=0
+[SKIP][whale 2w] p=0.259 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5500 candidates=0
+[SKIP][minnow 1d] p=0.384 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6200 candidates=0
+[SKIP][fish 3d] p=0.376 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6200 candidates=0
+[SKIP][shark 1w] p=0.293 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6200 candidates=0
+[SKIP][whale 2w] p=0.293 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6200 candidates=0
+[SKIP][minnow 1d] p=0.360 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5900 candidates=0
+[SKIP][fish 3d] p=0.357 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5900 candidates=0
+[SKIP][shark 1w] p=0.278 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5900 candidates=0
+[SKIP][whale 2w] p=0.278 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5900 candidates=0
+[SKIP][minnow 1d] p=0.400 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6400 candidates=0
+[SKIP][fish 3d] p=0.389 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6400 candidates=0
+[SKIP][shark 1w] p=0.302 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6400 candidates=0
+[SKIP][whale 2w] p=0.302 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6400 candidates=0
+[SKIP][minnow 1d] p=0.398 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6100 candidates=0
+[SKIP][fish 3d] p=0.369 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6100 candidates=0
+[SKIP][shark 1w] p=0.288 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6100 candidates=0
+[SKIP][whale 2w] p=0.288 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6100 candidates=0
+[SKIP][minnow 1d] p=0.447 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6500 candidates=0
+[SKIP][fish 3d] p=0.395 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6500 candidates=0
+[SKIP][shark 1w] p=0.307 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6500 candidates=0
+[SKIP][whale 2w] p=0.307 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6500 candidates=0
+[SKIP][minnow 1d] p=0.491 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7000 candidates=0
+[SKIP][fish 3d] p=0.427 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7000 candidates=0
+[SKIP][shark 1w] p=0.332 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7000 candidates=0
+[SKIP][whale 2w] p=0.332 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7000 candidates=0
+[SKIP][minnow 1d] p=0.592 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7500 candidates=0
+[SKIP][fish 3d] p=0.459 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7500 candidates=0
+[SKIP][shark 1w] p=0.356 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7500 candidates=0
+[SKIP][whale 2w] p=0.356 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7500 candidates=0
+[SKIP][minnow 1d] p=0.606 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7100 candidates=0
+[SKIP][fish 3d] p=0.433 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7100 candidates=0
+[SKIP][shark 1w] p=0.337 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7100 candidates=0
+[SKIP][whale 2w] p=0.337 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7100 candidates=0
+[SKIP][minnow 1d] p=0.727 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7000 candidates=0
+[SKIP][fish 3d] p=0.427 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7000 candidates=0
+[SKIP][shark 1w] p=0.332 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7000 candidates=0
+[SKIP][whale 2w] p=0.332 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7000 candidates=0
+[SKIP][minnow 1d] p=0.685 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6400 candidates=0
+[SKIP][fish 3d] p=0.389 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6400 candidates=0
+[SKIP][shark 1w] p=0.302 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6400 candidates=0
+[SKIP][whale 2w] p=0.302 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6400 candidates=0
+[SKIP][minnow 1d] p=0.562 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5500 candidates=0
+[SKIP][fish 3d] p=0.331 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5500 candidates=0
+[SKIP][shark 1w] p=0.259 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5500 candidates=0
+[SKIP][whale 2w] p=0.259 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5500 candidates=0
+[SKIP][minnow 1d] p=0.534 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5300 candidates=0
+[SKIP][fish 3d] p=0.318 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5300 candidates=0
+[SKIP][shark 1w] p=0.249 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5300 candidates=0
+[SKIP][whale 2w] p=0.249 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5300 candidates=0
+[SKIP][minnow 1d] p=0.507 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5100 candidates=0
+[SKIP][fish 3d] p=0.306 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5100 candidates=0
+[SKIP][shark 1w] p=0.239 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5100 candidates=0
+[SKIP][whale 2w] p=0.239 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5100 candidates=0
+[SKIP][minnow 1d] p=0.425 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4500 candidates=0
+[SKIP][fish 3d] p=0.268 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4500 candidates=0
+[SKIP][shark 1w] p=0.210 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4500 candidates=0
+[SKIP][whale 2w] p=0.210 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4500 candidates=0
+[SKIP][minnow 1d] p=0.356 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4000 candidates=0
+[SKIP][fish 3d] p=0.236 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4000 candidates=0
+[SKIP][shark 1w] p=0.202 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4000 candidates=0
+[SKIP][whale 2w] p=0.185 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4000 candidates=0
+[SKIP][minnow 1d] p=0.384 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4200 candidates=0
+[SKIP][fish 3d] p=0.248 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4200 candidates=0
+[SKIP][shark 1w] p=0.222 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.4200 candidates=0
+[SKIP][whale 2w] p=0.195 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.4200 candidates=0
+[SKIP][minnow 1d] p=0.342 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.3900 candidates=0
+[SKIP][fish 3d] p=0.229 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.3900 candidates=0
+[SKIP][shark 1w] p=0.215 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.3900 candidates=0
+[SKIP][whale 2w] p=0.180 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.3900 candidates=0
+[SKIP][minnow 1d] p=0.521 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5200 candidates=0
+[SKIP][fish 3d] p=0.312 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5200 candidates=0
+[SKIP][shark 1w] p=0.299 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5200 candidates=0
+[SKIP][whale 2w] p=0.244 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5200 candidates=0
+[SKIP][minnow 1d] p=0.521 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5200 candidates=0
+[SKIP][fish 3d] p=0.312 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5200 candidates=0
+[SKIP][shark 1w] p=0.316 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5200 candidates=0
+[SKIP][whale 2w] p=0.244 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5200 candidates=0
+[SKIP][minnow 1d] p=0.658 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6200 candidates=0
+[SKIP][fish 3d] p=0.376 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6200 candidates=0
+[SKIP][shark 1w] p=0.380 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6200 candidates=0
+[SKIP][whale 2w] p=0.293 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6200 candidates=0
+[SKIP][minnow 1d] p=0.765 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7100 candidates=0
+[SKIP][fish 3d] p=0.433 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7100 candidates=0
+[SKIP][shark 1w] p=0.437 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7100 candidates=0
+[SKIP][whale 2w] p=0.337 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7100 candidates=0
+[SKIP][minnow 1d] p=0.706 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6800 candidates=0
+[SKIP][fish 3d] p=0.414 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6800 candidates=0
+[SKIP][shark 1w] p=0.418 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6800 candidates=0
+[SKIP][whale 2w] p=0.322 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6800 candidates=0
+[SKIP][minnow 1d] p=0.686 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6700 candidates=0
+[SKIP][fish 3d] p=0.408 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6700 candidates=0
+[SKIP][shark 1w] p=0.411 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6700 candidates=0
+[SKIP][whale 2w] p=0.317 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6700 candidates=0
+[SKIP][minnow 1d] p=0.784 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7200 candidates=0
+[SKIP][fish 3d] p=0.439 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7200 candidates=0
+[SKIP][shark 1w] p=0.443 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7200 candidates=0
+[SKIP][whale 2w] p=0.341 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7200 candidates=0
+[SKIP][minnow 1d] p=0.721 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8100 candidates=0
+[SKIP][fish 3d] p=0.497 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8100 candidates=0
+[SKIP][shark 1w] p=0.500 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8100 candidates=0
+[SKIP][whale 2w] p=0.385 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8100 candidates=0
+[SKIP][minnow 1d] p=0.897 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.9300 candidates=0
+[SKIP][fish 3d] p=0.573 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.9300 candidates=0
+[SKIP][shark 1w] p=0.576 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.9300 candidates=0
+[SKIP][whale 2w] p=0.444 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.9300 candidates=0
+[SKIP][minnow 1d] p=0.882 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.9200 candidates=0
+[SKIP][fish 3d] p=0.567 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.9200 candidates=0
+[SKIP][shark 1w] p=0.570 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.9200 candidates=0
+[SKIP][whale 2w] p=0.439 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.9200 candidates=0
+[SKIP][minnow 1d] p=0.917 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.2000 candidates=0
+[SKIP][fish 3d] p=0.745 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.2000 candidates=0
+[SKIP][shark 1w] p=0.747 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.2000 candidates=0
+[SKIP][whale 2w] p=0.576 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.2000 candidates=0
+[SKIP][minnow 1d] p=0.740 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.0300 candidates=0
+[SKIP][fish 3d] p=0.637 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.0300 candidates=0
+[SKIP][shark 1w] p=0.639 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.0300 candidates=0
+[SKIP][whale 2w] p=0.493 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.0300 candidates=0
+[SKIP][minnow 1d] p=0.656 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.9500 candidates=0
+[SKIP][fish 3d] p=0.586 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.9500 candidates=0
+[SKIP][shark 1w] p=0.589 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.9500 candidates=0
+[SKIP][whale 2w] p=0.454 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.9500 candidates=0
+[SKIP][minnow 1d] p=0.719 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.0100 candidates=0
+[SKIP][fish 3d] p=0.596 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.0100 candidates=0
+[SKIP][shark 1w] p=0.627 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.0100 candidates=0
+[SKIP][whale 2w] p=0.483 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.0100 candidates=0
+[SKIP][minnow 1d] p=0.760 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$20.0500 candidates=0
+[SKIP][fish 3d] p=0.623 > buy_trigger=0.100
+[HOLD][fish 3d] price=$20.0500 candidates=0
+[SKIP][shark 1w] p=0.652 > buy_trigger=0.100
+[HOLD][shark 1w] price=$20.0500 candidates=0
+[SKIP][whale 2w] p=0.502 > buy_trigger=0.150
+[HOLD][whale 2w] price=$20.0500 candidates=0
+[SKIP][minnow 1d] p=0.573 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.8700 candidates=0
+[SKIP][fish 3d] p=0.500 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.8700 candidates=0
+[SKIP][shark 1w] p=0.538 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.8700 candidates=0
+[SKIP][whale 2w] p=0.415 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.8700 candidates=0
+[SKIP][minnow 1d] p=0.604 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.9000 candidates=0
+[SKIP][fish 3d] p=0.521 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.9000 candidates=0
+[SKIP][shark 1w] p=0.557 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.9000 candidates=0
+[SKIP][whale 2w] p=0.429 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.9000 candidates=0
+[SKIP][minnow 1d] p=0.604 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.9000 candidates=0
+[SKIP][fish 3d] p=0.521 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.9000 candidates=0
+[SKIP][shark 1w] p=0.557 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.9000 candidates=0
+[SKIP][whale 2w] p=0.429 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.9000 candidates=0
+[SKIP][minnow 1d] p=0.448 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.7500 candidates=0
+[SKIP][fish 3d] p=0.418 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.7500 candidates=0
+[SKIP][shark 1w] p=0.462 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.7500 candidates=0
+[SKIP][whale 2w] p=0.356 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.7500 candidates=0
+[SKIP][minnow 1d] p=0.313 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6200 candidates=0
+[SKIP][fish 3d] p=0.329 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6200 candidates=0
+[SKIP][shark 1w] p=0.380 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6200 candidates=0
+[SKIP][whale 2w] p=0.293 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6200 candidates=0
+[SKIP][minnow 1d] p=0.271 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5800 candidates=0
+[SKIP][fish 3d] p=0.301 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5800 candidates=0
+[SKIP][shark 1w] p=0.354 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5800 candidates=0
+[SKIP][whale 2w] p=0.273 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5800 candidates=0
+[SKIP][minnow 1d] p=0.250 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5600 candidates=0
+[SKIP][fish 3d] p=0.288 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5600 candidates=0
+[SKIP][shark 1w] p=0.342 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5600 candidates=0
+[SKIP][whale 2w] p=0.263 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5600 candidates=0
+[SKIP][minnow 1d] p=0.313 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.6200 candidates=0
+[SKIP][fish 3d] p=0.329 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.6200 candidates=0
+[SKIP][shark 1w] p=0.380 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.6200 candidates=0
+[SKIP][whale 2w] p=0.293 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.6200 candidates=0
+[SKIP][minnow 1d] p=0.271 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5800 candidates=0
+[SKIP][fish 3d] p=0.301 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5800 candidates=0
+[SKIP][shark 1w] p=0.354 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5800 candidates=0
+[SKIP][whale 2w] p=0.273 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5800 candidates=0
+[SKIP][minnow 1d] p=0.231 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5800 candidates=0
+[SKIP][fish 3d] p=0.301 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5800 candidates=0
+[SKIP][shark 1w] p=0.354 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5800 candidates=0
+[SKIP][whale 2w] p=0.273 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5800 candidates=0
+[SKIP][minnow 1d] p=0.165 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5200 candidates=0
+[SKIP][fish 3d] p=0.264 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5200 candidates=0
+[SKIP][shark 1w] p=0.316 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5200 candidates=0
+[SKIP][whale 2w] p=0.244 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5200 candidates=0
+[SKIP][minnow 1d] p=0.143 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5000 candidates=0
+[SKIP][fish 3d] p=0.277 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5000 candidates=0
+[SKIP][shark 1w] p=0.304 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5000 candidates=0
+[SKIP][whale 2w] p=0.234 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5000 candidates=0
+[SKIP][minnow 1d] p=0.154 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.5100 candidates=0
+[SKIP][fish 3d] p=0.291 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.5100 candidates=0
+[SKIP][shark 1w] p=0.306 > buy_trigger=0.100
+[HOLD][shark 1w] price=$19.5100 candidates=0
+[SKIP][whale 2w] p=0.239 > buy_trigger=0.150
+[HOLD][whale 2w] price=$19.5100 candidates=0
+[SKIP][minnow 1d] p=0.121 > buy_trigger=0.050
+[HOLD][minnow 1d] price=$19.4800 candidates=0
+[SKIP][fish 3d] p=0.268 > buy_trigger=0.100
+[HOLD][fish 3d] price=$19.4800 candidates=0
