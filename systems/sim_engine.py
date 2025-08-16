@@ -229,23 +229,27 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     df["confidence"] = forecast_confidences
 
     # --- Control Line Generation ---
-    control_line: list[int] = []
-    signal_counts = {1: 0, 0: 0, -1: 0}
-    for conf in df["confidence"]:
-        if conf >= ENTRY_THRESHOLD:
-            control_line.append(1)
-            signal_counts[1] += 1
-        elif conf <= EXIT_THRESHOLD:
-            control_line.append(-1)
-            signal_counts[-1] += 1
+    control_line: list[float] = []
+    signal_counts: Dict[float, int] = {}
+    for slope, conf in zip(df["forecast_angle"], df["confidence"]):
+        if slope >= 0 and conf >= ENTRY_THRESHOLD * 2:
+            val = 1.0
+        elif slope >= 0 and conf >= ENTRY_THRESHOLD:
+            val = 0.5
+        elif slope <= 0 and conf >= EXIT_THRESHOLD * 2:
+            val = -1.0
+        elif slope <= 0 and conf >= EXIT_THRESHOLD:
+            val = -0.5
         else:
-            control_line.append(0)
-            signal_counts[0] += 1
+            val = 0.0
+        control_line.append(val)
+        signal_counts[val] = signal_counts.get(val, 0) + 1
 
-    if control_line and control_line[-1] == 1:
-        control_line[-1] = -1
-        signal_counts[1] -= 1
-        signal_counts[-1] += 1
+    if control_line and control_line[-1] > 0:
+        last_val = control_line[-1]
+        signal_counts[last_val] -= 1
+        control_line[-1] = -1.0
+        signal_counts[-1.0] = signal_counts.get(-1.0, 0) + 1
 
     df["control_line"] = control_line
 
@@ -258,7 +262,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             continue
         actual_sign = np.sign(df["slope_angle"].iloc[idx])
         conf = df["confidence"].iloc[idx]
-        if signal == actual_sign:
+        if np.sign(signal) == actual_sign:
             correct_signals += 1
             weighted_correct += conf
         total_signal_conf += conf
@@ -287,7 +291,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         f"[SIM] Control Line Accuracy: {raw_signal_acc:.2f}% | Weighted: {weighted_signal_acc:.2f}%"
     )
     print(
-        f"[SIM] Signal Counts -> +1: {signal_counts[1]}, 0: {signal_counts[0]}, -1: {signal_counts[-1]}"
+        f"[SIM] Signal Counts -> +1: {signal_counts.get(1.0, 0)}, +0.5: {signal_counts.get(0.5, 0)}, 0: {signal_counts.get(0.0, 0)}, -0.5: {signal_counts.get(-0.5, 0)}, -1: {signal_counts.get(-1.0, 0)}"
     )
 
     state: Dict[str, Any] = {}
@@ -312,8 +316,16 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         df["candle_index"], df["control_line"], where="mid", color="red"
     )
     ax2.set_ylim(-1.2, 1.2)
-    ax2.set_yticks([-1, 0, 1])
-    ax2.set_yticklabels(["Dump (-1)", "Neutral (0)", "Hold (+1)"])
+    ax2.set_yticks([-1, -0.5, 0, 0.5, 1])
+    ax2.set_yticklabels(
+        [
+            "Dump Hard (-1)",
+            "Dump Light (-0.5)",
+            "Neutral (0)",
+            "Hold Light (+0.5)",
+            "Hold Hard (+1)",
+        ]
+    )
     ax2.set_xlabel("Candles (Index)")
     ax2.set_title("Control Line (Exit Oracle)")
 
