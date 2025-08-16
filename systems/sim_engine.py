@@ -14,34 +14,8 @@ from .scripts import evaluate_buy, evaluate_sell
 
 def run_simulation(*, timeframe: str = "1m") -> None:
     """Run a simple simulation over SOLUSD candles."""
-    csv_path = Path("data/sim/SOLUSD.csv")
-    df = pd.read_csv(csv_path)
-    df.columns = [str(c).lower().strip() for c in df.columns]
-
-    aliases = {
-        "timestamp": ["timestamp", "time", "date"],
-        "open": ["open", "o"],
-        "high": ["high", "h"],
-        "low": ["low", "l"],
-        "close": ["close", "c", "close_price"],
-        "volume": ["volume", "v"],
-    }
-
-    resolved = {}
-    for target, opts in aliases.items():
-        for col in opts:
-            if col in df.columns:
-                resolved[col] = target
-                break
-
-    missing = [t for t in aliases.keys() if t not in resolved.values()]
-    if missing:
-        raise ValueError(
-            "Missing required candle columns: "
-            f"{missing}. Found columns: {list(df.columns)}"
-        )
-
-    df = df.rename(columns=resolved)[list(aliases.keys())]
+    file_path = "data/sim/SOLUSD_1h.csv"
+    df = pd.read_csv(file_path)
 
     if timeframe == "1m":
         cutoff = datetime.now(tz=timezone.utc) - timedelta(days=30)
