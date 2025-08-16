@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 
 from .scripts import evaluate_buy, evaluate_sell
-from .scripts.forecast_slope import forecast_stepwise
 
 
 # Step size (candles) for slope updates
@@ -84,8 +83,31 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     df["bottom_slope"] = slopes
     df["slope_angle"] = slope_angles
 
-    # Stepwise forecast based on recent slope, volume, and breakout
-    df["forecast_slope"] = forecast_stepwise(df, BOTTOM_WINDOW)
+    # Predict next window's slope angle by stepping current angle forward
+    predicted_angles = [np.nan] * len(df)
+    for i in range(0, len(df), BOTTOM_WINDOW):
+        end = min(i + BOTTOM_WINDOW, len(df))
+        if end < len(df):
+            angle_val = df["slope_angle"].iloc[end - 1]
+            predicted_angles[end : end + BOTTOM_WINDOW] = [
+                angle_val
+            ] * min(BOTTOM_WINDOW, len(df) - end)
+    df["predicted_angle"] = predicted_angles
+
+    matches = 0
+    total = 0
+    for i in range(0, len(df), BOTTOM_WINDOW):
+        end = min(i + BOTTOM_WINDOW, len(df))
+        if end < len(df):
+            actual_next = df["slope_angle"].iloc[end - 1]
+            predicted = df["predicted_angle"].iloc[end]
+            if not np.isnan(actual_next) and not np.isnan(predicted):
+                total += 1
+                if np.sign(predicted) == np.sign(actual_next):
+                    matches += 1
+    if total > 0:
+        acc = matches / total * 100
+        print(f"[SIM] Predicted slope-angle directional accuracy: {acc:.1f}%")
 
     state: Dict[str, Any] = {}
     for _, candle in df.iterrows():
@@ -102,14 +124,6 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         linewidth=2,
         drawstyle="steps-post",
     )
-    ax1.plot(
-        df["candle_index"],
-        df["forecast_slope"],
-        label="Stepwise Forecast",
-        color="red",
-        linestyle="--",
-        alpha=0.8,
-    )
     ax1.set_ylabel("Price")
     ax1.set_xlabel("Candles (Index)")
     ax1.legend(loc="upper left")
@@ -117,15 +131,14 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     ax2 = ax1.twinx()
     ax2.plot(
         df["candle_index"],
-        df["slope_angle"],
-        label="Slope Angle [-1,1]",
+        df["predicted_angle"],
+        label="Predicted Slope Angle (next window)",
         color="green",
-        alpha=0.6,
         drawstyle="steps-post",
     )
     ax2.set_ylim(-1, 1)
-    ax2.set_ylabel("Slope Angle")
     ax2.axhline(0, color="gray", linestyle="--", linewidth=1)
+    ax2.set_ylabel("Slope Angle [-1,1]")
     ax2.legend(loc="lower right")
 
     plt.title("SOLUSD Discovery Simulation")
