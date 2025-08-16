@@ -186,18 +186,54 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     ax1.set_xlabel("Candles (Index)")
     ax1.legend(loc="upper left")
 
-    ax2 = ax1.twinx()
-    ax2.plot(
-        df["candle_index"],
-        df["forecast_angle"],
-        label="Forecast Slope Angle",
-        color="red",
-        drawstyle="steps-post",
+    # Plot forecast arrows and anchor dots
+    price_scale = df["close"].std() * 0.5
+    forecast_windows = 0
+    correct = 0
+    incorrect = 0
+    weighted_correct = 0.0
+    weight_sum = 0.0
+
+    for start in range(0, len(df), BOTTOM_WINDOW):
+        anchor_x = df["candle_index"].iloc[start]
+        anchor_y = df["close"].iloc[start]
+        forecast = df["forecast_angle"].iloc[start]
+        actual = df["slope_angle"].iloc[start]
+        if np.isnan(forecast) or np.isnan(actual):
+            continue
+        forecast_windows += 1
+        sign = np.sign(forecast)
+        magnitude = abs(forecast)
+        dy = sign * magnitude * price_scale
+        ax1.quiver(
+            anchor_x,
+            anchor_y,
+            BOTTOM_WINDOW,
+            dy,
+            angles="xy",
+            scale_units="xy",
+            scale=1,
+            color="red",
+        )
+        ax1.scatter(anchor_x, anchor_y, color="red")
+
+        if np.sign(actual) == sign:
+            correct += 1
+            weighted_correct += magnitude
+        else:
+            incorrect += 1
+        weight_sum += magnitude
+
+    accuracy = (correct / forecast_windows * 100) if forecast_windows else 0.0
+    weighted_accuracy = (
+        weighted_correct / weight_sum * 100 if weight_sum else 0.0
     )
-    ax2.set_ylim(-1, 1)
-    ax2.axhline(0, color="gray", linestyle="--", linewidth=1)
-    ax2.set_ylabel("Slope Angle [-1,1]")
-    ax2.legend(loc="lower right")
+
+    print(f"Forecast windows: {forecast_windows}")
+    print(f"Correct: {correct}")
+    print(f"Incorrect: {incorrect}")
+    print(f"Accuracy: {accuracy:.2f}%")
+    print(f"Weighted Accuracy: {weighted_accuracy:.2f}%")
 
     plt.title("SOLUSD Discovery Simulation")
     plt.grid(True)
