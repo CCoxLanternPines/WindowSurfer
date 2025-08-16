@@ -64,6 +64,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     # Stepwise slope calculation
     slopes = [np.nan] * len(df)
     slope_angles = [np.nan] * len(df)
+    last_value = df["close"].iloc[0]
 
     for i in range(0, len(df), BOTTOM_WINDOW):
         end = min(i + BOTTOM_WINDOW, len(df))
@@ -71,12 +72,13 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         x = np.arange(len(y))
         if len(y) > 1:
             m, b = np.polyfit(x, y, 1)
-            fitted = m * x + b
+            fitted = last_value + m * np.arange(len(y))
             slopes[i:end] = fitted
+            last_value = fitted[-1]
             slope_val = np.tanh(m)
             slope_angles[i:end] = [slope_val] * len(y)
         else:
-            slopes[i:end] = [y[-1]] * len(y)
+            slopes[i:end] = [last_value] * len(y)
             slope_angles[i:end] = [0] * len(y)
 
     df["bottom_slope"] = slopes
