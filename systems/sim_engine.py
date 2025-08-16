@@ -14,13 +14,9 @@ from .scripts import evaluate_buy, evaluate_sell
 from .scripts.forecast_slope import forecast_slope_segment
 
 
-# === Regime Detection Settings ===
-SHORT_MA = 10   # short moving average lookback (candles)
-LONG_MA = 50    # long moving average lookback (candles)
-
 # Step size (candles) for slope updates
-# Falls back to this value if no dynamic size can be derived
-DEFAULT_BOTTOM_WINDOW = 10
+# If < 1, treated as fraction of dataset length
+DEFAULT_BOTTOM_WINDOW = 0.3
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
@@ -55,22 +51,14 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     df = df.reset_index(drop=True)
     df["candle_index"] = range(len(df))
 
-    bottom_window = DEFAULT_BOTTOM_WINDOW
-    match = re.match(r"(\d+)", timeframe)
-    if match:
-        # Use half the numeric portion of the timeframe as the window size
-        bottom_window = max(1, int(match.group(1)) // 2)
+    total_candles = len(df)
+    if DEFAULT_BOTTOM_WINDOW < 1:
+        BOTTOM_WINDOW = max(1, int(total_candles * DEFAULT_BOTTOM_WINDOW))
+    else:
+        BOTTOM_WINDOW = int(DEFAULT_BOTTOM_WINDOW)
 
-    df["short"] = df["close"].rolling(window=SHORT_MA, min_periods=1).mean()
-    df["long"] = df["close"].rolling(window=LONG_MA, min_periods=1).mean()
-    df["delta"] = df["short"] - df["long"]
-
-    # scale delta into the price range
-    scale = (df["close"].max() - df["close"].min()) / (
-        df["delta"].max() - df["delta"].min()
-    )
-    df["norm_delta"] = (
-        (df["delta"] - df["delta"].min()) * scale + df["close"].min()
+    print(
+        f"[SIM] Using BOTTOM_WINDOW={BOTTOM_WINDOW} (derived from {DEFAULT_BOTTOM_WINDOW})"
     )
 
     # Stepwise slope calculation
@@ -79,8 +67,8 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     forecast_vals = [np.nan] * len(df)
     last_value = df["close"].iloc[0]
 
-    for i in range(0, len(df), bottom_window):
-        end = min(i + bottom_window, len(df))
+    for i in range(0, len(df), BOTTOM_WINDOW):
+        end = min(i + BOTTOM_WINDOW, len(df))
         y = df["close"].iloc[i:end].values
         x = np.arange(len(y))
         if len(y) > 1:
@@ -91,7 +79,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             slope_val = np.tanh(m)
             slope_angles[i:end] = [slope_val] * len(y)
 
-            future = forecast_slope_segment(df, i, end, m, b, bottom_window)
+            future = forecast_slope_segment(df, i, end, m, b, BOTTOM_WINDOW)
             for j, val in enumerate(future):
                 if end + j < len(df):
                     forecast_vals[end + j] = val
@@ -113,7 +101,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     ax1.plot(
         df["candle_index"],
         df["bottom_slope"],
-        label=f"Slope Line ({bottom_window})",
+        label=f"Slope Line ({BOTTOM_WINDOW})",
         color="black",
         linewidth=2,
         drawstyle="steps-post",
