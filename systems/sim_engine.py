@@ -12,8 +12,8 @@ import pandas as pd
 
 
 # Box visualization knobs
-WINDOW_SIZE = 150   # candles per box
-STEP_SIZE = 150     # rolling step
+WINDOW_SIZE = 24   # candles per box
+STEP_SIZE = 24     # rolling step
 BAR_COLOR = "orange"
 BAR_ALPHA = 0.7
 
