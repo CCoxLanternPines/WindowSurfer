@@ -16,6 +16,22 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     """Run a simple simulation over SOLUSD candles."""
     csv_path = Path("data/sim/SOLUSD.csv")
     df = pd.read_csv(csv_path)
+    df.columns = [c.lower().strip() for c in df.columns]
+    rename_map = {
+        "c": "close",
+        "close_price": "close",
+        "o": "open",
+        "h": "high",
+        "l": "low",
+        "v": "volume",
+        "t": "timestamp",
+    }
+    df.rename(columns=rename_map, inplace=True)
+
+    required_cols = {"timestamp", "open", "high", "low", "close"}
+    missing = required_cols - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing required candle columns: {sorted(missing)}")
 
     if timeframe == "1m":
         cutoff = datetime.now(tz=timezone.utc) - timedelta(days=30)
