@@ -78,7 +78,6 @@ def main(argv: list[str] | None = None) -> None:
             plot_trades(
                 result["candles"],
                 result["events"],
-                regime=result.get("regime"),
                 out_path="data/tmp/sim_plot.png",
                 show=True,
             )

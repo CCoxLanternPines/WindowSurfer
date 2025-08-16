@@ -15,10 +15,6 @@ from tqdm import tqdm
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
-from systems.scripts.regime_detector import (
-    DEFAULT_PARAMS as REGIME_PARAMS,
-    compute_regime_point,
-)
 from systems.scripts.runtime_state import build_runtime_state
 from systems.scripts.trade_apply import (
     apply_buy,
@@ -149,10 +145,6 @@ def run_simulation(
     runtime_state["buy_unlock_p"] = {}
     init_jackpot(runtime_state, ledger_cfg, df)
 
-    runtime_state.setdefault("regime_state", {"last_label": 0, "last_switch": 0})
-    runtime_state["regime_score"] = []
-    runtime_state["regime_label"] = []
-
     ledger_obj = Ledger()
     events: List[Dict[str, object]] = []
     win_metrics = {}
@@ -170,30 +162,7 @@ def run_simulation(
     addlog(f"[SIM] Starting simulation for {coin}", verbose_int=1, verbose_state=verbose)
 
     for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
-        rstate = runtime_state["regime_state"]
-        rpoint = compute_regime_point(
-            df,
-            t,
-            p=REGIME_PARAMS,
-            prev_label=rstate["last_label"],
-            prev_switch_t=rstate["last_switch"],
-        )
-        runtime_state["regime_score"].append(rpoint["score"])
-        runtime_state["regime_label"].append(rpoint["label"])
-        if rpoint["label"] != rstate["last_label"]:
-            rstate["last_switch"] = t
-        rstate["last_label"] = rpoint["label"]
-        if verbose >= 2 and t % 100 == 0:
-            lasted = t - rstate["last_switch"]
-            addlog(
-                f"[REGIME] t={t} score={rpoint['score']:+.2f} label={rpoint['label']:+d} lasted={lasted}",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-
         price = float(df.iloc[t]["close"])
-        curr_regime_score = rpoint["score"]
-        curr_regime_label = rpoint["label"]
 
         for window_name, wcfg in window_settings.items():
             ctx = {"ledger": ledger_obj}
@@ -206,8 +175,6 @@ def run_simulation(
                 runtime_state=runtime_state,
             )
             if buy_res:
-                buy_res["regime_label_at_entry"] = curr_regime_label
-                buy_res["regime_score_at_entry"] = curr_regime_score
                 ts = None
                 if "timestamp" in df.columns:
                     ts = int(df.iloc[t]["timestamp"])
@@ -275,8 +242,6 @@ def run_simulation(
                 sell_notes = []
 
             for note in sell_notes:
-                note["regime_label_at_exit"] = curr_regime_label
-                note["regime_score_at_exit"] = curr_regime_score
                 ts = None
                 if "timestamp" in df.columns:
                     ts = int(df.iloc[t]["timestamp"])
@@ -448,11 +413,6 @@ def run_simulation(
             "open_value_now": global_open_value,
             "total_at_liq": global_total_at_liq,
         },
-        "regime": {
-            "indices": list(range(total)),
-            "score": runtime_state.get("regime_score", []),
-            "label": runtime_state.get("regime_label", []),
-        },
     }
     if j.get("enabled"):
         json_data["jackpot"] = {
@@ -467,7 +427,6 @@ def run_simulation(
     with json_path.open("w", encoding="utf-8") as f_json:
         json.dump(json_data, f_json, indent=2)
 
-    ledger_obj.metadata["regime"] = json_data["regime"]
     save_ledger(
         ledger,
         ledger_obj,
@@ -483,9 +442,4 @@ def run_simulation(
         shutil.copyfile(default_path, sim_path)
 
     candles_df = df.rename(columns={ts_col: "time"})
-    return {
-        "ledger": ledger_obj,
-        "candles": candles_df,
-        "events": events,
-        "regime": json_data["regime"],
-    }
+    return {"ledger": ledger_obj, "candles": candles_df, "events": events}
