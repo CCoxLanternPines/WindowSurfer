@@ -30,6 +30,16 @@ SLOPE_THRESHOLD = 0.3       # slope > this = up
 VOLATILITY_MAX = 24       # filter noisy/flat boxes
 RANGE_MIN = 0.08           # must have enough range to matter
 
+# Percent-change grading
+STRONG_MOVE_THRESHOLD = 0.20  # 20% move is considered strong
+COLOR_MAP = {
+    -2: "darkred",
+    -1: "pink",
+    0: "gray",
+    1: "lightgreen",
+    2: "darkgreen",
+}
+
 FEATURES_CSV = "data/window_features.csv"
 
 
@@ -91,16 +101,20 @@ def detect_reversals(df: pd.DataFrame) -> list[tuple[int, float, str]]:
 
 
 def rule_predict(features: dict[str, float]) -> int:
-    """Classify window direction using simple thresholds."""
+    """Classify next window move using percent-change categories."""
     if (
         features.get("volatility", 0.0) > VOLATILITY_MAX
         or features.get("range", 0.0) < RANGE_MIN
     ):
         return 0
-    slope = features.get("slope", 0.0)
-    if slope > SLOPE_THRESHOLD:
+    pct = features.get("pct_change", 0.0)
+    if pct >= STRONG_MOVE_THRESHOLD:
+        return 2
+    if pct > 0:
         return 1
-    if slope < -SLOPE_THRESHOLD:
+    if pct <= -STRONG_MOVE_THRESHOLD:
+        return -2
+    if pct < 0:
         return -1
     return 0
 
@@ -184,27 +198,38 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         late = float(sub["volume"].iloc[mid:].mean()) if mid and "volume" in sub else 0.0
         volume_skew = ((late - early) / early) if early else 0.0
         exit_price = float(sub.iloc[-1]["close"])
-        exit_vs_entry = (exit_price - level) / level if level else 0.0
+        pct_change = (exit_price - level) / level if level else 0.0
 
-        actual = 1 if slope > 0 else -1 if slope < 0 else 0
-        if pred is not None:
-            results.append((pred, actual))
-            pred_str = {1: "UP", -1: "DOWN", 0: "FLAT"}[pred]
-            act_str = {1: "UP", -1: "DOWN", 0: "FLAT"}[actual]
-            print(f"start={start} predicted {pred_str} actual {act_str}")
-
-        next_sub = df.iloc[end : end + WINDOW_SIZE]
-        if len(next_sub) == WINDOW_SIZE:
-            next_closes = next_sub["close"].values
-            x_next = np.arange(len(next_closes))
-            next_slope = (
-                float(np.polyfit(x_next, next_closes, 1)[0])
-                if len(next_closes) > 1
-                else 0.0
-            )
-            label = 1 if next_slope > 0 else -1 if next_slope < 0 else 0
+        label: int
+        if pct_change <= -STRONG_MOVE_THRESHOLD:
+            label = -2
+        elif pct_change < 0:
+            label = -1
+        elif pct_change >= STRONG_MOVE_THRESHOLD:
+            label = 2
+        elif pct_change > 0:
+            label = 1
         else:
             label = 0
+
+        actual = label
+        if pred is not None:
+            results.append((pred, actual))
+            pred_str = {
+                -2: "STRONG DOWN",
+                -1: "MILD DOWN",
+                0: "FLAT",
+                1: "MILD UP",
+                2: "STRONG UP",
+            }[pred]
+            act_str = {
+                -2: "STRONG DOWN",
+                -1: "MILD DOWN",
+                0: "FLAT",
+                1: "MILD UP",
+                2: "STRONG UP",
+            }[actual]
+            print(f"start={start} predicted {pred_str} actual {act_str}")
 
         features = {
             "slope": slope,
@@ -212,7 +237,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             "range": rng,
             "volume_mean": vol_mean,
             "volume_skew": volume_skew,
-            "exit_vs_entry": exit_vs_entry,
+            "pct_change": pct_change,
             "label": label,
         }
         file_exists = os.path.exists(FEATURES_CSV)
@@ -237,11 +262,13 @@ def run_simulation(*, timeframe: str = "1m") -> None:
 
     for idx, price, pred in markers:
         if pred > 0:
-            ax1.scatter(idx, price, marker="^", color="green", zorder=5)
+            marker = "^"
         elif pred < 0:
-            ax1.scatter(idx, price, marker="v", color="red", zorder=5)
+            marker = "v"
         else:
-            ax1.scatter(idx, price, marker="o", color="gray", zorder=5)
+            marker = "o"
+        color = COLOR_MAP.get(pred, "gray")
+        ax1.scatter(idx, price, marker=marker, color=color, zorder=5)
 
     ax1.set_title("Rolling Window Box Visualization")
     ax1.set_xlabel("Candles (Index)")
@@ -252,7 +279,13 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     made = sum(1 for p, _ in results if p != 0)
     correct = sum(1 for p, a in results if p != 0 and p == a)
     acc = 100 * correct / made if made else 0.0
-    print(f"Predictions made: {made} Correct: {correct} Accuracy: {acc:.2f}%")
+    weights = {0: 1, 1: 1, -1: 1, 2: 2, -2: 2}
+    total_w = sum(weights.get(a, 1) for p, a in results if p != 0)
+    correct_w = sum(weights.get(a, 1) for p, a in results if p != 0 and p == a)
+    w_acc = 100 * correct_w / total_w if total_w else 0.0
+    print(
+        f"Predictions made: {made} Correct: {correct} Accuracy: {acc:.2f}% Weighted: {w_acc:.2f}%"
+    )
 
     plt.show()
 
