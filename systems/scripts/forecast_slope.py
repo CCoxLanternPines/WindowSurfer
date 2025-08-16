@@ -1,48 +1,55 @@
 from __future__ import annotations
 
-"""Forecast helper for projecting slope segments."""
+"""Stepwise forecast helper for slope projections."""
 
 import numpy as np
 import pandas as pd
 
 
-def forecast_slope_segment(
-    df: pd.DataFrame,
-    start_idx: int,
-    end_idx: int,
-    m: float,
-    b: float,
-    bottom_window: int,
-    anchor_val: float | None = None,
-) -> np.ndarray:
-    """Project slope forward ``bottom_window`` steps with bias adjustment.
+def forecast_stepwise(
+    df: pd.DataFrame, bottom_window: int, k1: float = 0.2, k2: float = 0.3
+) -> list[float]:
+    """Predict a per-tick forecast line.
 
-    If ``anchor_val`` is provided, the forecast is shifted so its first value
-    starts from ``anchor_val`` instead of the raw intercept, ensuring continuity
-    across segments.
+    Starting from the first candle's close, iteratively step forward using the
+    slope of the recent ``bottom_window`` closes plus volume and breakout bias.
     """
 
-    x_future = np.arange(bottom_window)
+    forecast = [np.nan] * len(df)
 
-    # Base projection
-    y_future = m * x_future + b
+    # Initialize at the first candle's actual close
+    forecast[0] = df["close"].iloc[0]
 
-    # Bias: volume + breakout distance
-    recent_vol = df["volume"].iloc[start_idx:end_idx]
-    volume_change = (
-        recent_vol.iloc[-1] - recent_vol.iloc[0]
-    ) / max(1e-9, recent_vol.iloc[0])
-    last_close = df["close"].iloc[end_idx - 1]
-    last_fit = m * (len(recent_vol) - 1) + b
-    breakout_dist = last_close - last_fit
+    for i in range(1, len(df)):
+        start = max(0, i - bottom_window)
+        y = df["close"].iloc[start:i].values
+        x = np.arange(len(y))
 
-    k1, k2 = 0.2, 0.3
-    adj = k1 * volume_change - k2 * breakout_dist
-    y_future = y_future + adj
+        if len(y) > 1:
+            m, b = np.polyfit(x, y, 1)
 
-    # Anchor continuity
-    if anchor_val is not None:
-        offset = anchor_val - y_future[0]
-        y_future = y_future + offset
+            # Base slope prediction from previous forecast value
+            step_pred = forecast[i - 1] + m
 
-    return y_future
+            # Volume bias
+            recent_vol = df["volume"].iloc[start:i]
+            volume_change = (recent_vol.iloc[-1] - recent_vol.iloc[0]) / max(
+                1e-9, recent_vol.iloc[0]
+            )
+
+            # Breakout bias
+            last_close = df["close"].iloc[i - 1]
+            last_fit = m * (len(y) - 1) + b
+            breakout_dist = last_close - last_fit
+
+            adjustment = k1 * volume_change - k2 * breakout_dist
+
+            forecast[i] = step_pred + adjustment
+        else:
+            forecast[i] = forecast[i - 1]
+
+    return forecast
+
+
+__all__ = ["forecast_stepwise"]
+
