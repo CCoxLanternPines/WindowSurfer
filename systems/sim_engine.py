@@ -28,7 +28,7 @@ CONFIDENCE_THRESHOLD = 0.1  # only use forecasts above this
 
 # Control line thresholds
 ENTRY_THRESHOLD = 0.2
-EXIT_THRESHOLD = .1
+EXIT_THRESHOLD = 0.03
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
