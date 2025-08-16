@@ -33,6 +33,13 @@ EXIT_THRESHOLD = -.1
 # Plotting constants
 CONTROL_PANEL_HEIGHTS = (4, 1)  # matplotlib height ratios for (price, control)
 
+# Control-line buy filter knobs
+MIN_SLOPE_TO_BUY = 0.0       # require slope_angle >= this
+MIN_CTX_ANGLE = 0.0          # require ctx_angle >= this
+MIN_PULLBACK = -0.02         # require deviation <= this (e.g. -0.02 = -2%)
+ATR_MIN = 0.005              # minimum ATR% to allow buys (0.5%)
+ATR_MAX = 0.03               # maximum ATR% to allow buys (3%)
+
 
 def parse_timeframe(tf: str) -> timedelta | None:
     match = re.match(r"(\d+)([dhmw])", tf)
@@ -250,7 +257,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
 
     df["control_line"] = control_line
 
-    # --- Generate buys when control line = +1 at start of window ---
+    # --- Generate buys when control line = +1 at start of window (filtered) ---
     buy_points = []
     for start in range(0, len(df), BOTTOM_WINDOW):
         anchor_x = df["candle_index"].iloc[start]
@@ -258,7 +265,29 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         control_val = df["control_line"].iloc[start]
 
         if control_val == 1.0:
-            buy_points.append((anchor_x, anchor_y))
+            slope_val = df["slope_angle"].iloc[start]
+            # context slope over 3 windows
+            context_size = min(len(df), BOTTOM_WINDOW * 3)
+            ctx_y = df["close"].iloc[max(0, start - context_size): start+BOTTOM_WINDOW].values
+            ctx_x = np.arange(len(ctx_y))
+            if len(ctx_y) > 1:
+                m_ctx, _ = np.polyfit(ctx_x, ctx_y, 1)
+                ctx_angle = np.tanh(m_ctx)
+            else:
+                ctx_angle = 0.0
+            # pullback
+            dev = (df["close"].iloc[start] - df["bottom_slope"].iloc[start]) / df["close"].iloc[start]
+            # ATR
+            atr = (df["high"].iloc[start:start+BOTTOM_WINDOW] - df["low"].iloc[start:start+BOTTOM_WINDOW]).mean()
+            atr_pct = atr / df["close"].iloc[start]
+
+            if (
+                slope_val >= MIN_SLOPE_TO_BUY
+                and ctx_angle >= MIN_CTX_ANGLE
+                and dev <= MIN_PULLBACK
+                and ATR_MIN <= atr_pct <= ATR_MAX
+            ):
+                buy_points.append((anchor_x, anchor_y))
 
     total_signals = len([s for s in control_line if s != 0])
     correct_signals = 0
