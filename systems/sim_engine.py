@@ -15,13 +15,13 @@ from .scripts import evaluate_buy, evaluate_sell
 
 # Step size (candles) for slope updates
 # If < 1, treated as fraction of dataset length
-DEFAULT_BOTTOM_WINDOW = "2d"
+DEFAULT_BOTTOM_WINDOW = "1d"
 
 # Forecast weights
 WEIGHT_PERSISTENCE = 0.5
-WEIGHT_ERROR = 0.2
-WEIGHT_VOLUME = 0.2
-WEIGHT_VOLATILITY = 0.08
+WEIGHT_ERROR = 0.5
+WEIGHT_VOLUME = 0.5
+WEIGHT_VOLATILITY = 0.1
 
 # Forecast confidence threshold
 CONFIDENCE_THRESHOLD = 0.5 # only use forecasts above this
