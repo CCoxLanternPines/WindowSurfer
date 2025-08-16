@@ -1,87 +1,59 @@
 from __future__ import annotations
 
-"""Pressure-based buy evaluator."""
+"""Switchback-based buy evaluator."""
 
 from typing import Any, Dict
 import pandas as pd
 
+from systems.scripts.math.trend_switch import slope_stats, classify_trend_z
 from systems.utils.addlog import addlog
 
-
-# --- tuning constants -----------------------------------------------------
-
-PRESSURE_WINDOWS = [
-    ("3m", 0.20),
-    ("1m", 0.20),
-    ("2w", 0.15),
-    ("1w", 0.15),
-    ("3d", 0.15),
-    ("1d", 0.15),
-]
-
-BUY_CD_MIN = 2  # bars
-BUY_CD_MAX = 48  # bars
-BASE_BUY_FRACTION = 0.10  # size = capital * this
+# ---- Switchback knobs (public; tweak in-file) ----
+WINDOW_LOOKBACK = {"minnow": 24, "fish": 48}
+Z_HI = 1.5
+Z_LO = -1.5
+PERSIST_K = {"minnow": 2, "fish": 3}
+MIN_ABS_SLOPE = 0.0005
+# Buy sizing & gates
+BASE_BUY_FRACTION = {"minnow": 0.125, "fish": 0.25}
+MIN_NOTE_USD = 10.0
+CASH_FLOOR_USD = 0.0
+BUY_COOLDOWN_BARS = {"minnow": 2, "fish": 2}
+# Sell gates (unused here but kept for parity)
+MAX_SELL_PER_CANDLE = {"minnow": 1, "fish": 1}
 
 
-def _clamp01(x: float) -> float:
-    return 0.0 if x < 0 else 1.0 if x > 1 else x
+def _trend_switch(series: pd.DataFrame, t: int, window: str, state: Dict[str, Any]):
+    look = WINDOW_LOOKBACK.get(window, 0)
+    if t + 1 < look or look <= 0:
+        return 0.0, 0.0, "FLAT", 0, "FLAT", False, ""
+    prices = series["close"].iloc[t - look + 1 : t + 1].tolist()
+    slope, se = slope_stats(prices)
+    z = slope / se if se else 0.0
+    side = classify_trend_z(slope, se, Z_HI, Z_LO, MIN_ABS_SLOPE)
 
+    trend_state = state.setdefault("trend_state", {})
+    ts = trend_state.setdefault(window, {"last_trend": "FLAT", "persist_count": 0, "prev_side": "FLAT"})
+    prev_trend = ts["last_trend"]
 
-def _span_to_bars(series: pd.DataFrame, span: str) -> int:
-    if not span:
-        return 1
-    try:
-        value = int(span[:-1])
-    except ValueError:
-        return 1
-    unit = span[-1].lower()
-    if "timestamp" in series.columns and len(series) >= 2:
-        step = int(series.iloc[1]["timestamp"]) - int(series.iloc[0]["timestamp"])
-        if step <= 0:
-            step = 3600
+    if side == ts.get("prev_side") and side in ("UP", "DOWN"):
+        ts["persist_count"] += 1
+    elif side in ("UP", "DOWN"):
+        ts["prev_side"] = side
+        ts["persist_count"] = 1
     else:
-        step = 3600
-    if unit == "m":
-        factor = 30 * 24 * 3600
-    elif unit == "w":
-        factor = 7 * 24 * 3600
-    elif unit == "d":
-        factor = 24 * 3600
-    elif unit == "h":
-        factor = 3600
-    else:
-        factor = 0
-    bars = int(round((value * factor) / step))
-    return max(1, bars)
+        ts["prev_side"] = side
+        ts["persist_count"] = 0
 
-
-def _window_scores(series: pd.DataFrame, t: int) -> Dict[str, Dict[str, float]]:
-    scores: Dict[str, Dict[str, float]] = {}
-    close_now = float(series.iloc[t]["close"])
-    for span, _ in PRESSURE_WINDOWS:
-        bars = _span_to_bars(series, span)
-        start = max(0, t - bars + 1)
-        window = series.iloc[start : t + 1]
-        low = float(window["close"].min())
-        high = float(window["close"].max())
-        width = max(high - low, 1e-9)
-        depth = (high - close_now) / width
-        height = (close_now - low) / width
-        scores[span] = {"depth": depth, "height": height}
-    return scores
-
-
-def _pressure(scores: Dict[str, Dict[str, float]], windows) -> tuple[float, float]:
-    wsum = sum(w for _, w in windows) or 1.0
-    sell_p = sum(w * scores[s]["height"] for s, w in windows if s in scores) / wsum
-    buy_p = sum(w * scores[s]["depth"] for s, w in windows if s in scores) / wsum
-    return _clamp01(buy_p), _clamp01(sell_p)
-
-
-def _cooldown_bars(pressure: float, min_bars: int, max_bars: int) -> int:
-    p = _clamp01(pressure)
-    return int(round(max_bars - p * (max_bars - min_bars)))
+    switchback = False
+    switch_desc = ""
+    if side in ("UP", "DOWN") and ts["persist_count"] >= PERSIST_K.get(window, 1):
+        confirmed = side
+        if prev_trend in ("UP", "DOWN") and confirmed != prev_trend:
+            switchback = True
+            switch_desc = f"{prev_trend}→{confirmed}"
+        ts["last_trend"] = confirmed
+    return slope, z, side, ts["persist_count"], prev_trend, switchback, switch_desc
 
 
 def evaluate_buy(
@@ -96,34 +68,43 @@ def evaluate_buy(
     """Return sizing and metadata for a buy signal in ``window_name``."""
 
     verbose = runtime_state.get("verbose", 0)
-
-    scores = _window_scores(series, t)
-    buy_p, sell_p = _pressure(scores, PRESSURE_WINDOWS)
-    cd = _cooldown_bars(buy_p, BUY_CD_MIN, BUY_CD_MAX)
-
-    last_key = f"last_buy_idx::{window_name}"
-    last_idx = int(runtime_state.get(last_key, -10**9))
-    elapsed = t - last_idx
-
-    decision: Dict[str, Any] | bool = False
-    if elapsed >= cd:
-        capital = float(runtime_state.get("capital", 0.0))
-        size_usd = max(0.0, capital * BASE_BUY_FRACTION)
-        decision = {
-            "size_usd": size_usd,
-            "window_name": window_name,
-            "window_size": cfg["window_size"],
-            "created_idx": t,
-        }
-        if "timestamp" in series.columns:
-            decision["created_ts"] = int(series.iloc[t]["timestamp"])
-        runtime_state[last_key] = t
-
+    slope, z, side, persist, last_trend, switchback, switch_desc = _trend_switch(
+        series, t, window_name, runtime_state
+    )
     addlog(
-        f"[{ 'BUY' if decision else 'SKIP' }][{window_name} {cfg['window_size']}] buy_p={buy_p:.3f} cd={cd} elapsed={elapsed}",
+        f"[TREND][{window_name}] slope={slope:.5f} z={z:.2f} side={side} "
+        f"persist={persist}/{PERSIST_K.get(window_name, 0)} last={last_trend} switchback={switch_desc}",
         verbose_int=1,
         verbose_state=verbose,
     )
 
-    return decision
+    if switch_desc != "DOWN→UP":
+        return False
 
+    cooldowns = runtime_state.setdefault("cooldowns", {}).setdefault("buy", {})
+    last_idx = int(cooldowns.get(window_name, -10**9))
+    cd = BUY_COOLDOWN_BARS.get(window_name, 0)
+    if t - last_idx < cd:
+        return False
+
+    cash = float(runtime_state.get("capital", 0.0))
+    size_usd = min(cash, BASE_BUY_FRACTION.get(window_name, 0.0) * cash)
+    if cash <= CASH_FLOOR_USD or size_usd < MIN_NOTE_USD:
+        return False
+
+    decision: Dict[str, Any] = {
+        "size_usd": size_usd,
+        "window_name": window_name,
+        "window_size": cfg.get("window_size"),
+        "created_idx": t,
+        "reason": f"[BUY][{window_name}] switchback DOWN→UP",
+    }
+    if "timestamp" in series.columns:
+        decision["created_ts"] = int(series.iloc[t]["timestamp"])
+    cooldowns[window_name] = t
+    addlog(
+        f"[BUY][{window_name}] switchback DOWN→UP size=${size_usd:.2f}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+    return decision
