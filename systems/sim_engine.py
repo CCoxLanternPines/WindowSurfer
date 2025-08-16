@@ -18,7 +18,8 @@ SHORT_MA = 10   # short moving average lookback (candles)
 LONG_MA = 50    # long moving average lookback (candles)
 
 # Step size (candles) for slope updates
-BOTTOM_WINDOW = 10
+# Falls back to this value if no dynamic size can be derived
+DEFAULT_BOTTOM_WINDOW = 10
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
@@ -49,6 +50,12 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             cutoff = pd.Timestamp.utcnow().tz_localize(None) - delta
             df = df[df["timestamp"] >= cutoff]
 
+    bottom_window = DEFAULT_BOTTOM_WINDOW
+    match = re.match(r"(\d+)", timeframe)
+    if match:
+        # Use half the numeric portion of the timeframe as the window size
+        bottom_window = max(1, int(match.group(1)) // 2)
+
     df["short"] = df["close"].rolling(window=SHORT_MA, min_periods=1).mean()
     df["long"] = df["close"].rolling(window=LONG_MA, min_periods=1).mean()
     df["delta"] = df["short"] - df["long"]
@@ -66,8 +73,8 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     slope_angles = [np.nan] * len(df)
     last_value = df["close"].iloc[0]
 
-    for i in range(0, len(df), BOTTOM_WINDOW):
-        end = min(i + BOTTOM_WINDOW, len(df))
+    for i in range(0, len(df), bottom_window):
+        end = min(i + bottom_window, len(df))
         y = df["close"].iloc[i:end].values
         x = np.arange(len(y))
         if len(y) > 1:
@@ -94,7 +101,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     ax1.plot(
         df["timestamp"],
         df["bottom_slope"],
-        label=f"Slope Line ({BOTTOM_WINDOW})",
+        label=f"Slope Line ({bottom_window})",
         color="black",
         linewidth=2,
         drawstyle="steps-post",
