@@ -30,6 +30,12 @@ CONFIDENCE_THRESHOLD = 0.1  # only use forecasts above this
 ENTRY_THRESHOLD = 0.2
 EXIT_THRESHOLD = 0.03
 
+# Plotting constants
+CONTROL_PANEL_HEIGHTS = (4, 1)  # matplotlib height ratios for (price, control)
+ARROW_Y_BASE = -1.05  # baseline Y in control panel to place arrow tails
+ARROW_DY_MAX = 0.25  # max vertical arrow length (keeps within [-1.2, 1.2])
+ARROW_CONF_FILTER = max(CONFIDENCE_THRESHOLD, 2 * CONFIDENCE_THRESHOLD)
+
 
 def parse_timeframe(tf: str) -> timedelta | None:
     match = re.match(r"(\d+)([dhmw])", tf)
@@ -245,12 +251,6 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         control_line.append(val)
         signal_counts[val] = signal_counts.get(val, 0) + 1
 
-    if control_line and control_line[-1] > 0:
-        last_val = control_line[-1]
-        signal_counts[last_val] -= 1
-        control_line[-1] = -1.0
-        signal_counts[-1.0] = signal_counts.get(-1.0, 0) + 1
-
     df["control_line"] = control_line
 
     total_signals = len([s for s in control_line if s != 0])
@@ -299,7 +299,13 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         evaluate_buy.evaluate_buy(candle.to_dict(), state)
         evaluate_sell.evaluate_sell(candle.to_dict(), state)
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(12, 6))
+    fig, (ax1, ax2) = plt.subplots(
+        2,
+        1,
+        sharex=True,
+        figsize=(12, 6),
+        gridspec_kw={"height_ratios": CONTROL_PANEL_HEIGHTS},
+    )
     ax1.plot(df["candle_index"], df["close"], label="Close Price", color="blue")
     ax1.plot(
         df["candle_index"],
@@ -329,30 +335,27 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     ax2.set_xlabel("Candles (Index)")
     ax2.set_title("Control Line (Exit Oracle)")
 
-    # Plot forecast arrows and anchor dots
-    price_scale = df["close"].std() * 0.5
-
+    # Plot forecast arrows in control panel
     for start in range(0, len(df), BOTTOM_WINDOW):
-        anchor_x = df["candle_index"].iloc[start]
-        anchor_y = df["close"].iloc[start]
+        mid = start + min(BOTTOM_WINDOW, len(df) - start) // 2
+        anchor_x = df["candle_index"].iloc[mid]
         forecast = df["forecast_angle"].iloc[start]
         conf = df["confidence"].iloc[start]
-        if np.isnan(forecast) or conf < CONFIDENCE_THRESHOLD:
+        if np.isnan(forecast) or conf < ARROW_CONF_FILTER:
             continue
-        sign = np.sign(forecast)
-        magnitude = abs(forecast)
-        dy = sign * magnitude * price_scale
-        ax1.quiver(
+        dy = np.sign(forecast) * min(
+            ARROW_DY_MAX, ARROW_DY_MAX * abs(forecast)
+        )
+        ax2.quiver(
             anchor_x,
-            anchor_y,
-            BOTTOM_WINDOW,
+            ARROW_Y_BASE,
+            0,
             dy,
             angles="xy",
             scale_units="xy",
             scale=1,
-            color="red",
         )
-        ax1.scatter(anchor_x, anchor_y, color="red")
+        ax2.scatter(anchor_x, ARROW_Y_BASE, s=10)
 
     fig.suptitle("SOLUSD Discovery Simulation")
     ax1.grid(True)
