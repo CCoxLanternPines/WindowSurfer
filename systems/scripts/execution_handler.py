@@ -9,6 +9,7 @@ from systems.scripts.kraken_utils import load_kraken_keys
 from systems.scripts.kraken_utils import get_live_price
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.resolve_symbol import split_tag
+from systems.utils.quote_norm import norm_quote
 from systems.utils.snapshot import load_snapshot, prime_snapshot
 from systems.scripts.trade_apply import apply_buy
 
@@ -187,19 +188,26 @@ def execute_buy(
     currently unused as ``place_order`` pulls pricing from Kraken directly.
     """
 
-    expected_quote = "USDC" if ledger_name.upper().endswith("USDC") else "USD"
+    expected_raw = "USDC" if ledger_name.upper().endswith("USDC") else "USD"
     _, fiat_symbol = split_tag(pair_code)
-    actual_quote = fiat_symbol
-    if actual_quote != expected_quote:
+    got_raw = fiat_symbol
+    exp = norm_quote(expected_raw)
+    got = norm_quote(got_raw)
+    if exp != got:
         addlog(
-            f"[ABORT][QUOTE_MISMATCH] ledger={ledger_name} expected={expected_quote} got={actual_quote} pair={pair_code}",
+            f"[DEBUG][QUOTE_RAW] expected_raw={expected_raw} got_raw={got_raw}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        addlog(
+            f"[ABORT][QUOTE_MISMATCH] ledger={ledger_name} expected={exp} got={got} pair={pair_code}",
             verbose_int=1,
             verbose_state=verbose,
         )
         return {
             "error": "QUOTE_MISMATCH",
-            "expected": expected_quote,
-            "got": actual_quote,
+            "expected": exp,
+            "got": got,
             "pair": pair_code,
         }
 
@@ -304,18 +312,25 @@ def execute_sell(
     sell_price = price if price is not None else get_live_price(pair_code)
     usd_amount = coin_amount * sell_price
     _, fiat_symbol = split_tag(pair_code)
-    expected_quote = "USDC" if ledger_name.upper().endswith("USDC") else "USD"
-    actual_quote = fiat_symbol
-    if actual_quote != expected_quote:
+    expected_raw = "USDC" if ledger_name.upper().endswith("USDC") else "USD"
+    got_raw = fiat_symbol
+    exp = norm_quote(expected_raw)
+    got = norm_quote(got_raw)
+    if exp != got:
         addlog(
-            f"[ABORT][QUOTE_MISMATCH] ledger={ledger_name} expected={expected_quote} got={actual_quote} pair={pair_code}",
+            f"[DEBUG][QUOTE_RAW] expected_raw={expected_raw} got_raw={got_raw}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        addlog(
+            f"[ABORT][QUOTE_MISMATCH] ledger={ledger_name} expected={exp} got={got} pair={pair_code}",
             verbose_int=1,
             verbose_state=verbose,
         )
         return {
             "error": "QUOTE_MISMATCH",
-            "expected": expected_quote,
-            "got": actual_quote,
+            "expected": exp,
+            "got": got,
             "pair": pair_code,
         }
     result = place_order(

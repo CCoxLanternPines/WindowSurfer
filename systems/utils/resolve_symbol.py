@@ -1,6 +1,7 @@
 """Helpers for resolving symbol and ledger configuration."""
 
 from systems.utils.config import load_settings
+from systems.utils.quote_norm import norm_quote
 
 
 SETTINGS = load_settings()
@@ -31,7 +32,19 @@ def resolve_ccxt_symbols(settings: dict, ledger: str) -> tuple[str, str]:
     if ledger not in ledgers:
         raise ValueError(f"Ledger '{ledger}' not found in settings")
     cfg = ledgers[ledger]
-    return cfg.get("kraken_name", ""), cfg.get("binance_name", "")
+    kraken = cfg.get("kraken_name", "")
+    if "/" in kraken:
+        base, quote = kraken.split("/", 1)
+        kraken = f"{base}/{norm_quote(quote)}"
+    else:
+        kraken = norm_quote(kraken)
+
+    binance = cfg.get("binance_name", "")
+    if "/" in binance:
+        base_b, quote_b = binance.split("/", 1)
+        binance = f"{base_b}/{norm_quote(quote_b)}"
+
+    return kraken, binance
 
 
 def to_tag(symbol: str) -> str:
