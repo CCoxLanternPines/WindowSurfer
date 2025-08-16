@@ -24,16 +24,16 @@ WEIGHT_VOLUME = 0.2
 WEIGHT_VOLATILITY = 0.08
 
 # Forecast confidence threshold
-CONFIDENCE_THRESHOLD = 0.1  # only use forecasts above this
+CONFIDENCE_THRESHOLD = 0.05  # only use forecasts above this
 
 # Control line thresholds
-ENTRY_THRESHOLD = 0.2
-EXIT_THRESHOLD = 0.03
+ENTRY_THRESHOLD = 0.4
+EXIT_THRESHOLD = -0.1
 
 # Plotting constants
 CONTROL_PANEL_HEIGHTS = (4, 1)  # matplotlib height ratios for (price, control)
 ARROW_Y_BASE = -1.05  # baseline Y in control panel to place arrow tails
-ARROW_DY_MAX = 0.25  # max vertical arrow length (keeps within [-1.2, 1.2])
+ARROW_DY_MAX = 1  # max vertical arrow length (keeps within [-1.2, 1.2])
 ARROW_CONF_FILTER = max(CONFIDENCE_THRESHOLD, 2 * CONFIDENCE_THRESHOLD)
 
 
