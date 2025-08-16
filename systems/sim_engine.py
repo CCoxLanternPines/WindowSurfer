@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .scripts import evaluate_buy, evaluate_sell
-from .scripts.forecast_slope import forecast_slope_segment
+from .scripts.forecast_slope import forecast_stepwise
 
 
 # Step size (candles) for slope updates
@@ -84,42 +84,8 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     df["bottom_slope"] = slopes
     df["slope_angle"] = slope_angles
 
-    # Forecast slope with anchoring between segments
-    forecast_vals = [np.nan] * len(df)
-    last_anchor: float | None = None
-    forecast_errors = []
-
-    for i in range(0, len(df), BOTTOM_WINDOW):
-        end = min(i + BOTTOM_WINDOW, len(df))
-        y = df["close"].iloc[i:end].values
-        x = np.arange(len(y))
-        if len(y) > 1:
-            m, b = np.polyfit(x, y, 1)
-
-            # Forecast forward and anchor to previous segment
-            future = forecast_slope_segment(
-                df, i, end, m, b, BOTTOM_WINDOW, anchor_val=last_anchor
-            )
-
-            for j, val in enumerate(future):
-                if end + j < len(df):
-                    forecast_vals[end + j] = val
-
-            # Update anchor for continuity
-            last_anchor = future[-1]
-
-            # Log error: forecast endpoint vs. actual slope endpoint
-            actual_end = df["bottom_slope"].iloc[end - 1]
-            forecast_end = future[-1]
-            err = forecast_end - actual_end
-            forecast_errors.append(err)
-
-    df["forecast_slope"] = forecast_vals
-
-    # After loop: print summary accuracy
-    if forecast_errors:
-        avg_err = sum(abs(e) for e in forecast_errors) / len(forecast_errors)
-        print(f"[SIM] Forecast average error = {avg_err:.2f}")
+    # Stepwise forecast based on recent slope, volume, and breakout
+    df["forecast_slope"] = forecast_stepwise(df, BOTTOM_WINDOW)
 
     state: Dict[str, Any] = {}
     for _, candle in df.iterrows():
@@ -139,7 +105,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     ax1.plot(
         df["candle_index"],
         df["forecast_slope"],
-        label="Forecast Slope",
+        label="Stepwise Forecast",
         color="red",
         linestyle="--",
         alpha=0.8,
