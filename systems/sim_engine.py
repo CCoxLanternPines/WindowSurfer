@@ -30,6 +30,14 @@ CONFIDENCE_THRESHOLD = 0.1  # only use forecasts above this
 ENTRY_THRESHOLD = 0.2
 EXIT_THRESHOLD = 0.03
 
+# Pressure bias defaults
+PRESSURE_LOOKBACK = 200  # candles
+PRESSURE_SCALE = 0.5
+ENABLE_PRESSURE_BIAS = True
+
+# Control line style
+ENABLE_CONTROL_STEPS = False
+
 
 def parse_timeframe(tf: str) -> timedelta | None:
     match = re.match(r"(\d+)([dhmw])", tf)
@@ -67,7 +75,16 @@ def parse_window_size(window: str | int, base_candle: str = "1h") -> int:
             return int(delta.total_seconds() // (3600 * 24))
     raise TypeError(f"Unsupported window type: {type(window)}")
 
-def run_simulation(*, timeframe: str = "1m") -> None:
+def run_simulation(
+    *,
+    timeframe: str = "1m",
+    verbose: int = 0,
+    debug_plots: bool = False,
+    enable_pressure_bias: bool = ENABLE_PRESSURE_BIAS,
+    enable_control_steps: bool = ENABLE_CONTROL_STEPS,
+    pressure_lookback: int = PRESSURE_LOOKBACK,
+    pressure_scale: float = PRESSURE_SCALE,
+) -> None:
     """Run a simple simulation over SOLUSD candles."""
     file_path = "data/sim/SOLUSD_1h.csv"
     df = pd.read_csv(file_path)
@@ -228,50 +245,69 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     df["forecast_angle"] = forecast_angles
     df["confidence"] = forecast_confidences
 
+    # --- Pressure Bias Calculation ---
+    lb_min = df["close"].rolling(pressure_lookback, min_periods=1).min()
+    lb_max = df["close"].rolling(pressure_lookback, min_periods=1).max()
+    pos_series = (df["close"] - lb_min) / (lb_max - lb_min + 1e-9)
+    bias_series = (pos_series - 0.5) * 2 * pressure_scale
+    if not enable_pressure_bias:
+        bias_series = pd.Series(0.0, index=df.index)
+    df["pressure_bias"] = bias_series
+
     # --- Control Line Generation ---
     control_line: list[float] = []
-    signal_counts: Dict[float, int] = {}
-    for slope, conf in zip(df["forecast_angle"], df["confidence"]):
-        if slope >= 0 and conf >= ENTRY_THRESHOLD * 2:
-            val = 1.0
-        elif slope >= 0 and conf >= ENTRY_THRESHOLD:
-            val = 0.5
-        elif slope <= 0 and conf >= EXIT_THRESHOLD * 2:
-            val = -1.0
-        elif slope <= 0 and conf >= EXIT_THRESHOLD:
-            val = -0.5
-        else:
-            val = 0.0
-        control_line.append(val)
-        signal_counts[val] = signal_counts.get(val, 0) + 1
-
-    if control_line and control_line[-1] > 0:
-        last_val = control_line[-1]
-        signal_counts[last_val] -= 1
-        control_line[-1] = -1.0
-        signal_counts[-1.0] = signal_counts.get(-1.0, 0) + 1
+    if enable_control_steps:
+        for idx, (slope, conf, bias, pos) in enumerate(
+            zip(df["forecast_angle"], df["confidence"], bias_series, pos_series)
+        ):
+            if slope >= 0 and conf >= ENTRY_THRESHOLD * 2:
+                val = 1.0
+            elif slope >= 0 and conf >= ENTRY_THRESHOLD:
+                val = 0.5
+            elif slope <= 0 and conf >= EXIT_THRESHOLD * 2:
+                val = -1.0
+            elif slope <= 0 and conf >= EXIT_THRESHOLD:
+                val = -0.5
+            else:
+                val = 0.0
+            final_val = val + bias
+            final_val = max(-1.0, min(1.0, final_val))
+            control_line.append(final_val)
+            if verbose >= 3 and idx % 100 == 0:
+                print(f"[PRESSURE] pos={pos:.3f}, bias={bias:.3f}")
+        if control_line and control_line[-1] > 0:
+            control_line[-1] = -1.0
+    else:
+        for idx, (slope, bias, pos) in enumerate(
+            zip(df["forecast_angle"], bias_series, pos_series)
+        ):
+            val = slope + bias
+            val = max(-1.0, min(1.0, val))
+            control_line.append(val)
+            if verbose >= 3 and idx % 100 == 0:
+                print(f"[PRESSURE] pos={pos:.3f}, bias={bias:.3f}")
+        if control_line and control_line[-1] > 0:
+            control_line[-1] = -1.0
 
     df["control_line"] = control_line
 
-    total_signals = len([s for s in control_line if s != 0])
-    correct_signals = 0
+    # Directional accuracy of control line
+    dir_total = len(control_line)
+    dir_correct = 0
     weighted_correct = 0.0
-    total_signal_conf = 0.0
-    for idx, signal in enumerate(control_line):
-        if signal == 0:
-            continue
-        actual_sign = np.sign(df["slope_angle"].iloc[idx])
+    weight_total = 0.0
+    for idx, val in enumerate(control_line):
+        actual = df["slope_angle"].iloc[idx]
         conf = df["confidence"].iloc[idx]
-        if np.sign(signal) == actual_sign:
-            correct_signals += 1
-            weighted_correct += conf
-        total_signal_conf += conf
+        weight = abs(actual) * conf
+        if np.sign(val) == np.sign(actual):
+            dir_correct += 1
+            weighted_correct += weight
+        weight_total += weight
 
-    raw_signal_acc = (
-        (correct_signals / total_signals * 100) if total_signals else 0
-    )
+    raw_signal_acc = (dir_correct / dir_total * 100) if dir_total else 0
     weighted_signal_acc = (
-        (weighted_correct / total_signal_conf * 100) if total_signal_conf else 0
+        (weighted_correct / weight_total * 100) if weight_total else 0
     )
 
     raw_acc = (total_correct / total_forecasts * 100) if total_forecasts else 0
@@ -288,10 +324,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     )
 
     print(
-        f"[SIM] Control Line Accuracy: {raw_signal_acc:.2f}% | Weighted: {weighted_signal_acc:.2f}%"
-    )
-    print(
-        f"[SIM] Signal Counts -> +1: {signal_counts.get(1.0, 0)}, +0.5: {signal_counts.get(0.5, 0)}, 0: {signal_counts.get(0.0, 0)}, -0.5: {signal_counts.get(-0.5, 0)}, -1: {signal_counts.get(-1.0, 0)}"
+        f"[SIM] Control Line Directional Accuracy: {raw_signal_acc:.2f}% | Weighted: {weighted_signal_acc:.2f}%"
     )
 
     state: Dict[str, Any] = {}
@@ -312,20 +345,23 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     ax1.set_ylabel("Price")
     ax1.legend(loc="upper left")
 
-    ax2.step(
-        df["candle_index"], df["control_line"], where="mid", color="red"
-    )
+    if enable_control_steps:
+        ax2.step(
+            df["candle_index"], df["control_line"], where="mid", color="red"
+        )
+    else:
+        ax2.plot(df["candle_index"], df["control_line"], color="red")
+    if debug_plots and enable_pressure_bias:
+        ax2.plot(
+            df["candle_index"],
+            df["pressure_bias"],
+            linestyle="--",
+            color="gray",
+            label="Pressure Bias",
+        )
+        ax2.legend(loc="upper left")
     ax2.set_ylim(-1.2, 1.2)
     ax2.set_yticks([-1, -0.5, 0, 0.5, 1])
-    ax2.set_yticklabels(
-        [
-            "Dump Hard (-1)",
-            "Dump Light (-0.5)",
-            "Neutral (0)",
-            "Hold Light (+0.5)",
-            "Hold Hard (+1)",
-        ]
-    )
     ax2.set_xlabel("Candles (Index)")
     ax2.set_title("Control Line (Exit Oracle)")
 
