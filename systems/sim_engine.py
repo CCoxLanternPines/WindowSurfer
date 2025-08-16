@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .scripts import evaluate_buy, evaluate_sell
+from .scripts.forecast_slope import forecast_slope_segment
 
 
 # === Regime Detection Settings ===
@@ -71,6 +72,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     # Stepwise slope calculation
     slopes = [np.nan] * len(df)
     slope_angles = [np.nan] * len(df)
+    forecast_vals = [np.nan] * len(df)
     last_value = df["close"].iloc[0]
 
     for i in range(0, len(df), bottom_window):
@@ -84,12 +86,18 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             last_value = fitted[-1]
             slope_val = np.tanh(m)
             slope_angles[i:end] = [slope_val] * len(y)
+
+            future = forecast_slope_segment(df, i, end, m, b, bottom_window)
+            for j, val in enumerate(future):
+                if end + j < len(df):
+                    forecast_vals[end + j] = val
         else:
             slopes[i:end] = [last_value] * len(y)
             slope_angles[i:end] = [0] * len(y)
 
     df["bottom_slope"] = slopes
     df["slope_angle"] = slope_angles
+    df["forecast_slope"] = forecast_vals
 
     state: Dict[str, Any] = {}
     for _, candle in df.iterrows():
@@ -105,6 +113,14 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         color="black",
         linewidth=2,
         drawstyle="steps-post",
+    )
+    ax1.plot(
+        df["timestamp"],
+        df["forecast_slope"],
+        label="Forecast Slope",
+        color="red",
+        linestyle="--",
+        alpha=0.8,
     )
     ax1.set_ylabel("Price")
     ax1.legend(loc="upper left")
