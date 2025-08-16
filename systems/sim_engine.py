@@ -3,6 +3,7 @@ from __future__ import annotations
 """Very small historical simulation engine."""
 
 import csv
+import json
 import os
 import re
 from datetime import timedelta
@@ -11,6 +12,7 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from systems.scripts.math.slope_score import classify_slope
 
 
 # Box visualization knobs
@@ -23,8 +25,6 @@ BAR_ALPHA = 0.7
 STRONG_MOVE_THRESHOLD = 0.15   # slightly easier "strong move"
 
 # Prediction filters
-SLOPE_THRESHOLD = 0.5          # medium-steep slopes allowed
-VOLATILITY_MAX = 12.0          # tolerate more volatility before skipping
 RANGE_MIN = 0.08               # only 8%+ range windows matter
 VOLUME_SKEW_BIAS = 0.4         # allow moderate skew to count
 
@@ -35,6 +35,15 @@ COLOR_MAP = {
     1: "lightgreen",
     2: "darkgreen",
 }
+
+# Load optional configuration knobs
+try:
+    with open("settings/config.json", "r") as _cfg:
+        CONFIG = json.load(_cfg)
+except FileNotFoundError:  # pragma: no cover - optional config
+    CONFIG = {}
+
+FLAT_BAND_DEG = float(CONFIG.get("flat_band_deg", 10.0))
 
 FEATURES_CSV = "data/window_features.csv"
 
@@ -64,16 +73,13 @@ def parse_timeframe(tf: str) -> timedelta | None:
 
 def rule_predict(features: dict[str, float]) -> int:
     """Classify next window move with multi-feature rules."""
-    global SLOPE_SKIPS, VOLATILITY_SKIPS, RANGE_SKIPS, SKEW_HITS
+    global SLOPE_SKIPS, RANGE_SKIPS, SKEW_HITS
 
     slope = features.get("slope", 0.0)
-    volatility = features.get("volatility", 0.0)
     rng = features.get("range", 0.0)
 
-    # Scale slope requirement based on volatility
-    scale = volatility / VOLATILITY_MAX if VOLATILITY_MAX else 1.0
-    scaled_threshold = SLOPE_THRESHOLD * scale
-    if abs(slope) < scaled_threshold:
+    slope_cls = classify_slope(slope, FLAT_BAND_DEG)
+    if slope_cls == 0:
         SLOPE_SKIPS += 1
         return 0
     if rng < RANGE_MIN:
@@ -81,10 +87,10 @@ def rule_predict(features: dict[str, float]) -> int:
         return 0
 
     skew = features.get("volume_skew", 0.0)
-    if skew > VOLUME_SKEW_BIAS and slope > 0:
+    if skew > VOLUME_SKEW_BIAS and slope_cls > 0:
         SKEW_HITS += 1
         return 1
-    if skew < -VOLUME_SKEW_BIAS and slope < 0:
+    if skew < -VOLUME_SKEW_BIAS and slope_cls < 0:
         SKEW_HITS += 1
         return -1
 
