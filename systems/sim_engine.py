@@ -11,8 +11,8 @@ import pandas as pd
 
 
 # Box visualization knobs
-WINDOW_SIZE = 200   # candles per box
-STEP_SIZE = 50      # rolling step
+WINDOW_SIZE = 150   # candles per box
+STEP_SIZE = 150     # rolling step
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
