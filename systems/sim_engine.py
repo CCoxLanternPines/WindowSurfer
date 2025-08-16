@@ -15,18 +15,18 @@ import pandas as pd
 
 # Box visualization knobs
 WINDOW_SIZE = 24   # candles per box
-STEP_SIZE = 24     # rolling step
+STEP_SIZE = 2    # rolling step
 BAR_COLOR = "orange"
 BAR_ALPHA = 0.7
 
 # Percent-change grading
-STRONG_MOVE_THRESHOLD = 0.20  # 20% move is considered strong
+STRONG_MOVE_THRESHOLD = 0.15   # slightly easier "strong move"
 
 # Prediction filters
-SLOPE_THRESHOLD = 0.50
-VOLATILITY_MAX = 5.0
-RANGE_MIN = 0.05
-VOLUME_SKEW_BIAS = 0.2
+SLOPE_THRESHOLD = 0.5          # medium-steep slopes allowed
+VOLATILITY_MAX = 12.0          # tolerate more volatility before skipping
+RANGE_MIN = 0.08               # only 8%+ range windows matter
+VOLUME_SKEW_BIAS = 0.4         # allow moderate skew to count
 
 COLOR_MAP = {
     -2: "darkred",
