@@ -15,16 +15,16 @@ from .scripts import evaluate_buy, evaluate_sell
 
 # Step size (candles) for slope updates
 # If < 1, treated as fraction of dataset length
-DEFAULT_BOTTOM_WINDOW = 0.1
+DEFAULT_BOTTOM_WINDOW = "24h"
 
 # Forecast weights
 WEIGHT_PERSISTENCE = 0.5
 WEIGHT_ERROR = 0.2
 WEIGHT_VOLUME = 0.2
-WEIGHT_VOLATILITY = 0.1
+WEIGHT_VOLATILITY = 0.08
 
 # Forecast confidence threshold
-CONFIDENCE_THRESHOLD = 0.25  # only use forecasts above this
+CONFIDENCE_THRESHOLD = 0.2  # only use forecasts above this
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
@@ -43,6 +43,26 @@ def parse_timeframe(tf: str) -> timedelta | None:
     return None
 
 
+def parse_window_size(window: str | int, base_candle: str = "1h") -> int:
+    """
+    Convert a string like '2d', '1w', '1m' into number of candles,
+    assuming each candle = 1h by default.
+    If already an int, just return it.
+    """
+    if isinstance(window, int):
+        return window
+    if isinstance(window, float):  # legacy % values
+        return max(1, int(len(df) * window))  # careful: df must exist here
+    if isinstance(window, str):
+        delta = parse_timeframe(window)
+        if not delta:
+            raise ValueError(f"Could not parse window size: {window}")
+        if base_candle == "1h":
+            return int(delta.total_seconds() // 3600)
+        if base_candle == "1d":
+            return int(delta.total_seconds() // (3600 * 24))
+    raise TypeError(f"Unsupported window type: {type(window)}")
+
 def run_simulation(*, timeframe: str = "1m") -> None:
     """Run a simple simulation over SOLUSD candles."""
     file_path = "data/sim/SOLUSD_1h.csv"
@@ -57,11 +77,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     df = df.reset_index(drop=True)
     df["candle_index"] = range(len(df))
 
-    total_candles = len(df)
-    if DEFAULT_BOTTOM_WINDOW < 1:
-        BOTTOM_WINDOW = max(1, int(total_candles * DEFAULT_BOTTOM_WINDOW))
-    else:
-        BOTTOM_WINDOW = int(DEFAULT_BOTTOM_WINDOW)
+    BOTTOM_WINDOW = parse_window_size(DEFAULT_BOTTOM_WINDOW)
 
     print(
         f"[SIM] Using BOTTOM_WINDOW={BOTTOM_WINDOW} (derived from {DEFAULT_BOTTOM_WINDOW})"
