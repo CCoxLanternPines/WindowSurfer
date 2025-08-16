@@ -16,7 +16,7 @@ from .scripts.forecast_slope import forecast_slope_segment
 
 # Step size (candles) for slope updates
 # If < 1, treated as fraction of dataset length
-DEFAULT_BOTTOM_WINDOW = 0.3
+DEFAULT_BOTTOM_WINDOW = 0.1
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
