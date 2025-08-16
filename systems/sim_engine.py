@@ -3,7 +3,6 @@ from __future__ import annotations
 """Very small historical simulation engine."""
 
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Dict, Any
 
 import matplotlib.pyplot as plt
@@ -30,12 +29,12 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         evaluate_buy.evaluate_buy(candle.to_dict(), state)
         evaluate_sell.evaluate_sell(candle.to_dict(), state)
 
-    out_path = Path("data/tmp/discovery.png")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.figure(figsize=(10, 5))
-    plt.plot(df["timestamp"], df["close"], label="Close")
-    plt.plot(df["timestamp"], df["delta"], label="Delta")
+    plt.figure(figsize=(12, 6))
+    plt.plot(df["timestamp"], df["close"], label="Close Price")
+    plt.plot(df["timestamp"], df["delta"], label="Delta Line")
+    plt.xlabel("Time")
+    plt.ylabel("Price / Delta")
     plt.legend()
-    plt.tight_layout()
-    plt.savefig(out_path)
-    plt.close()
+    plt.title("SOLUSD Discovery Simulation")
+    plt.grid(True)
+    plt.show()
