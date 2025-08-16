@@ -45,6 +45,10 @@ except FileNotFoundError:  # pragma: no cover - optional config
 
 FLAT_BAND_DEG = float(CONFIG.get("flat_band_deg", 10.0))
 
+PRESSURE_DECAY = float(CONFIG.get("pressure_decay", 0.1))
+BUY_THRESHOLD = float(CONFIG.get("buy_threshold", 1.0))
+SELL_THRESHOLD = float(CONFIG.get("sell_threshold", 1.0))
+
 FEATURES_CSV = "data/window_features.csv"
 
 
@@ -128,6 +132,9 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     last_features: dict[str, float] | None = None
     results: list[tuple[int, int]] = []  # (pred, actual)
 
+    buy_pressure = 0.0
+    sell_pressure = 0.0
+
     os.makedirs(os.path.dirname(FEATURES_CSV), exist_ok=True)
 
     for start in range(0, len(df) - WINDOW_SIZE, STEP_SIZE):
@@ -152,6 +159,24 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         if last_features is not None:
             pred = rule_predict(last_features)
             markers.append((start, level, pred))
+
+            if pred > 0:  # upward prediction
+                buy_pressure += 1.0
+                sell_pressure = max(0, sell_pressure - 0.5)  # buy suppresses sell
+            elif pred < 0:  # downward prediction
+                sell_pressure += 1.0
+                buy_pressure = max(0, buy_pressure - 0.5)  # sell suppresses buy
+            else:  # neutral
+                buy_pressure = max(0, buy_pressure - PRESSURE_DECAY)
+                sell_pressure = max(0, sell_pressure - PRESSURE_DECAY)
+
+            if buy_pressure >= BUY_THRESHOLD:
+                ax1.scatter(start, level, marker="o", color="green", zorder=6)
+                buy_pressure = 0  # reset
+
+            if sell_pressure >= SELL_THRESHOLD:
+                ax1.scatter(start, level, marker="o", color="red", zorder=6)
+                sell_pressure = 0  # reset
 
         closes = sub["close"].values
         x = np.arange(len(closes))
@@ -216,6 +241,8 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         last_features = {k: v for k, v in features.items() if k != "label"}
 
     ax1.plot([], [], color=BAR_COLOR, alpha=BAR_ALPHA, linewidth=1.5, label="Window Entry")
+    ax1.scatter([], [], marker="o", color="green", label="Buy (Pressure)")
+    ax1.scatter([], [], marker="o", color="red", label="Sell (Pressure)")
     for start, end, level in bars:
         ax1.hlines(
             y=level,
