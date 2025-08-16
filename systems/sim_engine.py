@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing import Any, Dict
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from .scripts import evaluate_buy, evaluate_sell
@@ -14,7 +15,10 @@ from .scripts import evaluate_buy, evaluate_sell
 
 # === Regime Detection Settings ===
 SHORT_MA = 10   # short moving average lookback (candles)
-LONG_MA  = 50   # long moving average lookback (candles)
+LONG_MA = 50    # long moving average lookback (candles)
+
+# Step size (candles) for slope updates
+BOTTOM_WINDOW = 10
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
@@ -57,22 +61,59 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         (df["delta"] - df["delta"].min()) * scale + df["close"].min()
     )
 
+    # Stepwise slope calculation
+    slopes = [np.nan] * len(df)
+    slope_angles = [np.nan] * len(df)
+
+    for i in range(0, len(df), BOTTOM_WINDOW):
+        end = min(i + BOTTOM_WINDOW, len(df))
+        y = df["close"].iloc[i:end].values
+        x = np.arange(len(y))
+        if len(y) > 1:
+            m, b = np.polyfit(x, y, 1)
+            fitted = m * x + b
+            slopes[i:end] = fitted
+            slope_val = np.tanh(m)
+            slope_angles[i:end] = [slope_val] * len(y)
+        else:
+            slopes[i:end] = [y[-1]] * len(y)
+            slope_angles[i:end] = [0] * len(y)
+
+    df["bottom_slope"] = slopes
+    df["slope_angle"] = slope_angles
+
     state: Dict[str, Any] = {}
     for _, candle in df.iterrows():
         evaluate_buy.evaluate_buy(candle.to_dict(), state)
         evaluate_sell.evaluate_sell(candle.to_dict(), state)
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(df["timestamp"], df["close"], label="Close Price", color="blue")
-    plt.plot(
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+    ax1.plot(df["timestamp"], df["close"], label="Close Price", color="blue")
+    ax1.plot(
         df["timestamp"],
-        df["norm_delta"],
-        label=f"Delta ({SHORT_MA}-{LONG_MA})",
-        color="red",
+        df["bottom_slope"],
+        label=f"Slope Line ({BOTTOM_WINDOW})",
+        color="black",
+        linewidth=2,
+        drawstyle="steps-post",
     )
-    plt.xlabel("Time")
-    plt.ylabel("Price / Scaled Delta")
+    ax1.set_ylabel("Price")
+    ax1.legend(loc="upper left")
+
+    ax2 = ax1.twinx()
+    ax2.plot(
+        df["timestamp"],
+        df["slope_angle"],
+        label="Slope Angle [-1,1]",
+        color="green",
+        alpha=0.6,
+        drawstyle="steps-post",
+    )
+    ax2.set_ylim(-1, 1)
+    ax2.set_ylabel("Slope Angle")
+    ax2.axhline(0, color="gray", linestyle="--", linewidth=1)
+    ax2.legend(loc="lower right")
+
     plt.title("SOLUSD Discovery Simulation")
-    plt.legend()
     plt.grid(True)
     plt.show()
