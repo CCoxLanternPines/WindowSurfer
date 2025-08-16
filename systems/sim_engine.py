@@ -14,6 +14,8 @@ import pandas as pd
 # Box visualization knobs
 WINDOW_SIZE = 150   # candles per box
 STEP_SIZE = 150     # rolling step
+BAR_COLOR = "orange"
+BAR_ALPHA = 0.7
 
 # Reversal detection knobs
 SLOPE_WINDOW = 8        # candles for slope calc
@@ -117,6 +119,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
                 zorder=5,
             )
 
+    bars: list[tuple[int, int, float]] = []
     for start in range(0, len(df) - WINDOW_SIZE, STEP_SIZE):
         end = start + WINDOW_SIZE
         sub = df.iloc[start:end]
@@ -132,6 +135,19 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             facecolor="none",
         )
         ax1.add_patch(rect)
+        level = float(df.iloc[start]["close"])
+        bars.append((start, end, level))
+
+    ax1.plot([], [], color=BAR_COLOR, alpha=BAR_ALPHA, linewidth=1.5, label="Window Entry")
+    for start, end, level in bars:
+        ax1.hlines(
+            y=level,
+            xmin=start,
+            xmax=end,
+            colors=BAR_COLOR,
+            linewidth=1.5,
+            alpha=BAR_ALPHA,
+        )
 
     ax1.set_title("Rolling Window Box Visualization")
     ax1.set_xlabel("Candles (Index)")
