@@ -15,7 +15,7 @@ from .scripts import evaluate_buy, evaluate_sell
 
 # Step size (candles) for slope updates
 # If < 1, treated as fraction of dataset length
-DEFAULT_BOTTOM_WINDOW = "24h"
+DEFAULT_BOTTOM_WINDOW = "2d"
 
 # Forecast weights
 WEIGHT_PERSISTENCE = 0.5
@@ -24,11 +24,11 @@ WEIGHT_VOLUME = 0.2
 WEIGHT_VOLATILITY = 0.08
 
 # Forecast confidence threshold
-CONFIDENCE_THRESHOLD = 0.1  # only use forecasts above this
+CONFIDENCE_THRESHOLD = 0.5 # only use forecasts above this
 
 # Control line thresholds
-ENTRY_THRESHOLD = 0.2
-EXIT_THRESHOLD = 0.03
+ENTRY_THRESHOLD = 0.1
+EXIT_THRESHOLD = -.1
 
 # Plotting constants
 CONTROL_PANEL_HEIGHTS = (4, 1)  # matplotlib height ratios for (price, control)
@@ -231,6 +231,21 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     df["forecast_angle"] = forecast_angles
     df["confidence"] = forecast_confidences
 
+
+    # --- Generate buys on upward forecast arrows ---
+    buy_points = []
+    for start in range(0, len(df), BOTTOM_WINDOW):
+        anchor_x = df["candle_index"].iloc[start]
+        anchor_y = df["close"].iloc[start]
+        forecast = df["forecast_angle"].iloc[start]
+        conf = df["confidence"].iloc[start]
+
+        if np.isnan(forecast) or conf < CONFIDENCE_THRESHOLD:
+            continue
+
+        if forecast > 0:  # upward forecast = buy
+            buy_points.append((anchor_x, anchor_y))
+
     # --- Control Line Generation ---
     control_line: list[float] = []
     signal_counts: Dict[float, int] = {}
@@ -291,15 +306,6 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         f"[SIM] Signal Counts -> +1: {signal_counts.get(1.0, 0)}, +0.5: {signal_counts.get(0.5, 0)}, 0: {signal_counts.get(0.0, 0)}, -0.5: {signal_counts.get(-0.5, 0)}, -1: {signal_counts.get(-1.0, 0)}"
     )
 
-    state: Dict[str, Any] = {}
-    buy_points = []
-    for _, candle in df.iterrows():
-        before_state = dict(state)
-        evaluate_buy.evaluate_buy(candle.to_dict(), state)
-        if state.get("last_action") == "buy":
-            buy_points.append((candle["candle_index"], candle["close"]))
-        evaluate_sell.evaluate_sell(candle.to_dict(), state)
-
     fig, (ax1, ax2) = plt.subplots(
         2,
         1,
@@ -319,14 +325,10 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     if buy_points:
         bx, by = zip(*buy_points)
         ax1.scatter(
-            bx,
-            by,
-            s=80,
-            color="green",
-            edgecolor="black",
-            zorder=5,
-            marker="o",
-            label=f"Buys ({len(buy_points)})",
+            bx, by,
+            s=80, color="green", edgecolor="black",
+            zorder=5, marker="o",
+            label=f"Buys ({len(buy_points)})"
         )
     ax1.set_ylabel("Price")
     ax1.legend(loc="upper left")
