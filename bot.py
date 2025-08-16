@@ -35,7 +35,7 @@ def main() -> None:
         dest="enable_control_steps",
         action="store_true",
         default=sim_engine.ENABLE_CONTROL_STEPS,
-        help="Use stepped control line",
+        help="Use stepped control line instead of continuous",
     )
     parser.add_argument(
         "--debug-plots", action="store_true", help="Show pressure bias overlay"
