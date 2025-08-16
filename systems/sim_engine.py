@@ -23,6 +23,9 @@ WEIGHT_ERROR = 0.2
 WEIGHT_VOLUME = 0.2
 WEIGHT_VOLATILITY = 0.1
 
+# Forecast confidence threshold
+CONFIDENCE_THRESHOLD = 0.25  # only use forecasts above this
+
 
 def parse_timeframe(tf: str) -> timedelta | None:
     match = re.match(r"(\d+)([dhmw])", tf)
@@ -89,10 +92,22 @@ def run_simulation(*, timeframe: str = "1m") -> None:
 
     # Forward slope forecasting
     forecast_angles = [np.nan] * len(df)
+    forecast_confidences = [np.nan] * len(df)
 
     # track persistence (consecutive slope runs)
     last_slope_sign = 0
     persistence_count = 0
+
+    # accuracy tracking
+    total_forecasts = 0
+    total_correct = 0
+    total_weighted = 0.0
+    total_conf = 0.0
+
+    total_filtered = 0
+    correct_filtered = 0
+    weighted_filtered = 0.0
+    conf_filtered = 0.0
 
     for i in range(0, len(df), BOTTOM_WINDOW):
         end = min(i + BOTTOM_WINDOW, len(df))
@@ -162,10 +177,49 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             # clamp [-1,1]
             forecast_angle = max(-1, min(1, forecast_angle))
 
+            # Confidence = absolute value of forecast angle
+            confidence = abs(forecast_angle)
+
+            # actual slope sign
+            actual_sign = np.sign(actual_angle)
+            pred_sign = np.sign(forecast_angle)
+
+            # --- raw accuracy ---
+            total_forecasts += 1
+            if pred_sign == actual_sign:
+                total_correct += 1
+            total_weighted += (1 if pred_sign == actual_sign else 0) * confidence
+            total_conf += confidence
+
+            # --- filtered accuracy ---
+            if confidence >= CONFIDENCE_THRESHOLD:
+                total_filtered += 1
+                if pred_sign == actual_sign:
+                    correct_filtered += 1
+                weighted_filtered += (
+                    (1 if pred_sign == actual_sign else 0) * confidence
+                )
+                conf_filtered += confidence
+
             # assign to full window
             forecast_angles[i:end] = [forecast_angle] * (end - i)
+            forecast_confidences[i:end] = [confidence] * (end - i)
 
     df["forecast_angle"] = forecast_angles
+    df["confidence"] = forecast_confidences
+
+    raw_acc = (total_correct / total_forecasts * 100) if total_forecasts else 0
+    raw_weighted = (total_weighted / total_conf * 100) if total_conf else 0
+    filt_acc = (correct_filtered / total_filtered * 100) if total_filtered else 0
+    filt_weighted = (weighted_filtered / conf_filtered * 100) if conf_filtered else 0
+
+    print(f"[SIM] Raw Accuracy: {raw_acc:.2f}% | Weighted: {raw_weighted:.2f}%")
+    print(
+        f"[SIM] Filtered Accuracy (conf ≥ {CONFIDENCE_THRESHOLD}): {filt_acc:.2f}% | Weighted: {filt_weighted:.2f}%"
+    )
+    print(
+        f"[SIM] Forecasts: {total_forecasts}, Used: {total_filtered}, Skipped: {total_forecasts - total_filtered}"
+    )
 
     state: Dict[str, Any] = {}
     for _, candle in df.iterrows():
@@ -188,20 +242,14 @@ def run_simulation(*, timeframe: str = "1m") -> None:
 
     # Plot forecast arrows and anchor dots
     price_scale = df["close"].std() * 0.5
-    forecast_windows = 0
-    correct = 0
-    incorrect = 0
-    weighted_correct = 0.0
-    weight_sum = 0.0
 
     for start in range(0, len(df), BOTTOM_WINDOW):
         anchor_x = df["candle_index"].iloc[start]
         anchor_y = df["close"].iloc[start]
         forecast = df["forecast_angle"].iloc[start]
-        actual = df["slope_angle"].iloc[start]
-        if np.isnan(forecast) or np.isnan(actual):
+        conf = df["confidence"].iloc[start]
+        if np.isnan(forecast) or conf < CONFIDENCE_THRESHOLD:
             continue
-        forecast_windows += 1
         sign = np.sign(forecast)
         magnitude = abs(forecast)
         dy = sign * magnitude * price_scale
@@ -216,24 +264,6 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             color="red",
         )
         ax1.scatter(anchor_x, anchor_y, color="red")
-
-        if np.sign(actual) == sign:
-            correct += 1
-            weighted_correct += magnitude
-        else:
-            incorrect += 1
-        weight_sum += magnitude
-
-    accuracy = (correct / forecast_windows * 100) if forecast_windows else 0.0
-    weighted_accuracy = (
-        weighted_correct / weight_sum * 100 if weight_sum else 0.0
-    )
-
-    print(f"Forecast windows: {forecast_windows}")
-    print(f"Correct: {correct}")
-    print(f"Incorrect: {incorrect}")
-    print(f"Accuracy: {accuracy:.2f}%")
-    print(f"Weighted Accuracy: {weighted_accuracy:.2f}%")
 
     plt.title("SOLUSD Discovery Simulation")
     plt.grid(True)
