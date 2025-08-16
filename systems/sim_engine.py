@@ -21,6 +21,13 @@ BAR_ALPHA = 0.7
 
 # Percent-change grading
 STRONG_MOVE_THRESHOLD = 0.20  # 20% move is considered strong
+
+# Prediction filters
+SLOPE_THRESHOLD = 0.50
+VOLATILITY_MAX = 10.0
+RANGE_MIN = 0.1
+VOLUME_SKEW_BIAS = 0.2
+
 COLOR_MAP = {
     -2: "darkred",
     -1: "pink",
@@ -30,6 +37,12 @@ COLOR_MAP = {
 }
 
 FEATURES_CSV = "data/window_features.csv"
+
+
+# Debug counters for filter skips
+SLOPE_SKIPS = 0
+VOLATILITY_SKIPS = 0
+RANGE_SKIPS = 0
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
@@ -49,8 +62,31 @@ def parse_timeframe(tf: str) -> timedelta | None:
 
 
 def rule_predict(features: dict[str, float]) -> int:
-    """Classify next window move using percent-change categories."""
+    """Classify next window move with multi-feature rules."""
+    global SLOPE_SKIPS, VOLATILITY_SKIPS, RANGE_SKIPS
+
+    slope = features.get("slope", 0.0)
+    volatility = features.get("volatility", 0.0)
+    rng = features.get("range", 0.0)
+
+    if abs(slope) < SLOPE_THRESHOLD:
+        SLOPE_SKIPS += 1
+        return 0
+    if volatility > VOLATILITY_MAX:
+        VOLATILITY_SKIPS += 1
+        return 0
+    if rng < RANGE_MIN:
+        RANGE_SKIPS += 1
+        return 0
+
     pct = features.get("pct_change", 0.0)
+    volume_skew = features.get("volume_skew", 0.0)
+
+    if volume_skew > VOLUME_SKEW_BIAS and slope > 0:
+        pct = abs(pct)
+    elif volume_skew < -VOLUME_SKEW_BIAS and slope < 0:
+        pct = -abs(pct)
+
     if pct >= STRONG_MOVE_THRESHOLD:
         return 2
     if pct > 0:
@@ -206,6 +242,9 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     w_acc = 100 * correct_w / total_w if total_w else 0.0
     print(
         f"Predictions made: {made} Correct: {correct} Accuracy: {acc:.2f}% Weighted: {w_acc:.2f}%"
+    )
+    print(
+        f"Skipped: slope={SLOPE_SKIPS} volatility={VOLATILITY_SKIPS} range={RANGE_SKIPS}"
     )
 
     plt.show()
