@@ -17,8 +17,8 @@ from systems.scripts.math.slope_score import classify_slope
 # Box visualization knobs
 WINDOW_SIZE = 24  # candles per box
 WINDOW_STEP = 2   # rolling step
-WINDOW_COLOR = "orange"
-WINDOW_ALPHA = 0.5
+WINDOW_EDGE_COLOR = "orange"
+WINDOW_ALPHA = 0.3
 
 # Percent-change grading
 STRONG_MOVE_THRESHOLD = 0.15   # slightly easier "strong move"
@@ -44,9 +44,9 @@ except FileNotFoundError:  # pragma: no cover - optional config
 
 FLAT_BAND_DEG = float(CONFIG.get("flat_band_deg", 10.0))
 
-PRESSURE_DECAY = float(CONFIG.get("pressure_decay", 0.1))
-BUY_THRESHOLD = float(CONFIG.get("buy_threshold", 1.0))
-SELL_THRESHOLD = float(CONFIG.get("sell_threshold", 1.0))
+MAX_PRESSURE = 10.0
+BUY_TRIGGER = 3.0
+SELL_TRIGGER = 3.0
 
 FEATURES_CSV = "data/window_features.csv"
 
@@ -131,9 +131,10 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         ax1.axvspan(
             df["candle_index"].iloc[start],
             df["candle_index"].iloc[end - 1],
-            color=WINDOW_COLOR,
+            facecolor="none",
+            edgecolor=WINDOW_EDGE_COLOR,
             alpha=WINDOW_ALPHA,
-            linewidth=0,
+            linewidth=1,
         )
 
     markers: list[tuple[int, float, int]] = []  # (start_idx, price, prediction)
@@ -143,8 +144,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     buy_pressure = 0.0
     sell_pressure = 0.0
 
-    capital = 100.0
-    open_notes: list[float] = []
+    open_notes: list[tuple[float, float]] = []  # (price, size)
     realized_pnl = 0.0
 
     os.makedirs(os.path.dirname(FEATURES_CSV), exist_ok=True)
@@ -163,49 +163,62 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             markers.append((start, level, pred))
 
             if pred > 0:  # upward prediction
-                buy_pressure += 1.0
-                sell_pressure = max(0, sell_pressure - 0.5)  # buy suppresses sell
+                buy_pressure = min(MAX_PRESSURE, buy_pressure + 1)
+                sell_pressure = max(0.0, sell_pressure - 2)
             elif pred < 0:  # downward prediction
-                sell_pressure += 1.0
-                buy_pressure = max(0, buy_pressure - 0.5)  # sell suppresses buy
+                sell_pressure = min(MAX_PRESSURE, sell_pressure + 1)
+                buy_pressure = max(0.0, buy_pressure - 2)
             else:  # neutral
-                buy_pressure = max(0, buy_pressure - PRESSURE_DECAY)
-                sell_pressure = max(0, sell_pressure - PRESSURE_DECAY)
+                buy_pressure = max(0.0, buy_pressure - 0.5)
+                sell_pressure = max(0.0, sell_pressure - 0.5)
 
             candle = df.iloc[start]
+            print(
+                f"[PRESSURE] candle={candle['candle_index']} buy={buy_pressure:.1f} sell={sell_pressure:.1f}"
+            )
 
-            if buy_pressure >= BUY_THRESHOLD:
-                print(
-                    f"[BUY] candle={candle['candle_index']} price={candle['close']} pressure={buy_pressure:.2f}"
-                )
+            if buy_pressure >= BUY_TRIGGER:
+                trade_size = buy_pressure / MAX_PRESSURE
+                open_notes.append((candle["close"], trade_size))
                 ax1.scatter(
                     candle["candle_index"],
                     candle["close"],
                     color="green",
                     s=120,
                     zorder=6,
-                    label="Buy",
                 )
-                open_notes.append(candle["close"])
+                print(
+                    f"[BUY] candle={candle['candle_index']} price={candle['close']} size={trade_size:.2f}"
+                )
                 buy_pressure = 0.0
 
-            if sell_pressure >= SELL_THRESHOLD:
-                if open_notes:
-                    avg_entry = sum(open_notes) / len(open_notes)
-                    pnl = (candle["close"] - avg_entry) * len(open_notes)
-                    realized_pnl += pnl
-                    open_notes = []
-                    print(
-                        f"[SELL] candle={candle['candle_index']} price={candle['close']} pnl={pnl:.2f} total={realized_pnl:.2f}"
-                    )
-                    ax1.scatter(
-                        candle["candle_index"],
-                        candle["close"],
-                        color="red",
-                        s=120,
-                        zorder=6,
-                        label="Sell",
-                    )
+            if sell_pressure >= SELL_TRIGGER and open_notes:
+                total_size = sum(size for _, size in open_notes)
+                sell_frac = sell_pressure / MAX_PRESSURE
+                trade_size = sell_frac * total_size
+                remaining = trade_size
+                pnl = 0.0
+                while remaining > 1e-9 and open_notes:
+                    entry_price, entry_size = open_notes[0]
+                    if entry_size <= remaining:
+                        pnl += (candle["close"] - entry_price) * entry_size
+                        remaining -= entry_size
+                        open_notes.pop(0)
+                    else:
+                        pnl += (candle["close"] - entry_price) * remaining
+                        open_notes[0] = (entry_price, entry_size - remaining)
+                        remaining = 0.0
+                realized_pnl += pnl
+                ax1.scatter(
+                    candle["candle_index"],
+                    candle["close"],
+                    color="red",
+                    s=120,
+                    zorder=6,
+                )
+                print(
+                    f"[SELL] candle={candle['candle_index']} price={candle['close']} size={trade_size:.2f} pnl={pnl:.2f} total={realized_pnl:.2f}"
+                )
                 sell_pressure = 0.0
 
         closes = sub["close"].values
@@ -270,7 +283,15 @@ def run_simulation(*, timeframe: str = "1m") -> None:
 
         last_features = {k: v for k, v in features.items() if k != "label"}
 
-    ax1.axvspan(0, 0, color=WINDOW_COLOR, alpha=WINDOW_ALPHA, linewidth=0, label="Rolling Window")
+    ax1.axvspan(
+        0,
+        0,
+        facecolor="none",
+        edgecolor=WINDOW_EDGE_COLOR,
+        alpha=WINDOW_ALPHA,
+        linewidth=1,
+        label="Rolling Window",
+    )
     ax1.scatter([], [], color="green", s=120, label="Buy")
     ax1.scatter([], [], color="red", s=120, label="Sell")
 
@@ -304,7 +325,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         f"Skipped: slope={SLOPE_SKIPS} volatility={VOLATILITY_SKIPS} range={RANGE_SKIPS} skew_hits={SKEW_HITS}"
     )
 
-    print(f"[RESULT] Final realized PnL={realized_pnl:.2f}, Capital={capital + realized_pnl:.2f}")
+    print(f"[RESULT] PnL={realized_pnl:.2f}, Remaining Notes={len(open_notes)}")
 
     plt.show()
 
