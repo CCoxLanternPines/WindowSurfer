@@ -292,12 +292,13 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     )
 
     state: Dict[str, Any] = {}
+    buy_points = []
     for _, candle in df.iterrows():
+        before_state = dict(state)
         evaluate_buy.evaluate_buy(candle.to_dict(), state)
+        if state.get("last_action") == "buy":
+            buy_points.append((candle["candle_index"], candle["close"]))
         evaluate_sell.evaluate_sell(candle.to_dict(), state)
-
-    buy_indices = state.get("buys", [])
-    buy_prices = df.loc[buy_indices, "close"].tolist() if buy_indices else []
 
     fig, (ax1, ax2) = plt.subplots(
         2,
@@ -315,7 +316,18 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         linewidth=2,
         drawstyle="steps-post",
     )
-    ax1.scatter(buy_indices, buy_prices, marker="o", s=40, color="green", label="Buys")
+    if buy_points:
+        bx, by = zip(*buy_points)
+        ax1.scatter(
+            bx,
+            by,
+            s=80,
+            color="green",
+            edgecolor="black",
+            zorder=5,
+            marker="o",
+            label=f"Buys ({len(buy_points)})",
+        )
     ax1.set_ylabel("Price")
     ax1.legend(loc="upper left")
 
