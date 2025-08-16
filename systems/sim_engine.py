@@ -32,9 +32,6 @@ EXIT_THRESHOLD = 0.03
 
 # Plotting constants
 CONTROL_PANEL_HEIGHTS = (4, 1)  # matplotlib height ratios for (price, control)
-ARROW_Y_BASE = -1.05  # baseline Y in control panel to place arrow tails
-ARROW_DY_MAX = 0.25  # max vertical arrow length (keeps within [-1.2, 1.2])
-ARROW_CONF_FILTER = max(CONFIDENCE_THRESHOLD, 2 * CONFIDENCE_THRESHOLD)
 
 
 def parse_timeframe(tf: str) -> timedelta | None:
@@ -299,6 +296,9 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         evaluate_buy.evaluate_buy(candle.to_dict(), state)
         evaluate_sell.evaluate_sell(candle.to_dict(), state)
 
+    buy_indices = state.get("buys", [])
+    buy_prices = df.loc[buy_indices, "close"].tolist() if buy_indices else []
+
     fig, (ax1, ax2) = plt.subplots(
         2,
         1,
@@ -315,6 +315,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         linewidth=2,
         drawstyle="steps-post",
     )
+    ax1.scatter(buy_indices, buy_prices, marker="o", s=40, color="green", label="Buys")
     ax1.set_ylabel("Price")
     ax1.legend(loc="upper left")
 
@@ -334,28 +335,6 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     )
     ax2.set_xlabel("Candles (Index)")
     ax2.set_title("Control Line (Exit Oracle)")
-
-    # Plot forecast arrows in control panel
-    for start in range(0, len(df), BOTTOM_WINDOW):
-        mid = start + min(BOTTOM_WINDOW, len(df) - start) // 2
-        anchor_x = df["candle_index"].iloc[mid]
-        forecast = df["forecast_angle"].iloc[start]
-        conf = df["confidence"].iloc[start]
-        if np.isnan(forecast) or conf < ARROW_CONF_FILTER:
-            continue
-        dy = np.sign(forecast) * min(
-            ARROW_DY_MAX, ARROW_DY_MAX * abs(forecast)
-        )
-        ax2.quiver(
-            anchor_x,
-            ARROW_Y_BASE,
-            0,
-            dy,
-            angles="xy",
-            scale_units="xy",
-            scale=1,
-        )
-        ax2.scatter(anchor_x, ARROW_Y_BASE, s=10)
 
     fig.suptitle("SOLUSD Discovery Simulation")
     ax1.grid(True)
