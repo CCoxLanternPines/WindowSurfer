@@ -42,9 +42,7 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     if timeframe:
         delta = parse_timeframe(timeframe)
         if delta:
-            cutoff = (
-                pd.Timestamp.utcnow().tz_localize(None) - delta
-            ).timestamp()
+            cutoff = (pd.Timestamp.utcnow().tz_localize(None) - delta).timestamp()
             df = df[df["timestamp"] >= cutoff]
 
     df = df.reset_index(drop=True)
@@ -83,31 +81,49 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     df["bottom_slope"] = slopes
     df["slope_angle"] = slope_angles
 
-    # Predict next window's slope angle by stepping current angle forward
+    # Half-window slope prediction + snapback exploration
     predicted_angles = [np.nan] * len(df)
-    for i in range(0, len(df), BOTTOM_WINDOW):
-        end = min(i + BOTTOM_WINDOW, len(df))
-        if end < len(df):
-            angle_val = df["slope_angle"].iloc[end - 1]
-            predicted_angles[end : end + BOTTOM_WINDOW] = [
-                angle_val
-            ] * min(BOTTOM_WINDOW, len(df) - end)
-    df["predicted_angle"] = predicted_angles
-
+    snapback_conf = [np.nan] * len(df)
     matches = 0
     total = 0
+
     for i in range(0, len(df), BOTTOM_WINDOW):
         end = min(i + BOTTOM_WINDOW, len(df))
-        if end < len(df):
-            actual_next = df["slope_angle"].iloc[end - 1]
-            predicted = df["predicted_angle"].iloc[end]
-            if not np.isnan(actual_next) and not np.isnan(predicted):
+        mid = i + BOTTOM_WINDOW // 2
+
+        # First half slope
+        y1 = df["close"].iloc[i:mid].values
+        x1 = np.arange(len(y1))
+        angle1 = None
+        if len(y1) > 1:
+            m1, _ = np.polyfit(x1, y1, 1)
+            angle1 = np.tanh(m1)
+            predicted_angles[mid:end] = [angle1] * (end - mid)
+
+        # Second half slope (projected forward)
+        y2 = df["close"].iloc[mid:end].values
+        x2 = np.arange(len(y2))
+        if len(y2) > 1:
+            m2, _ = np.polyfit(x2, y2, 1)
+            angle2 = np.tanh(m2)
+            predicted_angles[end : end + BOTTOM_WINDOW] = [angle2] * min(
+                BOTTOM_WINDOW, len(df) - end
+            )
+
+            if angle1 is not None:
+                # Snapback confidence high if directions oppose
+                snapback = abs(angle1 - angle2) / 2
+                snapback_conf[mid:end] = [snapback] * (end - mid)
                 total += 1
-                if np.sign(predicted) == np.sign(actual_next):
+                if np.sign(angle1) == np.sign(angle2):
                     matches += 1
+
     if total > 0:
         acc = matches / total * 100
-        print(f"[SIM] Predicted slope-angle directional accuracy: {acc:.1f}%")
+        print(f"[SIM] Half-window slope directional accuracy: {acc:.1f}%")
+
+    df["predicted_angle"] = predicted_angles
+    df["snapback_conf"] = snapback_conf
 
     state: Dict[str, Any] = {}
     for _, candle in df.iterrows():
@@ -132,13 +148,21 @@ def run_simulation(*, timeframe: str = "1m") -> None:
     ax2.plot(
         df["candle_index"],
         df["predicted_angle"],
-        label="Predicted Slope Angle (next window)",
+        label="Predicted Slope Angle (half-window)",
         color="green",
+        drawstyle="steps-post",
+    )
+    ax2.plot(
+        df["candle_index"],
+        df["snapback_conf"],
+        label="Snapback Confidence",
+        color="orange",
+        linestyle="--",
         drawstyle="steps-post",
     )
     ax2.set_ylim(-1, 1)
     ax2.axhline(0, color="gray", linestyle="--", linewidth=1)
-    ax2.set_ylabel("Slope Angle [-1,1]")
+    ax2.set_ylabel("Slope Angle / Confidence")
     ax2.legend(loc="lower right")
 
     plt.title("SOLUSD Discovery Simulation")
