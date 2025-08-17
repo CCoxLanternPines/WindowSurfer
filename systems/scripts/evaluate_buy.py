@@ -107,7 +107,6 @@ def evaluate_buy(
     window_name = "strategy"
     strategy = cfg or runtime_state.get("strategy", {})
     window_size = int(strategy.get("window_size", 0))
-    step = int(strategy.get("window_step", 1))
     start = t + 1 - window_size
     if start < 0:
         runtime_state["last_slope_cls"] = None
@@ -152,10 +151,9 @@ def evaluate_buy(
     else:
         runtime_state["last_slope_cls"] = None
 
-    # Compute features for next iteration only on step boundaries
-    if start % step == 0:
-        features = compute_window_features(series, start, window_size)
-        runtime_state["last_features"][window_name] = features
+    # Compute features for next iteration every tick
+    features = compute_window_features(series, start, window_size)
+    runtime_state["last_features"][window_name] = features
 
     if buy_p < strategy.get("buy_trigger", 0.0):
         return False

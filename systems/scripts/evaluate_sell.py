@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from systems.utils.addlog import addlog
+from .evaluate_buy import classify_slope
 
 
 def evaluate_sell(
@@ -53,7 +54,14 @@ def evaluate_sell(
         )
         return results
 
-    slope_cls = runtime_state.get("last_slope_cls", None)
+    features = runtime_state.get("last_features", {}).get(window_name)
+    slope_cls = (
+        classify_slope(
+            features.get("slope", 0.0), strategy.get("flat_band_deg", 10.0)
+        )
+        if features
+        else None
+    )
     flat_trigger = strategy.get("sell_trigger", 0.0) * strategy.get("flat_sell_threshold", 1.0)
     if slope_cls == 0 and sell_p >= flat_trigger and total_size > 0:
         frac = strategy.get("flat_sell_fraction", 0.0)

@@ -206,11 +206,12 @@ def run_simulation(
                     state=runtime_state,
                 )
             else:
+                note["entry_amount"] -= amt
+                note["entry_usdt"] -= amt * entry_price
                 partial = note.copy()
                 partial["entry_amount"] = amt
                 partial["entry_usdt"] = amt * entry_price
                 partial["sell_mode"] = mode
-                ledger_obj.open_note(partial)
                 apply_sell(
                     ledger=ledger_obj,
                     note=partial,
@@ -218,8 +219,7 @@ def run_simulation(
                     result=result,
                     state=runtime_state,
                 )
-                note["entry_amount"] -= amt
-                note["entry_usdt"] -= amt * entry_price
+                ledger_obj.closed_notes.append(partial)
 
             cost = entry_price * amt
             proceeds = result.get("avg_price", 0.0) * amt
