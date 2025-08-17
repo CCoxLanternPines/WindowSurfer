@@ -65,6 +65,7 @@ def run_simulation(*, ledger: str, verbose: int = 0, timeframe: str | None = Non
     }
     last_features: Dict[str, Any] | None = None
     closed_trades: List[Dict[str, Any]] = []
+    buy_count = sell_count = flat_count = 0
 
     viz_ax = None
     if viz:
@@ -76,15 +77,29 @@ def run_simulation(*, ledger: str, verbose: int = 0, timeframe: str | None = Non
 
     for i in tqdm(range(len(df)), desc="📉 Sim Progress", dynamic_ncols=True):
         candle = df.iloc[i]
-        features, state, trade = evaluate_buy(candle, last_features, state, viz_ax=viz_ax)
+
+        before_open = len(state.get("open_notes", []))
+        state, features = evaluate_buy(candle, last_features, state, viz_ax=viz_ax)
+        if len(state.get("open_notes", [])) > before_open:
+            buy_count += 1
+
         last_features = features
         slope_cls = features.get("slope_cls", 0) if features else 0
+
+        before_sell = len(state.get("open_notes", []))
         state, closed = evaluate_sell(candle, slope_cls, state, viz_ax=viz_ax)
         if closed:
+            if len(state.get("open_notes", [])) == 0 and before_sell > 0:
+                sell_count += 1
+            else:
+                flat_count += 1
             closed_trades.extend(closed)
 
     if viz and viz_ax is not None:
-        viz_ax.legend()
+        viz_ax.scatter([], [], color="green", marker="o", label="Buy")
+        viz_ax.scatter([], [], color="red", marker="o", label="Sell")
+        viz_ax.scatter([], [], color="orange", marker="o", label="Flat Sell")
+        viz_ax.legend(loc="upper left")
         import matplotlib.pyplot as plt
 
         plt.show()
@@ -92,3 +107,4 @@ def run_simulation(*, ledger: str, verbose: int = 0, timeframe: str | None = Non
     print(f"[SIM] Realized PnL: {state['realized_pnl']:.2f}")
     print(f"[SIM] Open notes: {len(state['open_notes'])}")
     print(f"[SIM] Closed trades: {len(closed_trades)}")
+    print(f"Buys={buy_count} Sells={sell_count} FlatSells={flat_count}")
