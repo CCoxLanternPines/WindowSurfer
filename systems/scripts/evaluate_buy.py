@@ -18,14 +18,14 @@ def evaluate_buy(
     t: int,
     series,
     *,
-    window_name: str,
     cfg: Dict[str, Any],
     runtime_state: Dict[str, Any],
 ):
-    """Return sizing and metadata for a buy signal in ``window_name``."""
+    """Return sizing and metadata for a buy signal."""
 
-    strategy = runtime_state.get("strategy", {})
-    window_size = int(strategy.get("window_size") or cfg.get("window_size", 0))
+    window_name = "strategy"
+    strategy = cfg or runtime_state.get("strategy", {})
+    window_size = int(strategy.get("window_size", 0))
     step = int(strategy.get("window_step", 1))
     start = t + 1 - window_size
     if start < 0 or start % step != 0:
