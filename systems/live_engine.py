@@ -130,7 +130,7 @@ def _run_iteration(
 
         open_notes = ledger_obj.get_open_notes()
         # evaluate_sell relies on pressures updated by evaluate_buy
-        sell_notes = evaluate_sell(
+        sell_orders = evaluate_sell(
             ctx,
             t,
             df,
@@ -138,23 +138,44 @@ def _run_iteration(
             open_notes=open_notes,
             runtime_state=state,
         )
-        for note in sell_notes:
+        for order in sell_orders:
+            note = order["note"]
+            amt = order["sell_amount"]
+            mode = order.get("sell_mode", "normal")
+            entry_price = note.get("entry_price", 0.0)
             result = execute_sell(
                 None,
                 pair_code=ledger_cfg["kraken_pair"],
-                coin_amount=note.get("entry_amount", 0.0),
+                coin_amount=amt,
                 price=price,
                 ledger_name=ledger_cfg["tag"],
                 verbose=state.get("verbose", 0),
             )
             if result and not result.get("error"):
-                apply_sell(
-                    ledger=ledger_obj,
-                    note=note,
-                    t=t,
-                    result=result,
-                    state=state,
-                )
+                if amt >= note.get("entry_amount", 0.0) - 1e-9:
+                    note["sell_mode"] = mode
+                    apply_sell(
+                        ledger=ledger_obj,
+                        note=note,
+                        t=t,
+                        result=result,
+                        state=state,
+                    )
+                else:
+                    partial = note.copy()
+                    partial["entry_amount"] = amt
+                    partial["entry_usdt"] = amt * entry_price
+                    partial["sell_mode"] = mode
+                    ledger_obj.open_note(partial)
+                    apply_sell(
+                        ledger=ledger_obj,
+                        note=partial,
+                        t=t,
+                        result=result,
+                        state=state,
+                    )
+                    note["entry_amount"] -= amt
+                    note["entry_usdt"] -= amt * entry_price
 
         ctx_j = {
             "ledger": ledger_obj,
