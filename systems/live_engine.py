@@ -129,6 +129,7 @@ def _run_iteration(
             )
 
         open_notes = ledger_obj.get_open_notes()
+        # evaluate_sell relies on pressures updated by evaluate_buy
         sell_notes = evaluate_sell(
             ctx,
             t,

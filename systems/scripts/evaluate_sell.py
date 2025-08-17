@@ -5,12 +5,6 @@ from __future__ import annotations
 from math import ceil
 from typing import Any, Dict, List
 
-from systems.scripts.trend_predict import (
-    compute_window_features,
-    rule_predict,
-    update_pressures,
-    classify_slope,
-)
 from systems.utils.addlog import addlog
 
 
@@ -36,14 +30,6 @@ def evaluate_sell(
 
     verbose = runtime_state.get("verbose", 0)
 
-    features = compute_window_features(series, start, window_size)
-    last = runtime_state.setdefault("last_features", {}).get(window_name)
-    if last is not None:
-        pred = rule_predict(last, strategy)
-        slope_cls = classify_slope(last.get("slope", 0.0), strategy.get("flat_band_deg", 10.0))
-        update_pressures(runtime_state, window_name, pred, slope_cls, strategy)
-    runtime_state["last_features"][window_name] = features
-
     pressures = runtime_state.setdefault("pressures", {"buy": {}, "sell": {}})
     sell_p = pressures["sell"].get(window_name, 0.0)
     max_p = strategy.get("max_pressure", 1.0)
@@ -63,7 +49,6 @@ def evaluate_sell(
         sell_frac = sell_p / max_p if max_p else 0.0
         k = max(1, ceil(sell_frac * n_notes))
         results = window_notes[:k]
-        # 🔴 tag these notes as normal sells
         for n in results:
             n["sell_mode"] = "normal"
         pressures["sell"][window_name] = 0.0
@@ -74,17 +59,11 @@ def evaluate_sell(
         )
         return results
 
-    slope_cls = classify_slope(last.get("slope", 0.0) if last else 0.0, strategy.get("flat_band_deg", 10.0))
+    slope_cls = runtime_state.get("last_slope_cls", None)
     flat_trigger = strategy.get("sell_trigger", 0.0) * strategy.get("flat_sell_threshold", 1.0)
-    if (
-        not results
-        and slope_cls == 0
-        and sell_p >= flat_trigger
-        and window_notes
-    ):
+    if slope_cls == 0 and sell_p >= flat_trigger and window_notes:
         k = max(1, ceil(strategy.get("flat_sell_fraction", 0.0) * n_notes))
         results = window_notes[:k]
-        # 🟠 tag these notes as flat sells
         for n in results:
             n["sell_mode"] = "flat"
         pressures["sell"][window_name] = 0.0
