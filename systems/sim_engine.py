@@ -35,9 +35,9 @@ except FileNotFoundError:  # pragma: no cover - optional config
 
 FLAT_BAND_DEG = float(CONFIG.get("flat_band_deg", 10.0))
 
-MAX_PRESSURE = 10.0
-BUY_TRIGGER = 3.0
-SELL_TRIGGER = 10
+MAX_PRESSURE = 7
+BUY_TRIGGER = 2
+SELL_TRIGGER = 4
 
 FLAT_SELL_FRACTION = float(CONFIG.get("flat_sell_fraction", 0.2))
 FLAT_SELL_THRESHOLD = float(CONFIG.get("flat_sell_threshold", 0.5))
