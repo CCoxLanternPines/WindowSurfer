@@ -3,11 +3,9 @@ from __future__ import annotations
 """Visualization utilities for simulation runs."""
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
-import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
 import pandas as pd
 
 
@@ -22,7 +20,7 @@ def plot_viz(
     Parameters
     ----------
     candles:
-        DataFrame containing at least ``open``, ``high``, ``low``, ``close`` and a timestamp column.
+        DataFrame containing at least ``close`` prices.
     ledger:
         Mapping with ``open_notes`` and ``closed_notes`` describing trade events.
     tag:
@@ -32,91 +30,71 @@ def plot_viz(
     """
 
     df = candles.copy()
-
-    # Determine a timestamp column if present for the x-axis
-    ts_col = None
-    for c in ("timestamp", "time", "date"):
-        if c in df.columns:
-            ts_col = c
-            break
-
-    if ts_col:
-        df["x"] = pd.to_datetime(df[ts_col], unit="s").map(mdates.date2num)
-    else:
-        df["x"] = range(len(df))
+    x_values = list(range(len(df)))
 
     fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(x_values, df["close"], color="black", linewidth=1)
 
-    # Determine candle body width
-    if len(df["x"]) > 1:
-        width = (df["x"].iloc[1] - df["x"].iloc[0]) * 0.8
-    else:
-        width = 0.6
-
-    for _, row in df.iterrows():
-        color = "green" if row["close"] >= row["open"] else "red"
-        ax.plot([row["x"], row["x"]], [row["low"], row["high"]], color="black", linewidth=0.5)
-        lower = min(row["open"], row["close"])
-        height = abs(row["close"] - row["open"])
-        rect = Rectangle((row["x"] - width / 2, lower), width, height, color=color)
-        ax.add_patch(rect)
-
-    buys_x: list[float] = []
-    buys_y: list[float] = []
-    sells_x: list[float] = []
-    sells_y: list[float] = []
-    jackpot_x: list[float] = []
-    jackpot_y: list[float] = []
+    buys_x: List[int] = []
+    buys_y: List[float] = []
+    sells_x: List[int] = []
+    sells_y: List[float] = []
+    flat_sells_x: List[int] = []
+    flat_sells_y: List[float] = []
+    jackpot_x: List[int] = []
+    jackpot_y: List[float] = []
 
     notes = ledger.get("open_notes", []) + ledger.get("closed_notes", [])
+    buy_count = len(notes)
+
     for note in notes:
         entry_idx = note.get("entry_idx")
-        entry_ts = note.get("created_ts")
         entry_price = note.get("entry_price")
-
-        if ts_col and entry_ts is not None:
-            x_entry = mdates.date2num(pd.to_datetime(entry_ts, unit="s"))
-        elif entry_idx is not None and len(df["x"]) > entry_idx:
-            x_entry = df["x"].iloc[entry_idx]
-        else:
-            x_entry = None
-        if x_entry is not None and entry_price is not None:
-            buys_x.append(x_entry)
+        if entry_idx is not None and entry_price is not None:
+            buys_x.append(entry_idx)
             buys_y.append(entry_price)
             if note.get("kind") == "jackpot":
-                jackpot_x.append(x_entry)
+                jackpot_x.append(entry_idx)
                 jackpot_y.append(entry_price)
 
-        exit_idx = note.get("exit_idx")
-        exit_ts = note.get("exit_ts")
-        exit_price = note.get("exit_price")
-        if exit_price is not None:
-            if ts_col and exit_ts is not None:
-                x_exit = mdates.date2num(pd.to_datetime(exit_ts, unit="s"))
-            elif exit_idx is not None and len(df["x"]) > exit_idx:
-                x_exit = df["x"].iloc[exit_idx]
-            else:
-                x_exit = None
-            if x_exit is not None:
-                sells_x.append(x_exit)
-                sells_y.append(exit_price)
-                if note.get("kind") == "jackpot":
-                    jackpot_x.append(x_exit)
-                    jackpot_y.append(exit_price)
+    pressure_sell_count = 0
+    flat_sell_count = 0
+    jackpot_note_ids = {n.get("id") for n in notes if n.get("kind") == "jackpot"}
 
-    ax.scatter(buys_x, buys_y, color="green", marker="o", label="BUY")
-    ax.scatter(sells_x, sells_y, color="red", marker="o", label="SELL")
+    for note in ledger.get("closed_notes", []):
+        exit_idx = note.get("exit_idx")
+        exit_price = note.get("exit_price")
+        reason = note.get("reason")
+        if exit_idx is None or exit_price is None:
+            continue
+        if reason == "PRESSURE_SELL":
+            sells_x.append(exit_idx)
+            sells_y.append(exit_price)
+            pressure_sell_count += 1
+        elif reason == "FLAT_SELL":
+            flat_sells_x.append(exit_idx)
+            flat_sells_y.append(exit_price)
+            flat_sell_count += 1
+        if note.get("kind") == "jackpot":
+            jackpot_x.append(exit_idx)
+            jackpot_y.append(exit_price)
+
+    ax.scatter(buys_x, buys_y, color="green", marker="o", label=f"BUY (count={buy_count})")
+    ax.scatter(sells_x, sells_y, color="red", marker="o", label=f"SELL (count={pressure_sell_count})")
+    ax.scatter(flat_sells_x, flat_sells_y, color="orange", marker="o", label=f"FLAT_SELL (count={flat_sell_count})")
     if jackpot_x:
-        ax.scatter(jackpot_x, jackpot_y, color="blue", marker="o", label="JACKPOT")
+        ax.scatter(
+            jackpot_x,
+            jackpot_y,
+            color="blue",
+            marker="o",
+            label=f"JACKPOT (count={len(jackpot_note_ids)})",
+        )
 
     ax.set_title("Simulation")
-    ax.set_xlabel("Time")
+    ax.set_xlabel("Candles (Index)")
     ax.set_ylabel("Price")
     ax.legend()
-
-    if ts_col:
-        ax.xaxis_date()
-        fig.autofmt_xdate()
 
     outfile = outfile or f"data/tmp/{tag}_viz.png"
     out_path = Path(outfile)
