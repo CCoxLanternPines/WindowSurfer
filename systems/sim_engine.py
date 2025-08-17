@@ -16,6 +16,7 @@ from systems.utils.resolve_symbol import (
     to_tag,
     sim_path_csv,
 )
+from systems.utils.timeparse import parse_timeframe
 
 
 def run_simulation(*, ledger: str, verbose: int = 0, timeframe: str | None = None, viz: bool = True) -> None:
@@ -42,6 +43,14 @@ def run_simulation(*, ledger: str, verbose: int = 0, timeframe: str | None = Non
         raise ValueError(f"No timestamp column in {csv_path}")
     df[ts_col] = pd.to_numeric(df[ts_col], errors="coerce")
     df = df.dropna(subset=[ts_col])
+    if timeframe:
+        delta = parse_timeframe(timeframe)
+        if delta:
+            cutoff = (
+                pd.Timestamp.utcnow().tz_localize(None) - delta
+            ).timestamp()
+            df = df[df[ts_col] >= cutoff]
+            df = df.reset_index(drop=True)
 
     state: Dict[str, Any] = {
         "buy_pressure": 0.0,
