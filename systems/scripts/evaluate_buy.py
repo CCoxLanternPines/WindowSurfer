@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, Any
 
-from systems.scripts.window_utils import get_window_bounds, check_buy_conditions
+from systems.scripts.strategy_pressure import pressure_buy_signal
 from systems.utils.addlog import addlog
 
 
@@ -35,72 +35,41 @@ def evaluate_buy(
         Mutable dictionary carrying ``capital`` and ``buy_unlock_p`` mapping.
     """
 
-    ledger = ctx.get("ledger")
     verbose = runtime_state.get("verbose", 0)
 
-    candle = series.iloc[t]
-    win_low, win_high = get_window_bounds(series, t, cfg["window_size"])
-    window_data = {"low": win_low, "high": win_high}
+    candle = series.iloc[t].to_dict()
 
-    open_notes = []
-    if ledger:
-        open_notes = [
-            n for n in ledger.get_open_notes() if n.get("window_name") == window_name
-        ]
+    if not pressure_buy_signal(candle, runtime_state):
+        return None
 
-    ledger_state = {
-        "open_notes": open_notes,
-        "buy_unlock_p": runtime_state.setdefault("buy_unlock_p", {}),
-        "verbose": verbose,
-    }
+    price = float(candle.get("close", 0.0))
 
-    ok, meta = check_buy_conditions(
-        candle,
-        window_data,
-        {**cfg, "window_name": window_name},
-        ledger_state,
-    )
-    if not ok:
-        return False
-
-    capital = runtime_state.get("capital", 0.0)
-    base = cfg.get("investment_fraction", 0.0)
-    size_usd = capital * base
-
+    capital = float(runtime_state.get("capital", 0.0))
     limits = runtime_state.get("limits", {})
+    max_sz = float(limits.get("max_note_usdt", capital))
     min_sz = float(limits.get("min_note_size", 0.0))
-    max_sz = float(limits.get("max_note_usdt", float("inf")))
-    raw = size_usd
-    size_usd = min(size_usd, capital, max_sz)
-    if raw != size_usd:
+    size_usd = min(capital, max_sz)
+    if size_usd < min_sz or size_usd <= 0:
         addlog(
-            f"[CLAMP] size=${raw:.2f} → ${size_usd:.2f} (cap=${capital:.2f}, max=${max_sz:.2f})",
+            f"[SKIP] size=${size_usd:.2f} < min=${min_sz:.2f}",
             verbose_int=2,
             verbose_state=verbose,
         )
-    if size_usd < min_sz:
-        addlog(
-            f"[SKIP][{window_name} {cfg['window_size']}] size=${size_usd:.2f} < min=${min_sz:.2f}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        return False
-
-    sz_pct = (size_usd / capital * 100) if capital else 0.0
+        return None
 
     addlog(
-        f"[BUY][{window_name} {cfg['window_size']}] p={meta['p_buy']:.3f}, base={base*100:.2f}% → size={sz_pct:.2f}% (cap=${size_usd:.2f})",
+        f"[PRESSURE_BUY] price=${price:.4f} size=${size_usd:.2f}",
         verbose_int=1,
         verbose_state=verbose,
     )
 
     result = {
+        "action": "BUY",
+        "price": price,
         "size_usd": size_usd,
         "window_name": window_name,
-        "window_size": cfg["window_size"],
-        **meta,
     }
     if "timestamp" in series.columns:
-        result["created_ts"] = int(candle["timestamp"])
+        result["created_ts"] = int(candle.get("timestamp", 0))
     result["created_idx"] = t
     return result

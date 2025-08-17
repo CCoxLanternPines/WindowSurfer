@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from systems.scripts.window_utils import check_sell_conditions
+from systems.scripts.strategy_pressure import (
+    pressure_sell_signal,
+    pressure_flat_sell_signal,
+)
 from systems.utils.addlog import addlog
 
 
@@ -20,73 +23,36 @@ def evaluate_sell(
 ) -> List[Dict[str, Any]]:
     """Return a list of notes to sell in ``window_name`` on this candle."""
 
-    verbose = 0
-    if runtime_state:
-        verbose = runtime_state.get("verbose", 0)
+    verbose = runtime_state.get("verbose", 0) if runtime_state else 0
 
-    candle = series.iloc[t]
-    price = float(candle["close"])
+    candle = series.iloc[t].to_dict()
+    price = float(candle.get("close", 0.0))
 
     window_notes = [n for n in open_notes if n.get("window_name") == window_name]
-    open_count = len(window_notes)
-
-    ledger = ctx.get("ledger") if ctx else None
-    closed_count = 0
-    if ledger:
-        closed_count = sum(
-            1 for n in ledger.get_closed_notes() if n.get("window_name") == window_name
-        )
-
-    future_targets = [
-        n.get("target_price", float("inf"))
-        for n in window_notes
-        if n.get("target_price", float("inf")) > price
-    ]
-    next_target = min(future_targets) if future_targets else None
-
-    candidates = [
-        n
-        for n in window_notes
-        if price >= n.get("target_price", float("inf"))
-        and price >= n.get("entry_price", float("inf"))
-    ]
-
-    if not candidates:
-        msg = (
-            f"[HOLD][{window_name} {cfg['window_size']}] price=${price:.4f} Notes | "
-            f"Open={open_count} | Closed={closed_count} | Next="
-        )
-        if next_target is not None:
-            msg += f"${next_target:.4f}"
-        else:
-            msg += "None"
-        addlog(msg, verbose_int=3, verbose_state=verbose)
-        return []
-
-    def roi_now(note: Dict[str, Any]) -> float:
-        buy = note.get("entry_price", 0.0)
-        return (price - buy) / buy if buy else 0.0
-
-    candidates.sort(key=roi_now, reverse=True)
-
-    state = {
-        "sell_count": 0,
-        "verbose": verbose,
-        "window_name": window_name,
-        "window_size": cfg["window_size"],
-        "max_sells": cfg.get("max_notes_sell_per_candle", 1),
-    }
 
     selected: List[Dict[str, Any]] = []
-    for note in candidates:
-        if check_sell_conditions(candle, note, cfg, state):
-            selected.append(note)
+    state = runtime_state or {}
 
-    if candidates:
-        addlog(
-            f"[MATURE][{window_name} {cfg['window_size']}] eligible={len(candidates)} sold={len(selected)} cap={state['max_sells']}",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
+    for note in window_notes:
+        if pressure_sell_signal(candle, note, state):
+            note["reason"] = "PRESSURE_SELL"
+            selected.append(note)
+            addlog(
+                f"[PRESSURE_SELL] note={note.get('id')} price=${price:.4f}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+
+    if pressure_flat_sell_signal(candle, state):
+        remaining = [n for n in window_notes if n not in selected]
+        if remaining:
+            addlog(
+                f"[FLAT_SELL] price=${price:.4f} notes={len(remaining)}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+        for note in remaining:
+            note["reason"] = "FLAT_SELL"
+            selected.append(note)
 
     return selected
