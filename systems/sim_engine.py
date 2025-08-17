@@ -53,7 +53,9 @@ def run_simulation(*, ledger: str, verbose: int = 0, timeframe: str | None = Non
                 pd.Timestamp.utcnow().tz_localize(None) - delta
             ).timestamp()
             df = df[df[ts_col] >= cutoff]
-            df = df.reset_index(drop=True)
+
+    df = df.reset_index(drop=True)
+    df["candle_index"] = range(len(df))
 
     state: Dict[str, Any] = {
         "buy_pressure": 0.0,
@@ -68,9 +70,8 @@ def run_simulation(*, ledger: str, verbose: int = 0, timeframe: str | None = Non
     if viz:
         import matplotlib.pyplot as plt
 
-        times = pd.to_datetime(df[ts_col], unit="s")
         fig, ax = plt.subplots()
-        ax.plot(times, df["close"], color="gray", zorder=1)
+        ax.plot(df["candle_index"], df["close"], color="gray", zorder=1)
         viz_ax = ax
 
     for i in tqdm(range(len(df)), desc="📉 Sim Progress", dynamic_ncols=True):

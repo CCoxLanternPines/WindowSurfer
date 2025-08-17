@@ -53,6 +53,7 @@ def _extract_features(candle: Any, last_close: Optional[float]) -> Dict[str, flo
         "slope": slope,
         "slope_cls": slope_cls,
         "timestamp": candle.get("timestamp"),
+        "candle_index": candle.get("candle_index"),
     }
 
 
@@ -105,8 +106,8 @@ def evaluate_buy(
         }
         state.setdefault("open_notes", []).append(note)
         trade = note
-        if viz_ax is not None and features.get("timestamp") is not None:
-            viz_ax.scatter(features["timestamp"], features["close"], color="green", marker="o")
+        if viz_ax is not None and features.get("candle_index") is not None:
+            viz_ax.scatter(features["candle_index"], features["close"], color="green", marker="o")
         state["buy_pressure"] = 0.0
 
     return features, state, trade
