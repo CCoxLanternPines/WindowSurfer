@@ -12,10 +12,9 @@ import pandas as pd
 from tqdm import tqdm
 
 from systems.scripts.ledger import Ledger, save_ledger
-from systems.scripts.evaluate_buy import evaluate_buy
-from systems.scripts.evaluate_sell import evaluate_sell
+from .scripts.evaluate_buy import evaluate_buy, WINDOW_SIZE
+from .scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
-from systems.scripts.strategy_pressure import update_pressure_state
 from systems.scripts.trade_apply import (
     apply_buy,
     apply_sell,
@@ -153,45 +152,34 @@ def run_simulation(
 
     for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
         candle = df.iloc[t].to_dict()
-        update_pressure_state(candle, runtime_state)
-        runtime_state["slope_direction_avg"] = float(
-            candle.get("slope_direction_avg", 0.0)
-        )
+        buy_res = evaluate_buy(candle, runtime_state)
         if verbose >= 2:
             addlog(
-                f"[STATE] t={t} anchor={runtime_state['anchor_price']:.2f} "
-                f"pressure={runtime_state['pressure']:.3f}",
+                f"[STATE] t={t} anchor={runtime_state.get('anchor_price', 0.0):.2f} "
+                f"pressure={runtime_state.get('pressure', 0.0):.3f}",
                 verbose_int=2,
                 verbose_state=verbose,
             )
         price = float(candle.get("close", 0.0))
 
-        ctx = {"ledger": ledger_obj}
-        buy_res = evaluate_buy(
-            ctx,
-            t,
-            df,
-            runtime_state=runtime_state,
-        )
         if buy_res:
             ts = None
             if "timestamp" in df.columns:
                 ts = int(df.iloc[t]["timestamp"])
-            result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
-            net_usd = on_buy_drip(runtime_state, buy_res["size_usd"])
-            if buy_res["size_usd"] > 0 and net_usd < buy_res["size_usd"]:
-                factor = net_usd / buy_res["size_usd"]
+            result = paper_execute_buy(price, buy_res["entry_usdt"], timestamp=ts)
+            net_usd = on_buy_drip(runtime_state, buy_res["entry_usdt"])
+            if buy_res["entry_usdt"] > 0 and net_usd < buy_res["entry_usdt"]:
+                factor = net_usd / buy_res["entry_usdt"]
                 result["filled_amount"] *= factor
+            meta = {"window_name": "pressure", "window_size": WINDOW_SIZE, **buy_res}
             note = apply_buy(
                 ledger=ledger_obj,
-                window_name=buy_res.get("window_name", "pressure"),
+                window_name=meta.get("window_name", "pressure"),
                 t=t,
-                meta=buy_res,
+                meta=meta,
                 result=result,
                 state=runtime_state,
             )
-            wn = buy_res.get("window_name", "pressure")
-            runtime_state.setdefault("buy_unlock_p", {})[wn] = buy_res.get("unlock_p")
             if runtime_state["capital"] < -1e-9:
                 addlog(
                     f"[BUG] capital negative after buy: ${runtime_state['capital']:.2f}",
@@ -200,34 +188,20 @@ def run_simulation(
                 )
                 runtime_state["capital"] = 0.0
 
-            m_buy = strategy_metrics.get(wn)
+            m_buy = strategy_metrics.get(meta.get("window_name"))
             if m_buy is not None:
                 cost = result["filled_amount"] * result["avg_price"]
                 m_buy["buys"] += 1
                 m_buy["gross_invested"] += cost
 
         open_notes = ledger_obj.get_open_notes()
-        sell_res = evaluate_sell(
-            ctx,
-            t,
-            df,
-            open_notes=open_notes,
-            runtime_state=runtime_state,
-        )
-
-        if __debug__ and not runtime_state.get("_sell_shape_logged"):
-            if isinstance(sell_res, list):
-                addlog("[SIM] evaluate_sell returned list", verbose_int=2, verbose_state=verbose)
-            elif isinstance(sell_res, dict):
-                addlog("[SIM] evaluate_sell returned dict", verbose_int=2, verbose_state=verbose)
-            runtime_state["_sell_shape_logged"] = True
-
-        if isinstance(sell_res, list):
-            sell_notes = sell_res
-        elif isinstance(sell_res, dict):
-            sell_notes = sell_res.get("notes", [])
-        else:
-            sell_notes = []
+        runtime_state["open_notes"] = open_notes
+        sell_res = evaluate_sell(candle, open_notes, runtime_state)
+        sell_notes = []
+        for req in sell_res:
+            note = next((n for n in open_notes if n.get("id") == req.get("note_id")), None)
+            if note is not None:
+                sell_notes.append(note)
 
         for note in sell_notes:
             ts = None

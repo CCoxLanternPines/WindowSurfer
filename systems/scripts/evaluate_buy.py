@@ -1,70 +1,46 @@
-from __future__ import annotations
-
-"""Position-based buy evaluation."""
-
-from typing import Dict, Any
-
-from systems.scripts.strategy_pressure import pressure_buy_signal
-from systems.utils.addlog import addlog
+# Pressure Bot Buy Knobs
+DROP_SCALE = 0.005      # how deep below anchor before pressure = 1.0
+AGGRESSIVENESS = 1.0    # scales buy size
+SLOPE_MIN = 0.0         # slope must be >= this to allow buys
+MIN_NOTE_SIZE = 10.0    # minimum note size in USD
+WINDOW_SIZE = 48        # number of candles to calculate anchor/slope
 
 
-def evaluate_buy(
-    ctx: Dict[str, Any],
-    t: int,
-    series,
-    *,
-    runtime_state: Dict[str, Any],
-):
-    """Return sizing and metadata for a buy signal."""
+def evaluate_buy(candle, state):
+    price = float(candle["close"])
+    closes = state.get("recent_closes", [])
+    closes.append(price)
+    if len(closes) > WINDOW_SIZE:
+        closes.pop(0)
+    state["recent_closes"] = closes
 
-    verbose = runtime_state.get("verbose", 0)
+    # Update anchor
+    anchor = max(closes) if closes else price
+    state["anchor_price"] = anchor
 
-    candle = series.iloc[t].to_dict()
+    # Update slope
+    if len(closes) >= 2:
+        slope = (closes[-1] - closes[0]) / len(closes)
+    else:
+        slope = 0.0
+    state["slope_direction_avg"] = slope
 
-    slope = runtime_state.get("slope_direction_avg", 0.0)
-    if slope < 0:
-        addlog(
-            "[SKIP][DOWN_TREND] slope<0",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        return None
+    # Update pressure
+    drop = max(0.0, (anchor - price) / anchor)
+    pressure = drop / DROP_SCALE
+    state["pressure"] = pressure
 
-    if not pressure_buy_signal(candle, runtime_state):
-        return None
+    # Check buy conditions
+    if slope >= SLOPE_MIN and pressure >= 1.0:
+        size_usd = state.get("capital", 0) * AGGRESSIVENESS
+        if size_usd >= MIN_NOTE_SIZE:
+            note = {
+                "entry_price": price,
+                "entry_usdt": size_usd,
+                "size_usd": size_usd,
+                "reason": "PRESSURE_BUY",
+            }
+            state["pressure"] = 0.0  # reset pressure
+            return note
 
-    price = float(candle.get("close", 0.0))
-
-    capital = float(runtime_state.get("capital", 0.0))
-    limits = runtime_state.get("limits", {})
-    max_sz = float(limits.get("max_note_usdt", capital))
-    min_sz = float(limits.get("min_note_size", 0.0))
-    size_usd = min(capital, max_sz)
-    if size_usd < min_sz or size_usd <= 0:
-        addlog(
-            f"[SKIP] size=${size_usd:.2f} < min=${min_sz:.2f}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        return None
-
-    addlog(
-        f"[PRESSURE_BUY] price=${price:.4f} size=${size_usd:.2f}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
-
-    signal_log = runtime_state.get("signal_log")
-    if signal_log is not None:
-        signal_log.write(f"{t},PRESSURE_BUY,{price}\n")
-
-    result = {
-        "action": "BUY",
-        "price": price,
-        "size_usd": size_usd,
-        "window_name": "pressure",
-    }
-    if "timestamp" in series.columns:
-        result["created_ts"] = int(candle.get("timestamp", 0))
-    result["created_idx"] = t
-    return result
+    return None
