@@ -14,6 +14,24 @@
         "trigger_p": 0.75,
         "depth_scale": 5.0,
         "min_usd": 1.0
+      },
+      "window_settings": {
+        "minnow": {
+          "window_size": "12h",
+          "buy_trigger_position": 0.1,
+          "reset_buy_percent": 0.5,
+          "maturity_position": 1.0,
+          "max_notes_sell_per_candle": 1,
+          "investment_fraction": 0.125
+        },
+        "fish": {
+          "window_size": "2d",
+          "buy_trigger_position": 0.1,
+          "reset_buy_percent": 0.5,
+          "maturity_position": 1,
+          "max_notes_sell_per_candle": 1,
+          "investment_fraction": 0.25
+        }
       }
     },
     "Travis_Ledger": {
@@ -30,6 +48,24 @@
         "trigger_p": 0.75,
         "depth_scale": 5.0,
         "min_usd": 1.0
+      },
+      "window_settings": {
+        "mouse": {
+          "window_size": "12h",
+          "buy_trigger_position": 0.1,
+          "reset_buy_percent": 0.5,
+          "maturity_position": 1.0,
+          "max_notes_sell_per_candle": 1,
+          "investment_fraction": 0.125
+        },
+        "rabbit": {
+          "window_size": "2d",
+          "buy_trigger_position": 0.1,
+          "reset_buy_percent": 0.5,
+          "maturity_position": 1,
+          "max_notes_sell_per_candle": 1,
+          "investment_fraction": 0.25
+        }
       }
     }
   },
