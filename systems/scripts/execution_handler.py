@@ -284,7 +284,7 @@ def process_buy_signal(
         runtime_state.setdefault("buy_unlock_p", {})[window_name] = unlock_p
 
     msg = (
-        f"[BUY][EXECUTED][{window_name} {note.get('window_size')}] "
+        f"[BUY][EXECUTED][{window_name}] "
         f"qty={note.get('entry_amount'):.6f} at ${note.get('entry_price'):.4f} "
         f"spend=${note.get('entry_usdt'):.2f} target=${note.get('target_price'):.4f} "
         f"p={note.get('p_buy'):.3f} note_id={note.get('id')}"

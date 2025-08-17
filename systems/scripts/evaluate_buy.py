@@ -45,6 +45,10 @@ def evaluate_buy(
         verbose_state=verbose,
     )
 
+    signal_log = runtime_state.get("signal_log")
+    if signal_log is not None:
+        signal_log.write(f"{t},PRESSURE_BUY,{price}\n")
+
     result = {
         "action": "BUY",
         "price": price,

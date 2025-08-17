@@ -77,6 +77,27 @@ def main(argv: list[str] | None = None) -> None:
             verbose=args.verbose,
             time_limit_seconds=time_limit_seconds,
         )
+    elif mode == "simdebug":
+        if not args.ledger:
+            addlog("Error: --ledger is required for simdebug mode")
+            sys.exit(1)
+        time_limit_seconds = None
+        if args.time:
+            try:
+                time_limit_seconds = int(parse_cutoff(args.time).total_seconds())
+            except ValueError as exc:
+                addlog(
+                    f"[ERROR] Invalid --time value '{args.time}': {exc}",
+                    verbose_int=1,
+                    verbose_state=True,
+                )
+                sys.exit(1)
+        run_simulation(
+            ledger=args.ledger,
+            verbose=args.verbose,
+            time_limit_seconds=time_limit_seconds,
+            dump_signals=True,
+        )
     elif mode == "live":
         run_live(
             ledger=args.ledger,
