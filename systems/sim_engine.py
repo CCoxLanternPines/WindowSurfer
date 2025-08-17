@@ -39,6 +39,9 @@ MAX_PRESSURE = 10.0
 BUY_TRIGGER = 3.0
 SELL_TRIGGER = 10
 
+FLAT_SELL_FRACTION = float(CONFIG.get("flat_sell_fraction", 0.2))
+FLAT_SELL_THRESHOLD = float(CONFIG.get("flat_sell_threshold", 0.5))
+
 FEATURES_CSV = "data/window_features.csv"
 
 
@@ -141,8 +144,10 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         level = float(df.iloc[start]["close"])
 
         pred: int | None = None
+        slope_cls: int | None = None
         if last_features is not None:
             pred = rule_predict(last_features)
+            slope_cls = classify_slope(last_features.get("slope", 0.0), FLAT_BAND_DEG)
 
             if pred > 0:  # upward prediction
                 buy_pressure = min(MAX_PRESSURE, buy_pressure + 1)
@@ -151,8 +156,12 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
                 sell_pressure = min(MAX_PRESSURE, sell_pressure + 1)
                 buy_pressure = max(0.0, buy_pressure - 2)
             else:  # neutral
-                buy_pressure = max(0.0, buy_pressure - 0.5)
-                sell_pressure = max(0.0, sell_pressure - 0.5)
+                if slope_cls == 0:
+                    sell_pressure = min(MAX_PRESSURE, sell_pressure + 0.5)
+                    buy_pressure = max(0.0, buy_pressure - 0.5)
+                else:
+                    buy_pressure = max(0.0, buy_pressure - 0.5)
+                    sell_pressure = max(0.0, sell_pressure - 0.5)
 
             candle = df.iloc[start]
             print(
@@ -175,6 +184,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
                 )
                 buy_pressure = 0.0
 
+            flat_trigger = SELL_TRIGGER * FLAT_SELL_THRESHOLD
             if sell_pressure >= SELL_TRIGGER and open_notes:
                 total_size = sum(size for _, size in open_notes)
                 sell_frac = sell_pressure / MAX_PRESSURE
@@ -202,6 +212,38 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
                     )
                 print(
                     f"[SELL] candle={candle['candle_index']} price={candle['close']} size={trade_size:.2f} pnl={pnl:.2f} total={realized_pnl:.2f}"
+                )
+                sell_pressure = 0.0
+            elif (
+                slope_cls == 0
+                and sell_pressure >= flat_trigger
+                and open_notes
+            ):
+                total_size = sum(size for _, size in open_notes)
+                trade_size = FLAT_SELL_FRACTION * total_size
+                remaining = trade_size
+                pnl = 0.0
+                while remaining > 1e-9 and open_notes:
+                    entry_price, entry_size = open_notes[0]
+                    if entry_size <= remaining:
+                        pnl += (candle["close"] - entry_price) * entry_size
+                        remaining -= entry_size
+                        open_notes.pop(0)
+                    else:
+                        pnl += (candle["close"] - entry_price) * remaining
+                        open_notes[0] = (entry_price, entry_size - remaining)
+                        remaining = 0.0
+                realized_pnl += pnl
+                if viz:
+                    ax1.scatter(
+                        candle["candle_index"],
+                        candle["close"],
+                        color="orange",
+                        s=90,
+                        zorder=6,
+                    )
+                print(
+                    f"[FLAT SELL] candle={candle['candle_index']} price={candle['close']:.2f} size={trade_size:.2f} pnl={pnl:+.2f} total={realized_pnl:+.2f}"
                 )
                 sell_pressure = 0.0
 
@@ -270,6 +312,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     if viz:
         ax1.scatter([], [], color="green", s=120, label="Buy")
         ax1.scatter([], [], color="red", s=120, label="Sell")
+        ax1.scatter([], [], color="orange", s=90, label="Flat Sell")
 
         ax1.set_title("Price with Trades")
         ax1.set_xlabel("Candles (Index)")
