@@ -7,7 +7,7 @@
       "kraken_pair": "SOLUSD",
       "binance_name": "SOLUSDT",
       "jackpot": {
-        "enabled": true,
+        "enabled": false,
         "period": "1m",
         "drip_fraction": 0.02,
         "cashout_p": 0.90,
