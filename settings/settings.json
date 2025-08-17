@@ -71,7 +71,20 @@
   },
   "general_settings": {
     "max_note_usdt": 10000.0,
-    "minimum_note_size": 10
+    "minimum_note_size": 10,
+    "strategy_settings": {
+      "window_size": 24,
+      "window_step": 2,
+      "buy_trigger": 3.0,
+      "sell_trigger": 10.0,
+      "flat_sell_fraction": 0.2,
+      "flat_sell_threshold": 0.5,
+      "max_pressure": 10.0,
+      "strong_move_threshold": 0.15,
+      "range_min": 0.08,
+      "volume_skew_bias": 0.4,
+      "flat_band_deg": 10.0
+    }
   },
   "simulation_capital": 1000
 }

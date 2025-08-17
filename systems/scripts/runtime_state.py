@@ -29,10 +29,29 @@ def build_runtime_state(
 
     prev = prev or {}
     general = settings.get("general_settings", {})
-    limits = {
-        "min_note_size": float(general.get("minimum_note_size", 0.0)),
-        "max_note_usdt": float(general.get("max_note_usdt", float("inf"))),
+
+    limits = prev.get(
+        "limits",
+        {
+            "min_note_size": float(general.get("minimum_note_size", 0.0)),
+            "max_note_usdt": float(general.get("max_note_usdt", float("inf"))),
+        },
+    )
+
+    defaults = {
+        "window_size": 24,
+        "window_step": 2,
+        "buy_trigger": 3.0,
+        "sell_trigger": 10.0,
+        "flat_sell_fraction": 0.2,
+        "flat_sell_threshold": 0.5,
+        "max_pressure": 10.0,
+        "strong_move_threshold": 0.15,
+        "range_min": 0.08,
+        "volume_skew_bias": 0.4,
+        "flat_band_deg": 10.0,
     }
+    strategy_cfg = {**defaults, **general.get("strategy_settings", {})}
 
     buy_unlock_p = prev.get("buy_unlock_p", {})
     verbose = prev.get("verbose", 0)
@@ -48,9 +67,15 @@ def build_runtime_state(
     else:
         capital = prev.get("capital", 0.0)
 
-    return {
+    state = {
         "capital": capital,
         "buy_unlock_p": buy_unlock_p,
         "verbose": verbose,
         "limits": limits,
+        "strategy": strategy_cfg,
     }
+
+    state.setdefault("pressures", prev.get("pressures", {"buy": {}, "sell": {}}))
+    state.setdefault("last_features", prev.get("last_features", {}))
+
+    return state
