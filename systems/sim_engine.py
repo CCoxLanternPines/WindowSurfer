@@ -154,6 +154,9 @@ def run_simulation(
     for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
         candle = df.iloc[t].to_dict()
         update_pressure_state(candle, runtime_state)
+        runtime_state["slope_direction_avg"] = float(
+            candle.get("slope_direction_avg", 0.0)
+        )
         if verbose >= 2:
             addlog(
                 f"[STATE] t={t} anchor={runtime_state['anchor_price']:.2f} "
