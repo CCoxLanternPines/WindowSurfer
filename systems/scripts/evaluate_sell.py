@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Sell evaluation based on accumulated pressure and slope classification."""
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from systems.utils.config import load_settings
 
@@ -19,7 +19,7 @@ def evaluate_sell(
     state: Dict[str, Any],
     viz_ax=None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    """Update sell pressure and possibly close open positions.
+    """Execute sells once pressure thresholds are crossed.
 
     Parameters
     ----------

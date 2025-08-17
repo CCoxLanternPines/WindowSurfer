@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
 
+from systems.scripts.math.slope_score import classify_slope
 from systems.utils.config import load_settings
 
 CONFIG: Dict[str, Any] = load_settings()
@@ -19,29 +20,29 @@ MAX_PRESSURE = 10.0
 BUY_TRIGGER = 3.0
 
 
-def _rule_predict(features: Optional[Dict[str, float]]) -> int:
-    """Classify window features into buy (+1), sell (-1) or neutral (0)."""
-
-    if not features:
+def rule_predict(features: Dict[str, float]) -> int:
+    slope = features.get("slope", 0.0)
+    rng = features.get("range", 0.0)
+    slope_cls = classify_slope(slope, FLAT_BAND_DEG)
+    if slope_cls == 0:
         return 0
-
-    score = 0
-    if features.get("volatility", 0.0) > RANGE_MIN:
-        score += 1
-    if features.get("pct_change", 0.0) > 0:
-        score += 1
-    else:
-        score -= 1
-    if features.get("skew", 0.0) > VOLUME_SKEW_BIAS:
-        score += 1
-    else:
-        score -= 1
-    slope_cls = features.get("slope_cls", 0)
-    if slope_cls > 0:
-        score += 1
-    elif slope_cls < 0:
-        score -= 1
-    return 1 if score > 0 else -1 if score < 0 else 0
+    if rng < RANGE_MIN:
+        return 0
+    skew = features.get("volume_skew", 0.0)
+    if skew > VOLUME_SKEW_BIAS and slope_cls > 0:
+        return 1
+    if skew < -VOLUME_SKEW_BIAS and slope_cls < 0:
+        return -1
+    pct = features.get("pct_change", 0.0)
+    if pct >= STRONG_MOVE_THRESHOLD:
+        return 2
+    if pct > 0:
+        return 1
+    if pct <= -STRONG_MOVE_THRESHOLD:
+        return -2
+    if pct < 0:
+        return -1
+    return 0
 
 
 def _window_features(window: list[Dict[str, Any]], candle: Any) -> Dict[str, float]:
@@ -53,17 +54,25 @@ def _window_features(window: list[Dict[str, Any]], candle: Any) -> Dict[str, flo
     low_p = min(float(c.get("low", close_p)) for c in window)
 
     pct_change = (close_p - open_p) / open_p if open_p else 0.0
-    volatility = (high_p - low_p) / open_p if open_p else 0.0
-    skew = (close_p - (high_p + low_p) / 2) / (high_p - low_p) if high_p != low_p else 0.0
-    slope = (close_p - float(window[0].get("close", open_p))) / float(window[0].get("close", open_p)) if window[0].get("close", open_p) else 0.0
-    slope_cls = 1 if slope > STRONG_MOVE_THRESHOLD else -1 if slope < -STRONG_MOVE_THRESHOLD else 0
+    rng = (high_p - low_p) / open_p if open_p else 0.0
+    volume_skew = (
+        (close_p - (high_p + low_p) / 2) / (high_p - low_p)
+        if high_p != low_p
+        else 0.0
+    )
+    slope = (
+        (close_p - float(window[0].get("close", open_p))) / float(window[0].get("close", open_p))
+        if window[0].get("close", open_p)
+        else 0.0
+    )
+    slope_cls = classify_slope(slope, FLAT_BAND_DEG)
 
     return {
         "open": open_p,
         "close": close_p,
         "pct_change": pct_change,
-        "volatility": volatility,
-        "skew": skew,
+        "range": rng,
+        "volume_skew": volume_skew,
         "slope": slope,
         "slope_cls": slope_cls,
         "timestamp": candle.get("timestamp"),
@@ -79,16 +88,24 @@ def evaluate_buy(
 ) -> Tuple[Dict[str, Any], Optional[Dict[str, float]]]:
     """Update pressure balances and maybe open a new note."""
 
-    pred = _rule_predict(last_features)
+    pred = rule_predict(last_features or {})
 
     bp = state.get("buy_pressure", 0.0)
     sp = state.get("sell_pressure", 0.0)
-    if pred > 0:
-        bp = min(MAX_PRESSURE, bp + pred)
-        sp = max(0.0, sp - pred)
-    elif pred < 0:
-        sp = min(MAX_PRESSURE, sp + abs(pred))
-        bp = max(0.0, bp + pred)
+    if pred > 0:  # upward prediction
+        bp = min(MAX_PRESSURE, bp + 1)
+        sp = max(0.0, sp - 2)
+    elif pred < 0:  # downward prediction
+        sp = min(MAX_PRESSURE, sp + 1)
+        bp = max(0.0, bp - 2)
+    else:  # neutral
+        slope_cls = classify_slope((last_features or {}).get("slope", 0.0), FLAT_BAND_DEG)
+        if slope_cls == 0:
+            sp = min(MAX_PRESSURE, sp + 0.5)
+            bp = max(0.0, bp - 0.5)
+        else:
+            bp = max(0.0, bp - 0.5)
+            sp = max(0.0, sp - 0.5)
     state["buy_pressure"] = bp
     state["sell_pressure"] = sp
 
