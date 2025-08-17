@@ -11,6 +11,8 @@ import pandas as pd
 
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
+from systems.scripts.trade_apply import paper_execute_buy, paper_execute_sell
+from systems.utils.config import load_settings
 
 
 CFG = {
@@ -42,10 +44,28 @@ def parse_timeframe(tf: str) -> timedelta | None:
         return timedelta(hours=val)
     return None
 
+def run_simulation(series=None, settings=None, ledger=None, **kwargs):
+    """Run a mini-bot style simulation ignoring ledger writes.
 
-def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
-    file_path = "data/sim/SOLUSD_1h.csv"
-    df = pd.read_csv(file_path)
+    ``series`` and ``settings`` are optional for compatibility with the
+    command-line invocation via ``bot.py``.  The ``ledger`` parameter is
+    retained but ignored when ``disable_ledger`` is true.
+    """
+
+    timeframe = kwargs.get("timeframe") or kwargs.get("time") or "1m"
+    viz = kwargs.get("viz", False)
+
+    if settings is None:
+        settings = load_settings()
+    disable_ledger = settings.get("sim", {}).get("disable_ledger", True)
+
+    ledger_name = ledger if isinstance(ledger, str) else None
+    if series is None:
+        tag = settings.get("ledger_settings", {}).get(ledger_name, {}).get("tag", "SOLUSD")
+        file_path = f"data/sim/{tag}_1h.csv"
+        df = pd.read_csv(file_path)
+    else:
+        df = series.copy()
 
     if timeframe:
         delta = parse_timeframe(timeframe)
@@ -73,7 +93,10 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         buy_res = evaluate_buy(t, df, cfg=CFG, state=state)
         if buy_res:
             size = buy_res["trade_size"]
+            paper_execute_buy(price, size)
             open_notes.append({"price": price, "amount": size})
+            # if ledger is not None and not disable_ledger:
+            #     ledger.log_event({"action": "buy", "price": price, "amount": size})
             if ax1 is not None:
                 ax1.scatter(
                     df.iloc[t]["candle_index"], price, color="green", s=120, zorder=6
@@ -86,6 +109,8 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             mode = order.get("sell_mode", "normal")
             entry_price = note["price"]
 
+            paper_execute_sell(price, amt)
+
             pnl = (price - entry_price) * amt
             realized_pnl += pnl
 
@@ -93,6 +118,9 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
                 open_notes.remove(note)
             else:
                 note["amount"] -= amt
+
+            # if ledger is not None and not disable_ledger:
+            #     ledger.log_event({"action": "sell", "price": price, "amount": amt})
 
             if ax1 is not None:
                 color = "red" if mode == "normal" else "orange"

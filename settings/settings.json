@@ -86,5 +86,8 @@
       "flat_band_deg": 10.0
     }
   },
+  "sim": {
+    "disable_ledger": true
+  },
   "simulation_capital": 1000
 }
