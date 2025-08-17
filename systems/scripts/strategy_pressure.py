@@ -67,3 +67,25 @@ def pressure_flat_sell_signal(candle: Dict[str, float], state: Dict[str, Any]) -
             verbose_state=state.get("verbose", 0),
         )
     return decision
+
+
+def update_pressure_state(candle: Dict[str, float], state: Dict[str, Any]) -> None:
+    """Update ``anchor_price`` and ``pressure`` based on the current candle.
+
+    Parameters
+    ----------
+    candle:
+        Dictionary representing current candle with at least ``close``.
+    state:
+        Mutable runtime state containing ``anchor_price`` and ``pressure``.
+    """
+
+    price = float(candle.get("close", 0.0))
+    anchor = float(state.get("anchor_price", price))
+    if price > anchor:
+        anchor = price
+    state["anchor_price"] = anchor
+
+    drop = (anchor - price) / anchor if anchor else 0.0
+    pressure = float(state.get("pressure", 0.0)) + drop
+    state["pressure"] = max(0.0, pressure)
