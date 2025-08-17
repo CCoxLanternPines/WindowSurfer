@@ -1,106 +1,112 @@
 from __future__ import annotations
 
-"""Position-based buy evaluation."""
+"""Buy evaluation based on pressure and simple feature rules."""
 
-from typing import Dict, Any
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Tuple
 
-from systems.scripts.window_utils import get_window_bounds, check_buy_conditions
-from systems.utils.addlog import addlog
+from systems.utils.config import load_settings
+
+CONFIG: Dict[str, Any] = load_settings()
+
+# Constants originally defined in ``sim_engine.py``
+WINDOW_SIZE = 24
+WINDOW_STEP = 2
+STRONG_MOVE_THRESHOLD = 0.15
+RANGE_MIN = 0.08
+VOLUME_SKEW_BIAS = 0.4
+FLAT_BAND_DEG = float(CONFIG.get("flat_band_deg", 10.0))
+MAX_PRESSURE = 10.0
+BUY_TRIGGER = 3.0
 
 
-def evaluate_buy(
-    ctx: Dict[str, Any],
-    t: int,
-    series,
-    *,
-    window_name: str,
-    cfg: Dict[str, Any],
-    runtime_state: Dict[str, Any],
-):
-    """Return sizing and metadata for a buy signal in ``window_name``.
+def _extract_features(candle: Any, last_close: Optional[float]) -> Dict[str, float]:
+    """Compute basic features from the current candle.
 
     Parameters
     ----------
-    ctx:
-        Context dictionary containing at least a ``ledger`` instance.
-    t:
-        Current candle index within ``series``.
-    series:
-        Candle DataFrame with at least ``close``, ``low`` and ``high`` columns.
-    window_name:
-        Name of the window configuration under evaluation.
-    cfg:
-        Strategy configuration for ``window_name``.
-    runtime_state:
-        Mutable dictionary carrying ``capital`` and ``buy_unlock_p`` mapping.
+    candle: Any
+        Candle row providing ``open``, ``high``, ``low`` and ``close`` values.
+    last_close: Optional[float]
+        Close price from the previous candle.
     """
 
-    ledger = ctx.get("ledger")
-    verbose = runtime_state.get("verbose", 0)
+    open_p = float(candle.get("open", 0.0))
+    close_p = float(candle.get("close", 0.0))
+    high_p = float(candle.get("high", close_p))
+    low_p = float(candle.get("low", close_p))
 
-    candle = series.iloc[t]
-    win_low, win_high = get_window_bounds(series, t, cfg["window_size"])
-    window_data = {"low": win_low, "high": win_high}
+    pct_change = (close_p - open_p) / open_p if open_p else 0.0
+    volatility = (high_p - low_p) / open_p if open_p else 0.0
+    skew = (close_p - (high_p + low_p) / 2) / (high_p - low_p) if high_p != low_p else 0.0
+    slope = 0.0
+    if last_close is not None and last_close:
+        slope = (close_p - last_close) / last_close
+    slope_cls = 1 if slope > STRONG_MOVE_THRESHOLD else -1 if slope < -STRONG_MOVE_THRESHOLD else 0
 
-    open_notes = []
-    if ledger:
-        open_notes = [
-            n for n in ledger.get_open_notes() if n.get("window_name") == window_name
-        ]
-
-    ledger_state = {
-        "open_notes": open_notes,
-        "buy_unlock_p": runtime_state.setdefault("buy_unlock_p", {}),
-        "verbose": verbose,
+    return {
+        "open": open_p,
+        "close": close_p,
+        "pct_change": pct_change,
+        "volatility": volatility,
+        "skew": skew,
+        "slope": slope,
+        "slope_cls": slope_cls,
+        "timestamp": candle.get("timestamp"),
     }
 
-    ok, meta = check_buy_conditions(
-        candle,
-        window_data,
-        {**cfg, "window_name": window_name},
-        ledger_state,
-    )
-    if not ok:
-        return False
 
-    capital = runtime_state.get("capital", 0.0)
-    base = cfg.get("investment_fraction", 0.0)
-    size_usd = capital * base
+def _rule_predict(features: Dict[str, float]) -> float:
+    """Heuristic rule used to accumulate buy pressure."""
 
-    limits = runtime_state.get("limits", {})
-    min_sz = float(limits.get("min_note_size", 0.0))
-    max_sz = float(limits.get("max_note_usdt", float("inf")))
-    raw = size_usd
-    size_usd = min(size_usd, capital, max_sz)
-    if raw != size_usd:
-        addlog(
-            f"[CLAMP] size=${raw:.2f} → ${size_usd:.2f} (cap=${capital:.2f}, max=${max_sz:.2f})",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-    if size_usd < min_sz:
-        addlog(
-            f"[SKIP][{window_name} {cfg['window_size']}] size=${size_usd:.2f} < min=${min_sz:.2f}",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        return False
+    score = 0.0
+    if features["volatility"] > RANGE_MIN:
+        score += 1.0
+    if features["pct_change"] > 0:
+        score += 1.0
+    if features["skew"] > VOLUME_SKEW_BIAS:
+        score += 1.0
+    return score
 
-    sz_pct = (size_usd / capital * 100) if capital else 0.0
 
-    addlog(
-        f"[BUY][{window_name} {cfg['window_size']}] p={meta['p_buy']:.3f}, base={base*100:.2f}% → size={sz_pct:.2f}% (cap=${size_usd:.2f})",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
+def evaluate_buy(
+    candle: Any,
+    last_features: Optional[Dict[str, float]],
+    state: Dict[str, Any],
+    viz_ax=None,
+) -> Tuple[Dict[str, float], Dict[str, Any], Optional[Dict[str, Any]]]:
+    """Update buy pressure and possibly open a new position.
 
-    result = {
-        "size_usd": size_usd,
-        "window_name": window_name,
-        "window_size": cfg["window_size"],
-        **meta,
-    }
-    if "timestamp" in series.columns:
-        result["created_ts"] = int(candle["timestamp"])
-    result["created_idx"] = t
-    return result
+    Parameters
+    ----------
+    candle:
+        Current market candle.
+    last_features:
+        Feature dictionary from previous candle; may be ``None``.
+    state:
+        Mutable strategy state.
+    viz_ax:
+        Optional Matplotlib axis for plotting buy markers.
+    """
+
+    last_close = last_features.get("close") if last_features else None
+    features = _extract_features(candle, last_close)
+
+    pred = _rule_predict(features)
+    bp = state.get("buy_pressure", 0.0)
+    bp = min(MAX_PRESSURE, bp + pred + features["slope_cls"])
+    state["buy_pressure"] = bp
+
+    trade = None
+    if bp >= BUY_TRIGGER:
+        note = {
+            "entry_price": features["close"],
+            "timestamp": features.get("timestamp"),
+        }
+        state.setdefault("open_notes", []).append(note)
+        trade = note
+        if viz_ax is not None and features.get("timestamp") is not None:
+            viz_ax.scatter(features["timestamp"], features["close"], color="green", marker="o")
+        state["buy_pressure"] = 0.0
+
+    return features, state, trade
