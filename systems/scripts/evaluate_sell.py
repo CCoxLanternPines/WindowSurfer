@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-"""Price-target-based sell evaluation."""
+"""Sell evaluation based on predictive pressures."""
 
+from math import ceil
 from typing import Any, Dict, List
 
-from systems.scripts.window_utils import check_sell_conditions
+from systems.scripts.trend_predict import (
+    compute_window_features,
+    rule_predict,
+    update_pressures,
+    classify_slope,
+)
 from systems.utils.addlog import addlog
 
 
@@ -20,73 +26,67 @@ def evaluate_sell(
 ) -> List[Dict[str, Any]]:
     """Return a list of notes to sell in ``window_name`` on this candle."""
 
-    verbose = 0
-    if runtime_state:
-        verbose = runtime_state.get("verbose", 0)
+    runtime_state = runtime_state or {}
+    strategy = runtime_state.get("strategy", {})
+    window_size = int(strategy.get("window_size") or cfg.get("window_size", 0))
+    step = int(strategy.get("window_step", 1))
+    start = t + 1 - window_size
+    if start < 0 or start % step != 0:
+        return []
 
+    verbose = runtime_state.get("verbose", 0)
+
+    features = compute_window_features(series, start, window_size)
+    last = runtime_state.setdefault("last_features", {}).get(window_name)
+    if last is not None:
+        pred = rule_predict(last, strategy)
+        slope_cls = classify_slope(last.get("slope", 0.0), strategy.get("flat_band_deg", 10.0))
+        update_pressures(runtime_state, window_name, pred, slope_cls, strategy)
+    runtime_state["last_features"][window_name] = features
+
+    pressures = runtime_state.setdefault("pressures", {"buy": {}, "sell": {}})
+    sell_p = pressures["sell"].get(window_name, 0.0)
+    max_p = strategy.get("max_pressure", 1.0)
+    results: List[Dict[str, Any]] = []
+    window_notes = [n for n in open_notes if n.get("window_name") == window_name]
+    n_notes = len(window_notes)
     candle = series.iloc[t]
     price = float(candle["close"])
-
-    window_notes = [n for n in open_notes if n.get("window_name") == window_name]
-    open_count = len(window_notes)
-
-    ledger = ctx.get("ledger") if ctx else None
-    closed_count = 0
-    if ledger:
-        closed_count = sum(
-            1 for n in ledger.get_closed_notes() if n.get("window_name") == window_name
-        )
-
-    future_targets = [
-        n.get("target_price", float("inf"))
-        for n in window_notes
-        if n.get("target_price", float("inf")) > price
-    ]
-    next_target = min(future_targets) if future_targets else None
-
-    candidates = [
-        n
-        for n in window_notes
-        if price >= n.get("target_price", float("inf"))
-        and price >= n.get("entry_price", float("inf"))
-    ]
-
-    if not candidates:
-        msg = (
-            f"[HOLD][{window_name} {cfg['window_size']}] price=${price:.4f} Notes | "
-            f"Open={open_count} | Closed={closed_count} | Next="
-        )
-        if next_target is not None:
-            msg += f"${next_target:.4f}"
-        else:
-            msg += "None"
-        addlog(msg, verbose_int=3, verbose_state=verbose)
-        return []
 
     def roi_now(note: Dict[str, Any]) -> float:
         buy = note.get("entry_price", 0.0)
         return (price - buy) / buy if buy else 0.0
 
-    candidates.sort(key=roi_now, reverse=True)
+    window_notes.sort(key=roi_now, reverse=True)
 
-    state = {
-        "sell_count": 0,
-        "verbose": verbose,
-        "window_name": window_name,
-        "window_size": cfg["window_size"],
-        "max_sells": cfg.get("max_notes_sell_per_candle", 1),
-    }
-
-    selected: List[Dict[str, Any]] = []
-    for note in candidates:
-        if check_sell_conditions(candle, note, cfg, state):
-            selected.append(note)
-
-    if candidates:
+    if sell_p >= strategy.get("sell_trigger", 0.0) and window_notes:
+        sell_frac = sell_p / max_p if max_p else 0.0
+        k = max(1, ceil(sell_frac * n_notes))
+        results = window_notes[:k]
+        pressures["sell"][window_name] = 0.0
         addlog(
-            f"[MATURE][{window_name} {cfg['window_size']}] eligible={len(candidates)} sold={len(selected)} cap={state['max_sells']}",
+            f"[SELL][{window_name} {window_size}] mode=normal count={k}/{n_notes} pressure={sell_p:.1f}/{max_p:.1f}",
             verbose_int=1,
             verbose_state=verbose,
         )
+        return results
 
-    return selected
+    slope_cls = classify_slope(last.get("slope", 0.0) if last else 0.0, strategy.get("flat_band_deg", 10.0))
+    flat_trigger = strategy.get("sell_trigger", 0.0) * strategy.get("flat_sell_threshold", 1.0)
+    if (
+        not results
+        and slope_cls == 0
+        and sell_p >= flat_trigger
+        and window_notes
+    ):
+        k = max(1, ceil(strategy.get("flat_sell_fraction", 0.0) * n_notes))
+        results = window_notes[:k]
+        pressures["sell"][window_name] = 0.0
+        addlog(
+            f"[SELL][{window_name} {window_size}] mode=flat count={k}/{n_notes} pressure={sell_p:.1f}/{max_p:.1f}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return results
+
+    return []
