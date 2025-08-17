@@ -7,6 +7,7 @@ from systems.scripts.strategy_pressure import (
     pressure_buy_signal,
     pressure_sell_signal,
     pressure_flat_sell_signal,
+    update_pressure_state,
 )
 
 
@@ -38,6 +39,16 @@ def _ref_pressure_flat_sell_signal(candle, state):
     return price <= trigger
 
 
+def _ref_update_pressure_state(candle, state):
+    price = float(candle.get("close", 0.0))
+    anchor = float(state.get("anchor_price", price))
+    if price > anchor:
+        anchor = price
+    state["anchor_price"] = anchor
+    drop = (anchor - price) / anchor if anchor else 0.0
+    state["pressure"] = max(0.0, state.get("pressure", 0.0) + drop)
+
+
 def test_pressure_buy_parity():
     state = {"anchor_price": 100.0, "pressure": 1.0, "drop_scale": 0.01}
     candle_hit = {"close": 98.0}
@@ -61,3 +72,12 @@ def test_pressure_flat_sell_parity():
     candle_miss = {"close": 96.0}
     assert pressure_flat_sell_signal(candle_hit, state) == _ref_pressure_flat_sell_signal(candle_hit, state)
     assert pressure_flat_sell_signal(candle_miss, state) == _ref_pressure_flat_sell_signal(candle_miss, state)
+
+
+def test_update_pressure_state_parity():
+    state = {"anchor_price": 100.0, "pressure": 1.0}
+    candle = {"close": 95.0}
+    expected = state.copy()
+    _ref_update_pressure_state(candle, expected)
+    update_pressure_state(candle, state)
+    assert state == expected

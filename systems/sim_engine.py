@@ -15,6 +15,7 @@ from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
+from systems.scripts.strategy_pressure import update_pressure_state
 from systems.scripts.trade_apply import (
     apply_buy,
     apply_sell,
@@ -151,7 +152,16 @@ def run_simulation(
     addlog(f"[SIM] Starting simulation for {coin}", verbose_int=1, verbose_state=verbose)
 
     for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
-        price = float(df.iloc[t]["close"])
+        candle = df.iloc[t].to_dict()
+        update_pressure_state(candle, runtime_state)
+        if verbose >= 2:
+            addlog(
+                f"[STATE] t={t} anchor={runtime_state['anchor_price']:.2f} "
+                f"pressure={runtime_state['pressure']:.3f}",
+                verbose_int=2,
+                verbose_state=verbose,
+            )
+        price = float(candle.get("close", 0.0))
 
         ctx = {"ledger": ledger_obj}
         buy_res = evaluate_buy(
