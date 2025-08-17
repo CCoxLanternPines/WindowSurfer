@@ -25,22 +25,19 @@ def evaluate_buy(candle, state):
         slope = 0.0
     state["slope_direction_avg"] = slope
 
-    # Update pressure
-    drop = max(0.0, (anchor - price) / anchor)
-    pressure = drop / DROP_SCALE
-    state["pressure"] = pressure
+    # Update pressure (cumulative)
+    drop = (anchor - price) / anchor if anchor else 0.0
+    state["pressure"] = max(0.0, state.get("pressure", 0.0) + drop)
 
     # Check buy conditions
-    if slope >= SLOPE_MIN and pressure >= 1.0:
-        size_usd = state.get("capital", 0) * AGGRESSIVENESS
-        if size_usd >= MIN_NOTE_SIZE:
-            note = {
-                "entry_price": price,
-                "entry_usdt": size_usd,
-                "size_usd": size_usd,
-                "reason": "PRESSURE_BUY",
-            }
-            state["pressure"] = 0.0  # reset pressure
-            return note
+    trigger = anchor * (1.0 - state["pressure"] * DROP_SCALE)
+    if slope >= SLOPE_MIN and price <= trigger:
+        note = {
+            "entry_price": price,
+            "entry_usdt": state.get("capital", 0) * AGGRESSIVENESS,
+            "reason": "PRESSURE_BUY",
+        }
+        state["pressure"] = 0.0  # reset after buy
+        return note
 
     return None
