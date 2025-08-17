@@ -391,16 +391,16 @@ def run_simulation(
 
         times = pd.to_datetime(df[ts_col], unit="s")
         plt.figure()
-        plt.plot(times, df["close"], label="Close")
+        plt.plot(times, df["close"], label="Close", color="gray", zorder=1)
         if buy_points:
             b_t, b_p = zip(*buy_points)
             plt.scatter(
-                pd.to_datetime(b_t, unit="s"), b_p, marker="^", color="g", label="Buy"
+                pd.to_datetime(b_t, unit="s"), b_p, marker="o", color="g", label="Buy", zorder=2
             )
         if sell_points:
             s_t, s_p = zip(*sell_points)
             plt.scatter(
-                pd.to_datetime(s_t, unit="s"), s_p, marker="v", color="r", label="Sell"
+                pd.to_datetime(s_t, unit="s"), s_p, marker="o", color="r", label="Sell", zorder=2
             )
         plt.xlabel("Time")
         plt.ylabel("Price")
