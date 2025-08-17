@@ -12,25 +12,20 @@ from systems.scripts.wallet import show_wallet
 from systems.utils.addlog import init_logger, addlog
 from systems.utils.config import load_settings
 from systems.utils.cli import build_parser
-from systems.utils.time import parse_cutoff
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     parser.add_argument(
         "--time",
+        type=str,
         default=None,
-        help="Restrict simulation to recent duration (e.g., 1d, 1w, 1m)",
-    )
-    parser.add_argument(
-        "--plot",
-        action="store_true",
-        help="Generate a plot after simulation (sim mode only)",
+        help="How far back to simulate (e.g. 1m, 7d, 1y)",
     )
     parser.add_argument(
         "--viz",
         action="store_true",
-        help="Generate original visualization plot after simulation",
+        help="Enable visualization plotting",
     )
 
     args = parser.parse_args(argv or sys.argv[1:])
@@ -71,43 +66,20 @@ def main(argv: list[str] | None = None) -> None:
         if not args.ledger:
             addlog("Error: --ledger is required for sim mode")
             sys.exit(1)
-        time_limit_seconds = None
-        if args.time:
-            try:
-                time_limit_seconds = int(parse_cutoff(args.time).total_seconds())
-            except ValueError as exc:
-                addlog(
-                    f"[ERROR] Invalid --time value '{args.time}': {exc}",
-                    verbose_int=1,
-                    verbose_state=True,
-                )
-                sys.exit(1)
         run_simulation(
             ledger=args.ledger,
             verbose=args.verbose,
-            time_limit_seconds=time_limit_seconds,
-            plot=args.plot,
+            timeframe=args.time,
             viz=args.viz,
         )
     elif mode == "simdebug":
         if not args.ledger:
             addlog("Error: --ledger is required for simdebug mode")
             sys.exit(1)
-        time_limit_seconds = None
-        if args.time:
-            try:
-                time_limit_seconds = int(parse_cutoff(args.time).total_seconds())
-            except ValueError as exc:
-                addlog(
-                    f"[ERROR] Invalid --time value '{args.time}': {exc}",
-                    verbose_int=1,
-                    verbose_state=True,
-                )
-                sys.exit(1)
         run_simulation(
             ledger=args.ledger,
             verbose=args.verbose,
-            time_limit_seconds=time_limit_seconds,
+            timeframe=args.time,
             dump_signals=True,
             viz=args.viz,
         )

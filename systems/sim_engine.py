@@ -37,16 +37,15 @@ from systems.utils.resolve_symbol import (
     to_tag,
     sim_path_csv,
 )
-from systems.utils.time import duration_from_candle_count
+from systems.utils.time import duration_from_candle_count, parse_cutoff as parse_timeframe
 
 
 def run_simulation(
     *,
     ledger: str,
     verbose: int = 0,
-    time_limit_seconds: int | None = None,
+    timeframe: str | None = None,
     dump_signals: bool = False,
-    plot: bool = False,
     viz: bool = False,
 ) -> None:
     settings = load_settings()
@@ -85,9 +84,9 @@ def run_simulation(
     if not df[ts_col].is_monotonic_increasing:
         raise ValueError(f"Candles not sorted by {ts_col}: {csv_path}")
 
-    last_ts = int(df[ts_col].iloc[-1]) if len(df) else None
-    if time_limit_seconds and last_ts is not None:
-        cutoff_ts = last_ts - time_limit_seconds
+    if timeframe:
+        delta = parse_timeframe(timeframe)
+        cutoff_ts = datetime.now(tz=timezone.utc).timestamp() - delta.total_seconds()
         df = df[df[ts_col] >= cutoff_ts].reset_index(drop=True)
         if len(df) >= 2:
             candle_interval_minutes = int(
@@ -393,17 +392,6 @@ def run_simulation(
 
     if signal_log is not None:
         signal_log.close()
-
-    if plot:
-        from systems.scripts.plot_pressure import plot_pressure
-
-        ledger_dict = {
-            "open_notes": ledger_obj.get_open_notes(),
-            "closed_notes": ledger_obj.get_closed_notes(),
-            "metadata": ledger_obj.get_metadata(),
-        }
-        out_path = root / "data" / "tmp" / "sim_plot.png"
-        plot_pressure(df, ledger_dict, str(out_path))
 
     if viz:
         from systems.scripts.viz import plot_viz
