@@ -107,53 +107,46 @@ def evaluate_buy(
     window_name = "strategy"
     strategy = cfg or runtime_state.get("strategy", {})
     window_size = int(strategy.get("window_size", 0))
-    step = int(strategy.get("window_step", 1))
-    start = t + 1 - window_size
-    if start < 0 or start % step != 0:
-        return False
 
     verbose = runtime_state.get("verbose", 0)
 
     pressures = runtime_state.setdefault("pressures", {"buy": {}, "sell": {}})
-    last_features = runtime_state.setdefault("last_features", {}).get(window_name)
+
+    # Compute features for this window and store for other components
+    features = compute_window_features(series, t, window_size)
+    runtime_state.setdefault("last_features", {})[window_name] = features
 
     buy_p = pressures["buy"].get(window_name, 0.0)
     sell_p = pressures["sell"].get(window_name, 0.0)
     max_p = strategy.get("max_pressure", 1.0)
 
-    if last_features is not None:
-        pred = rule_predict(last_features, strategy)
-        slope_cls = classify_slope(
-            last_features.get("slope", 0.0), strategy.get("flat_band_deg", 10.0)
-        )
-        runtime_state["last_slope_cls"] = slope_cls
-        if pred > 0:
-            buy_p = min(max_p, buy_p + 1)
-            sell_p = max(0.0, sell_p - 2)
-        elif pred < 0:
-            sell_p = min(max_p, sell_p + 1)
-            buy_p = max(0.0, buy_p - 2)
-        else:
-            if slope_cls == 0:
-                sell_p = min(max_p, sell_p + 0.5)
-                buy_p = max(0.0, buy_p - 0.5)
-            else:
-                buy_p = max(0.0, buy_p - 0.5)
-                sell_p = max(0.0, sell_p - 0.5)
-        pressures["buy"][window_name] = buy_p
-        pressures["sell"][window_name] = sell_p
-        if verbose >= 2:
-            addlog(
-                f"[PRESSURE][{window_name}] buy={buy_p:.1f} sell={sell_p:.1f} pred={pred} slope_cls={slope_cls}",
-                verbose_int=2,
-                verbose_state=verbose,
-            )
-    else:
-        runtime_state["last_slope_cls"] = None
+    pred = rule_predict(features, strategy)
+    slope_cls = classify_slope(
+        features.get("slope", 0.0), strategy.get("flat_band_deg", 10.0)
+    )
 
-    # Compute features for next iteration
-    features = compute_window_features(series, start, window_size)
-    runtime_state["last_features"][window_name] = features
+    if pred > 0:
+        buy_p = min(max_p, buy_p + 1)
+        sell_p = max(0.0, sell_p - 2)
+    elif pred < 0:
+        sell_p = min(max_p, sell_p + 1)
+        buy_p = max(0.0, buy_p - 2)
+    else:
+        if slope_cls == 0:
+            sell_p = min(max_p, sell_p + 0.5)
+            buy_p = max(0.0, buy_p - 0.5)
+        else:
+            buy_p = max(0.0, buy_p - 0.5)
+            sell_p = max(0.0, sell_p - 0.5)
+
+    pressures["buy"][window_name] = buy_p
+    pressures["sell"][window_name] = sell_p
+    if verbose >= 2:
+        addlog(
+            f"[PRESSURE][{window_name}] buy={buy_p:.1f} sell={sell_p:.1f} pred={pred} slope_cls={slope_cls}",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
 
     if buy_p < strategy.get("buy_trigger", 0.0):
         return False
