@@ -21,6 +21,15 @@ def evaluate_buy(
 
     candle = series.iloc[t].to_dict()
 
+    slope = runtime_state.get("slope_direction_avg", 0.0)
+    if slope < 0:
+        addlog(
+            "[SKIP][DOWN_TREND] slope<0",
+            verbose_int=2,
+            verbose_state=verbose,
+        )
+        return None
+
     if not pressure_buy_signal(candle, runtime_state):
         return None
 
