@@ -75,8 +75,8 @@
     "strategy_settings": {
       "window_size": 24,
       "window_step": 2,
-      "buy_trigger": 3.0,
-      "sell_trigger": 10.0,
+      "buy_trigger": 2,
+      "sell_trigger": 1,
       "flat_sell_fraction": 0.2,
       "flat_sell_threshold": 0.5,
       "max_pressure": 10.0,
