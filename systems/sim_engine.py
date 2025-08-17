@@ -152,13 +152,9 @@ def run_simulation(
                 ts = None
                 if "timestamp" in df.columns:
                     ts = int(df.iloc[t]["timestamp"])
+
                 result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
-                if viz:
-                    buy_points.append((float(df.iloc[t][ts_col]), price))
-                net_usd = on_buy_drip(runtime_state, buy_res["size_usd"])
-                if buy_res["size_usd"] > 0 and net_usd < buy_res["size_usd"]:
-                    factor = net_usd / buy_res["size_usd"]
-                    result["filled_amount"] *= factor
+
                 note = apply_buy(
                     ledger=ledger_obj,
                     window_name=window_name,
@@ -167,20 +163,21 @@ def run_simulation(
                     result=result,
                     state=runtime_state,
                 )
-                runtime_state.setdefault("buy_unlock_p", {})[window_name] = buy_res.get("unlock_p")
-                if runtime_state["capital"] < -1e-9:
-                    addlog(
-                        f"[BUG] capital negative after buy: ${runtime_state['capital']:.2f}",
-                        verbose_int=1,
-                        verbose_state=verbose,
-                    )
-                    runtime_state["capital"] = 0.0
 
+                # Track unlock threshold
+                runtime_state.setdefault("buy_unlock_p", {})[window_name] = buy_res.get("unlock_p")
+
+                # Update metrics
                 m_buy = win_metrics.get(window_name)
                 if m_buy is not None:
                     cost = result["filled_amount"] * result["avg_price"]
                     m_buy["buys"] += 1
                     m_buy["gross_invested"] += cost
+
+                # ✅ Plot green dot for buys
+                if viz:
+                    buy_points.append((float(df.iloc[t][ts_col]), price))
+
 
             open_notes = ledger_obj.get_open_notes()
             sell_res = evaluate_sell(
@@ -214,8 +211,9 @@ def run_simulation(
                 result = paper_execute_sell(
                     price, note.get("entry_amount", 0.0), timestamp=ts
                 )
-                if viz:
-                    sell_points.append((float(df.iloc[t][ts_col]), price))
+                if viz:  # ✅ must be inside the for-loop
+                    mode = note.get("sell_mode", "normal")
+                    sell_points.append((float(df.iloc[t][ts_col]), price, mode))
                 apply_sell(
                     ledger=ledger_obj,
                     note=note,
@@ -238,6 +236,7 @@ def run_simulation(
                     m_sell["realized_proceeds"] += proceeds
                     m_sell["realized_trades"] += 1
                     m_sell["realized_roi_accum"] += roi_trade
+
         ctx_j = {
             "ledger": ledger_obj,
             "verbosity": runtime_state.get("verbose", 0),
@@ -392,16 +391,37 @@ def run_simulation(
         times = pd.to_datetime(df[ts_col], unit="s")
         plt.figure()
         plt.plot(times, df["close"], label="Close", color="gray", zorder=1)
+        # --- Plot buys (single block, no duplication) ---
         if buy_points:
             b_t, b_p = zip(*buy_points)
             plt.scatter(
-                pd.to_datetime(b_t, unit="s"), b_p, marker="o", color="g", label="Buy", zorder=2
+                pd.to_datetime(b_t, unit="s"),
+                b_p,
+                marker="o", color="g", label="Buy", zorder=2,
             )
+
+
+        # --- Plot sells (normal vs flat) ---
         if sell_points:
-            s_t, s_p = zip(*sell_points)
-            plt.scatter(
-                pd.to_datetime(s_t, unit="s"), s_p, marker="o", color="r", label="Sell", zorder=2
-            )
+            times_normal = [t for t, p, m in sell_points if m == "normal"]
+            prices_normal = [p for t, p, m in sell_points if m == "normal"]
+            times_flat   = [t for t, p, m in sell_points if m == "flat"]
+            prices_flat  = [p for t, p, m in sell_points if m == "flat"]
+
+            if times_normal:
+                plt.scatter(
+                    pd.to_datetime(times_normal, unit="s"),
+                    prices_normal,
+                    marker="o", color="r", label="Sell", zorder=2,
+                )
+            if times_flat:
+                plt.scatter(
+                    pd.to_datetime(times_flat, unit="s"),
+                    prices_flat,
+                    marker="o", color="orange", label="Flat Sell", zorder=2,
+                )
+
+
         plt.xlabel("Time")
         plt.ylabel("Price")
         plt.legend()

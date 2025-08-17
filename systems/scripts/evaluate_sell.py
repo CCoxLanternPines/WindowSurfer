@@ -63,6 +63,9 @@ def evaluate_sell(
         sell_frac = sell_p / max_p if max_p else 0.0
         k = max(1, ceil(sell_frac * n_notes))
         results = window_notes[:k]
+        # 🔴 tag these notes as normal sells
+        for n in results:
+            n["sell_mode"] = "normal"
         pressures["sell"][window_name] = 0.0
         addlog(
             f"[SELL][{window_name} {window_size}] mode=normal count={k}/{n_notes} pressure={sell_p:.1f}/{max_p:.1f}",
@@ -81,6 +84,9 @@ def evaluate_sell(
     ):
         k = max(1, ceil(strategy.get("flat_sell_fraction", 0.0) * n_notes))
         results = window_notes[:k]
+        # 🟠 tag these notes as flat sells
+        for n in results:
+            n["sell_mode"] = "flat"
         pressures["sell"][window_name] = 0.0
         addlog(
             f"[SELL][{window_name} {window_size}] mode=flat count={k}/{n_notes} pressure={sell_p:.1f}/{max_p:.1f}",
@@ -88,5 +94,6 @@ def evaluate_sell(
             verbose_state=verbose,
         )
         return results
+
 
     return []
