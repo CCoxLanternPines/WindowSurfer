@@ -1,92 +1,68 @@
 from __future__ import annotations
 
-"""Price-target-based sell evaluation."""
+"""Sell evaluation based on accumulated pressure and slope classification."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
-from systems.scripts.window_utils import check_sell_conditions
-from systems.utils.addlog import addlog
+from systems.utils.config import load_settings
+
+CONFIG: Dict[str, Any] = load_settings()
+
+SELL_TRIGGER = 10
+FLAT_SELL_FRACTION = float(CONFIG.get("flat_sell_fraction", 0.2))
+FLAT_SELL_THRESHOLD = float(CONFIG.get("flat_sell_threshold", 0.5))
+MAX_PRESSURE = 10.0
 
 
 def evaluate_sell(
-    ctx: Dict[str, Any],
-    t: int,
-    series,
-    *,
-    window_name: str,
-    cfg: Dict[str, Any],
-    open_notes: List[Dict[str, Any]],
-    runtime_state: Dict[str, Any] | None = None,
-) -> List[Dict[str, Any]]:
-    """Return a list of notes to sell in ``window_name`` on this candle."""
+    candle: Any,
+    slope_cls: int,
+    state: Dict[str, Any],
+    viz_ax=None,
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """Update sell pressure and possibly close open positions.
 
-    verbose = 0
-    if runtime_state:
-        verbose = runtime_state.get("verbose", 0)
+    Parameters
+    ----------
+    candle:
+        Current market candle.
+    slope_cls:
+        Classification of the recent slope; typically ``-1``, ``0`` or ``1``.
+    state:
+        Strategy state shared with the buy evaluator.
+    viz_ax:
+        Optional Matplotlib axis for plotting sell markers.
+    """
 
-    candle = series.iloc[t]
-    price = float(candle["close"])
+    price = float(candle.get("close", 0.0))
+    sp = state.get("sell_pressure", 0.0)
+    # Negative slope increases sell pressure; positive slope relieves it slightly
+    sp = min(MAX_PRESSURE, max(0.0, sp + max(-slope_cls, 0)))
+    state["sell_pressure"] = sp
 
-    window_notes = [n for n in open_notes if n.get("window_name") == window_name]
-    open_count = len(window_notes)
+    closed: List[Dict[str, Any]] = []
+    if state.get("open_notes"):
+        if sp >= SELL_TRIGGER:
+            # Full liquidation
+            closed = state["open_notes"]
+            state["open_notes"] = []
+            cost = sum(n.get("entry_price", 0.0) for n in closed)
+            proceeds = price * len(closed)
+            state["realized_pnl"] = state.get("realized_pnl", 0.0) + (proceeds - cost)
+            if viz_ax is not None and candle.get("timestamp") is not None:
+                viz_ax.scatter(candle["timestamp"], price, color="red", marker="o")
+            state["sell_pressure"] = 0.0
+        elif slope_cls == 0:
+            flat_trigger = SELL_TRIGGER * FLAT_SELL_FRACTION
+            if sp >= flat_trigger:
+                qty = max(1, int(len(state["open_notes"]) * FLAT_SELL_THRESHOLD))
+                closed = state["open_notes"][:qty]
+                state["open_notes"] = state["open_notes"][qty:]
+                cost = sum(n.get("entry_price", 0.0) for n in closed)
+                proceeds = price * qty
+                state["realized_pnl"] = state.get("realized_pnl", 0.0) + (proceeds - cost)
+                if viz_ax is not None and candle.get("timestamp") is not None:
+                    viz_ax.scatter(candle["timestamp"], price, color="orange", marker="o")
+                state["sell_pressure"] = 0.0
 
-    ledger = ctx.get("ledger") if ctx else None
-    closed_count = 0
-    if ledger:
-        closed_count = sum(
-            1 for n in ledger.get_closed_notes() if n.get("window_name") == window_name
-        )
-
-    future_targets = [
-        n.get("target_price", float("inf"))
-        for n in window_notes
-        if n.get("target_price", float("inf")) > price
-    ]
-    next_target = min(future_targets) if future_targets else None
-
-    candidates = [
-        n
-        for n in window_notes
-        if price >= n.get("target_price", float("inf"))
-        and price >= n.get("entry_price", float("inf"))
-    ]
-
-    if not candidates:
-        msg = (
-            f"[HOLD][{window_name} {cfg['window_size']}] price=${price:.4f} Notes | "
-            f"Open={open_count} | Closed={closed_count} | Next="
-        )
-        if next_target is not None:
-            msg += f"${next_target:.4f}"
-        else:
-            msg += "None"
-        addlog(msg, verbose_int=3, verbose_state=verbose)
-        return []
-
-    def roi_now(note: Dict[str, Any]) -> float:
-        buy = note.get("entry_price", 0.0)
-        return (price - buy) / buy if buy else 0.0
-
-    candidates.sort(key=roi_now, reverse=True)
-
-    state = {
-        "sell_count": 0,
-        "verbose": verbose,
-        "window_name": window_name,
-        "window_size": cfg["window_size"],
-        "max_sells": cfg.get("max_notes_sell_per_candle", 1),
-    }
-
-    selected: List[Dict[str, Any]] = []
-    for note in candidates:
-        if check_sell_conditions(candle, note, cfg, state):
-            selected.append(note)
-
-    if candidates:
-        addlog(
-            f"[MATURE][{window_name} {cfg['window_size']}] eligible={len(candidates)} sold={len(selected)} cap={state['max_sells']}",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-
-    return selected
+    return state, closed
