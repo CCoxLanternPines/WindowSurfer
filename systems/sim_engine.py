@@ -37,9 +37,16 @@ from systems.utils.resolve_symbol import (
     to_tag,
     sim_path_csv,
 )
+from systems.utils.time import parse_cutoff as parse_timeframe
 
 
-def run_simulation(*, ledger: str, verbose: int = 0) -> None:
+def run_simulation(
+    *,
+    ledger: str,
+    verbose: int = 0,
+    timeframe: str = "1m",
+    viz: bool = True,
+) -> None:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
     base, _ = split_tag(ledger_cfg["tag"])
@@ -77,6 +84,11 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     if not df[ts_col].is_monotonic_increasing:
         raise ValueError(f"Candles not sorted by {ts_col}: {csv_path}")
 
+    if timeframe:
+        delta = parse_timeframe(timeframe)
+        cutoff_ts = (datetime.now(tz=timezone.utc) - delta).timestamp()
+        df = df[df[ts_col] >= cutoff_ts].reset_index(drop=True)
+
     # Log one line so we always know what we ran on
     first_ts = int(df[ts_col].iloc[0]) if len(df) else None
     last_ts = int(df[ts_col].iloc[-1]) if len(df) else None
@@ -107,6 +119,8 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     init_jackpot(runtime_state, ledger_cfg, df)
 
     ledger_obj = Ledger()
+    buy_points: list[tuple[float, float]] = []
+    sell_points: list[tuple[float, float]] = []
     win_metrics = {}
     for wname, wcfg in window_settings.items():
         win_metrics[wname] = {
@@ -139,6 +153,8 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                 if "timestamp" in df.columns:
                     ts = int(df.iloc[t]["timestamp"])
                 result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
+                if viz:
+                    buy_points.append((float(df.iloc[t][ts_col]), price))
                 net_usd = on_buy_drip(runtime_state, buy_res["size_usd"])
                 if buy_res["size_usd"] > 0 and net_usd < buy_res["size_usd"]:
                     factor = net_usd / buy_res["size_usd"]
@@ -195,7 +211,11 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
                 ts = None
                 if "timestamp" in df.columns:
                     ts = int(df.iloc[t]["timestamp"])
-                result = paper_execute_sell(price, note.get("entry_amount", 0.0), timestamp=ts)
+                result = paper_execute_sell(
+                    price, note.get("entry_amount", 0.0), timestamp=ts
+                )
+                if viz:
+                    sell_points.append((float(df.iloc[t][ts_col]), price))
                 apply_sell(
                     ledger=ledger_obj,
                     note=note,
@@ -366,6 +386,27 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
         }
     with json_path.open("w", encoding="utf-8") as f_json:
         json.dump(json_data, f_json, indent=2)
+    if viz:
+        import matplotlib.pyplot as plt
+
+        times = pd.to_datetime(df[ts_col], unit="s")
+        plt.figure()
+        plt.plot(times, df["close"], label="Close")
+        if buy_points:
+            b_t, b_p = zip(*buy_points)
+            plt.scatter(
+                pd.to_datetime(b_t, unit="s"), b_p, marker="^", color="g", label="Buy"
+            )
+        if sell_points:
+            s_t, s_p = zip(*sell_points)
+            plt.scatter(
+                pd.to_datetime(s_t, unit="s"), s_p, marker="v", color="r", label="Sell"
+            )
+        plt.xlabel("Time")
+        plt.ylabel("Price")
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
 
     save_ledger(
         ledger,

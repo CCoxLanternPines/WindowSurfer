@@ -16,6 +16,17 @@ from systems.utils.cli import build_parser
 
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
+    parser.add_argument(
+        "--time",
+        type=str,
+        default=None,
+        help="How far back to simulate (e.g. 1m, 7d, 1y)",
+    )
+    parser.add_argument(
+        "--viz",
+        action="store_true",
+        help="Enable visualization plotting",
+    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -55,7 +66,12 @@ def main(argv: list[str] | None = None) -> None:
         if not args.ledger:
             addlog("Error: --ledger is required for sim mode")
             sys.exit(1)
-        run_simulation(ledger=args.ledger, verbose=args.verbose)
+        run_simulation(
+            ledger=args.ledger,
+            verbose=args.verbose,
+            timeframe=args.time,
+            viz=args.viz,
+        )
     elif mode == "live":
         run_live(
             ledger=args.ledger,
