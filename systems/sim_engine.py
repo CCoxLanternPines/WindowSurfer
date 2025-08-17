@@ -134,7 +134,14 @@ def run_simulation(
     }
     addlog(f"[SIM] Starting simulation for {coin}", verbose_int=1, verbose_state=verbose)
 
-    for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
+    step = int(strategy_cfg.get("window_step", 1))
+    window_size = int(strategy_cfg.get("window_size", 0))
+    for start in tqdm(
+        range(0, total - window_size, step),
+        desc="📉 Sim Progress",
+        dynamic_ncols=True,
+    ):
+        t = start  # anchor candle for this window
         price = float(df.iloc[t]["close"])
 
         ctx = {"ledger": ledger_obj}

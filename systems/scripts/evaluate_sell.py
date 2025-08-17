@@ -5,6 +5,10 @@ from __future__ import annotations
 from math import ceil
 from typing import Any, Dict, List
 
+from systems.scripts.evaluate_buy import (
+    classify_slope,
+    compute_window_features,
+)
 from systems.utils.addlog import addlog
 
 
@@ -23,10 +27,6 @@ def evaluate_sell(
     window_name = "strategy"
     strategy = cfg or runtime_state.get("strategy", {})
     window_size = int(strategy.get("window_size", 0))
-    step = int(strategy.get("window_step", 1))
-    start = t + 1 - window_size
-    if start < 0 or start % step != 0:
-        return []
 
     verbose = runtime_state.get("verbose", 0)
 
@@ -59,8 +59,16 @@ def evaluate_sell(
         )
         return results
 
-    slope_cls = runtime_state.get("last_slope_cls", None)
-    flat_trigger = strategy.get("sell_trigger", 0.0) * strategy.get("flat_sell_threshold", 1.0)
+    # Recompute slope classification from the latest window features
+    features = runtime_state.get("last_features", {}).get(window_name)
+    if features is None:
+        features = compute_window_features(series, t, window_size)
+    slope_cls = classify_slope(
+        features.get("slope", 0.0), strategy.get("flat_band_deg", 10.0)
+    )
+    flat_trigger = strategy.get("sell_trigger", 0.0) * strategy.get(
+        "flat_sell_threshold", 1.0
+    )
     if slope_cls == 0 and sell_p >= flat_trigger and window_notes:
         k = max(1, ceil(strategy.get("flat_sell_fraction", 0.0) * n_notes))
         results = window_notes[:k]
