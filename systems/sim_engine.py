@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Very small historical simulation engine."""
 
+import argparse
 import csv
 import json
 import os
@@ -14,11 +15,9 @@ import pandas as pd
 from systems.scripts.math.slope_score import classify_slope
 
 
-# Box visualization knobs
+# Box / rolling window parameters
 WINDOW_SIZE = 24  # candles per box
 WINDOW_STEP = 2   # rolling step
-WINDOW_EDGE_COLOR = "orange"
-WINDOW_ALPHA = 0.3
 
 # Percent-change grading
 STRONG_MOVE_THRESHOLD = 0.15   # slightly easier "strong move"
@@ -26,14 +25,6 @@ STRONG_MOVE_THRESHOLD = 0.15   # slightly easier "strong move"
 # Prediction filters
 RANGE_MIN = 0.08               # only 8%+ range windows matter
 VOLUME_SKEW_BIAS = 0.4         # allow moderate skew to count
-
-COLOR_MAP = {
-    -2: "darkred",
-    -1: "pink",
-    0: "gray",
-    1: "lightgreen",
-    2: "darkgreen",
-}
 
 # Load optional configuration knobs
 try:
@@ -110,7 +101,7 @@ def rule_predict(features: dict[str, float]) -> int:
     return 0
 
 
-def run_simulation(*, timeframe: str = "1m") -> None:
+def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     """Run a simple simulation over SOLUSD candles."""
     file_path = "data/sim/SOLUSD_1h.csv"
     df = pd.read_csv(file_path)
@@ -123,21 +114,13 @@ def run_simulation(*, timeframe: str = "1m") -> None:
 
     df = df.reset_index(drop=True)
     df["candle_index"] = range(len(df))
-    fig, ax1 = plt.subplots(figsize=(12, 6))
-    ax1.plot(df["candle_index"], df["close"], color="blue", label="Close Price")
 
-    for start in range(0, len(df), WINDOW_STEP):
-        end = min(start + WINDOW_SIZE, len(df))
-        ax1.axvspan(
-            df["candle_index"].iloc[start],
-            df["candle_index"].iloc[end - 1],
-            facecolor="none",
-            edgecolor=WINDOW_EDGE_COLOR,
-            alpha=WINDOW_ALPHA,
-            linewidth=1,
-        )
+    if viz:
+        fig, ax1 = plt.subplots(figsize=(12, 6))
+        ax1.plot(df["candle_index"], df["close"], color="blue", label="Close Price")
+    else:
+        ax1 = None
 
-    markers: list[tuple[int, float, int]] = []  # (start_idx, price, prediction)
     last_features: dict[str, float] | None = None
     results: list[tuple[int, int]] = []  # (pred, actual)
 
@@ -160,7 +143,6 @@ def run_simulation(*, timeframe: str = "1m") -> None:
         pred: int | None = None
         if last_features is not None:
             pred = rule_predict(last_features)
-            markers.append((start, level, pred))
 
             if pred > 0:  # upward prediction
                 buy_pressure = min(MAX_PRESSURE, buy_pressure + 1)
@@ -180,13 +162,14 @@ def run_simulation(*, timeframe: str = "1m") -> None:
             if buy_pressure >= BUY_TRIGGER:
                 trade_size = buy_pressure / MAX_PRESSURE
                 open_notes.append((candle["close"], trade_size))
-                ax1.scatter(
-                    candle["candle_index"],
-                    candle["close"],
-                    color="green",
-                    s=120,
-                    zorder=6,
-                )
+                if viz:
+                    ax1.scatter(
+                        candle["candle_index"],
+                        candle["close"],
+                        color="green",
+                        s=120,
+                        zorder=6,
+                    )
                 print(
                     f"[BUY] candle={candle['candle_index']} price={candle['close']} size={trade_size:.2f}"
                 )
@@ -209,13 +192,14 @@ def run_simulation(*, timeframe: str = "1m") -> None:
                         open_notes[0] = (entry_price, entry_size - remaining)
                         remaining = 0.0
                 realized_pnl += pnl
-                ax1.scatter(
-                    candle["candle_index"],
-                    candle["close"],
-                    color="red",
-                    s=120,
-                    zorder=6,
-                )
+                if viz:
+                    ax1.scatter(
+                        candle["candle_index"],
+                        candle["close"],
+                        color="red",
+                        s=120,
+                        zorder=6,
+                    )
                 print(
                     f"[SELL] candle={candle['candle_index']} price={candle['close']} size={trade_size:.2f} pnl={pnl:.2f} total={realized_pnl:.2f}"
                 )
@@ -283,33 +267,15 @@ def run_simulation(*, timeframe: str = "1m") -> None:
 
         last_features = {k: v for k, v in features.items() if k != "label"}
 
-    ax1.axvspan(
-        0,
-        0,
-        facecolor="none",
-        edgecolor=WINDOW_EDGE_COLOR,
-        alpha=WINDOW_ALPHA,
-        linewidth=1,
-        label="Rolling Window",
-    )
-    ax1.scatter([], [], color="green", s=120, label="Buy")
-    ax1.scatter([], [], color="red", s=120, label="Sell")
+    if viz:
+        ax1.scatter([], [], color="green", s=120, label="Buy")
+        ax1.scatter([], [], color="red", s=120, label="Sell")
 
-    for idx, price, pred in markers:
-        if pred > 0:
-            marker = "^"
-        elif pred < 0:
-            marker = "v"
-        else:
-            marker = "o"
-        color = COLOR_MAP.get(pred, "gray")
-        ax1.scatter(idx, price, marker=marker, color=color, zorder=5)
-
-    ax1.set_title("Rolling Window Box Visualization")
-    ax1.set_xlabel("Candles (Index)")
-    ax1.set_ylabel("Price")
-    ax1.legend(loc="upper left")
-    ax1.grid(True)
+        ax1.set_title("Price with Trades")
+        ax1.set_xlabel("Candles (Index)")
+        ax1.set_ylabel("Price")
+        ax1.legend(loc="upper left")
+        ax1.grid(True)
 
     made = sum(1 for p, _ in results if p != 0)
     correct = sum(1 for p, a in results if p != 0 and p == a)
@@ -327,5 +293,19 @@ def run_simulation(*, timeframe: str = "1m") -> None:
 
     print(f"[RESULT] PnL={realized_pnl:.2f}, Remaining Notes={len(open_notes)}")
 
-    plt.show()
+    if viz:
+        plt.show()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--time", type=str, default="1m")
+    parser.add_argument("--viz", action="store_true", help="Enable visualization")
+    args = parser.parse_args()
+
+    run_simulation(timeframe=args.time, viz=args.viz)
+
+
+if __name__ == "__main__":
+    main()
 
