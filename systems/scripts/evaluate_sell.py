@@ -1,89 +1,29 @@
-from __future__ import annotations
-
-"""Price-target-based sell evaluation."""
-
-from typing import Any, Dict, List
-
-from systems.scripts.strategy_pressure import pressure_flat_sell_signal
-from systems.utils.addlog import addlog
+# Pressure Bot Sell Knobs
+FLAT_THRESHOLD = 0.03   # 3% drawdown from anchor triggers flat-sell
 
 
-def evaluate_sell(
-    ctx: Dict[str, Any],
-    t: int,
-    series,
-    *,
-    open_notes: List[Dict[str, Any]],
-    runtime_state: Dict[str, Any] | None = None,
-) -> List[Dict[str, Any]]:
-    """Return a list of notes to sell on this candle."""
+def evaluate_sell(candle, notes, state):
+    price = float(candle["close"])
+    anchor = state.get("anchor_price", price)
 
-    verbose = runtime_state.get("verbose", 0) if runtime_state else 0
+    sells = []
 
-    candle = series.iloc[t].to_dict()
-    price = float(candle.get("close", 0.0))
-
-    active_notes = [n for n in open_notes if n.get("kind") != "jackpot"]
-
-    selected: List[Dict[str, Any]] = []
-    state = runtime_state or {}
-
-    signal_log = state.get("signal_log")
-
-    for note in active_notes:
-        if pressure_sell_signal(candle, note, state):
-            note["action"] = "SELL"
-            note["reason"] = "PRESSURE_SELL"
-            selected.append(note)
-            addlog(
-                f"[PRESSURE_SELL] note={note.get('id')} price=${price:.4f}",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-            if signal_log is not None:
-                signal_log.write(f"{t},PRESSURE_SELL,{price}\n")
-
-    if pressure_flat_sell_signal(candle, state):
-        remaining = [n for n in active_notes if n not in selected]
-        if remaining:
-            anchor = float(state.get("anchor_price", price))
-            drawdown = float(state.get("flat_sell_drawdown", 0.03))
-            trigger = anchor * (1.0 - drawdown)
-            for note in remaining:
-                note["action"] = "SELL"
-                note["reason"] = "FLAT_SELL"
-                buy = float(note.get("entry_price", 0.0))
-                roi = (price - buy) / buy if buy else 0.0
-                addlog(
-                    f"[FLAT_SELL] note={note.get('id')} "
-                    f"buy={buy:.4f} now={price:.4f} trigger={trigger:.4f} "
-                    f"roi={roi*100:.2f}%",
-                    verbose_int=1,
-                    verbose_state=verbose,
-                )
-                selected.append(note)
-                if signal_log is not None:
-                    signal_log.write(f"{t},FLAT_SELL,{price}\n")
-
-    return selected
-
-
-def pressure_sell_signal(
-    candle: Dict[str, float], note: Dict[str, Any], state: Dict[str, Any]
-) -> bool:
-    """Return True if conditions trigger a pressure-scaled sell."""
-    price = float(candle.get("close", 0.0))
-    buy_price = float(note.get("entry_price", 0.0))
-    pressure = float(state.get("pressure", 0.0))
-    base_profit = float(state.get("base_profit", 0.01))
-    pressure_scale = float(state.get("pressure_scale", 0.01))
-    target_gain = base_profit + pressure * pressure_scale
-    gain = (price - buy_price) / buy_price if buy_price else 0.0
-    decision = gain >= target_gain
-    if decision and state.get("debug"):
-        addlog(
-            f"[PRESSURE_SELL] price={price:.2f} gain={gain:.4f} "
-            f"target={target_gain:.4f}",
-            verbose_state=state.get("verbose", 0),
+    # Flat sell: sell half the notes if price drops below threshold
+    trigger = anchor * (1.0 - FLAT_THRESHOLD)
+    if price <= trigger and notes:
+        # Sort notes by ROI (highest first)
+        notes_sorted = sorted(
+            notes,
+            key=lambda n: (price - n["entry_price"]) / n["entry_price"],
+            reverse=True,
         )
-    return decision
+        half = len(notes_sorted) // 2
+        for n in notes_sorted[:half]:
+            sells.append({"note_id": n["id"], "reason": "FLAT_SELL"})
+
+    # Full sell: external trigger
+    if state.get("force_sell", False):
+        for n in notes:
+            sells.append({"note_id": n["id"], "reason": "SELL_FULL"})
+
+    return sells

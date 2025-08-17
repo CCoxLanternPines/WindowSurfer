@@ -21,7 +21,7 @@ from systems.scripts.candle_cache import (
     load_sim_for_high_low,
 )
 from systems.scripts.ledger import load_ledger, save_ledger
-from systems.scripts.evaluate_buy import evaluate_buy
+from systems.scripts.evaluate_buy import evaluate_buy, WINDOW_SIZE
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
 from systems.scripts.trade_apply import apply_sell
@@ -104,18 +104,15 @@ def _run_iteration(
         if j.get("enabled"):
             j["notes_open"] = [n for n in ledger_obj.get_open_notes() if n.get("kind") == "jackpot"]
 
-        price = float(df.iloc[t]["close"])
-        ctx = {"ledger": ledger_obj}
-        buy_res = evaluate_buy(
-            ctx,
-            t,
-            df,
-            runtime_state=state,
-        )
+        candle = df.iloc[t].to_dict()
+        price = float(candle["close"])
+        buy_res = evaluate_buy(candle, state)
         if buy_res:
-            buy_res["size_usd"] = on_buy_drip(state, buy_res["size_usd"])
+            buy_usd = on_buy_drip(state, buy_res["entry_usdt"])
+            buy_signal = {"window_name": "pressure", "window_size": WINDOW_SIZE, **buy_res}
+            buy_signal["size_usd"] = buy_usd
             process_buy_signal(
-                buy_signal=buy_res,
+                buy_signal=buy_signal,
                 ledger=ledger_obj,
                 t=t,
                 runtime_state=state,
@@ -127,13 +124,12 @@ def _run_iteration(
             )
 
         open_notes = ledger_obj.get_open_notes()
-        sell_notes = evaluate_sell(
-            ctx,
-            t,
-            df,
-            open_notes=open_notes,
-            runtime_state=state,
-        )
+        sell_reqs = evaluate_sell(candle, open_notes, state)
+        sell_notes = []
+        for req in sell_reqs:
+            note = next((n for n in open_notes if n.get("id") == req.get("note_id")), None)
+            if note is not None:
+                sell_notes.append(note)
         for note in sell_notes:
             result = execute_sell(
                 None,
