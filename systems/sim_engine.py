@@ -182,16 +182,6 @@ def run_simulation(
             runtime_state=runtime_state,
         )
 
-        if __debug__ and not runtime_state.get("_sell_shape_logged"):
-            if isinstance(sell_notes, list):
-                addlog("[SIM] evaluate_sell returned list", verbose_int=2, verbose_state=verbose)
-            elif isinstance(sell_notes, dict):
-                addlog("[SIM] evaluate_sell returned dict", verbose_int=2, verbose_state=verbose)
-            runtime_state["_sell_shape_logged"] = True
-
-        if isinstance(sell_notes, dict):
-            sell_notes = sell_notes.get("notes", [])
-
         for note in sell_notes:
             ts = None
             if "timestamp" in df.columns:
