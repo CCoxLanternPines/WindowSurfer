@@ -12,7 +12,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from systems.scripts.ledger import Ledger, save_ledger
-from .scripts.evaluate_buy import evaluate_buy, WINDOW_SIZE
+from .scripts.evaluate_buy import evaluate_buy
 from .scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
 from systems.scripts.trade_apply import (
@@ -152,7 +152,7 @@ def run_simulation(
 
     for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
         candle = df.iloc[t].to_dict()
-        buy_res = evaluate_buy(candle, runtime_state)
+        note = evaluate_buy(candle, runtime_state)
         if verbose >= 2:
             addlog(
                 f"[STATE] t={t} anchor={runtime_state.get('anchor_price', 0.0):.2f} "
@@ -162,17 +162,17 @@ def run_simulation(
             )
         price = float(candle.get("close", 0.0))
 
-        if buy_res:
+        if note:
             ts = None
             if "timestamp" in df.columns:
                 ts = int(df.iloc[t]["timestamp"])
-            result = paper_execute_buy(price, buy_res["entry_usdt"], timestamp=ts)
-            net_usd = on_buy_drip(runtime_state, buy_res["entry_usdt"])
-            if buy_res["entry_usdt"] > 0 and net_usd < buy_res["entry_usdt"]:
-                factor = net_usd / buy_res["entry_usdt"]
+            result = paper_execute_buy(price, note["entry_usdt"], timestamp=ts)
+            net_usd = on_buy_drip(runtime_state, note["entry_usdt"])
+            if note["entry_usdt"] > 0 and net_usd < note["entry_usdt"]:
+                factor = net_usd / note["entry_usdt"]
                 result["filled_amount"] *= factor
-            meta = {"window_name": "pressure", "window_size": WINDOW_SIZE, **buy_res}
-            note = apply_buy(
+            meta = {"window_name": "pressure", **note}
+            note_obj = apply_buy(
                 ledger=ledger_obj,
                 window_name=meta.get("window_name", "pressure"),
                 t=t,
@@ -196,12 +196,12 @@ def run_simulation(
 
         open_notes = ledger_obj.get_open_notes()
         runtime_state["open_notes"] = open_notes
-        sell_res = evaluate_sell(candle, open_notes, runtime_state)
+        sell_actions = evaluate_sell(candle, open_notes, runtime_state)
         sell_notes = []
-        for req in sell_res:
-            note = next((n for n in open_notes if n.get("id") == req.get("note_id")), None)
-            if note is not None:
-                sell_notes.append(note)
+        for action in sell_actions:
+            note_obj = next((n for n in open_notes if n.get("id") == action.get("note_id")), None)
+            if note_obj is not None:
+                sell_notes.append(note_obj)
 
         for note in sell_notes:
             ts = None
