@@ -22,6 +22,11 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
         help="Restrict simulation to recent duration (e.g., 1d, 1w, 1m)",
     )
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        help="Generate a plot after simulation (sim mode only)",
+    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -76,6 +81,7 @@ def main(argv: list[str] | None = None) -> None:
             ledger=args.ledger,
             verbose=args.verbose,
             time_limit_seconds=time_limit_seconds,
+            plot=args.plot,
         )
     elif mode == "simdebug":
         if not args.ledger:
