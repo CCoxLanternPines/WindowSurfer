@@ -33,6 +33,7 @@ def evaluate_sell(
 
     for note in window_notes:
         if pressure_sell_signal(candle, note, state):
+            note["action"] = "SELL"
             note["reason"] = "PRESSURE_SELL"
             selected.append(note)
             addlog(
@@ -44,13 +45,22 @@ def evaluate_sell(
     if pressure_flat_sell_signal(candle, state):
         remaining = [n for n in window_notes if n not in selected]
         if remaining:
-            addlog(
-                f"[FLAT_SELL] price=${price:.4f} notes={len(remaining)}",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-        for note in remaining:
-            note["reason"] = "FLAT_SELL"
-            selected.append(note)
+            anchor = float(state.get("anchor_price", price))
+            drawdown = float(state.get("flat_sell_drawdown", 0.03))
+            trigger = anchor * (1.0 - drawdown)
+            for note in remaining:
+                note["action"] = "SELL"
+                note["reason"] = "FLAT_SELL"
+                buy = float(note.get("entry_price", 0.0))
+                roi = (price - buy) / buy if buy else 0.0
+                window_name = note.get("window_name", "")
+                addlog(
+                    f"[FLAT_SELL][{window_name}] note={note.get('id')} "
+                    f"buy={buy:.4f} now={price:.4f} trigger={trigger:.4f} "
+                    f"roi={roi*100:.2f}%",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
+                selected.append(note)
 
     return selected

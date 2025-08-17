@@ -35,10 +35,13 @@ class Ledger:
         """
         self.open_notes.append(note)
 
-    def close_note(self, note: Dict) -> None:
-        """Move ``note`` from open to closed."""
+    def close_note(self, note: Dict, *, reason: str | None = None) -> None:
+        """Move ``note`` from open to closed, recording ``reason`` if provided."""
         if note not in self.open_notes:
             return
+        if reason:
+            note["reason"] = reason
+        note.pop("action", None)
         self.open_notes.remove(note)
         self.closed_notes.append(note)
 
