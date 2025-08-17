@@ -49,8 +49,8 @@ def evaluate_sell(
             cost = sum(n.get("entry_price", 0.0) for n in closed)
             proceeds = price * len(closed)
             state["realized_pnl"] = state.get("realized_pnl", 0.0) + (proceeds - cost)
-            if viz_ax is not None and candle.get("timestamp") is not None:
-                viz_ax.scatter(candle["timestamp"], price, color="red", marker="o")
+            if viz_ax is not None and candle.get("candle_index") is not None:
+                viz_ax.scatter(candle["candle_index"], price, color="red", marker="o")
             state["sell_pressure"] = 0.0
         elif slope_cls == 0:
             flat_trigger = SELL_TRIGGER * FLAT_SELL_FRACTION
@@ -61,8 +61,8 @@ def evaluate_sell(
                 cost = sum(n.get("entry_price", 0.0) for n in closed)
                 proceeds = price * qty
                 state["realized_pnl"] = state.get("realized_pnl", 0.0) + (proceeds - cost)
-                if viz_ax is not None and candle.get("timestamp") is not None:
-                    viz_ax.scatter(candle["timestamp"], price, color="orange", marker="o")
+                if viz_ax is not None and candle.get("candle_index") is not None:
+                    viz_ax.scatter(candle["candle_index"], price, color="orange", marker="o")
                 state["sell_pressure"] = 0.0
 
     return state, closed
