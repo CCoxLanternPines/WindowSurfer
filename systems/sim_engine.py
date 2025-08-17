@@ -46,6 +46,7 @@ def run_simulation(
     verbose: int = 0,
     time_limit_seconds: int | None = None,
     dump_signals: bool = False,
+    plot: bool = False,
 ) -> None:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
@@ -404,3 +405,14 @@ def run_simulation(
 
     if signal_log is not None:
         signal_log.close()
+
+    if plot:
+        from systems.scripts.plot_pressure import plot_pressure
+
+        ledger_dict = {
+            "open_notes": ledger_obj.get_open_notes(),
+            "closed_notes": ledger_obj.get_closed_notes(),
+            "metadata": ledger_obj.get_metadata(),
+        }
+        out_path = root / "data" / "tmp" / "sim_plot.png"
+        plot_pressure(df, ledger_dict, str(out_path))
