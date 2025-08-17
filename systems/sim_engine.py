@@ -47,6 +47,7 @@ def run_simulation(
     time_limit_seconds: int | None = None,
     dump_signals: bool = False,
     plot: bool = False,
+    viz: bool = False,
 ) -> None:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
@@ -416,3 +417,14 @@ def run_simulation(
         }
         out_path = root / "data" / "tmp" / "sim_plot.png"
         plot_pressure(df, ledger_dict, str(out_path))
+
+    if viz:
+        from systems.scripts.viz import plot_viz
+
+        ledger_dict = {
+            "open_notes": ledger_obj.get_open_notes(),
+            "closed_notes": ledger_obj.get_closed_notes(),
+            "metadata": ledger_obj.get_metadata(),
+        }
+        out_path = root / "data" / "tmp" / f"{ledger}_viz.png"
+        plot_viz(df, ledger_dict, ledger, str(out_path))

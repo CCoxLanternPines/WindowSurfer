@@ -27,6 +27,11 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Generate a plot after simulation (sim mode only)",
     )
+    parser.add_argument(
+        "--viz",
+        action="store_true",
+        help="Generate original visualization plot after simulation",
+    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -82,6 +87,7 @@ def main(argv: list[str] | None = None) -> None:
             verbose=args.verbose,
             time_limit_seconds=time_limit_seconds,
             plot=args.plot,
+            viz=args.viz,
         )
     elif mode == "simdebug":
         if not args.ledger:
@@ -103,6 +109,7 @@ def main(argv: list[str] | None = None) -> None:
             verbose=args.verbose,
             time_limit_seconds=time_limit_seconds,
             dump_signals=True,
+            viz=args.viz,
         )
     elif mode == "live":
         run_live(
