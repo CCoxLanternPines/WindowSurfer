@@ -200,16 +200,16 @@ def run_live(*, ledger: str | None = None, dry: bool = False, verbose: int = 0) 
         ledger_obj = load_ledger(name, tag=ledger_cfg["tag"])
         open_notes = ledger_obj.get_open_notes()
         total = len(open_notes)
-        per_window: Dict[str, int] = {}
+        per_strategy: Dict[str, int] = {}
         last_ts = None
         for n in open_notes:
             w = n.get("window_name")
-            per_window[w] = per_window.get(w, 0) + 1
+            per_strategy[w] = per_strategy.get(w, 0) + 1
             ts = n.get("created_ts")
             if ts is not None and (last_ts is None or ts > last_ts):
                 last_ts = ts
         addlog(
-            f"[LEDGER][OPEN] total={total} per-window={per_window}",
+            f"[LEDGER][OPEN] total={total} per-strategy={per_strategy}",
             verbose_int=1,
             verbose_state=verbose,
         )

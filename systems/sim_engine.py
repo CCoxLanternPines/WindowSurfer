@@ -40,7 +40,13 @@ from systems.utils.resolve_symbol import (
 from systems.utils.time import duration_from_candle_count
 
 
-def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | None = None) -> None:
+def run_simulation(
+    *,
+    ledger: str,
+    verbose: int = 0,
+    time_limit_seconds: int | None = None,
+    dump_signals: bool = False,
+) -> None:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
     base, _ = split_tag(ledger_cfg["tag"])
@@ -117,12 +123,20 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | N
     )
     runtime_state["mode"] = "sim"
     runtime_state["buy_unlock_p"] = {}
+
+    signal_log = None
+    if dump_signals:
+        root_path = resolve_path("")
+        sig_path = Path(root_path) / "data" / "tmp" / "pressure_signals.txt"
+        sig_path.parent.mkdir(parents=True, exist_ok=True)
+        signal_log = sig_path.open("w")
+        runtime_state["signal_log"] = signal_log
+
     init_jackpot(runtime_state, ledger_cfg, df)
 
     ledger_obj = Ledger()
-    win_metrics = {
+    strategy_metrics = {
         "pressure": {
-            "window_size": "",
             "buys": 0,
             "sells": 0,
             "gross_invested": 0.0,
@@ -171,7 +185,7 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | N
                 )
                 runtime_state["capital"] = 0.0
 
-            m_buy = win_metrics.get(wn)
+            m_buy = strategy_metrics.get(wn)
             if m_buy is not None:
                 cost = result["filled_amount"] * result["avg_price"]
                 m_buy["buys"] += 1
@@ -220,7 +234,7 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | N
             cost = buy_price * qty
             proceeds = exit_price * qty
             roi_trade = (proceeds - cost) / cost if cost > 0 else 0.0
-            m_sell = win_metrics.get(w)
+            m_sell = strategy_metrics.get(w)
             if m_sell is not None:
                 m_sell["sells"] += 1
                 m_sell["realized_cost"] += cost
@@ -253,15 +267,15 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | N
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)
 
-    open_value_by_window = defaultdict(float)
+    open_value_by_strategy = defaultdict(float)
     for note in ledger_obj.get_open_notes():
         w = note.get("window_name")
         qty = note.get("entry_amount", 0.0)
-        open_value_by_window[w] += qty * final_price
+        open_value_by_strategy[w] += qty * final_price
 
     wallet_cash = runtime_state["capital"]
     rows = []
-    for w, m in win_metrics.items():
+    for w, m in strategy_metrics.items():
         realized_roi = (
             (m["realized_proceeds"] / m["realized_cost"] - 1.0)
             if m["realized_cost"] > 0
@@ -272,18 +286,17 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | N
             if m["realized_trades"] > 0
             else 0.0
         )
-        open_value = open_value_by_window.get(w, 0.0)
+        open_value = open_value_by_strategy.get(w, 0.0)
         total_value_at_liq = m["realized_proceeds"] + open_value
         realized_pnl = m["realized_proceeds"] - m["realized_cost"]
         addlog(
-            f"[REPORT][{w} {m['window_size']}] buys={m['buys']} sells={m['sells']} realized_pnl=${realized_pnl:.2f} realized_roi={(realized_roi*100):.2f}% avg_trade_roi={(avg_trade_roi*100):.2f}% open_notes_value=${open_value:.2f} window_total_at_liq=${total_value_at_liq:.2f}",
+            f"[REPORT][{w}] buys={m['buys']} sells={m['sells']} realized_pnl=${realized_pnl:.2f} realized_roi={(realized_roi*100):.2f}% avg_trade_roi={(avg_trade_roi*100):.2f}% open_notes_value=${open_value:.2f} total_at_liq=${total_value_at_liq:.2f}",
             verbose_int=1,
             verbose_state=verbose,
         )
         rows.append(
             {
-                "window": w,
-                "window_size": m["window_size"],
+                "strategy": w,
                 "buys": m["buys"],
                 "sells": m["sells"],
                 "gross_invested": m["gross_invested"],
@@ -293,11 +306,11 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | N
                 "realized_roi": realized_roi,
                 "avg_trade_roi": avg_trade_roi,
                 "open_value_now": open_value,
-                "window_total_at_liq": total_value_at_liq,
+                "total_at_liq": total_value_at_liq,
             }
         )
 
-    global_open_value = sum(open_value_by_window.values())
+    global_open_value = sum(open_value_by_strategy.values())
     global_total_at_liq = wallet_cash + global_open_value
     addlog(
         f"[REPORT][GLOBAL] cash=${wallet_cash:.2f} open_value=${global_open_value:.2f} total_at_liq=${global_total_at_liq:.2f}",
@@ -331,8 +344,7 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | N
         writer = csv.DictWriter(
             f_csv,
             fieldnames=[
-                "window",
-                "window_size",
+                "strategy",
                 "buys",
                 "sells",
                 "gross_invested",
@@ -342,7 +354,7 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | N
                 "realized_roi",
                 "avg_trade_roi",
                 "open_value_now",
-                "window_total_at_liq",
+                "total_at_liq",
             ],
         )
         writer.writeheader()
@@ -356,7 +368,7 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | N
                 f"{j.get('drips',0.0)},{j.get('buys',0)},{j.get('sells',0)},{j.get('realized_pnl',0.0)},{j.get('pool_usd',0.0)},{coin_value},{jackpot_total}\n"
             )
     json_data = {
-        "windows": rows,
+        "strategies": rows,
         "global": {
             "cash": wallet_cash,
             "open_value_now": global_open_value,
@@ -389,3 +401,6 @@ def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | N
     if default_path.exists() and default_path != sim_path:
         sim_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(default_path, sim_path)
+
+    if signal_log is not None:
+        signal_log.close()
