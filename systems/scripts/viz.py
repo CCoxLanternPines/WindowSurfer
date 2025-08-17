@@ -123,6 +123,7 @@ def plot_viz(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
     fig.savefig(out_path)
+    plt.show()
     plt.close(fig)
     print(f"[VIZ] Saved plot to {out_path}")
 
