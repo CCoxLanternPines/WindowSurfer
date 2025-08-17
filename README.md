@@ -1,9 +1,9 @@
 # WindowSurfer
 
-WindowSurfer is a position-based cryptocurrency trading toolkit. It focuses on pattern-driven strategies that act on the relative position of price inside rolling "windows" of historical candles. The system can simulate strategies on past data, tune parameters, run against fresh market data, inspect wallet balances and keep raw candle histories in sync.
+WindowSurfer is a pressure-based cryptocurrency trading toolkit. The system can simulate strategies on past data, run against fresh market data, inspect wallet balances and keep raw candle histories in sync.
 
 ## Goals
-* Provide reproducible backtesting for window/"tunnel" strategies.
+* Provide reproducible backtesting for pressure-based strategies.
 * Mirror simulation logic in live trading for apples-to-apples comparison.
 * Maintain a ledger of trades ("notes") for later analysis and risk tracking.
 
@@ -13,7 +13,6 @@ WindowSurfer is a position-based cryptocurrency trading toolkit. It focuses on p
 | Mode | Purpose |
 |------|---------|
 | `sim` | Run a historical backtest using `systems/sim_engine.py`.
-| `simtune` | Optimise strategy parameters with Optuna via `systems/scripts/sim_tuner.py`.
 | `live` | Execute the same logic on fresh data at the top of every hour using `systems/live_engine.py`.
 | `wallet` | Query Kraken for balances of the configured quote asset.
 | `fetch` | Fill gaps in `data/raw/<TAG>.csv` by pulling candles from Kraken and Binance.
@@ -35,10 +34,10 @@ python bot.py --mode wallet --ledger default
 * **systems/scripts/** – house the buy/sell evaluators, ledger implementation and data helpers.
 * **systems/utils/** – configuration loader, logging/Telegram helpers, asset pair caching and CLI builder.
 
-Trades are stored as *notes* in a JSON ledger. Each note records entry price, window metrics and targeted exit. The ledger can be persisted for live trading or inspected after simulations.
+Trades are stored as *notes* in a JSON ledger. Each note records entry price and targeted exit. The ledger can be persisted for live trading or inspected after simulations.
 
 ## Configuration
-* `settings/settings.json` – defines one or more ledgers. Each ledger sets a trading pair (`tag`) and a collection of `window_settings` that describe strategy windows (size, trigger position, investment fraction, etc.).
+* `settings/settings.json` – defines one or more ledgers. Each ledger sets a trading pair (`tag`), exchange symbols and optional jackpot configuration.
 * `telegram.yaml` – optional credentials for Telegram notifications.
 * Candle files live under `data/raw/<TAG>.csv`; live mode updates ledgers under `data/ledgers/`.
 

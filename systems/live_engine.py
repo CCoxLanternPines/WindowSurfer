@@ -49,7 +49,6 @@ def _run_iteration(
             continue
         kraken_symbol, _ = resolve_ccxt_symbols(settings, name)
         tag = to_tag(kraken_symbol)
-        window_settings = ledger_cfg.get("window_settings", {})
         refresh_live_kraken_720(kraken_symbol)
         live_file = live_path_csv(tag)
         if not Path(live_file).exists():
@@ -106,56 +105,51 @@ def _run_iteration(
             j["notes_open"] = [n for n in ledger_obj.get_open_notes() if n.get("kind") == "jackpot"]
 
         price = float(df.iloc[t]["close"])
-        for window_name, wcfg in window_settings.items():
-            ctx = {"ledger": ledger_obj}
-            buy_res = evaluate_buy(
-                ctx,
-                t,
-                df,
-                window_name=window_name,
-                cfg=wcfg,
+        ctx = {"ledger": ledger_obj}
+        buy_res = evaluate_buy(
+            ctx,
+            t,
+            df,
+            runtime_state=state,
+        )
+        if buy_res:
+            buy_res["size_usd"] = on_buy_drip(state, buy_res["size_usd"])
+            process_buy_signal(
+                buy_signal=buy_res,
+                ledger=ledger_obj,
+                t=t,
                 runtime_state=state,
+                pair_code=ledger_cfg["kraken_pair"],
+                price=price,
+                ledger_name=ledger_cfg["tag"],
+                wallet_code=ledger_cfg.get("wallet_code", ""),
+                verbose=state.get("verbose", 0),
             )
-            if buy_res:
-                buy_res["size_usd"] = on_buy_drip(state, buy_res["size_usd"])
-                process_buy_signal(
-                    buy_signal=buy_res,
-                    ledger=ledger_obj,
-                    t=t,
-                    runtime_state=state,
-                    pair_code=ledger_cfg["kraken_pair"],
-                    price=price,
-                    ledger_name=ledger_cfg["tag"],
-                    wallet_code=ledger_cfg.get("wallet_code", ""),
-                    verbose=state.get("verbose", 0),
-                )
 
-            open_notes = ledger_obj.get_open_notes()
-            sell_notes = evaluate_sell(
-                ctx,
-                t,
-                df,
-                window_name=window_name,
-                cfg=wcfg,
-                open_notes=open_notes,
-                runtime_state=state,
+        open_notes = ledger_obj.get_open_notes()
+        sell_notes = evaluate_sell(
+            ctx,
+            t,
+            df,
+            open_notes=open_notes,
+            runtime_state=state,
+        )
+        for note in sell_notes:
+            result = execute_sell(
+                None,
+                pair_code=ledger_cfg["kraken_pair"],
+                coin_amount=note.get("entry_amount", 0.0),
+                price=price,
+                ledger_name=ledger_cfg["tag"],
+                verbose=state.get("verbose", 0),
             )
-            for note in sell_notes:
-                result = execute_sell(
-                    None,
-                    pair_code=ledger_cfg["kraken_pair"],
-                    coin_amount=note.get("entry_amount", 0.0),
-                    price=price,
-                    ledger_name=ledger_cfg["tag"],
-                    verbose=state.get("verbose", 0),
-                )
-                if result and not result.get("error"):
-                    apply_sell(
-                        ledger=ledger_obj,
-                        note=note,
-                        t=t,
-                        result=result,
-                        state=state,
+            if result and not result.get("error"):
+                apply_sell(
+                    ledger=ledger_obj,
+                    note=note,
+                    t=t,
+                    result=result,
+                    state=state,
                 )
 
         ctx_j = {

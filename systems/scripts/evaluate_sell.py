@@ -16,19 +16,17 @@ def evaluate_sell(
     t: int,
     series,
     *,
-    window_name: str,
-    cfg: Dict[str, Any],
     open_notes: List[Dict[str, Any]],
     runtime_state: Dict[str, Any] | None = None,
 ) -> List[Dict[str, Any]]:
-    """Return a list of notes to sell in ``window_name`` on this candle."""
+    """Return a list of notes to sell on this candle."""
 
     verbose = runtime_state.get("verbose", 0) if runtime_state else 0
 
     candle = series.iloc[t].to_dict()
     price = float(candle.get("close", 0.0))
 
-    window_notes = [n for n in open_notes if n.get("window_name") == window_name]
+    window_notes = [n for n in open_notes if n.get("kind") != "jackpot"]
 
     selected: List[Dict[str, Any]] = []
     state = runtime_state or {}
