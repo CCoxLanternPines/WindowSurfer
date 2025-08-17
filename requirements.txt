@@ -5,3 +5,4 @@ krakenex
 ccxt
 pyyaml
 optuna
+matplotlib
