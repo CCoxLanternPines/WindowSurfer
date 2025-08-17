@@ -19,16 +19,16 @@ def evaluate_sell(
     t: int,
     series,
     *,
-    window_name: str,
     cfg: Dict[str, Any],
     open_notes: List[Dict[str, Any]],
     runtime_state: Dict[str, Any] | None = None,
 ) -> List[Dict[str, Any]]:
-    """Return a list of notes to sell in ``window_name`` on this candle."""
+    """Return a list of notes to sell on this candle."""
 
     runtime_state = runtime_state or {}
-    strategy = runtime_state.get("strategy", {})
-    window_size = int(strategy.get("window_size") or cfg.get("window_size", 0))
+    window_name = "strategy"
+    strategy = cfg or runtime_state.get("strategy", {})
+    window_size = int(strategy.get("window_size", 0))
     step = int(strategy.get("window_step", 1))
     start = t + 1 - window_size
     if start < 0 or start % step != 0:
@@ -48,7 +48,7 @@ def evaluate_sell(
     sell_p = pressures["sell"].get(window_name, 0.0)
     max_p = strategy.get("max_pressure", 1.0)
     results: List[Dict[str, Any]] = []
-    window_notes = [n for n in open_notes if n.get("window_name") == window_name]
+    window_notes = open_notes
     n_notes = len(window_notes)
     candle = series.iloc[t]
     price = float(candle["close"])

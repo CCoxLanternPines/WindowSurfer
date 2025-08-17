@@ -3,7 +3,6 @@ from __future__ import annotations
 """Historical simulation engine for position-based strategy."""
 
 import shutil
-from collections import defaultdict
 from datetime import datetime, timezone
 import csv
 import json
@@ -51,7 +50,7 @@ def run_simulation(
     ledger_cfg = load_ledger_config(ledger)
     base, _ = split_tag(ledger_cfg["tag"])
     coin = base.upper()
-    window_settings = ledger_cfg.get("window_settings", {})
+    strategy_cfg = settings.get("general_settings", {}).get("strategy_settings", {})
 
     kraken_symbol, _ = resolve_ccxt_symbols(settings, ledger)
     tag = to_tag(kraken_symbol)
@@ -121,10 +120,9 @@ def run_simulation(
     ledger_obj = Ledger()
     buy_points: list[tuple[float, float]] = []
     sell_points: list[tuple[float, float]] = []
-    win_metrics = {}
-    for wname, wcfg in window_settings.items():
-        win_metrics[wname] = {
-            "window_size": str(wcfg.get("window_size", "")),
+    win_metrics = {
+        "strategy": {
+            "window_size": str(strategy_cfg.get("window_size", "")),
             "buys": 0,
             "sells": 0,
             "gross_invested": 0.0,
@@ -133,109 +131,98 @@ def run_simulation(
             "realized_trades": 0,
             "realized_roi_accum": 0.0,
         }
+    }
     addlog(f"[SIM] Starting simulation for {coin}", verbose_int=1, verbose_state=verbose)
 
     for t in tqdm(range(total), desc="📉 Sim Progress", dynamic_ncols=True):
         price = float(df.iloc[t]["close"])
 
-        for window_name, wcfg in window_settings.items():
-            ctx = {"ledger": ledger_obj}
-            buy_res = evaluate_buy(
-                ctx,
-                t,
-                df,
-                window_name=window_name,
-                cfg=wcfg,
-                runtime_state=runtime_state,
-            )
-            if buy_res:
-                ts = None
-                if "timestamp" in df.columns:
-                    ts = int(df.iloc[t]["timestamp"])
+        ctx = {"ledger": ledger_obj}
+        buy_res = evaluate_buy(
+            ctx,
+            t,
+            df,
+            cfg=strategy_cfg,
+            runtime_state=runtime_state,
+        )
+        if buy_res:
+            ts = None
+            if "timestamp" in df.columns:
+                ts = int(df.iloc[t]["timestamp"])
 
-                result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
+            result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
 
-                note = apply_buy(
-                    ledger=ledger_obj,
-                    window_name=window_name,
-                    t=t,
-                    meta=buy_res,
-                    result=result,
-                    state=runtime_state,
-                )
-
-                # Track unlock threshold
-                runtime_state.setdefault("buy_unlock_p", {})[window_name] = buy_res.get("unlock_p")
-
-                # Update metrics
-                m_buy = win_metrics.get(window_name)
-                if m_buy is not None:
-                    cost = result["filled_amount"] * result["avg_price"]
-                    m_buy["buys"] += 1
-                    m_buy["gross_invested"] += cost
-
-                # ✅ Plot green dot for buys
-                if viz:
-                    buy_points.append((float(df.iloc[t][ts_col]), price))
-
-
-            open_notes = ledger_obj.get_open_notes()
-            sell_res = evaluate_sell(
-                ctx,
-                t,
-                df,
-                window_name=window_name,
-                cfg=wcfg,
-                open_notes=open_notes,
-                runtime_state=runtime_state,
+            note = apply_buy(
+                ledger=ledger_obj,
+                window_name="strategy",
+                t=t,
+                meta=buy_res,
+                result=result,
+                state=runtime_state,
             )
 
-            if __debug__ and not runtime_state.get("_sell_shape_logged"):
-                if isinstance(sell_res, list):
-                    addlog("[SIM] evaluate_sell returned list", verbose_int=2, verbose_state=verbose)
-                elif isinstance(sell_res, dict):
-                    addlog("[SIM] evaluate_sell returned dict", verbose_int=2, verbose_state=verbose)
-                runtime_state["_sell_shape_logged"] = True
+            runtime_state.setdefault("buy_unlock_p", {})["strategy"] = buy_res.get("unlock_p")
 
-            if isinstance(sell_res, list):
-                sell_notes = sell_res
-            elif isinstance(sell_res, dict):
-                sell_notes = sell_res.get("notes", [])
-            else:
-                sell_notes = []
+            m_buy = win_metrics.get("strategy")
+            if m_buy is not None:
+                cost = result["filled_amount"] * result["avg_price"]
+                m_buy["buys"] += 1
+                m_buy["gross_invested"] += cost
 
-            for note in sell_notes:
-                ts = None
-                if "timestamp" in df.columns:
-                    ts = int(df.iloc[t]["timestamp"])
-                result = paper_execute_sell(
-                    price, note.get("entry_amount", 0.0), timestamp=ts
-                )
-                if viz:  # ✅ must be inside the for-loop
-                    mode = note.get("sell_mode", "normal")
-                    sell_points.append((float(df.iloc[t][ts_col]), price, mode))
-                apply_sell(
-                    ledger=ledger_obj,
-                    note=note,
-                    t=t,
-                    result=result,
-                    state=runtime_state,
-                )
+            if viz:
+                buy_points.append((float(df.iloc[t][ts_col]), price))
 
-                w = note.get("window_name")
-                qty = note.get("entry_amount", 0.0)
-                buy_price = note.get("entry_price", 0.0)
-                exit_price = note.get("exit_price", 0.0)
-                cost = buy_price * qty
-                proceeds = exit_price * qty
-                roi_trade = (proceeds - cost) / cost if cost > 0 else 0.0
-                m_sell = win_metrics.get(w)
-                if m_sell is not None:
-                    m_sell["sells"] += 1
-                    m_sell["realized_cost"] += cost
-                    m_sell["realized_proceeds"] += proceeds
-                    m_sell["realized_trades"] += 1
-                    m_sell["realized_roi_accum"] += roi_trade
+        open_notes = ledger_obj.get_open_notes()
+        sell_notes = evaluate_sell(
+            ctx,
+            t,
+            df,
+            cfg=strategy_cfg,
+            open_notes=open_notes,
+            runtime_state=runtime_state,
+        )
+
+        if __debug__ and not runtime_state.get("_sell_shape_logged"):
+            if isinstance(sell_notes, list):
+                addlog("[SIM] evaluate_sell returned list", verbose_int=2, verbose_state=verbose)
+            elif isinstance(sell_notes, dict):
+                addlog("[SIM] evaluate_sell returned dict", verbose_int=2, verbose_state=verbose)
+            runtime_state["_sell_shape_logged"] = True
+
+        if isinstance(sell_notes, dict):
+            sell_notes = sell_notes.get("notes", [])
+
+        for note in sell_notes:
+            ts = None
+            if "timestamp" in df.columns:
+                ts = int(df.iloc[t]["timestamp"])
+            result = paper_execute_sell(
+                price, note.get("entry_amount", 0.0), timestamp=ts
+            )
+            if viz:
+                mode = note.get("sell_mode", "normal")
+                sell_points.append((float(df.iloc[t][ts_col]), price, mode))
+            apply_sell(
+                ledger=ledger_obj,
+                note=note,
+                t=t,
+                result=result,
+                state=runtime_state,
+            )
+
+            qty = note.get("entry_amount", 0.0)
+            buy_price = note.get("entry_price", 0.0)
+            exit_price = note.get("exit_price", 0.0)
+            cost = buy_price * qty
+            proceeds = exit_price * qty
+            roi_trade = (proceeds - cost) / cost if cost > 0 else 0.0
+            m_sell = win_metrics.get("strategy")
+            if m_sell is not None:
+                m_sell["sells"] += 1
+                m_sell["realized_cost"] += cost
+                m_sell["realized_proceeds"] += proceeds
+                m_sell["realized_trades"] += 1
+                m_sell["realized_roi_accum"] += roi_trade
 
         ctx_j = {
             "ledger": ledger_obj,
@@ -263,54 +250,49 @@ def run_simulation(
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)
 
-    open_value_by_window = defaultdict(float)
-    for note in ledger_obj.get_open_notes():
-        w = note.get("window_name")
-        qty = note.get("entry_amount", 0.0)
-        open_value_by_window[w] += qty * final_price
+    open_value = sum(
+        n.get("entry_amount", 0.0) * final_price for n in ledger_obj.get_open_notes()
+    )
 
     wallet_cash = runtime_state["capital"]
-    rows = []
-    for w, m in win_metrics.items():
-        realized_roi = (
-            (m["realized_proceeds"] / m["realized_cost"] - 1.0)
-            if m["realized_cost"] > 0
-            else 0.0
-        )
-        avg_trade_roi = (
-            m["realized_roi_accum"] / m["realized_trades"]
-            if m["realized_trades"] > 0
-            else 0.0
-        )
-        open_value = open_value_by_window.get(w, 0.0)
-        total_value_at_liq = m["realized_proceeds"] + open_value
-        realized_pnl = m["realized_proceeds"] - m["realized_cost"]
-        addlog(
-            f"[REPORT][{w} {m['window_size']}] buys={m['buys']} sells={m['sells']} realized_pnl=${realized_pnl:.2f} realized_roi={(realized_roi*100):.2f}% avg_trade_roi={(avg_trade_roi*100):.2f}% open_notes_value=${open_value:.2f} window_total_at_liq=${total_value_at_liq:.2f}",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-        rows.append(
-            {
-                "window": w,
-                "window_size": m["window_size"],
-                "buys": m["buys"],
-                "sells": m["sells"],
-                "gross_invested": m["gross_invested"],
-                "realized_cost": m["realized_cost"],
-                "realized_proceeds": m["realized_proceeds"],
-                "realized_pnl": realized_pnl,
-                "realized_roi": realized_roi,
-                "avg_trade_roi": avg_trade_roi,
-                "open_value_now": open_value,
-                "window_total_at_liq": total_value_at_liq,
-            }
-        )
-
-    global_open_value = sum(open_value_by_window.values())
-    global_total_at_liq = wallet_cash + global_open_value
+    m = win_metrics.get("strategy", {})
+    realized_roi = (
+        (m.get("realized_proceeds", 0.0) / m.get("realized_cost", 1.0) - 1.0)
+        if m.get("realized_cost", 0.0) > 0
+        else 0.0
+    )
+    avg_trade_roi = (
+        m.get("realized_roi_accum", 0.0) / m.get("realized_trades", 1)
+        if m.get("realized_trades", 0) > 0
+        else 0.0
+    )
+    total_value_at_liq = m.get("realized_proceeds", 0.0) + open_value
+    realized_pnl = m.get("realized_proceeds", 0.0) - m.get("realized_cost", 0.0)
     addlog(
-        f"[REPORT][GLOBAL] cash=${wallet_cash:.2f} open_value=${global_open_value:.2f} total_at_liq=${global_total_at_liq:.2f}",
+        f"[REPORT][strategy] buys={m.get('buys',0)} sells={m.get('sells',0)} realized_pnl=${realized_pnl:.2f} realized_roi={(realized_roi*100):.2f}% avg_trade_roi={(avg_trade_roi*100):.2f}% open_notes_value=${open_value:.2f} strategy_total_at_liq=${total_value_at_liq:.2f}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+    rows = [
+        {
+            "window": "strategy",
+            "window_size": m.get("window_size", ""),
+            "buys": m.get("buys", 0),
+            "sells": m.get("sells", 0),
+            "gross_invested": m.get("gross_invested", 0.0),
+            "realized_cost": m.get("realized_cost", 0.0),
+            "realized_proceeds": m.get("realized_proceeds", 0.0),
+            "realized_pnl": realized_pnl,
+            "realized_roi": realized_roi,
+            "avg_trade_roi": avg_trade_roi,
+            "open_value_now": open_value,
+            "window_total_at_liq": total_value_at_liq,
+        }
+    ]
+
+    global_total_at_liq = wallet_cash + open_value
+    addlog(
+        f"[REPORT][GLOBAL] cash=${wallet_cash:.2f} open_value=${open_value:.2f} total_at_liq=${global_total_at_liq:.2f}",
         verbose_int=1,
         verbose_state=verbose,
     )
@@ -369,7 +351,7 @@ def run_simulation(
         "windows": rows,
         "global": {
             "cash": wallet_cash,
-            "open_value_now": global_open_value,
+            "open_value_now": open_value,
             "total_at_liq": global_total_at_liq,
         },
     }
