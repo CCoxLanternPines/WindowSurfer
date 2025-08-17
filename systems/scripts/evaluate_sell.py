@@ -8,10 +8,9 @@ from systems.utils.config import load_settings
 
 CONFIG: Dict[str, Any] = load_settings()
 
-SELL_TRIGGER = 10
+SELL_TRIGGER = 3.0
 FLAT_SELL_FRACTION = float(CONFIG.get("flat_sell_fraction", 0.2))
 FLAT_SELL_THRESHOLD = float(CONFIG.get("flat_sell_threshold", 0.5))
-MAX_PRESSURE = 10.0
 
 
 def evaluate_sell(
@@ -36,9 +35,6 @@ def evaluate_sell(
 
     price = float(candle.get("close", 0.0))
     sp = state.get("sell_pressure", 0.0)
-    # Negative slope increases sell pressure; positive slope relieves it slightly
-    sp = min(MAX_PRESSURE, max(0.0, sp + max(-slope_cls, 0)))
-    state["sell_pressure"] = sp
 
     closed: List[Dict[str, Any]] = []
     if state.get("open_notes"):
@@ -53,9 +49,9 @@ def evaluate_sell(
                 viz_ax.scatter(candle["candle_index"], price, color="red", marker="o")
             state["sell_pressure"] = 0.0
         elif slope_cls == 0:
-            flat_trigger = SELL_TRIGGER * FLAT_SELL_FRACTION
+            flat_trigger = SELL_TRIGGER * FLAT_SELL_THRESHOLD
             if sp >= flat_trigger:
-                qty = max(1, int(len(state["open_notes"]) * FLAT_SELL_THRESHOLD))
+                qty = max(1, int(len(state["open_notes"]) * FLAT_SELL_FRACTION))
                 closed = state["open_notes"][:qty]
                 state["open_notes"] = state["open_notes"][qty:]
                 cost = sum(n.get("entry_price", 0.0) for n in closed)
