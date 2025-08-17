@@ -37,9 +37,10 @@ from systems.utils.resolve_symbol import (
     to_tag,
     sim_path_csv,
 )
+from systems.utils.time import duration_from_candle_count
 
 
-def run_simulation(*, ledger: str, verbose: int = 0) -> None:
+def run_simulation(*, ledger: str, verbose: int = 0, time_limit_seconds: int | None = None) -> None:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
     base, _ = split_tag(ledger_cfg["tag"])
@@ -76,6 +77,19 @@ def run_simulation(*, ledger: str, verbose: int = 0) -> None:
     # Optional hard check
     if not df[ts_col].is_monotonic_increasing:
         raise ValueError(f"Candles not sorted by {ts_col}: {csv_path}")
+
+    last_ts = int(df[ts_col].iloc[-1]) if len(df) else None
+    if time_limit_seconds and last_ts is not None:
+        cutoff_ts = last_ts - time_limit_seconds
+        df = df[df[ts_col] >= cutoff_ts].reset_index(drop=True)
+        if len(df) >= 2:
+            candle_interval_minutes = int(
+                (df[ts_col].iloc[1] - df[ts_col].iloc[0]) / 60
+            )
+        else:
+            candle_interval_minutes = 60
+        duration_str = duration_from_candle_count(len(df), candle_interval_minutes)
+        print(f"[SIM][TIME] Restricted to last {len(df)} candles (≈{duration_str})")
 
     # Log one line so we always know what we ran on
     first_ts = int(df[ts_col].iloc[0]) if len(df) else None
