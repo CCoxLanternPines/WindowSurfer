@@ -37,7 +37,7 @@ FLAT_BAND_DEG = float(CONFIG.get("flat_band_deg", 10.0))
 
 MAX_PRESSURE = 10.0
 BUY_TRIGGER = 3.0
-SELL_TRIGGER = 3.0
+SELL_TRIGGER = 10
 
 FEATURES_CSV = "data/window_features.csv"
 
