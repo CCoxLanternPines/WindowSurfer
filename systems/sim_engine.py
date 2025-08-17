@@ -173,7 +173,7 @@ def run_simulation(
                 buy_points.append((float(df.iloc[t][ts_col]), price))
 
         open_notes = ledger_obj.get_open_notes()
-        sell_notes = evaluate_sell(
+        sell_orders = evaluate_sell(
             ctx,
             t,
             df,
@@ -182,29 +182,47 @@ def run_simulation(
             runtime_state=runtime_state,
         )
 
-        for note in sell_notes:
+        for order in sell_orders:
+            note = order["note"]
+            amt = order["sell_amount"]
+            mode = order.get("sell_mode", "normal")
+            entry_price = note.get("entry_price", 0.0)
+
             ts = None
             if "timestamp" in df.columns:
                 ts = int(df.iloc[t]["timestamp"])
-            result = paper_execute_sell(
-                price, note.get("entry_amount", 0.0), timestamp=ts
-            )
-            if viz:
-                mode = note.get("sell_mode", "normal")
-                sell_points.append((float(df.iloc[t][ts_col]), price, mode))
-            apply_sell(
-                ledger=ledger_obj,
-                note=note,
-                t=t,
-                result=result,
-                state=runtime_state,
-            )
+            result = paper_execute_sell(price, amt, timestamp=ts)
 
-            qty = note.get("entry_amount", 0.0)
-            buy_price = note.get("entry_price", 0.0)
-            exit_price = note.get("exit_price", 0.0)
-            cost = buy_price * qty
-            proceeds = exit_price * qty
+            if viz:
+                sell_points.append((float(df.iloc[t][ts_col]), price, mode))
+
+            if amt >= note.get("entry_amount", 0.0) - 1e-9:
+                note["sell_mode"] = mode
+                apply_sell(
+                    ledger=ledger_obj,
+                    note=note,
+                    t=t,
+                    result=result,
+                    state=runtime_state,
+                )
+            else:
+                partial = note.copy()
+                partial["entry_amount"] = amt
+                partial["entry_usdt"] = amt * entry_price
+                partial["sell_mode"] = mode
+                ledger_obj.open_note(partial)
+                apply_sell(
+                    ledger=ledger_obj,
+                    note=partial,
+                    t=t,
+                    result=result,
+                    state=runtime_state,
+                )
+                note["entry_amount"] -= amt
+                note["entry_usdt"] -= amt * entry_price
+
+            cost = entry_price * amt
+            proceeds = result.get("avg_price", 0.0) * amt
             roi_trade = (proceeds - cost) / cost if cost > 0 else 0.0
             m_sell = win_metrics.get("strategy")
             if m_sell is not None:
