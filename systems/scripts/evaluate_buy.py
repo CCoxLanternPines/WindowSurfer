@@ -13,27 +13,9 @@ def evaluate_buy(
     t: int,
     series,
     *,
-    window_name: str,
-    cfg: Dict[str, Any],
     runtime_state: Dict[str, Any],
 ):
-    """Return sizing and metadata for a buy signal in ``window_name``.
-
-    Parameters
-    ----------
-    ctx:
-        Context dictionary containing at least a ``ledger`` instance.
-    t:
-        Current candle index within ``series``.
-    series:
-        Candle DataFrame with at least ``close``, ``low`` and ``high`` columns.
-    window_name:
-        Name of the window configuration under evaluation.
-    cfg:
-        Strategy configuration for ``window_name``.
-    runtime_state:
-        Mutable dictionary carrying ``capital`` and ``buy_unlock_p`` mapping.
-    """
+    """Return sizing and metadata for a buy signal."""
 
     verbose = runtime_state.get("verbose", 0)
 
@@ -67,7 +49,7 @@ def evaluate_buy(
         "action": "BUY",
         "price": price,
         "size_usd": size_usd,
-        "window_name": window_name,
+        "window_name": "pressure",
     }
     if "timestamp" in series.columns:
         result["created_ts"] = int(candle.get("timestamp", 0))
