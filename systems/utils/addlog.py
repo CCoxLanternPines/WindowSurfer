@@ -14,6 +14,24 @@ TELEGRAM_CHAT_ID: Optional[str] = None
 _TELEGRAM_WARNED = False
 
 
+def _load_telegram_credentials() -> None:
+    """Populate Telegram credentials from ``telegram.yaml`` if available."""
+    global TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, _TELEGRAM_WARNED
+    if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+        return
+    try:
+        with open("telegram.yaml", "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+            TELEGRAM_TOKEN = data["telegram"]["token"]
+            TELEGRAM_CHAT_ID = str(data["telegram"]["chat_id"])
+    except Exception as exc:
+        if not _TELEGRAM_WARNED:
+            tqdm.write(f"[WARN] Telegram not initialized: {exc}")
+            _TELEGRAM_WARNED = True
+        TELEGRAM_TOKEN = None
+        TELEGRAM_CHAT_ID = None
+
+
 def init_logger(
     logging_enabled: bool = False,
     verbose_level: int = 1,
@@ -47,6 +65,8 @@ def init_logger(
 def send_telegram_message(message: str) -> None:
     """Send a Telegram message if credentials are available."""
     global _TELEGRAM_WARNED
+    if not (TELEGRAM_TOKEN and TELEGRAM_CHAT_ID):
+        _load_telegram_credentials()
     if not (TELEGRAM_TOKEN and TELEGRAM_CHAT_ID):
         return
     try:
