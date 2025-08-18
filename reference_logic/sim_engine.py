@@ -39,8 +39,8 @@ MAX_PRESSURE = 7
 BUY_TRIGGER = 2
 SELL_TRIGGER = 4
 
-FLAT_SELL_FRACTION = float(CONFIG.get("flat_sell_fraction", 0.2))
-FLAT_SELL_THRESHOLD = float(CONFIG.get("flat_sell_threshold", 0.5))
+FLAT_SELL_PERCENT = float(CONFIG.get("flat_sell_percent", 0.25))
+ALL_SELL_PERCENT = float(CONFIG.get("all_sell_percent", 1.0))
 
 FEATURES_CSV = "data/window_features.csv"
 
@@ -184,11 +184,9 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
                 )
                 buy_pressure = 0.0
 
-            flat_trigger = SELL_TRIGGER * FLAT_SELL_THRESHOLD
-            if sell_pressure >= SELL_TRIGGER and open_notes:
+            if sell_pressure >= MAX_PRESSURE and open_notes:
                 total_size = sum(size for _, size in open_notes)
-                sell_frac = sell_pressure / MAX_PRESSURE
-                trade_size = sell_frac * total_size
+                trade_size = ALL_SELL_PERCENT * total_size
                 remaining = trade_size
                 pnl = 0.0
                 while remaining > 1e-9 and open_notes:
@@ -211,16 +209,12 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
                         zorder=6,
                     )
                 print(
-                    f"[SELL] candle={candle['candle_index']} price={candle['close']} size={trade_size:.2f} pnl={pnl:.2f} total={realized_pnl:.2f}"
+                    f"[SELL ALL] candle={candle['candle_index']} price={candle['close']} size={trade_size:.2f} pnl={pnl:.2f} total={realized_pnl:.2f}"
                 )
                 sell_pressure = 0.0
-            elif (
-                slope_cls == 0
-                and sell_pressure >= flat_trigger
-                and open_notes
-            ):
+            elif slope_cls == 0 and sell_pressure >= SELL_TRIGGER and open_notes:
                 total_size = sum(size for _, size in open_notes)
-                trade_size = FLAT_SELL_FRACTION * total_size
+                trade_size = FLAT_SELL_PERCENT * total_size
                 remaining = trade_size
                 pnl = 0.0
                 while remaining > 1e-9 and open_notes:
