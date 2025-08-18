@@ -176,5 +176,6 @@ def evaluate_sell(
         verbose_int=2,
         verbose_state=verbose,
     )
+
     return []
 

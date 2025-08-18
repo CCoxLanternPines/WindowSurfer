@@ -6,6 +6,7 @@ import shutil
 from datetime import datetime, timezone
 import csv
 import json
+import os
 
 import pandas as pd
 from tqdm import tqdm
@@ -46,6 +47,7 @@ def run_simulation(
     timeframe: str = "1m",
     viz: bool = True,
 ) -> None:
+    os.environ["WS_MODE"] = "sim"
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
     base, _ = split_tag(ledger_cfg["tag"])

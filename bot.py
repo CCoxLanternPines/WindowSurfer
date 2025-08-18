@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from systems.utils.asset_pairs import load_asset_pairs
 
@@ -31,13 +32,14 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
         parser.error("--mode is required")
+    mode = args.mode.lower()
+    os.environ["WS_MODE"] = mode
     init_logger(
         logging_enabled=args.log,
         verbose_level=args.verbose,
-        telegram_enabled=args.telegram,
+        telegram_enabled=args.telegram and mode != "sim",
     )
 
-    mode = args.mode.lower()
     verbose = args.verbose
 
     settings = load_settings()
