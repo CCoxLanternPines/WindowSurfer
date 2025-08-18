@@ -161,6 +161,10 @@ def evaluate_buy(
     open_notes = len(ledger.get_open_notes()) if ledger else 0
 
     if buy_p < buy_trigger:
+        if verbose >= 1:
+            send_telegram_message(
+                f"[HOLD][BUY {window_size}h] need={buy_trigger:.2f}, have={buy_p:.2f}, sell_p={sell_p:.2f}"
+            )
         return False
 
     fraction = buy_p / max_p if max_p else 0.0
