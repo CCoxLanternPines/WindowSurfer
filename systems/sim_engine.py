@@ -114,6 +114,7 @@ def run_simulation(
         prev={"verbose": verbose},
     )
     runtime_state["mode"] = "sim"
+    runtime_state["symbol"] = ledger_cfg.get("tag", "")
     runtime_state["buy_unlock_p"] = {}
     init_jackpot(runtime_state, ledger_cfg, df)
 
