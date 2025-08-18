@@ -92,19 +92,25 @@ def evaluate_sell(
             )
             send_telegram_message(msg)
             return results
-        msg = format_window_status(
-            symbol,
-            window_label,
-            trend,
-            slope,
-            volatility,
-            buy_trigger,
-            current_pos,
-            sell_trigger,
-            n_notes,
-            "HOLD (confident skip)",
+        addlog(
+            f"[HOLD][{window_name} {window_size}] sell trigger met but no notes",
+            verbose_int=2,
+            verbose_state=verbose,
         )
-        send_telegram_message(msg)
+        if verbose >= 3:
+            msg = format_window_status(
+                symbol,
+                window_label,
+                trend,
+                slope,
+                volatility,
+                buy_trigger,
+                current_pos,
+                sell_trigger,
+                n_notes,
+                "HOLD (confident skip)",
+            )
+            send_telegram_message(msg)
         return []
 
     slope_cls = classify_slope(
@@ -144,23 +150,31 @@ def evaluate_sell(
             )
             send_telegram_message(msg)
             return results
-        msg = format_window_status(
-            symbol,
-            window_label,
-            trend,
-            slope,
-            volatility,
-            buy_trigger,
-            current_pos,
-            sell_trigger,
-            n_notes,
-            "HOLD (confident skip)",
+        addlog(
+            f"[HOLD][{window_name} {window_size}] flat sell condition met but no notes",
+            verbose_int=2,
+            verbose_state=verbose,
         )
-        send_telegram_message(msg)
+        if verbose >= 3:
+            msg = format_window_status(
+                symbol,
+                window_label,
+                trend,
+                slope,
+                volatility,
+                buy_trigger,
+                current_pos,
+                sell_trigger,
+                n_notes,
+                "HOLD (confident skip)",
+            )
+            send_telegram_message(msg)
         return []
 
-    if verbose >= 1:
-        send_telegram_message(
-            f"[HOLD][SELL {window_size}h] need={sell_trigger:.2f}, have={sell_p:.2f}, buy_p={buy_p:.2f}"
-        )
+    addlog(
+        f"[HOLD][{window_name} {window_size}] need={sell_trigger:.2f}, have={sell_p:.2f}, buy_p={buy_p:.2f}",
+        verbose_int=2,
+        verbose_state=verbose,
+    )
     return []
+
