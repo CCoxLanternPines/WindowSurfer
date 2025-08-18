@@ -171,7 +171,10 @@ def evaluate_buy(
     capital = runtime_state.get("capital", 0.0)
     limits = runtime_state.get("limits", {})
     max_sz = float(limits.get("max_note_usdt", capital))
-    min_sz = float(limits.get("min_note_size", 0.0))
+    # Accept both legacy and new configuration keys for minimum note size
+    min_sz = float(
+        limits.get("minimum_note_size", limits.get("min_note_size", 0.0))
+    )
 
     raw = capital * fraction
     size_usd = min(raw, capital, max_sz)
