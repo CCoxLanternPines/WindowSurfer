@@ -97,6 +97,7 @@ def _run_iteration(
             prev=prev,
         )
         state["mode"] = "live"
+        state["symbol"] = ledger_cfg.get("tag", "")
         state["hist_low"] = hist_low
         state["hist_high"] = hist_high
         runtime_states[name] = state
@@ -220,6 +221,7 @@ def run_live(*, ledger: str | None = None, dry: bool = False, verbose: int = 0) 
             prev={"verbose": verbose},
         )
         state["buy_unlock_p"] = {}
+        state["symbol"] = ledger_cfg.get("tag", "")
         runtime_states[name] = state
 
         ledger_obj = load_ledger(name, tag=ledger_cfg["tag"])

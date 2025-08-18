@@ -7,31 +7,7 @@
       "kraken_pair": "SOLUSD",
       "binance_name": "SOLUSDT",
       "jackpot": {
-        "enabled": true,
-        "period": "1m",
-        "drip_fraction": 0.02,
-        "cashout_p": 0.90,
-        "trigger_p": 0.75,
-        "depth_scale": 5.0,
-        "min_usd": 1.0
-      },
-      "window_settings": {
-        "minnow": {
-          "window_size": "12h",
-          "buy_trigger_position": 0.1,
-          "reset_buy_percent": 0.5,
-          "maturity_position": 1.0,
-          "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.125
-        },
-        "fish": {
-          "window_size": "2d",
-          "buy_trigger_position": 0.1,
-          "reset_buy_percent": 0.5,
-          "maturity_position": 1,
-          "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.25
-        }
+        "enabled": false
       }
     },
     "Travis_Ledger": {
@@ -41,50 +17,33 @@
       "kraken_pair": "SOLUSDC",
       "binance_name": "SOLUSDC",
       "jackpot": {
-        "enabled": true,
-        "period": "1m",
-        "drip_fraction": 0.02,
-        "cashout_p": 0.90,
-        "trigger_p": 0.75,
-        "depth_scale": 5.0,
-        "min_usd": 1.0
-      },
-      "window_settings": {
-        "mouse": {
-          "window_size": "12h",
-          "buy_trigger_position": 0.1,
-          "reset_buy_percent": 0.5,
-          "maturity_position": 1.0,
-          "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.125
-        },
-        "rabbit": {
-          "window_size": "2d",
-          "buy_trigger_position": 0.1,
-          "reset_buy_percent": 0.5,
-          "maturity_position": 1,
-          "max_notes_sell_per_candle": 1,
-          "investment_fraction": 0.25
-        }
+        "enabled": false
       }
     }
   },
   "general_settings": {
     "max_note_usdt": 10000.0,
     "minimum_note_size": 10,
+    "investment_fraction": 0.2,
     "strategy_settings": {
       "window_size": 24,
       "window_step": 2,
+
       "buy_trigger": 2,
-      "sell_trigger": 1,
-      "flat_sell_fraction": 0.2,
-      "flat_sell_threshold": 0.5,
+      "buy_percent_aggressiveness": 1.0,
       "max_pressure": 10.0,
+
+      "sell_trigger": 1,
+      "sell_note_percent": 1.0,
+      "flat_sell_note_percent": 0.2,
+      "flat_sell_threshold": 0.5,
+      "sell_all_fraction": 1.0,
+
       "strong_move_threshold": 0.15,
       "range_min": 0.08,
       "volume_skew_bias": 0.4,
       "flat_band_deg": 10.0
     }
   },
-  "simulation_capital": 1000
+  "simulation_capital": 20000
 }
