@@ -6,6 +6,7 @@ import shutil
 from datetime import datetime, timezone
 import csv
 import json
+import time
 
 import pandas as pd
 from tqdm import tqdm
@@ -45,6 +46,7 @@ def run_simulation(
     verbose: int = 0,
     timeframe: str = "1m",
     viz: bool = True,
+    slow: bool = False,
 ) -> None:
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
@@ -244,6 +246,9 @@ def run_simulation(
             runtime_state.get("limits", {}),
             ledger_cfg["tag"],
         )
+
+        if slow:
+            time.sleep(0.15)
 
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)

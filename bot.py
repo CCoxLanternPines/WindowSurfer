@@ -27,6 +27,11 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Enable visualization plotting",
     )
+    parser.add_argument(
+        "--slow",
+        action="store_true",
+        help="Add a 0.15s delay between simulation steps",
+    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -71,6 +76,7 @@ def main(argv: list[str] | None = None) -> None:
             verbose=args.verbose,
             timeframe=args.time,
             viz=args.viz,
+            slow=args.slow,
         )
     elif mode == "live":
         run_live(

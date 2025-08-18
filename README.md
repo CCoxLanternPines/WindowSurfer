@@ -23,6 +23,7 @@ Examples:
 ```bash
 python bot.py --mode fetch --ledger default --time 72h
 python bot.py --mode sim --ledger default -vv
+python bot.py --mode sim --ledger default --slow
 python bot.py --mode live --ledger default --telegram
 python bot.py --mode wallet --ledger default
 ```
