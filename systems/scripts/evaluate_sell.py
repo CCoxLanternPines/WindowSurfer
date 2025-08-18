@@ -176,8 +176,6 @@ def evaluate_sell(
         verbose_int=2,
         verbose_state=verbose,
     )
-    if verbose >= 1:
-        send_telegram_message(
-            f"[HOLD][SELL {window_size}h] need={sell_trigger:.2f}, have={sell_p:.2f}, buy_p={buy_p:.2f}"
-        )
+
     return []
+
