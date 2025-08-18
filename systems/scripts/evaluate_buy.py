@@ -168,6 +168,10 @@ def evaluate_buy(
         return False
 
     fraction = buy_p / max_p if max_p else 0.0
+    aggressiveness = strategy.get("buy_percent_aggressiveness", 1.0)
+    fraction *= aggressiveness
+    fraction = min(fraction, 1.0)
+
     capital = runtime_state.get("capital", 0.0)
     limits = runtime_state.get("limits", {})
     max_sz = float(limits.get("max_note_usdt", capital))
@@ -203,7 +207,8 @@ def evaluate_buy(
         return False
 
     addlog(
-        f"[BUY][{window_name} {window_size}] pressure={buy_p:.1f}/{max_p:.1f} spend=${size_usd:.2f}",
+        f"[BUY][{window_name} {window_size}] pressure={buy_p:.1f}/{max_p:.1f} "
+        f"buy_frac={fraction:.2f} agg={aggressiveness:.2f} spend=${size_usd:.2f}",
         verbose_int=1,
         verbose_state=verbose,
     )
@@ -227,7 +232,10 @@ def evaluate_buy(
         action += f" ({size_usd / capital * 100:.0f}% capital)"
     note_id = f"{window_name}-{t}"
     price = float(candle.get("close", 0.0))
-    note = f"id={note_id} price={price:.2f}"
+    note = (
+        f"id={note_id} price={price:.2f} "
+        f"buy_frac={fraction:.2f} agg={aggressiveness:.2f}"
+    )
     msg = format_window_status(
         symbol,
         window_label,
