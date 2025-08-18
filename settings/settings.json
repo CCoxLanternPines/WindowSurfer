@@ -27,12 +27,18 @@
     "investment_fraction": 0.2,
     "strategy_settings": {
       "window_size": 24,
-      "window_step": 1,
-      "buy_trigger": 1,
-      "sell_trigger": 3,
-      "flat_sell_fraction": 0.1,
-      "flat_sell_threshold": 0.7,
-      "max_pressure": 8.0,
+      "window_step": 2,
+
+      "buy_trigger": 2,
+      "buy_percent_aggressiveness": 1.0,
+      "max_pressure": 10.0,
+
+      "sell_trigger": 1,
+      "sell_note_percent": 1.0,
+      "flat_sell_note_percent": 0.2,
+      "flat_sell_threshold": 0.5,
+      "sell_all_fraction": 1.0,
+
       "strong_move_threshold": 0.15,
       "range_min": 0.08,
       "volume_skew_bias": 0.4,
