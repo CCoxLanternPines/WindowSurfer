@@ -65,6 +65,8 @@ def init_logger(
 def send_telegram_message(message: str) -> None:
     """Send a Telegram message if credentials are available."""
     global _TELEGRAM_WARNED
+    if os.environ.get("WS_MODE") == "sim":
+        return
     if not (TELEGRAM_TOKEN and TELEGRAM_CHAT_ID):
         _load_telegram_credentials()
     if not (TELEGRAM_TOKEN and TELEGRAM_CHAT_ID):
