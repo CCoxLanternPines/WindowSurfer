@@ -61,8 +61,8 @@ def evaluate_sell(
     buy_trigger = strategy.get("buy_trigger", 0.0)
 
     if sell_p >= max_p and window_notes:
-        all_frac = strategy.get("sell_all_fraction", 1.0)
-        k = max(1, ceil(n_notes * all_frac))
+        all_percent = strategy.get("all_sell_percent", 1.0)
+        k = max(1, ceil(n_notes * all_percent))
         results = window_notes[:k]
         for n in results:
             n["sell_mode"] = "all"
@@ -70,14 +70,14 @@ def evaluate_sell(
         addlog(
             f"[SELL][{window_name} {window_size}] mode=all count={k}/{n_notes} "
             f"pressure={sell_p:.1f}/{max_p:.1f} "
-            f"(all_frac={all_frac:.2%}, sold={k}/{n_notes})",
+            f"(all_percent={all_percent:.2%}, sold={k}/{n_notes})",
             verbose_int=1,
             verbose_state=verbose,
         )
         total_usd = sum(n.get("entry_amount", 0.0) * price for n in results)
         action = f"SELL ${total_usd:.2f} ({k}/{n_notes} notes)"
         note = (
-            f"id={results[0]['id']} price={price:.2f} all_frac={all_frac:.2%} sold={k}/{n_notes}"
+            f"id={results[0]['id']} price={price:.2f} all_percent={all_percent:.2%} sold={k}/{n_notes}"
             if results
             else None
         )
@@ -98,93 +98,27 @@ def evaluate_sell(
         send_telegram_message(msg)
         return results
 
-    if sell_p >= sell_trigger:
-        if window_notes:
-            sell_frac = (
-                (sell_p / max_p if max_p else 0.0)
-                * strategy.get("sell_note_percent", 1.0)
-            )
-            k = max(1, ceil(sell_frac * n_notes))
-            results = window_notes[:k]
-            for n in results:
-                n["sell_mode"] = "normal"
-            pressures["sell"][window_name] = 0.0
-            addlog(
-                f"[SELL][{window_name} {window_size}] mode=normal count={k}/{n_notes} "
-                f"pressure={sell_p:.1f}/{max_p:.1f} "
-                f"(sell_frac={sell_frac:.2%}, setting={strategy.get('sell_note_percent', 1.0)})",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-            total_usd = sum(n.get("entry_amount", 0.0) * price for n in results)
-            action = f"SELL ${total_usd:.2f} ({k}/{n_notes} notes)"
-            note = (
-                f"id={results[0]['id']} price={price:.2f} sell_frac={sell_frac:.2%} "
-                f"setting={strategy.get('sell_note_percent', 1.0)}"
-                if results
-                else None
-            )
-            msg = format_window_status(
-                symbol,
-                window_label,
-                trend,
-                slope,
-                volatility,
-                buy_trigger,
-                current_pos,
-                sell_trigger,
-                n_notes,
-                "SELL (confident exit)",
-                action,
-                note,
-            )
-            send_telegram_message(msg)
-            return results
-        addlog(
-            f"[HOLD][{window_name} {window_size}] sell trigger met but no notes",
-            verbose_int=2,
-            verbose_state=verbose,
-        )
-        if verbose >= 3:
-            msg = format_window_status(
-                symbol,
-                window_label,
-                trend,
-                slope,
-                volatility,
-                buy_trigger,
-                current_pos,
-                sell_trigger,
-                n_notes,
-                "HOLD (confident skip)",
-            )
-            send_telegram_message(msg)
-        return []
-
     slope_cls = classify_slope(
         slope, strategy.get("flat_band_deg", 10.0)
     )
-    flat_trigger = strategy.get("sell_trigger", 0.0) * strategy.get(
-        "flat_sell_threshold", 1.0
-    )
-    if slope_cls == 0 and sell_p >= flat_trigger:
+    if slope_cls == 0 and sell_p >= sell_trigger:
         if window_notes:
-            flat_frac = strategy.get("flat_sell_note_percent", 0.0)
-            k = max(1, ceil(flat_frac * n_notes))
+            flat_percent = strategy.get("flat_sell_percent", 0.0)
+            k = max(1, ceil(flat_percent * n_notes))
             results = window_notes[:k]
             for n in results:
                 n["sell_mode"] = "flat"
             pressures["sell"][window_name] = 0.0
             addlog(
                 f"[SELL][{window_name} {window_size}] mode=flat count={k}/{n_notes} "
-                f"pressure={sell_p:.1f}/{max_p:.1f} (flat_frac={flat_frac:.2%})",
+                f"pressure={sell_p:.1f}/{max_p:.1f} (flat_percent={flat_percent:.2%})",
                 verbose_int=1,
                 verbose_state=verbose,
             )
             total_usd = sum(n.get("entry_amount", 0.0) * price for n in results)
             action = f"SELL ${total_usd:.2f} ({k}/{n_notes} notes)"
             note = (
-                f"id={results[0]['id']} price={price:.2f} flat_frac={flat_frac:.2%}"
+                f"id={results[0]['id']} price={price:.2f} flat_percent={flat_percent:.2%}"
                 if results
                 else None
             )
