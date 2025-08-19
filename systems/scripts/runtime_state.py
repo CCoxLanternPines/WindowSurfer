@@ -33,7 +33,9 @@ def build_runtime_state(
     limits = prev.get(
         "limits",
         {
+            # Store both legacy and new naming for minimum note size
             "min_note_size": float(general.get("minimum_note_size", 0.0)),
+            "minimum_note_size": float(general.get("minimum_note_size", 0.0)),
             "max_note_usdt": float(general.get("max_note_usdt", float("inf"))),
         },
     )
