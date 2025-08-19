@@ -139,11 +139,9 @@ def _run_iteration(
             open_notes=open_notes,
             runtime_state=state,
         )
-        for order in sell_orders:
-            note = order["note"]
-            amt = order["sell_amount"]
-            mode = order.get("sell_mode", "normal")
-            entry_price = note.get("entry_price", 0.0)
+        for note in sell_orders:
+            amt = note.get("partial_sell", 0.0)
+            mode = note.get("sell_mode", "normal")
             result = execute_sell(
                 None,
                 pair_code=ledger_cfg["kraken_pair"],
@@ -153,30 +151,14 @@ def _run_iteration(
                 verbose=state.get("verbose", 0),
             )
             if result and not result.get("error"):
-                if amt >= note.get("entry_amount", 0.0) - 1e-9:
-                    note["sell_mode"] = mode
-                    apply_sell(
-                        ledger=ledger_obj,
-                        note=note,
-                        t=t,
-                        result=result,
-                        state=state,
-                    )
-                else:
-                    partial = note.copy()
-                    partial["entry_amount"] = amt
-                    partial["entry_usdt"] = amt * entry_price
-                    partial["sell_mode"] = mode
-                    ledger_obj.open_note(partial)
-                    apply_sell(
-                        ledger=ledger_obj,
-                        note=partial,
-                        t=t,
-                        result=result,
-                        state=state,
-                    )
-                    note["entry_amount"] -= amt
-                    note["entry_usdt"] -= amt * entry_price
+                note["sell_mode"] = mode
+                apply_sell(
+                    ledger=ledger_obj,
+                    note=note,
+                    t=t,
+                    result=result,
+                    state=state,
+                )
 
         ctx_j = {
             "ledger": ledger_obj,

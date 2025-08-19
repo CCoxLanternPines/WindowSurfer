@@ -33,6 +33,7 @@ class Ledger:
         These fields are stored verbatim and are not interpreted by the
         ledger itself but are useful for downstream analysis and evaluation.
         """
+        note.setdefault("remaining_amount", note.get("entry_amount", 0.0))
         self.open_notes.append(note)
 
     def close_note(self, note: Dict) -> None:
@@ -61,24 +62,39 @@ class Ledger:
     def get_total_liquid_value(self, final_price: float) -> float:
         """Return all value assuming open notes liquidate at ``final_price``."""
         open_value = sum(
-            n.get("entry_amount", 0) for n in self.get_open_notes()
+            n.get("remaining_amount", n.get("entry_amount", 0))
+            for n in self.get_open_notes()
         ) * final_price
-        realised = sum(
+        realised_closed = sum(
             n.get("entry_amount", 0)
             * (n.get("exit_price", 0) - n.get("entry_price", 0))
             for n in self.get_closed_notes()
         )
-        return open_value + realised
+        realised_partial = sum(
+            n.get("exit_usdt", 0.0)
+            - n.get("entry_price", 0.0) * n.get("exit_amount", 0.0)
+            for n in self.get_open_notes()
+        )
+        return open_value + realised_closed + realised_partial
 
     # Summary ---------------------------------------------------------------
     def get_account_summary(self, final_price: float) -> dict:
-        open_amount = sum(n.get("entry_amount", 0) for n in self.get_open_notes())
+        open_amount = sum(
+            n.get("remaining_amount", n.get("entry_amount", 0))
+            for n in self.get_open_notes()
+        )
         open_value = open_amount * final_price
-        realised = sum(
+        realised_closed = sum(
             n.get("entry_amount", 0)
             * (n.get("exit_price", 0) - n.get("entry_price", 0))
             for n in self.get_closed_notes()
         )
+        realised_partial = sum(
+            n.get("exit_usdt", 0.0)
+            - n.get("entry_price", 0.0) * n.get("exit_amount", 0.0)
+            for n in self.get_open_notes()
+        )
+        realised = realised_closed + realised_partial
         total_value = open_value + realised
 
         return {
@@ -123,7 +139,45 @@ class Ledger:
             ledger.open_notes = data.get("open_notes", [])
             ledger.closed_notes = data.get("closed_notes", [])
             ledger.metadata = data.get("metadata", {})
+            for n in ledger.open_notes:
+                n.setdefault("remaining_amount", n.get("entry_amount", 0.0))
+                if n.get("remaining_amount", 0.0) < 0:
+                    n["remaining_amount"] = 0.0
         return ledger
+
+    def apply_sell(
+        self,
+        note: Dict,
+        *,
+        sell_amount: float,
+        price: float,
+        t: int | None = None,
+        timestamp: int | None = None,
+    ) -> Dict:
+        if note not in self.open_notes:
+            return note
+        remaining = note.get("remaining_amount", note.get("entry_amount", 0.0))
+        amount = min(sell_amount, remaining)
+        if amount <= 0:
+            return note
+        note.setdefault("sell_history", []).append(
+            {"amount": amount, "price": price, "idx": t, "ts": timestamp}
+        )
+        note["remaining_amount"] = remaining - amount
+        note["exit_amount"] = note.get("exit_amount", 0.0) + amount
+        part_usdt = amount * price
+        note["exit_usdt"] = note.get("exit_usdt", 0.0) + part_usdt
+        if note["remaining_amount"] <= 0:
+            note["exit_price"] = note["exit_usdt"] / note.get("entry_amount", amount)
+            if t is not None:
+                note["exit_idx"] = t
+            if timestamp is not None:
+                note["exit_ts"] = timestamp
+            entry_usdt = note.get("entry_usdt", 0.0)
+            note["gain"] = note.get("exit_usdt", 0.0) - entry_usdt
+            note["gain_pct"] = (note["gain"] / entry_usdt) if entry_usdt else 0.0
+            self.close_note(note)
+        return note
 
 
 def load_ledger(

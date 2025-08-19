@@ -2,7 +2,6 @@ from __future__ import annotations
 
 """Sell evaluation based on predictive pressures."""
 
-from math import ceil
 from typing import Any, Dict, List
 
 from systems.scripts.evaluate_buy import (
@@ -62,24 +61,27 @@ def evaluate_sell(
 
     if sell_p >= max_p and window_notes:
         all_percent = strategy.get("all_sell_percent", 1.0)
-        k = ceil(n_notes * all_percent)
-        if k <= 0:
-            return []
-        results = window_notes[:k]
-        for n in results:
+        for n in window_notes:
+            remaining = n.get("remaining_amount", n.get("entry_amount", 0.0))
+            sell_amt = remaining * all_percent
+            if sell_amt <= 0:
+                continue
+            n["partial_sell"] = sell_amt
             n["sell_mode"] = "all"
+            results.append(n)
+        if not results:
+            return []
         pressures["sell"][window_name] = 0.0
         addlog(
-            f"[SELL][{window_name} {window_size}] mode=all count={k}/{n_notes} "
-            f"pressure={sell_p:.1f}/{max_p:.1f} "
-            f"(all_percent={all_percent:.2%}, sold={k}/{n_notes})",
+            f"[SELL][{window_name} {window_size}] mode=all pct={all_percent:.2%} "
+            f"pressure={sell_p:.1f}/{max_p:.1f} (notes={len(results)}/{n_notes})",
             verbose_int=1,
             verbose_state=verbose,
         )
-        total_usd = sum(n.get("entry_amount", 0.0) * price for n in results)
-        action = f"SELL ${total_usd:.2f} ({k}/{n_notes} notes)"
+        total_usd = sum(n.get("partial_sell", 0.0) * price for n in results)
+        action = f"SELL ${total_usd:.2f} ({all_percent:.2%} of each note)"
         note = (
-            f"id={results[0]['id']} price={price:.2f} all_percent={all_percent:.2%} sold={k}/{n_notes}"
+            f"id={results[0]['id']} price={price:.2f} all_percent={all_percent:.2%}"
             if results
             else None
         )
@@ -106,21 +108,25 @@ def evaluate_sell(
     if slope_cls == 0 and sell_p >= sell_trigger:
         if window_notes:
             flat_percent = strategy.get("flat_sell_percent", 0.0)
-            k = ceil(flat_percent * n_notes)
-            if k <= 0:
-                return []
-            results = window_notes[:k]
-            for n in results:
+            for n in window_notes:
+                remaining = n.get("remaining_amount", n.get("entry_amount", 0.0))
+                sell_amt = remaining * flat_percent
+                if sell_amt <= 0:
+                    continue
+                n["partial_sell"] = sell_amt
                 n["sell_mode"] = "flat"
+                results.append(n)
+            if not results:
+                return []
             pressures["sell"][window_name] = 0.0
             addlog(
-                f"[SELL][{window_name} {window_size}] mode=flat count={k}/{n_notes} "
-                f"pressure={sell_p:.1f}/{max_p:.1f} (flat_percent={flat_percent:.2%})",
+                f"[SELL][{window_name} {window_size}] mode=flat pct={flat_percent:.2%} "
+                f"pressure={sell_p:.1f}/{max_p:.1f} (notes={len(results)}/{n_notes})",
                 verbose_int=1,
                 verbose_state=verbose,
             )
-            total_usd = sum(n.get("entry_amount", 0.0) * price for n in results)
-            action = f"SELL ${total_usd:.2f} ({k}/{n_notes} notes)"
+            total_usd = sum(n.get("partial_sell", 0.0) * price for n in results)
+            action = f"SELL ${total_usd:.2f} ({flat_percent:.2%} of each note)"
             note = (
                 f"id={results[0]['id']} price={price:.2f} flat_percent={flat_percent:.2%}"
                 if results

@@ -61,16 +61,14 @@ def apply_sell(
     state: Dict[str, Any],
 ) -> Dict[str, Any]:
     exit_price = result.get("avg_price", 0.0)
-    exit_usdt = result.get("filled_amount", 0.0) * exit_price
-    note["exit_price"] = exit_price
-    note["exit_usdt"] = exit_usdt
-    if t is not None:
-        note["exit_idx"] = t
-    if result.get("timestamp") is not None:
-        note["exit_ts"] = result.get("timestamp")
-    entry_usdt = note.get("entry_usdt", 0.0)
-    note["gain"] = exit_usdt - entry_usdt
-    note["gain_pct"] = (note["gain"] / entry_usdt) if entry_usdt else 0.0
-    ledger.close_note(note)
+    sell_amount = result.get("filled_amount", 0.0)
+    ledger.apply_sell(
+        note,
+        sell_amount=sell_amount,
+        price=exit_price,
+        t=t,
+        timestamp=result.get("timestamp"),
+    )
+    exit_usdt = sell_amount * exit_price
     state["capital"] = state.get("capital", 0.0) + exit_usdt
     return note

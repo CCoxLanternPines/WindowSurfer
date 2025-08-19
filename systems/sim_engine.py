@@ -196,9 +196,8 @@ def run_simulation(
             ts = None
             if "timestamp" in df.columns:
                 ts = int(df.iloc[t]["timestamp"])
-            result = paper_execute_sell(
-                price, note.get("entry_amount", 0.0), timestamp=ts
-            )
+            sell_amt = note.get("partial_sell", 0.0)
+            result = paper_execute_sell(price, sell_amt, timestamp=ts)
             if viz:
                 mode = note.get("sell_mode", "normal")
                 sell_points.append((float(df.iloc[t][ts_col]), price, mode))
@@ -210,9 +209,9 @@ def run_simulation(
                 state=runtime_state,
             )
 
-            qty = note.get("entry_amount", 0.0)
+            qty = result.get("filled_amount", 0.0)
             buy_price = note.get("entry_price", 0.0)
-            exit_price = note.get("exit_price", 0.0)
+            exit_price = result.get("avg_price", 0.0)
             cost = buy_price * qty
             proceeds = exit_price * qty
             roi_trade = (proceeds - cost) / cost if cost > 0 else 0.0
@@ -251,7 +250,8 @@ def run_simulation(
     summary = ledger_obj.get_account_summary(final_price)
 
     open_value = sum(
-        n.get("entry_amount", 0.0) * final_price for n in ledger_obj.get_open_notes()
+        n.get("remaining_amount", n.get("entry_amount", 0.0)) * final_price
+        for n in ledger_obj.get_open_notes()
     )
 
     wallet_cash = runtime_state["capital"]
