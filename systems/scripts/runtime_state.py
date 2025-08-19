@@ -44,7 +44,7 @@ def build_runtime_state(
         "buy_trigger": 3.0,
         "sell_trigger": 10.0,
         "flat_sell_percent": 0.25,
-        "all_sell_percent": 1.0,
+        "all_sell_count": 99,
         "max_pressure": 10.0,
         "strong_move_threshold": 0.15,
         "range_min": 0.08,
