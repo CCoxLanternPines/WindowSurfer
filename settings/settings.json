@@ -5,20 +5,14 @@
       "wallet_code": "SOL.F",
       "kraken_name": "SOL/USD",
       "kraken_pair": "SOLUSD",
-      "binance_name": "SOLUSDT",
-      "jackpot": {
-        "enabled": false
-      }
+      "binance_name": "SOLUSDT"
     },
     "Travis_Ledger": {
       "tag": "SOLUSDC",
       "wallet_code": "SOL.F",
       "kraken_name": "SOL/USDC",
       "kraken_pair": "SOLUSDC",
-      "binance_name": "SOLUSDC",
-      "jackpot": {
-        "enabled": false
-      }
+      "binance_name": "SOLUSDC"
     }
   },
   "general_settings": {

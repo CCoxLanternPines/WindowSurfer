@@ -60,8 +60,6 @@ Reusable components used by the engines:
   high/low ranges.
 - **fetch_candles.py** – low-level Binance/Kraken OHLCV downloaders used by
   `fetch` and cache utilities.
-- **strategy_jackpot.py** – optional jackpot drip/cash-out logic that augments
-  buy/sell behaviour.
 - **kraken_utils.py** – loads API keys, snapshots and balances from Kraken.
 - **wallet.py** – shows Kraken balances for a ledger's quote asset.
 - `sim_tuner.py` – Optuna-based parameter tuner for simulations, run separately
