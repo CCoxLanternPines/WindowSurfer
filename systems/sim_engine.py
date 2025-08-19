@@ -389,6 +389,8 @@ def run_simulation(
             prices_normal = [p for t, p, m in sell_points if m == "normal"]
             times_flat   = [t for t, p, m in sell_points if m == "flat"]
             prices_flat  = [p for t, p, m in sell_points if m == "flat"]
+            times_all   = [t for t, p, m in sell_points if m == "all"]
+            prices_all  = [p for t, p, m in sell_points if m == "all"]
 
             if times_normal:
                 plt.scatter(
@@ -401,6 +403,12 @@ def run_simulation(
                     pd.to_datetime(times_flat, unit="s"),
                     prices_flat,
                     marker="o", color="orange", label="Flat Sell", zorder=2,
+                )
+            if times_all:
+                plt.scatter(
+                    pd.to_datetime(times_all, unit="s"),
+                    prices_all,
+                    marker="x", color="red", label="All Sell", zorder=3,
                 )
 
 
