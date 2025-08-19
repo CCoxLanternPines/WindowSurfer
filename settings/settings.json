@@ -34,8 +34,8 @@
       "max_pressure": 10.0,
 
       "sell_trigger": 1,
-      "flat_sell_percent": 0.25,
-      "all_sell_percent": 1.0,
+      "flat_sell_count": 1,
+      "all_sell_count": 99,
 
       "strong_move_threshold": 0.15,
       "range_min": 0.08,
