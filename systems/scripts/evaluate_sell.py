@@ -60,7 +60,8 @@ def evaluate_sell(
     buy_trigger = strategy.get("buy_trigger", 0.0)
 
     if sell_p >= max_p and window_notes:
-        k = min(strategy.get("all_sell_count", n_notes), n_notes)
+        all_count = strategy.get("all_sell_count", n_notes)
+        k = min(all_count, n_notes)
         if k <= 0:
             return []
         results = window_notes[:k]
@@ -68,8 +69,7 @@ def evaluate_sell(
             n["sell_mode"] = "all"
         pressures["sell"][window_name] = 0.0
         addlog(
-            f"[SELL][{window_name} {window_size}] mode=all count={k}/{n_notes} "
-            f"pressure={sell_p:.1f}/{max_p:.1f}",
+            f"[SELL][{window_name} {window_size}] mode=all count={k}/{n_notes}",
             verbose_int=1,
             verbose_state=verbose,
         )
@@ -102,7 +102,8 @@ def evaluate_sell(
     )
     if slope_cls == 0 and sell_p >= sell_trigger:
         if window_notes:
-            k = min(strategy.get("flat_sell_count", 0), n_notes)
+            flat_percent = strategy.get("flat_sell_percent", 0.0)
+            k = int(round(n_notes * flat_percent))
             if k <= 0:
                 return []
             results = window_notes[:k]
@@ -111,7 +112,7 @@ def evaluate_sell(
             pressures["sell"][window_name] = 0.0
             addlog(
                 f"[SELL][{window_name} {window_size}] mode=flat count={k}/{n_notes} "
-                f"pressure={sell_p:.1f}/{max_p:.1f}",
+                f"flat_percent={flat_percent:.2%}",
                 verbose_int=1,
                 verbose_state=verbose,
             )
