@@ -22,26 +22,26 @@
     }
   },
   "general_settings": {
-    "max_note_usdt": 10000.0,
+    "max_note_usdt": 99999.0,
     "minimum_note_size": 10,
-    "investment_fraction": 0.2,
     "strategy_settings": {
       "window_size": 24,
-      "window_step": 2,
+      "window_step": 1,
 
-      "buy_trigger": 2,
+      "buy_trigger": 3,
       "buy_percent_aggressiveness": 1.0,
-      "max_pressure": 10.0,
+      "investment_fraction": 0.65,
+      "max_pressure": 12.0,
 
       "sell_trigger": 1,
-      "flat_sell_percent": 0.25,
-      "all_sell_count": 10,
+      "flat_sell_percent": 0.1,
+      "all_sell_count": 999,
 
-      "strong_move_threshold": 0.15,
+      "strong_move_threshold": 0.1,
       "range_min": 0.08,
       "volume_skew_bias": 0.4,
-      "flat_band_deg": 10.0
+      "flat_band_deg": 8.0
     }
   },
-  "simulation_capital": 20000
+  "simulation_capital": 1000
 }
