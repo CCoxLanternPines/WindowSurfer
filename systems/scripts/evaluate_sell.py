@@ -62,7 +62,9 @@ def evaluate_sell(
 
     if sell_p >= max_p and window_notes:
         all_percent = strategy.get("all_sell_percent", 1.0)
-        k = max(1, ceil(n_notes * all_percent))
+        k = ceil(n_notes * all_percent)
+        if k <= 0:
+            return []
         results = window_notes[:k]
         for n in results:
             n["sell_mode"] = "all"
@@ -104,7 +106,9 @@ def evaluate_sell(
     if slope_cls == 0 and sell_p >= sell_trigger:
         if window_notes:
             flat_percent = strategy.get("flat_sell_percent", 0.0)
-            k = max(1, ceil(flat_percent * n_notes))
+            k = ceil(flat_percent * n_notes)
+            if k <= 0:
+                return []
             results = window_notes[:k]
             for n in results:
                 n["sell_mode"] = "flat"
