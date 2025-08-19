@@ -27,7 +27,7 @@ from pathlib import Path
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
 from systems.utils.resolve_symbol import (
     split_tag,
-    resolve_ccxt_symbols,
+    resolve_symbols,
     to_tag,
     sim_path_csv,
 )
@@ -44,12 +44,13 @@ def run_simulation(
     os.environ["WS_MODE"] = "sim"
     settings = load_settings()
     ledger_cfg = load_ledger_config(ledger)
-    base, _ = split_tag(ledger_cfg["tag"])
+    symbols = resolve_symbols(ledger_cfg["kraken_name"])
+    kraken_symbol = symbols["kraken_name"]
+    tag = to_tag(kraken_symbol)
+    file_tag = kraken_symbol.replace("/", "_")
+    base, _ = split_tag(tag)
     coin = base.upper()
     strategy_cfg = settings.get("general_settings", {}).get("strategy_settings", {})
-
-    kraken_symbol, _ = resolve_ccxt_symbols(settings, ledger)
-    tag = to_tag(kraken_symbol)
     csv_path = sim_path_csv(tag)
     if not Path(csv_path).exists():
         print(
@@ -110,7 +111,7 @@ def run_simulation(
         prev={"verbose": verbose},
     )
     runtime_state["mode"] = "sim"
-    runtime_state["symbol"] = ledger_cfg.get("tag", "")
+    runtime_state["symbol"] = tag
     runtime_state["buy_unlock_p"] = {}
 
     ledger_obj = Ledger()
@@ -365,7 +366,7 @@ def run_simulation(
         sim=True,
         final_tick=total - 1,
         summary=summary,
-        tag=ledger_cfg["tag"],
+        tag=file_tag,
     )
     default_path = root / "data" / "tmp" / "simulation" / f"{ledger}.json"
     sim_path = root / "data" / "tmp" / f"simulation_{ledger}.json"

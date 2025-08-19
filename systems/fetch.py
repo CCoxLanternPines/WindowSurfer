@@ -12,7 +12,7 @@ if __package__ is None or __package__ == "":
 from systems.utils.addlog import addlog
 from systems.utils.config import load_settings
 from systems.utils.resolve_symbol import (
-    resolve_ccxt_symbols,
+    resolve_symbols,
     to_tag,
     live_path_csv,
     sim_path_csv,
@@ -44,7 +44,9 @@ def run_fetch(ledger: str | None) -> None:
         )
         raise SystemExit(1)
 
-    kraken_symbol, binance_symbol = resolve_ccxt_symbols(settings, ledger)
+    symbols = resolve_symbols(ledger_cfg["kraken_name"])
+    kraken_symbol = symbols["kraken_name"]
+    binance_symbol = symbols["binance_name"]
 
     if "/" not in kraken_symbol:
         addlog(

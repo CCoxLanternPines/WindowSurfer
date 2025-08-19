@@ -7,6 +7,7 @@ import json
 from typing import Any, Dict, List
 
 from systems.utils.addlog import addlog
+from systems.utils.resolve_symbol import resolve_symbols, to_tag
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _SETTINGS_CACHE: Dict[str, Any] | None = None
@@ -74,6 +75,14 @@ def load_settings(*, reload: bool = False) -> Dict[str, Any]:
         parsed = json.loads(raw, object_pairs_hook=list)
         _SETTINGS_CACHE = _convert(parsed, [])
         _warn_deprecated(_SETTINGS_CACHE)
+        for name, ledger in _SETTINGS_CACHE.get("ledger_settings", {}).items():
+            for key in ("tag", "wallet_code", "kraken_pair", "binance_name"):
+                if key in ledger:
+                    addlog(
+                        f"[DEPRECATED] ledger '{name}' field '{key}' is ignored; use kraken_name only",
+                        verbose_int=1,
+                        verbose_state=True,
+                    )
         if dup_flag:
             addlog(
                 "[WARN] window_settings contains duplicate keys; only the last occurrence is kept by JSON. Ensure unique names (e.g., minnow, fish, dolphin, whale).",
@@ -107,26 +116,29 @@ def load_ledger_config(ledger_name: str) -> Dict[str, Any]:
 def resolve_ccxt_symbols_by_coin(coin: str) -> tuple[str, str]:
     """Return Kraken and Binance symbols for ``coin``.
 
-    The first ledger whose tag starts with ``coin`` (case-insensitive) is used.
+    The first ledger whose base starts with ``coin`` (case-insensitive) is used.
     Logs which ledger tag was matched.
     """
 
     settings = load_settings()
     coin_up = coin.upper()
     for cfg in settings.get("ledger_settings", {}).values():
-        tag = cfg.get("tag", "")
-        if tag.upper().startswith(coin_up):
-            kraken = cfg.get("kraken_name", "")
-            binance = cfg.get("binance_name", "")
+        kraken_name = cfg.get("kraken_name", "")
+        if not kraken_name:
+            continue
+        symbols = resolve_symbols(kraken_name)
+        tag = to_tag(symbols["kraken_name"])
+        base = symbols["kraken_name"].split("/")[0].upper()
+        if base.startswith(coin_up):
             addlog(
                 f"[CONFIG] coin={coin_up} resolved using tag={tag}",
                 verbose_int=1,
                 verbose_state=True,
             )
-            return kraken, binance
+            return symbols["kraken_name"], symbols["binance_name"]
     msg = (
         f"[ERROR] No ledger maps coin={coin_up} to exchange symbols. "
-        f"Add a ledger with tag starting '{coin_up}' including kraken_name/binance_name."
+        f"Add a ledger with kraken_name for the coin."
     )
     addlog(msg, verbose_int=1, verbose_state=True)
     raise ValueError(msg)

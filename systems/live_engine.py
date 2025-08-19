@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from systems.utils.resolve_symbol import (
     to_tag,
-    resolve_ccxt_symbols,
+    resolve_symbols,
     live_path_csv,
     sim_path_csv,
 )
@@ -41,8 +41,12 @@ def _run_iteration(
     for name, ledger_cfg in settings.get("ledger_settings", {}).items():
         if ledger_filter and name != ledger_filter:
             continue
-        kraken_symbol, _ = resolve_ccxt_symbols(settings, name)
+        symbols = resolve_symbols(ledger_cfg["kraken_name"])
+        kraken_symbol = symbols["kraken_name"]
+        kraken_pair = symbols["kraken_pair"]
         tag = to_tag(kraken_symbol)
+        file_tag = kraken_symbol.replace("/", "_")
+        base = kraken_symbol.split("/")[0]
         strategy_cfg = settings.get("general_settings", {}).get("strategy_settings", {})
         refresh_live_kraken_720(kraken_symbol)
         live_file = live_path_csv(tag)
@@ -82,7 +86,7 @@ def _run_iteration(
             )
         hist_low, hist_high = hist_cache[tag]
         t = len(df) - 1
-        ledger_obj = load_ledger(name, tag=ledger_cfg["tag"])
+        ledger_obj = load_ledger(name, tag=file_tag)
         prev = runtime_states.get(name, {"verbose": verbose})
         state = build_runtime_state(
             settings,
@@ -91,7 +95,7 @@ def _run_iteration(
             prev=prev,
         )
         state["mode"] = "live"
-        state["symbol"] = ledger_cfg.get("tag", "")
+        state["symbol"] = tag
         state["hist_low"] = hist_low
         state["hist_high"] = hist_high
         runtime_states[name] = state
@@ -112,10 +116,10 @@ def _run_iteration(
                 ledger=ledger_obj,
                 t=t,
                 runtime_state=state,
-                pair_code=ledger_cfg["kraken_pair"],
+                pair_code=kraken_pair,
                 price=price,
-                ledger_name=ledger_cfg["tag"],
-                wallet_code=ledger_cfg.get("wallet_code", ""),
+                ledger_name=tag,
+                wallet_code=base,
                 verbose=state.get("verbose", 0),
             )
 
@@ -136,10 +140,10 @@ def _run_iteration(
             entry_price = note.get("entry_price", 0.0)
             result = execute_sell(
                 None,
-                pair_code=ledger_cfg["kraken_pair"],
+                pair_code=kraken_pair,
                 coin_amount=amt,
                 price=price,
-                ledger_name=ledger_cfg["tag"],
+                ledger_name=tag,
                 verbose=state.get("verbose", 0),
             )
             if result and not result.get("error"):
@@ -168,7 +172,7 @@ def _run_iteration(
                     note["entry_amount"] -= amt
                     note["entry_usdt"] -= amt * entry_price
 
-        save_ledger(name, ledger_obj, tag=ledger_cfg["tag"])
+        save_ledger(name, ledger_obj, tag=file_tag)
 
 
 def run_live(*, ledger: str | None = None, dry: bool = False, verbose: int = 0) -> None:
@@ -180,6 +184,9 @@ def run_live(*, ledger: str | None = None, dry: bool = False, verbose: int = 0) 
     for name, ledger_cfg in settings.get("ledger_settings", {}).items():
         if ledger and name != ledger:
             continue
+        symbols = resolve_symbols(ledger_cfg["kraken_name"])
+        tag = to_tag(symbols["kraken_name"])
+        file_tag = symbols["kraken_name"].replace("/", "_")
         state = build_runtime_state(
             settings,
             ledger_cfg,
@@ -187,10 +194,10 @@ def run_live(*, ledger: str | None = None, dry: bool = False, verbose: int = 0) 
             prev={"verbose": verbose},
         )
         state["buy_unlock_p"] = {}
-        state["symbol"] = ledger_cfg.get("tag", "")
+        state["symbol"] = tag
         runtime_states[name] = state
 
-        ledger_obj = load_ledger(name, tag=ledger_cfg["tag"])
+        ledger_obj = load_ledger(name, tag=file_tag)
         open_notes = ledger_obj.get_open_notes()
         total = len(open_notes)
         last_ts = None
