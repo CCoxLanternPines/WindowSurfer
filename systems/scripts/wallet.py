@@ -3,7 +3,7 @@ from __future__ import annotations
 """Wallet helper functions."""
 
 from systems.utils.addlog import addlog
-from systems.utils.resolve_symbol import split_tag
+from systems.utils.resolve_symbol import split_tag, resolve_symbols, to_tag
 from .ledger import resolve_ledger_config
 from .kraken_utils import get_kraken_balance
 
@@ -12,7 +12,9 @@ def show_wallet(ledger: str | None, verbose: int = 0) -> None:
     """Display Kraken wallet balances for the given ledger."""
 
     ledger_cfg = resolve_ledger_config(ledger)
-    _, quote_asset = split_tag(ledger_cfg["tag"])
+    symbols = resolve_symbols(ledger_cfg["kraken_name"])
+    tag = to_tag(symbols["kraken_name"])
+    _, quote_asset = split_tag(tag)
     balances = get_kraken_balance(quote_asset, verbose)
 
     if verbose >= 1:

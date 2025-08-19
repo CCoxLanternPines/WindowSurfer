@@ -1,19 +1,8 @@
 {
   "ledger_settings": {
-    "Kris_Ledger": {
-      "tag": "SOLUSD",
-      "wallet_code": "SOL.F",
-      "kraken_name": "SOL/USD",
-      "kraken_pair": "SOLUSD",
-      "binance_name": "SOLUSDT"
-    },
-    "Travis_Ledger": {
-      "tag": "SOLUSDC",
-      "wallet_code": "SOL.F",
-      "kraken_name": "SOL/USDC",
-      "kraken_pair": "SOLUSDC",
-      "binance_name": "SOLUSDC"
-    }
+    "Kris_Ledger": { "kraken_name": "SOL/USD" },
+    "Travis_Ledger": { "kraken_name": "SOL/USDC" },
+    "default": { "kraken_name": "XMR/USD" }
   },
   "general_settings": {
     "max_note_usdt": 99999.0,

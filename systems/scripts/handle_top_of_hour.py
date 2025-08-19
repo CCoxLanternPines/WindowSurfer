@@ -23,7 +23,7 @@ from systems.utils.addlog import addlog, send_telegram_message
 from systems.scripts.send_top_hour_report import send_top_hour_report
 from systems.utils.config import resolve_path
 from systems.utils.top_hour_report import format_top_of_hour_report
-from systems.utils.resolve_symbol import split_tag
+from systems.utils.resolve_symbol import split_tag, resolve_symbols, to_tag
 from systems.scripts.window_utils import get_trade_params
 from systems.scripts.candle_refresh import refresh_to_last_closed_hour
 
@@ -78,8 +78,10 @@ def handle_top_of_hour(
         verbose = general_cfg.get("verbose", 0)
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
-            tag = ledger_cfg["tag"]
-            pair_code = ledger_cfg.get("kraken_pair", tag)
+            symbols = resolve_symbols(ledger_cfg["kraken_name"])
+            tag = to_tag(symbols["kraken_name"])
+            file_tag = symbols["kraken_name"].replace("/", "_")
+            pair_code = symbols["kraken_pair"]
             refresh_to_last_closed_hour(
                 settings,
                 tag,
@@ -88,13 +90,13 @@ def handle_top_of_hour(
                 verbose=verbose,
             )
             _, quote = split_tag(tag)
-            wallet_code = ledger_cfg["wallet_code"]
+            wallet_code = symbols["kraken_name"].split("/")[0]
             window_settings = ledger_cfg.get("window_settings", {})
             triggered_strategies = {wn.title(): False for wn in window_settings}
             strategy_summary: dict[str, dict] = {}
-            ledger = load_ledger(ledger_name, tag=ledger_cfg["tag"])
+            ledger = load_ledger(ledger_name, tag=file_tag)
 
-            snapshot = load_or_fetch_snapshot(ledger_name)
+            snapshot = load_or_fetch_snapshot(file_tag)
             if not snapshot:
                 addlog(
                     "[ERROR] Kraken snapshot missing — cannot proceed in live mode.",
@@ -341,7 +343,7 @@ def handle_top_of_hour(
                 metadata["last_buy_tick"] = last_buy_tick
                 metadata["last_sell_tick"] = last_sell_tick
             ledger.set_metadata(metadata)
-            save_ledger(ledger_name, ledger, tag=ledger_cfg["tag"])
+            save_ledger(ledger_name, ledger, tag=file_tag)
 
 
             usd_balance = float(balance.get(quote, 0.0))

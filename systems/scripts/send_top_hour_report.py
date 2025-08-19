@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.config import load_settings
-from systems.utils.resolve_symbol import split_tag
+from systems.utils.resolve_symbol import split_tag, resolve_symbols
 from systems.utils.snapshot import load_snapshot
 
 
@@ -34,7 +34,10 @@ def send_top_hour_report(
     verbose: int = 0,
 ) -> None:
     """Load Kraken snapshot and send a formatted Telegram report."""
-    snapshot = load_snapshot(ledger_name)
+    ledger_cfg = settings.get("ledger_settings", {}).get(ledger_name, {})
+    symbols = resolve_symbols(ledger_cfg.get("kraken_name", tag))
+    file_tag = symbols["kraken_name"].replace("/", "_")
+    snapshot = load_snapshot(file_tag)
     if not snapshot:
         addlog(
             f"[WARN] Snapshot for {ledger_name} not found; skipping report",
@@ -44,8 +47,8 @@ def send_top_hour_report(
         return
 
     settings = load_settings()
-    ledger_cfg = settings.get("ledger_settings", {}).get(ledger_name, {})
-    wallet_code = ledger_cfg.get("wallet_code", "")
+    wallet_code = symbols["kraken_name"].split("/")[0]
+    pair_code = symbols["kraken_pair"]
     _, fiat_code = split_tag(tag)
 
     balance = snapshot.get("balance", {})
@@ -53,7 +56,6 @@ def send_top_hour_report(
 
     usd_balance = float(balance.get(fiat_code, 0.0))
     coin_balance = float(balance.get(wallet_code, 0.0))
-    pair_code = tag
     price = _get_latest_price(trades, pair_code)
     coin_value = coin_balance * price
     total_value = usd_balance + coin_value

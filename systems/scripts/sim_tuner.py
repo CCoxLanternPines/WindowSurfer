@@ -20,14 +20,15 @@ from systems.utils.config import (
     load_settings,
     resolve_path,
 )
-from systems.utils.resolve_symbol import split_tag
+from systems.utils.resolve_symbol import split_tag, resolve_symbols, to_tag
 
 
 def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
     """Run sequential Optuna tuning on each window for ``ledger``."""
 
     ledger_cfg = load_ledger_config(ledger)
-    tag = ledger_cfg.get("tag", "").upper()
+    symbols = resolve_symbols(ledger_cfg["kraken_name"])
+    tag = to_tag(symbols["kraken_name"]).upper()
     window_settings = ledger_cfg.get("window_settings", {})
     if not window_settings:
         raise ValueError("No windows defined for ledger")

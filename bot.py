@@ -13,6 +13,7 @@ from systems.scripts.wallet import show_wallet
 from systems.utils.addlog import init_logger, addlog
 from systems.utils.config import load_settings
 from systems.utils.cli import build_parser
+from systems.utils.resolve_symbol import resolve_symbols, to_tag
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -46,7 +47,9 @@ def main(argv: list[str] | None = None) -> None:
 
     try:
         asset_pairs = load_asset_pairs()
-        valid_pairs = {pair_info["altname"].upper() for pair_info in asset_pairs.values()}
+        valid_pairs = {
+            to_tag(pair_info.get("wsname", "")) for pair_info in asset_pairs.values()
+        }
     except Exception:
         addlog(
             "[ERROR] Failed to load Kraken AssetPairs",
@@ -55,11 +58,16 @@ def main(argv: list[str] | None = None) -> None:
         )
         sys.exit(1)
 
-    for ledger_cfg in settings.get("ledger_settings", {}).values():
-        tag = ledger_cfg.get("tag", "")
+    for name, ledger_cfg in settings.get("ledger_settings", {}).items():
+        if args.ledger and name != args.ledger:
+            continue
+        symbols = resolve_symbols(ledger_cfg["kraken_name"])
+        tag = to_tag(symbols["kraken_name"])
         if tag.upper() not in valid_pairs:
-            raise RuntimeError(
-                f"[ERROR] Invalid trading pair: {ledger_cfg['tag']} — Not found in Kraken altname list",
+            addlog(
+                f"[ERROR] Invalid trading pair: {ledger_cfg['kraken_name']} — Not found in Kraken altname list",
+                verbose_int=1,
+                verbose_state=True,
             )
 
     if mode == "fetch":
