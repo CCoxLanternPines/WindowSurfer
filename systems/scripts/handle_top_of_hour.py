@@ -6,7 +6,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
-import json
 import pandas as pd
 
 from systems.scripts.evaluate_buy import evaluate_buy
@@ -344,28 +343,6 @@ def handle_top_of_hour(
             ledger.set_metadata(metadata)
             save_ledger(ledger_name, ledger, tag=ledger_cfg["tag"])
 
-            jackpot_path = root / "data" / "tmp" / "jackpot.json"
-            if jackpot_path.exists():
-                with jackpot_path.open("r") as jfile:
-                    jackpot_state = json.load(jfile)
-            else:
-                jackpot_state = {}
-            pool_usd = float(jackpot_state.get("pool_usd", 0.0))
-            drips = float(jackpot_state.get("drips", 0.0))
-            buys = int(jackpot_state.get("buys", 0))
-            sells = int(jackpot_state.get("sells", 0))
-            coin_value = sum(
-                n.get("entry_amount", 0.0) * price
-                for n in ledger.get_open_notes()
-                if n.get("kind") == "jackpot"
-            )
-            strategy_summary["jackpot"] = {
-                "pool": pool_usd,
-                "coin_value": coin_value,
-                "drips": drips,
-                "buys": buys,
-                "sells": sells,
-            }
 
             usd_balance = float(balance.get(quote, 0.0))
             coin_balance = float(balance.get(wallet_code, 0.0))

@@ -21,12 +21,6 @@ from systems.scripts.trade_apply import (
     paper_execute_buy,
     paper_execute_sell,
 )
-from systems.scripts.strategy_jackpot import (
-    init_jackpot,
-    on_buy_drip,
-    maybe_periodic_jackpot_buy,
-    maybe_cashout_jackpot,
-)
 from systems.utils.addlog import addlog
 from pathlib import Path
 
@@ -118,7 +112,6 @@ def run_simulation(
     runtime_state["mode"] = "sim"
     runtime_state["symbol"] = ledger_cfg.get("tag", "")
     runtime_state["buy_unlock_p"] = {}
-    init_jackpot(runtime_state, ledger_cfg, df)
 
     ledger_obj = Ledger()
     buy_points: list[tuple[float, float]] = []
@@ -224,29 +217,6 @@ def run_simulation(
                 m_sell["realized_trades"] += 1
                 m_sell["realized_roi_accum"] += roi_trade
 
-        ctx_j = {
-            "ledger": ledger_obj,
-            "verbosity": runtime_state.get("verbose", 0),
-        }
-        maybe_periodic_jackpot_buy(
-            ctx_j,
-            runtime_state,
-            t,
-            df,
-            price,
-            runtime_state.get("limits", {}),
-            ledger_cfg["tag"],
-        )
-        maybe_cashout_jackpot(
-            ctx_j,
-            runtime_state,
-            t,
-            df,
-            price,
-            runtime_state.get("limits", {}),
-            ledger_cfg["tag"],
-        )
-
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)
 
@@ -296,17 +266,6 @@ def run_simulation(
         verbose_int=1,
         verbose_state=verbose,
     )
-    j = runtime_state.get("jackpot", {})
-    coin_value = sum(
-        n.get("entry_amount", 0.0) * final_price for n in j.get("notes_open", [])
-    )
-    jackpot_total = j.get("pool_usd", 0.0) + coin_value
-    if j.get("enabled"):
-        addlog(
-            f"[REPORT][JACKPOT] drips=${j.get('drips',0.0):.2f} buys={j.get('buys',0)} sells={j.get('sells',0)} realized_pnl=${j.get('realized_pnl',0.0):.2f} pool_left=${j.get('pool_usd',0.0):.2f} coin_value={coin_value:.2f} total={jackpot_total:.2f}",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
     addlog(
         f"Final Value (USD): ${summary['total_value']:.2f}",
         verbose_int=1,
@@ -339,14 +298,6 @@ def run_simulation(
         )
         writer.writeheader()
         writer.writerows(rows)
-        if j.get("enabled"):
-            f_csv.write("\n")
-            f_csv.write(
-                "jackpot_drips,jackpot_buys,jackpot_sells,jackpot_realized_pnl,jackpot_pool_left,jackpot_coin_value,jackpot_total\n"
-            )
-            f_csv.write(
-                f"{j.get('drips',0.0)},{j.get('buys',0)},{j.get('sells',0)},{j.get('realized_pnl',0.0)},{j.get('pool_usd',0.0)},{coin_value},{jackpot_total}\n"
-            )
     json_data = {
         "windows": rows,
         "global": {
@@ -355,16 +306,6 @@ def run_simulation(
             "total_at_liq": global_total_at_liq,
         },
     }
-    if j.get("enabled"):
-        json_data["jackpot"] = {
-            "drips": j.get("drips", 0.0),
-            "buys": j.get("buys", 0),
-            "sells": j.get("sells", 0),
-            "realized_pnl": j.get("realized_pnl", 0.0),
-            "pool_left": j.get("pool_usd", 0.0),
-            "coin_value": coin_value,
-            "total": jackpot_total,
-        }
     with json_path.open("w", encoding="utf-8") as f_json:
         json.dump(json_data, f_json, indent=2)
     if viz:
