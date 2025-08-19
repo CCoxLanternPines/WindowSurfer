@@ -177,7 +177,8 @@ def evaluate_buy(
     max_sz = float(limits.get("max_note_usdt", capital))
     min_sz = float(limits.get("min_note_size", 0.0))
 
-    raw = capital * fraction
+    inv_frac = strategy.get("investment_fraction", 1.0)
+    raw = capital * fraction * inv_frac
     size_usd = min(raw, capital, max_sz)
     if size_usd != raw:
         addlog(
