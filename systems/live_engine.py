@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Any
 
 import pandas as pd
 from tqdm import tqdm
@@ -27,6 +27,7 @@ from systems.scripts.runtime_state import build_runtime_state
 from systems.scripts.trade_apply import apply_sell
 from systems.scripts.execution_handler import execute_sell, process_buy_signal
 from systems.utils.addlog import addlog
+from systems.utils.trade_logger import init_logger as init_trade_logger, record_event
 from systems.utils.config import load_settings
 
 
@@ -41,6 +42,7 @@ def _run_iteration(
     for name, ledger_cfg in settings.get("ledger_settings", {}).items():
         if ledger_filter and name != ledger_filter:
             continue
+        init_trade_logger(name)
         kraken_symbol, _ = resolve_ccxt_symbols(settings, name)
         tag = to_tag(kraken_symbol)
         strategy_cfg = settings.get("general_settings", {}).get("strategy_settings", {})
@@ -68,6 +70,8 @@ def _run_iteration(
             "%Y-%m-%dT%H:%M:%SZ"
         )
         print(f"[DATA][LIVE] file={live_file} rows={len(df)} last={last_iso}")
+        decision = "HOLD"
+        trades_log: list[dict[str, Any]] = []
         if tag not in hist_cache:
             sim_file = sim_path_csv(tag)
             if not Path(sim_file).exists():
@@ -107,7 +111,7 @@ def _run_iteration(
             runtime_state=state,
         )
         if buy_res:
-            process_buy_signal(
+            buy_result = process_buy_signal(
                 buy_signal=buy_res,
                 ledger=ledger_obj,
                 t=t,
@@ -117,6 +121,16 @@ def _run_iteration(
                 ledger_name=ledger_cfg["tag"],
                 wallet_code=ledger_cfg.get("wallet_code", ""),
                 verbose=state.get("verbose", 0),
+            )
+            decision = "BUY"
+            note_id = f"{buy_res.get('window_name', 'strategy')}-{t}"
+            trades_log.append(
+                {
+                    "action": "BUY",
+                    "amount": buy_res.get("size_usd", 0.0),
+                    "price": (buy_result or {}).get("avg_price", 0.0),
+                    "note_id": note_id,
+                }
             )
 
         open_notes = ledger_obj.get_open_notes()
@@ -129,6 +143,8 @@ def _run_iteration(
             open_notes=open_notes,
             runtime_state=state,
         )
+        if sell_orders:
+            decision = "FLAT" if any(o.get("sell_mode") == "flat" for o in sell_orders) else "SELL"
         for order in sell_orders:
             note = order["note"]
             amt = order["sell_amount"]
@@ -145,7 +161,7 @@ def _run_iteration(
             if result and not result.get("error"):
                 if amt >= note.get("entry_amount", 0.0) - 1e-9:
                     note["sell_mode"] = mode
-                    apply_sell(
+                    closed = apply_sell(
                         ledger=ledger_obj,
                         note=note,
                         t=t,
@@ -158,7 +174,7 @@ def _run_iteration(
                     partial["entry_usdt"] = amt * entry_price
                     partial["sell_mode"] = mode
                     ledger_obj.open_note(partial)
-                    apply_sell(
+                    closed = apply_sell(
                         ledger=ledger_obj,
                         note=partial,
                         t=t,
@@ -168,7 +184,37 @@ def _run_iteration(
                     note["entry_amount"] -= amt
                     note["entry_usdt"] -= amt * entry_price
 
+                trade_usd = result.get("filled_amount", 0.0) * result.get("avg_price", 0.0)
+                trades_log.append(
+                    {
+                        "action": "SELL",
+                        "amount": trade_usd,
+                        "price": result.get("avg_price", 0.0),
+                        "note_id": closed.get("id"),
+                    }
+                )
+
         save_ledger(name, ledger_obj, tag=ledger_cfg["tag"])
+
+        features = state.get("last_features", {}).get("strategy", {})
+        pressures = state.get("pressures", {})
+        event = {
+            "timestamp": last_iso,
+            "ledger": name,
+            "pair": tag,
+            "window": f"{strategy_cfg.get('window_size', 0)}h",
+            "decision": decision,
+            "features": {
+                "slope": features.get("slope"),
+                "volatility": features.get("volatility"),
+                "buy_pressure": pressures.get("buy", {}).get("strategy", 0.0),
+                "sell_pressure": pressures.get("sell", {}).get("strategy", 0.0),
+                "buy_trigger": strategy_cfg.get("buy_trigger", 0.0),
+                "sell_trigger": strategy_cfg.get("sell_trigger", 0.0),
+            },
+            "trades": trades_log,
+        }
+        record_event(event)
 
 
 def run_live(*, ledger: str | None = None, dry: bool = False, verbose: int = 0) -> None:
@@ -180,6 +226,7 @@ def run_live(*, ledger: str | None = None, dry: bool = False, verbose: int = 0) 
     for name, ledger_cfg in settings.get("ledger_settings", {}).items():
         if ledger and name != ledger:
             continue
+        init_trade_logger(name)
         state = build_runtime_state(
             settings,
             ledger_cfg,
