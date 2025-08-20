@@ -24,5 +24,21 @@
       "buy_trigger": 4,
       "flat_sell_percent": 0.2
     }
+  },
+  "accounts": {
+    "Kris_Ledger": {
+      "tag": "SOLUSD",
+      "wallet_code": "SOL.F",
+      "kraken_name": "SOL/USD",
+      "kraken_pair": "SOLUSD",
+      "binance_name": "SOLUSDT",
+      "reporting": {
+        "email": "kris@example.com",
+        "daily": false,
+        "weekly": false,
+        "monthly": false,
+        "yearly": false
+      }
+    }
   }
 }
