@@ -35,7 +35,7 @@ def view_log(account_name: str, timeframe: str | None = None) -> None:
         return
 
     times = pd.to_datetime([e["timestamp"] for e in events])
-    prices: list[float | None] = []
+    prices: list[float] = []
     colors: list[str] = []
     annotations: list[str] = []
 
@@ -43,16 +43,24 @@ def view_log(account_name: str, timeframe: str | None = None) -> None:
         decision = e["decision"]
         trades = e.get("trades") or []
         price = trades[0].get("price") if trades else None
+
+        # fallback to 0 so we always plot something
+        if price is None:
+            price = 0.0
+
         prices.append(price)
-        colors.append(
-            "green"
-            if decision == "BUY"
-            else "red"
-            if decision == "SELL"
-            else "orange"
-            if decision == "FLAT"
-            else "gray"
-        )
+
+        if decision == "BUY":
+            colors.append("green")
+        elif decision == "SELL":
+            colors.append("red")
+        elif decision == "FLAT":
+            colors.append("orange")
+        elif decision == "HOLD":
+            colors.append("gray")
+        else:
+            colors.append("yellow")  # catch unexpected cases
+
         features = e.get("features", {})
         annotations.append(
             f"{e['timestamp']}\n"
