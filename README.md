@@ -55,14 +55,10 @@ Reusable components used by the engines:
 - **ledger.py** – in-memory ledger with helpers to load/save trade notes to
   `data/ledgers` or simulation folders.
 - **execution_handler.py** – communicates with Kraken for live order placement.
-- **candle_cache.py** – refreshes live candle caches and tracks historical
-  high/low ranges.
 - **fetch_candles.py** – low-level Binance/Kraken OHLCV downloaders used by
   `fetch` and cache utilities.
 - **kraken_utils.py** – loads API keys and balances from Kraken.
 - **wallet.py** – shows Kraken balances for a ledger's quote asset.
-- `sim_tuner.py` – Optuna-based parameter tuner for simulations, run separately
-  from the main bot.
 
 ### systems/utils
 
@@ -92,7 +88,6 @@ Simulation reports may also be written to `logs/`.
 ### Additional Utilities
 
 - `systems/manual.py` for manual test trades.
-- `systems/scripts/sim_tuner.py` for sequential parameter tuning.
 - `reference_logic/sim_engine.py` provides a compact reference
   implementation of the simulation algorithm.
 
