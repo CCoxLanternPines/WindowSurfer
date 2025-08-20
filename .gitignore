@@ -55,8 +55,6 @@ data/brains/
 data/tuned/
 data/regimes/
 data/cache/
-logs/
-*.log
 *.tmp
 
 # Common large artifacts
