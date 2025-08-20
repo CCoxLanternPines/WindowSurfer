@@ -28,6 +28,11 @@ def parse_cutoff(value: str) -> timedelta:
     raise ValueError("cutoff unit must be one of h,d,w,m,y")
 
 
+def parse_duration(value: str) -> timedelta:
+    """Return a ``timedelta`` parsed from shorthand like ``'1m'`` or ``'7d'``."""
+    return parse_cutoff(value)
+
+
 def parse_relative_time(value: str) -> tuple[float, float]:
     """Return (start_ts, end_ts) parsed from a relative time string."""
     delta = parse_cutoff(value)

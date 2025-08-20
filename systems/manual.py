@@ -26,8 +26,8 @@ def _parse_args(argv: Optional[list[str]] = None):
     action.add_argument("--sell", action="store_true", help="Execute a sell")
     parser.add_argument("--usd", required=True, type=float, help="USD amount")
     args = parser.parse_args(argv)
-    if not args.ledger:
-        parser.error("--ledger is required")
+    if not args.account:
+        parser.error("--account is required")
     return args
 
 
@@ -35,9 +35,9 @@ def main(argv: Optional[list[str]] = None) -> None:
     args = _parse_args(argv)
 
     settings = load_settings()
-    ledger_cfg = settings.get("ledger_settings", {}).get(args.ledger)
+    ledger_cfg = settings.get("ledger_settings", {}).get(args.account)
     if ledger_cfg is None:
-        raise SystemExit(f"[ERROR] Ledger '{args.ledger}' not found in settings")
+        raise SystemExit(f"[ERROR] Account '{args.account}' not found in settings")
 
     if args.usd <= 0:
         raise SystemExit("[ERROR] --usd must be positive")
@@ -55,12 +55,12 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     coin_amt = args.usd / price
     coin_str = _coin_label(tag)
-    path_new = resolve_path(f"data/ledgers/{args.ledger}.json")
+    path_new = resolve_path(f"data/ledgers/{args.account}.json")
     legacy_path = resolve_path(f"data/ledgers/{file_tag}.json") if file_tag else None
     if legacy_path and legacy_path.exists() and not path_new.exists():
         legacy_path.rename(path_new)
 
-    ledger = load_ledger(args.ledger, tag=file_tag)
+    ledger = load_ledger(args.account, tag=file_tag)
     metadata = ledger.get_metadata()
 
     if args.buy:
@@ -71,7 +71,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                 wallet_code=base,
                 price=price,
                 amount_usd=args.usd,
-                ledger_name=args.ledger,
+                ledger_name=args.account,
                 verbose=args.verbose,
             )
             if not result or result.get("error"):
@@ -89,9 +89,9 @@ def main(argv: Optional[list[str]] = None) -> None:
                 }
             )
             ledger.set_metadata(metadata)
-            save_ledger(args.ledger, ledger, tag=file_tag)
+            save_ledger(args.account, ledger, tag=file_tag)
         addlog(
-            f"[MANUAL BUY] {args.ledger} | {tag} | ${args.usd:.2f} → {coin_amt:.4f} {coin_str} @ ${price:.4f}",
+            f"[MANUAL BUY] {args.account} | {tag} | ${args.usd:.2f} → {coin_amt:.4f} {coin_str} @ ${price:.4f}",
             verbose_int=1,
             verbose_state=args.verbose,
         )
@@ -102,7 +102,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                 pair_code=kraken_pair,
                 coin_amount=coin_amt,
                 price=price,
-                ledger_name=args.ledger,
+                ledger_name=args.account,
                 verbose=args.verbose,
             )
             if not result or result.get("error"):
@@ -121,11 +121,11 @@ def main(argv: Optional[list[str]] = None) -> None:
                 }
             )
             ledger.set_metadata(metadata)
-            save_ledger(args.ledger, ledger, tag=file_tag)
+            save_ledger(args.account, ledger, tag=file_tag)
         else:
             usd_total = args.usd
         addlog(
-            f"[MANUAL SELL] {args.ledger} | {tag} | {coin_amt:.4f} {coin_str} → ${usd_total:.2f} @ ${price:.4f}",
+            f"[MANUAL SELL] {args.account} | {tag} | {coin_amt:.4f} {coin_str} → ${usd_total:.2f} @ ${price:.4f}",
             verbose_int=1,
             verbose_state=args.verbose,
         )
