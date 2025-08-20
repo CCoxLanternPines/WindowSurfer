@@ -73,10 +73,10 @@ def main(argv: list[str] | None = None) -> None:
     elif mode == "test":
         from systems.scripts.test_mode import run_test
 
-        if not args.ledger:
-            addlog("Error: --ledger is required for test mode")
+        if not args.account:
+            addlog("Error: --account is required for test mode")
             sys.exit(1)
-        exit_code = run_test(args.ledger)
+        exit_code = run_test(args.account)
         sys.exit(exit_code)
 
     elif mode == "wallet":

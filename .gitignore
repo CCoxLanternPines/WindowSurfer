@@ -72,3 +72,6 @@ data/cache/
 # OS-specific alt streams (Windows)
 *.Zone.Identifier
 
+
+# Settings secrets
+settings/keys.json

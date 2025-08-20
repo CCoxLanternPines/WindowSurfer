@@ -1,8 +1,13 @@
 import argparse
+import sys
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Return a configured argument parser for WindowSurfer CLI tools."""
+
+    if any(arg.startswith("--ledger") for arg in sys.argv[1:]):
+        raise SystemExit("[ERROR] --ledger is no longer supported. Use --account instead.")
+
     parser = argparse.ArgumentParser(description="WindowSurfer command line interface")
     parser.add_argument(
         "--mode",
@@ -11,15 +16,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--account",
-        help="Account name defined in accounts.json",
+        help="Account name defined in account_settings.json",
     )
     parser.add_argument(
         "--market",
         help="Specific market symbol to operate on (default: all for account)",
-    )
-    parser.add_argument(
-        "--ledger",
-        help="Ledger name to validate in test mode",
     )
     parser.add_argument(
         "--all",
