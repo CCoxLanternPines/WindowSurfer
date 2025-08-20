@@ -11,21 +11,21 @@ subsystem based on `--mode`:
 
 | Mode | Module | Description |
 |------|--------|-------------|
-| `fetch`  | `systems.fetch.run_fetch` | Sync hourly candles from Binance (simulation) and Kraken (live) for a ledger. |
+| `fetch`  | `systems.fetch.run_fetch` | Sync hourly candles from Binance (simulation) and Kraken (live) for an account's ledger. |
 | `sim`    | `systems.sim_engine.run_simulation` | Backtest the strategy on historical data. |
 | `live`   | `systems.live_engine.run_live` | Execute the strategy on current market data; `--dry` runs once and exits. |
-| `wallet` | `systems.scripts.wallet.show_wallet` | Display Kraken balances for the ledger's quote asset. |
+| `wallet` | `systems.scripts.wallet.show_wallet` | Display Kraken balances for the account's quote asset. |
 
-Common options include `--ledger`, `-v/--verbose`, and `--log` to write
+Common options include `--account`, `-v/--verbose`, and `--log` to write
 local JSON logs under `data/logs/`.
 
 Examples:
 
 ```bash
-python bot.py --mode fetch --ledger Kris_Ledger
-python bot.py --mode sim --ledger Kris_Ledger -vv --time 7d
-python bot.py --mode live --ledger Kris_Ledger --dry
-python bot.py --mode wallet --ledger Kris_Ledger
+python bot.py --mode fetch --account Kris_Ledger
+python bot.py --mode sim --account Kris_Ledger -vv --time 7d
+python bot.py --mode live --account Kris_Ledger --dry
+python bot.py --mode wallet --account Kris_Ledger
 ```
 
 ## Architecture

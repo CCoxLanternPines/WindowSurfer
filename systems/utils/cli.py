@@ -1,7 +1,5 @@
 import argparse
 
-from .addlog import addlog
-
 
 def build_parser() -> argparse.ArgumentParser:
     """Return a configured argument parser for WindowSurfer CLI tools."""
@@ -25,10 +23,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run all configured accounts and their markets",
     )
     parser.add_argument(
-        "--ledger",
-        help=argparse.SUPPRESS,
-    )
-    parser.add_argument(
         "--dry",
         action="store_true",
         help="Run live mode once immediately and exit",
@@ -46,16 +40,3 @@ def build_parser() -> argparse.ArgumentParser:
         help="Enable log file output",
     )
     return parser
-
-
-def handle_legacy_args(args: argparse.Namespace) -> argparse.Namespace:
-    """Map deprecated ``--ledger`` flag to ``--account``."""
-    if getattr(args, "ledger", None):
-        addlog(
-            "[DEPRECATED] --ledger is deprecated; use --account",
-            verbose_int=1,
-            verbose_state=True,
-        )
-        if not getattr(args, "account", None):
-            args.account = args.ledger
-    return args

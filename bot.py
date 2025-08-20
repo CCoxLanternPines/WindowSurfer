@@ -11,7 +11,7 @@ from systems.sim_engine import run_simulation
 from systems.scripts.wallet import show_wallet
 from systems.utils.addlog import init_logger, addlog
 from systems.utils.load_config import load_config
-from systems.utils.cli import build_parser, handle_legacy_args
+from systems.utils.cli import build_parser
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -29,7 +29,6 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     args = parser.parse_args(argv or sys.argv[1:])
-    args = handle_legacy_args(args)
     if not args.mode:
         parser.error("--mode is required")
     mode = args.mode.lower()
@@ -94,11 +93,11 @@ def main(argv: list[str] | None = None) -> None:
                 show_wallet(acct, m, verbose)
 
     elif mode == "view":
-        if not args.ledger:
-            addlog("Error: --ledger is required for view mode")
+        if not args.account:
+            addlog("Error: --account is required for view mode")
             sys.exit(1)
         from systems.scripts.view_log import view_log
-        view_log(args.ledger)
+        view_log(args.account, timeframe=args.time)
 
     else:
         parser.error(f"Unknown mode: {args.mode}")
