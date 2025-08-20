@@ -41,12 +41,12 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     verbose = args.verbose
-
     cfg = load_config()
     run_all = args.all or not args.account
 
     if mode == "fetch":
         run_fetch(account=args.account, market=args.market, all_accounts=run_all)
+
     elif mode == "sim":
         run_simulation(
             account=args.account,
@@ -56,6 +56,7 @@ def main(argv: list[str] | None = None) -> None:
             timeframe=args.time,
             viz=args.viz,
         )
+
     elif mode == "live":
         run_live(
             account=args.account,
@@ -64,6 +65,7 @@ def main(argv: list[str] | None = None) -> None:
             dry=args.dry,
             verbose=args.verbose,
         )
+
     elif mode == "wallet":
         accounts_cfg = cfg.get("accounts", {})
         targets = accounts_cfg.keys() if run_all else [args.account]
@@ -83,6 +85,14 @@ def main(argv: list[str] | None = None) -> None:
                 if m not in markets_cfg:
                     continue
                 show_wallet(acct, m, verbose)
+
+    elif mode == "view":
+        if not args.ledger:
+            addlog("Error: --ledger is required for view mode")
+            sys.exit(1)
+        from systems.scripts.view_log import view_log
+        view_log(args.ledger)
+
     else:
         parser.error(f"Unknown mode: {args.mode}")
 
