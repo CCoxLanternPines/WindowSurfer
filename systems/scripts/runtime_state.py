@@ -8,24 +8,13 @@ from systems.utils.resolve_symbol import split_tag, resolve_symbols, to_tag
 
 def build_runtime_state(
     settings: Dict[str, Any],
-    ledger_cfg: Dict[str, Any],
+    market: str,
+    strategy_cfg: Dict[str, Any],
     mode: str,
     *,
     prev: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Build and refresh runtime state for engines.
-
-    Parameters
-    ----------
-    settings:
-        Global settings dictionary.
-    ledger_cfg:
-        Ledger configuration mapping containing at least ``tag``.
-    mode:
-        Either ``"sim"`` or ``"live"``.
-    prev:
-        Previous runtime state to carry over verbose level and unlock map.
-    """
+    """Build and refresh runtime state for engines."""
 
     prev = prev or {}
     general = settings.get("general_settings", {})
@@ -51,16 +40,16 @@ def build_runtime_state(
         "volume_skew_bias": 0.4,
         "flat_band_deg": 10.0,
     }
-    strategy_cfg = {**defaults, **general.get("strategy_settings", {})}
+    strategy = {**defaults, **strategy_cfg}
 
     buy_unlock_p = prev.get("buy_unlock_p", {})
     verbose = prev.get("verbose", 0)
 
-    symbols = resolve_symbols(ledger_cfg["kraken_name"])
+    symbols = resolve_symbols(market)
     tag = to_tag(symbols["kraken_name"])
     file_tag = symbols["kraken_name"].replace("/", "_")
     if mode == "sim":
-        capital = float(settings.get("simulation_capital", 0.0))
+        capital = float(settings.get("general_settings", {}).get("simulation_capital", 0.0))
     elif mode == "live":
         snapshot = load_or_fetch_snapshot(file_tag)
         _, quote = split_tag(tag)
@@ -74,7 +63,7 @@ def build_runtime_state(
         "buy_unlock_p": buy_unlock_p,
         "verbose": verbose,
         "limits": limits,
-        "strategy": strategy_cfg,
+        "strategy": strategy,
     }
 
     state.update(symbols)

@@ -11,7 +11,7 @@ from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
 from systems.scripts.wallet import show_wallet
 from systems.utils.addlog import init_logger, addlog
-from systems.utils.config import load_settings
+from systems.utils.load_config import load_config
 from systems.utils.cli import build_parser
 from systems.utils.resolve_symbol import resolve_symbols, to_tag
 
@@ -43,7 +43,15 @@ def main(argv: list[str] | None = None) -> None:
 
     verbose = args.verbose
 
-    settings = load_settings()
+    if args.ledger and not args.account:
+        addlog(
+            "[DEPRECATED] --ledger is deprecated; use --account",
+            verbose_int=1,
+            verbose_state=True,
+        )
+        args.account = args.ledger
+
+    cfg = load_config()
 
     try:
         asset_pairs = load_asset_pairs()
@@ -58,38 +66,69 @@ def main(argv: list[str] | None = None) -> None:
         )
         sys.exit(1)
 
-    for name, ledger_cfg in settings.get("ledger_settings", {}).items():
-        if args.ledger and name != args.ledger:
-            continue
-        symbols = resolve_symbols(ledger_cfg["kraken_name"])
-        tag = to_tag(symbols["kraken_name"])
-        if tag.upper() not in valid_pairs:
+    account_cfg = None
+    check_markets: list[str] = []
+    if args.account:
+        account_cfg = cfg.get("accounts", {}).get(args.account)
+        if not account_cfg:
             addlog(
-                f"[ERROR] Invalid trading pair: {ledger_cfg['kraken_name']} — Not found in Kraken altname list",
+                f"[ERROR] Unknown account {args.account}",
                 verbose_int=1,
                 verbose_state=True,
             )
+            sys.exit(1)
+        markets = account_cfg.get("markets", {})
+        if args.market and args.market not in markets:
+            addlog(
+                f"[ERROR] Market {args.market} not configured for account {args.account}",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            sys.exit(1)
+        check_markets = [args.market] if args.market else list(markets.keys())
+        for m in check_markets:
+            symbols = resolve_symbols(m)
+            tag = to_tag(symbols["kraken_name"])
+            if tag.upper() not in valid_pairs:
+                addlog(
+                    f"[ERROR] Invalid trading pair: {m} — Not found in Kraken altname list",
+                    verbose_int=1,
+                    verbose_state=True,
+                )
 
     if mode == "fetch":
-        run_fetch(args.ledger)
-    elif mode == "sim":
-        if not args.ledger:
-            addlog("Error: --ledger is required for sim mode")
+        if not args.account:
+            addlog("Error: --account is required for fetch mode")
             sys.exit(1)
-        run_simulation(
-            ledger=args.ledger,
-            verbose=args.verbose,
-            timeframe=args.time,
-            viz=args.viz,
-        )
+        run_fetch(args.account, market=args.market)
+    elif mode == "sim":
+        if not args.account:
+            addlog("Error: --account is required for sim mode")
+            sys.exit(1)
+        markets_to_run = check_markets if args.account else []
+        for m in markets_to_run:
+            run_simulation(
+                account=args.account,
+                market=m,
+                verbose=args.verbose,
+                timeframe=args.time,
+                viz=args.viz,
+            )
     elif mode == "live":
+        if not args.account:
+            addlog("Error: --account is required for live mode")
+            sys.exit(1)
         run_live(
-            ledger=args.ledger,
+            account=args.account,
+            market=args.market,
             dry=args.dry,
             verbose=args.verbose,
         )
     elif mode == "wallet":
-        show_wallet(args.ledger, verbose)
+        if not args.account:
+            addlog("Error: --account is required for wallet mode")
+            sys.exit(1)
+        show_wallet(args.account, args.market, verbose)
     else:
         parser.error(f"Unknown mode: {args.mode}")
 

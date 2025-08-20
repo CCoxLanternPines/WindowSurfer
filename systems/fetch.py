@@ -10,7 +10,7 @@ if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from systems.utils.addlog import addlog
-from systems.utils.config import load_settings
+from systems.utils.load_config import load_config
 from systems.utils.resolve_symbol import (
     resolve_symbols,
     to_tag,
@@ -23,77 +23,72 @@ from systems.scripts.fetch_candles import (
 )
 
 
-def run_fetch(ledger: str | None) -> None:
-    """Fetch candles for ``ledger`` from Binance (SIM) and Kraken (LIVE)."""
+def run_fetch(account: str, market: str | None = None) -> None:
+    """Fetch candles for markets defined under ``account``."""
 
-    if not ledger:
+    cfg = load_config()
+    acct_cfg = cfg.get("accounts", {}).get(account)
+    if not acct_cfg:
         addlog(
-            "Error: --ledger is required for fetch mode",
+            f"Error: Unknown account {account}",
             verbose_int=1,
             verbose_state=True,
         )
         raise SystemExit(1)
+    markets = acct_cfg.get("markets", {})
+    targets = [market] if market else list(markets.keys())
 
-    settings = load_settings()
-    ledger_cfg = settings.get("ledger_settings", {}).get(ledger)
-    if not ledger_cfg:
+    for m in targets:
+        symbols = resolve_symbols(m)
+        kraken_symbol = symbols["kraken_name"]
+        binance_symbol = symbols["binance_name"]
+
+        if "/" not in kraken_symbol:
+            addlog(
+                f"[ERROR] Kraken symbol missing '/' : {kraken_symbol}",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            raise SystemExit(1)
+        if "/" in binance_symbol:
+            addlog(
+                f"[ERROR] Binance symbol must not contain '/' : {binance_symbol}",
+                verbose_int=1,
+                verbose_state=True,
+            )
+            raise SystemExit(1)
+
+        tag = to_tag(kraken_symbol)
+
+        # Binance full history -> SIM
+        df_sim = fetch_binance_full_history_1h(binance_symbol)
+        sim_path = sim_path_csv(tag)
+        tmp_sim = sim_path + ".tmp"
+        os.makedirs(os.path.dirname(sim_path), exist_ok=True)
+        df_sim.to_csv(tmp_sim, index=False)
+        os.replace(tmp_sim, sim_path)
         addlog(
-            f"Error: Unknown ledger {ledger}",
+            f"[FETCH][SIM] source=binance symbol={binance_symbol} tag={tag} rows={len(df_sim)} path={sim_path}",
             verbose_int=1,
             verbose_state=True,
         )
-        raise SystemExit(1)
 
-    symbols = resolve_symbols(ledger_cfg["kraken_name"])
-    kraken_symbol = symbols["kraken_name"]
-    binance_symbol = symbols["binance_name"]
-
-    if "/" not in kraken_symbol:
+        # Kraken last 720 -> LIVE
+        df_live = fetch_kraken_last_n_hours_1h(kraken_symbol, n=720)
+        live_path = live_path_csv(tag)
+        tmp_live = live_path + ".tmp"
+        os.makedirs(os.path.dirname(live_path), exist_ok=True)
+        df_live.to_csv(tmp_live, index=False)
+        os.replace(tmp_live, live_path)
+        rows = len(df_live)
+        if rows < 720:
+            addlog(
+                f"[FETCH][LIVE][WARN] source=kraken symbol={kraken_symbol} returned {rows} rows (<720)",
+                verbose_int=1,
+                verbose_state=True,
+            )
         addlog(
-            f"[ERROR] Kraken symbol missing '/' : {kraken_symbol}",
+            f"[FETCH][LIVE] source=kraken symbol={kraken_symbol} tag={tag} rows={rows} path={live_path}",
             verbose_int=1,
             verbose_state=True,
         )
-        raise SystemExit(1)
-    if "/" in binance_symbol:
-        addlog(
-            f"[ERROR] Binance symbol must not contain '/' : {binance_symbol}",
-            verbose_int=1,
-            verbose_state=True,
-        )
-        raise SystemExit(1)
-
-    tag = to_tag(kraken_symbol)
-
-    # Binance full history -> SIM
-    df_sim = fetch_binance_full_history_1h(binance_symbol)
-    sim_path = sim_path_csv(tag)
-    tmp_sim = sim_path + ".tmp"
-    os.makedirs(os.path.dirname(sim_path), exist_ok=True)
-    df_sim.to_csv(tmp_sim, index=False)
-    os.replace(tmp_sim, sim_path)
-    addlog(
-        f"[FETCH][SIM] source=binance symbol={binance_symbol} tag={tag} rows={len(df_sim)} path={sim_path}",
-        verbose_int=1,
-        verbose_state=True,
-    )
-
-    # Kraken last 720 -> LIVE
-    df_live = fetch_kraken_last_n_hours_1h(kraken_symbol, n=720)
-    live_path = live_path_csv(tag)
-    tmp_live = live_path + ".tmp"
-    os.makedirs(os.path.dirname(live_path), exist_ok=True)
-    df_live.to_csv(tmp_live, index=False)
-    os.replace(tmp_live, live_path)
-    rows = len(df_live)
-    if rows < 720:
-        addlog(
-            f"[FETCH][LIVE][WARN] source=kraken symbol={kraken_symbol} returned {rows} rows (<720)",
-            verbose_int=1,
-            verbose_state=True,
-        )
-    addlog(
-        f"[FETCH][LIVE] source=kraken symbol={kraken_symbol} tag={tag} rows={rows} path={live_path}",
-        verbose_int=1,
-        verbose_state=True,
-    )
