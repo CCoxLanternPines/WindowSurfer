@@ -35,6 +35,7 @@ def run_fetch(account: str, market: str | None = None) -> None:
             verbose_state=True,
         )
         raise SystemExit(1)
+    os.environ["WS_ACCOUNT"] = account
     markets = acct_cfg.get("markets", {})
     targets = [market] if market else list(markets.keys())
 

@@ -1,3 +1,4 @@
+import os
 import requests
 from pathlib import Path
 import yaml
@@ -12,7 +13,21 @@ KRAKEN_API_URL = "https://api.kraken.com"
 # --- Authentication -------------------------------------------------------
 
 def load_kraken_keys(path: str = "kraken.yaml") -> tuple[str, str]:
-    """Load Kraken API key and secret from local YAML file."""
+    """Load Kraken API key/secret using WS_ACCOUNT or fallback YAML."""
+    account = os.environ.get("WS_ACCOUNT")
+    if account:
+        try:
+            from systems.utils.load_config import load_config
+
+            cfg = load_config()
+            acct = cfg.get("accounts", {}).get(account, {})
+            key = acct.get("api_key")
+            secret = acct.get("api_secret")
+            if key and secret:
+                return key, secret
+        except Exception:
+            pass
+
     file = Path(path)
     if not file.exists():
         raise FileNotFoundError("Missing kraken.yaml in project root")
@@ -22,9 +37,7 @@ def load_kraken_keys(path: str = "kraken.yaml") -> tuple[str, str]:
 
     kraken = data.get("kraken")
     if not kraken or "api_key" not in kraken or "api_secret" not in kraken:
-        raise ValueError(
-            "Malformed kraken.yaml: missing 'kraken.api_key' or 'api_secret'"
-        )
+        raise ValueError("Malformed kraken.yaml: missing 'kraken.api_key' or 'api_secret'")
 
     return kraken["api_key"], kraken["api_secret"]
 
@@ -80,3 +93,4 @@ def ensure_snapshot(ledger_name: str) -> dict:
         return snapshot
     api_key, api_secret = load_kraken_keys()
     return prime_snapshot(ledger_name, api_key, api_secret)
+

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Live engine mirroring the simulation strategy."""
 
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,6 +40,7 @@ def _run_iteration(
     for acct_name, acct_cfg in cfg.get("accounts", {}).items():
         if account_filter and acct_name != account_filter:
             continue
+        os.environ["WS_ACCOUNT"] = acct_name
         for market, strategy_cfg in acct_cfg.get("markets", {}).items():
             if market_filter and market != market_filter:
                 continue
@@ -182,6 +184,7 @@ def run_live(*, account: str, market: str | None = None, dry: bool = False, verb
     for acct_name, acct_cfg in cfg.get("accounts", {}).items():
         if account and acct_name != account:
             continue
+        os.environ["WS_ACCOUNT"] = acct_name
         for mkt, strat in acct_cfg.get("markets", {}).items():
             if market and mkt != market:
                 continue
