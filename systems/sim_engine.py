@@ -11,6 +11,7 @@ import os
 import ccxt
 import pandas as pd
 from tqdm import tqdm
+from typing import Any, Dict
 
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.candle_loader import load_candles_df
@@ -36,6 +37,7 @@ from systems.utils.resolve_symbol import (
     candle_filename,
 )
 from systems.utils.time import parse_cutoff as parse_timeframe
+from systems.utils.trade_logger import init_logger as init_trade_logger, record_event
 
 
 def _run_single_sim(
@@ -71,6 +73,7 @@ def _run_single_sim(
     tag = to_tag(kraken_name)
     file_tag = market.replace("/", "_")
     ledger_name = f"{account}_{file_tag}"
+    init_trade_logger(ledger_name)
     base, _ = split_tag(tag)
     coin = base.upper()
     csv_path = candle_filename(account, market)
@@ -151,8 +154,8 @@ def _run_single_sim(
             if ts is not None
             else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         )
-        # Simulation mode does not emit structured trade logs
-
+        decision = "HOLD"
+        trades_log: list[dict[str, Any]] = []
         ctx = {"ledger": ledger_obj}
         buy_res = evaluate_buy(
             ctx,
@@ -181,7 +184,15 @@ def _run_single_sim(
                 m_buy["buys"] += 1
                 m_buy["gross_invested"] += cost
 
-            # No structured logging in simulation
+            trades_log.append(
+                {
+                    "action": "BUY",
+                    "amount": result["filled_amount"] * result["avg_price"],
+                    "price": result["avg_price"],
+                    "note_id": note.get("id"),
+                }
+            )
+            decision = "BUY"
 
             if viz:
                 buy_points.append((float(df.iloc[t][ts_col]), price))
@@ -195,6 +206,12 @@ def _run_single_sim(
             open_notes=open_notes,
             runtime_state=runtime_state,
         )
+        if sell_notes:
+            decision = (
+                "FLAT"
+                if any(n.get("sell_mode") == "flat" for n in sell_notes)
+                else "SELL"
+            )
 
         for note in sell_notes:
             result = paper_execute_sell(
@@ -210,8 +227,14 @@ def _run_single_sim(
                 result=result,
                 state=runtime_state,
             )
-
-            # No structured logging in simulation
+            trades_log.append(
+                {
+                    "action": "SELL",
+                    "amount": result["filled_amount"] * result["avg_price"],
+                    "price": result["avg_price"],
+                    "note_id": closed.get("id"),
+                }
+            )
 
             qty = closed.get("entry_amount", 0.0)
             buy_price = closed.get("entry_price", 0.0)
@@ -226,8 +249,26 @@ def _run_single_sim(
                 m_sell["realized_proceeds"] += proceeds
                 m_sell["realized_trades"] += 1
                 m_sell["realized_roi_accum"] += roi_trade
-
-        # No structured logging in simulation
+        features = runtime_state.get("last_features", {}).get("strategy", {})
+        pressures = runtime_state.get("pressures", {})
+        event = {
+            "timestamp": iso_ts,
+            "ledger": ledger_name,
+            "pair": tag,
+            "window": f"{strategy_cfg.get('window_size', 0)}h",
+            "decision": decision,
+            "features": {
+                "close": price,
+                "slope": features.get("slope"),
+                "volatility": features.get("volatility"),
+                "buy_pressure": pressures.get("buy", {}).get("strategy", 0.0),
+                "sell_pressure": pressures.get("sell", {}).get("strategy", 0.0),
+                "buy_trigger": strategy_cfg.get("buy_trigger", 0.0),
+                "sell_trigger": strategy_cfg.get("sell_trigger", 0.0),
+            },
+            "trades": trades_log,
+        }
+        record_event(event)
 
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)

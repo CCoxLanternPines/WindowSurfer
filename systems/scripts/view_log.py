@@ -42,9 +42,11 @@ def view_log(account_name: str, timeframe: str | None = None) -> None:
     for e in events:
         decision = e["decision"]
         trades = e.get("trades") or []
-        price = trades[0].get("price") if trades else None
-
-        # fallback to 0 so we always plot something
+        if trades:
+            price = trades[0].get("price")
+        else:
+            # fallback to candle close if no trade
+            price = e.get("features", {}).get("close")
         if price is None:
             price = 0.0
 

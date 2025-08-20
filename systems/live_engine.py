@@ -202,6 +202,7 @@ def _run_iteration(
                 "window": f"{strategy_cfg.get('window_size', 0)}h",
                 "decision": decision,
                 "features": {
+                    "close": float(df.iloc[t]["close"]),
                     "slope": features.get("slope"),
                     "volatility": features.get("volatility"),
                     "buy_pressure": pressures.get("buy", {}).get("strategy", 0.0),
