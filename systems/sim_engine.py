@@ -24,7 +24,8 @@ from systems.scripts.trade_apply import (
 from systems.utils.addlog import addlog
 from pathlib import Path
 
-from systems.utils.config import load_settings, load_ledger_config, resolve_path
+from systems.utils.config import resolve_path
+from systems.utils.load_config import load_config
 from systems.utils.resolve_symbol import (
     split_tag,
     resolve_symbols,
@@ -36,25 +37,41 @@ from systems.utils.time import parse_cutoff as parse_timeframe
 
 def run_simulation(
     *,
-    ledger: str,
+    account: str,
+    market: str,
     verbose: int = 0,
     timeframe: str = "1m",
     viz: bool = True,
 ) -> None:
     os.environ["WS_MODE"] = "sim"
-    settings = load_settings()
-    ledger_cfg = load_ledger_config(ledger)
-    symbols = resolve_symbols(ledger_cfg["kraken_name"])
+    cfg = load_config()
+    acct_cfg = cfg.get("accounts", {}).get(account)
+    if not acct_cfg:
+        addlog(
+            f"[ERROR] Unknown account {account}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        raise SystemExit(1)
+    strategy_cfg = acct_cfg.get("markets", {}).get(market)
+    if not strategy_cfg:
+        addlog(
+            f"[ERROR] Market {market} not configured for account {account}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        raise SystemExit(1)
+    symbols = resolve_symbols(market)
     kraken_symbol = symbols["kraken_name"]
     tag = to_tag(kraken_symbol)
     file_tag = kraken_symbol.replace("/", "_")
+    ledger_name = f"{account}_{file_tag}"
     base, _ = split_tag(tag)
     coin = base.upper()
-    strategy_cfg = settings.get("general_settings", {}).get("strategy_settings", {})
     csv_path = sim_path_csv(tag)
     if not Path(csv_path).exists():
         print(
-            f"[ERROR] Missing data file: {csv_path}. Run: python bot.py --mode fetch --ledger {ledger}"
+            f"[ERROR] Missing data file: {csv_path}. Run: python bot.py --mode fetch --account {account} --market {market}"
         )
         raise SystemExit(1)
     df = pd.read_csv(csv_path)
@@ -105,8 +122,9 @@ def run_simulation(
     total = len(df)
 
     runtime_state = build_runtime_state(
-        settings,
-        ledger_cfg,
+        cfg,
+        market,
+        strategy_cfg,
         mode="sim",
         prev={"verbose": verbose},
     )
@@ -277,8 +295,8 @@ def run_simulation(
     logs_dir = root / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_path = logs_dir / f"sim_report_{ledger}_{ts}.csv"
-    json_path = logs_dir / f"sim_report_{ledger}_{ts}.json"
+    csv_path = logs_dir / f"sim_report_{ledger_name}_{ts}.csv"
+    json_path = logs_dir / f"sim_report_{ledger_name}_{ts}.json"
     with csv_path.open("w", newline="", encoding="utf-8") as f_csv:
         writer = csv.DictWriter(
             f_csv,
@@ -361,15 +379,15 @@ def run_simulation(
         plt.show()
 
     save_ledger(
-        ledger,
+        ledger_name,
         ledger_obj,
         sim=True,
         final_tick=total - 1,
         summary=summary,
         tag=file_tag,
     )
-    default_path = root / "data" / "tmp" / "simulation" / f"{ledger}.json"
-    sim_path = root / "data" / "tmp" / f"simulation_{ledger}.json"
+    default_path = root / "data" / "tmp" / "simulation" / f"{ledger_name}.json"
+    sim_path = root / "data" / "tmp" / f"simulation_{ledger_name}.json"
     if default_path.exists() and default_path != sim_path:
         sim_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(default_path, sim_path)

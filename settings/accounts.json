@@ -1,0 +1,12 @@
+{
+  "Kris": {
+    "api_key": "YOUR_KRAKEN_API_KEY",
+    "api_secret": "YOUR_KRAKEN_API_SECRET",
+    "markets": ["SOL/USD", "XMR/USD"]
+  },
+  "Travis": {
+    "api_key": "ANOTHER_KEY",
+    "api_secret": "ANOTHER_SECRET",
+    "markets": ["DOGE/USD", "SOL/USDC"]
+  }
+}

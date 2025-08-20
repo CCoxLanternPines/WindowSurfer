@@ -10,8 +10,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Execution mode: fetch, sim, live, or wallet",
     )
     parser.add_argument(
+        "--account",
+        help="Account name defined in accounts.json",
+    )
+    parser.add_argument(
+        "--market",
+        help="Specific market symbol to operate on (default: all for account)",
+    )
+    parser.add_argument(
         "--ledger",
-        help="Ledger name defined in settings.json",
+        help="[DEPRECATED] use --account instead",
     )
     parser.add_argument(
         "--dry",

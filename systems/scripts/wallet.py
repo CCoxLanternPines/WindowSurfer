@@ -4,15 +4,33 @@ from __future__ import annotations
 
 from systems.utils.addlog import addlog
 from systems.utils.resolve_symbol import split_tag, resolve_symbols, to_tag
-from .ledger import resolve_ledger_config
+from systems.utils.load_config import load_config
 from .kraken_utils import get_kraken_balance
 
 
-def show_wallet(ledger: str | None, verbose: int = 0) -> None:
-    """Display Kraken wallet balances for the given ledger."""
+def show_wallet(account: str, market: str | None, verbose: int = 0) -> None:
+    """Display Kraken wallet balances for the given account and market."""
 
-    ledger_cfg = resolve_ledger_config(ledger)
-    symbols = resolve_symbols(ledger_cfg["kraken_name"])
+    cfg = load_config()
+    acct_cfg = cfg.get("accounts", {}).get(account)
+    if not acct_cfg:
+        addlog(
+            f"[ERROR] Unknown account {account}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return
+    markets = acct_cfg.get("markets", {})
+    market_symbol = market or next(iter(markets.keys()), None)
+    if not market_symbol or market_symbol not in markets:
+        addlog(
+            f"[ERROR] Market {market_symbol} not configured for account {account}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
+        return
+
+    symbols = resolve_symbols(market_symbol)
     tag = to_tag(symbols["kraken_name"])
     _, quote_asset = split_tag(tag)
     balances = get_kraken_balance(quote_asset, verbose)
