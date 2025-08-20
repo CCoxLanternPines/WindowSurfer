@@ -10,7 +10,6 @@ from systems.scripts.kraken_utils import get_live_price
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.resolve_symbol import split_tag
 from systems.utils.quote_norm import norm_quote
-from systems.utils.snapshot import load_snapshot, prime_snapshot
 from systems.scripts.trade_apply import apply_buy
 
 
@@ -26,16 +25,6 @@ def now_utc_timestamp() -> int:
     return int(time.time())
 
 
-def load_or_fetch_snapshot(tag: str) -> dict:
-    api_key, api_secret = load_kraken_keys()
-    return _get_snapshot(tag, api_key, api_secret)
-
-
-def _get_snapshot(tag: str, api_key: str, api_secret: str) -> dict:
-    snapshot = load_snapshot(tag)
-    if not snapshot or snapshot.get("timestamp", 0) < now_utc_timestamp() - 60:
-        snapshot = prime_snapshot(tag, api_key, api_secret)
-    return snapshot
 
 def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) -> dict:
     url_path = f"/0/private/{endpoint}"
@@ -72,8 +61,8 @@ def place_order(
     verbose: int = 0,
 ) -> dict:
     api_key, api_secret = load_kraken_keys()
-    snapshot = _get_snapshot(ledger_name, api_key, api_secret)
-    balance = snapshot.get("balance", {})
+    balance_resp = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
+    balance = {k: float(v) for k, v in balance_resp.items()}
 
     price_data = fetch_price_data(pair_code)
     price = float(price_data.get("c", [0])[0])
@@ -82,7 +71,7 @@ def place_order(
 
     if order_type.lower() == "buy":
         available_usd = float(balance.get(fiat_symbol, 0.0))
-        addlog(f"[DEBUG] Balance snapshot: {balance}", verbose_int=1, verbose_state=verbose)
+        addlog(f"[DEBUG] Balance: {balance}", verbose_int=1, verbose_state=verbose)
         addlog(f"[DEBUG] Using fiat_symbol = {fiat_symbol}", verbose_int=1, verbose_state=verbose)
         addlog(
             f"[DEBUG] available_usd = {available_usd} | trying to spend = {amount}",

@@ -72,9 +72,18 @@ def run_simulation(
     )
 
     symbols = resolve_symbols(client, market)
-    kraken_symbol = symbols["kraken_name"]
-    tag = to_tag(kraken_symbol)
-    file_tag = kraken_symbol.replace("/", "_")
+    kraken_name = symbols["kraken_name"]
+    kraken_pair = symbols["kraken_pair"]
+    binance_name = symbols["binance_name"]
+
+    addlog(
+        f"[RESOLVE][{account}][{market}] KrakenName={kraken_name} KrakenPair={kraken_pair} BinanceName={binance_name}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
+
+    tag = to_tag(kraken_name)
+    file_tag = market.replace("/", "_")
     ledger_name = f"{account}_{file_tag}"
     base, _ = split_tag(tag)
     coin = base.upper()

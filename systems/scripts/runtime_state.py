@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from systems.scripts.execution_handler import load_or_fetch_snapshot
-from systems.utils.resolve_symbol import split_tag, resolve_symbols, to_tag
+from systems.utils.resolve_symbol import resolve_symbols
 
 
 def build_runtime_state(
@@ -47,14 +46,11 @@ def build_runtime_state(
     verbose = prev.get("verbose", 0)
 
     symbols = resolve_symbols(client, market)
-    tag = to_tag(symbols["kraken_name"])
-    file_tag = symbols["kraken_name"].replace("/", "_")
     if mode == "sim":
         capital = float(settings.get("general_settings", {}).get("simulation_capital", 0.0))
     elif mode == "live":
-        snapshot = load_or_fetch_snapshot(file_tag)
-        _, quote = split_tag(tag)
-        balance = snapshot.get("balance", {})
+        quote = symbols["kraken_name"].split("/")[1]
+        balance = client.fetch_balance().get("free", {})
         capital = float(balance.get(quote, 0.0))
     else:
         capital = prev.get("capital", 0.0)

@@ -53,13 +53,14 @@ def _run_iteration(
             if market_filter and market != market_filter:
                 continue
             symbols = resolve_symbols(client, market)
-            kraken_symbol = symbols["kraken_name"]
+            kraken_name = symbols["kraken_name"]
             kraken_pair = symbols["kraken_pair"]
-            tag = to_tag(kraken_symbol)
-            file_tag = kraken_symbol.replace("/", "_")
+            binance_name = symbols["binance_name"]
+            tag = to_tag(kraken_name)
+            file_tag = market.replace("/", "_")
             ledger_name = f"{acct_name}_{file_tag}"
-            base = kraken_symbol.split("/")[0]
-            refresh_live_kraken_720(kraken_symbol)
+            base = kraken_name.split("/")[0]
+            refresh_live_kraken_720(kraken_name)
             live_file = live_path_csv(tag)
             if not Path(live_file).exists():
                 print(
@@ -205,8 +206,16 @@ def run_live(*, account: str, market: str | None = None, dry: bool = False, verb
             if market and mkt != market:
                 continue
             symbols = resolve_symbols(client, mkt)
-            tag = to_tag(symbols["kraken_name"])
-            file_tag = symbols["kraken_name"].replace("/", "_")
+            kraken_name = symbols["kraken_name"]
+            kraken_pair = symbols["kraken_pair"]
+            binance_name = symbols["binance_name"]
+            addlog(
+                f"[RESOLVE][{acct_name}][{mkt}] KrakenName={kraken_name} KrakenPair={kraken_pair} BinanceName={binance_name}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            tag = to_tag(kraken_name)
+            file_tag = mkt.replace("/", "_")
             ledger_name = f"{acct_name}_{file_tag}"
             state = build_runtime_state(
                 cfg,

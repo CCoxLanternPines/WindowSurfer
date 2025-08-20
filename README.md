@@ -54,13 +54,12 @@ Reusable components used by the engines:
   capital.
 - **ledger.py** – in-memory ledger with helpers to load/save trade notes to
   `data/ledgers` or simulation folders.
-- **execution_handler.py** – communicates with Kraken for live order placement
-  and snapshot loading.
+- **execution_handler.py** – communicates with Kraken for live order placement.
 - **candle_cache.py** – refreshes live candle caches and tracks historical
   high/low ranges.
 - **fetch_candles.py** – low-level Binance/Kraken OHLCV downloaders used by
   `fetch` and cache utilities.
-- **kraken_utils.py** – loads API keys, snapshots and balances from Kraken.
+- **kraken_utils.py** – loads API keys and balances from Kraken.
 - **wallet.py** – shows Kraken balances for a ledger's quote asset.
 - `sim_tuner.py` – Optuna-based parameter tuner for simulations, run separately
   from the main bot.
@@ -78,7 +77,7 @@ Utility layer shared across modules:
   exchange-specific identifiers.
 - **time.py** – helpers for parsing relative durations such as `7d` or `1m`.
 - Additional helpers: `quote_norm.py`, `price_fetcher.py`, `telegram_utils.py`,
-  `snapshot.py`, `trade_eval.py`.
+  `trade_eval.py`.
 
 ### Configuration & Data
 

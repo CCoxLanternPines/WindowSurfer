@@ -5,7 +5,6 @@ import yaml
 
 from systems.utils.addlog import addlog
 from systems.utils.price_fetcher import get_price
-from systems.utils.snapshot import load_snapshot, prime_snapshot
 
 KRAKEN_API_URL = "https://api.kraken.com"
 
@@ -86,11 +85,4 @@ def get_kraken_balance(fiat_code: str, verbose: int = 0) -> dict:
     return {k: float(v) for k, v in result.items()}
 
 
-def ensure_snapshot(ledger_name: str) -> dict:
-    """Load a snapshot or fetch a new one if absent."""
-    snapshot = load_snapshot(ledger_name)
-    if snapshot:
-        return snapshot
-    api_key, api_secret = load_kraken_keys()
-    return prime_snapshot(ledger_name, api_key, api_secret)
 

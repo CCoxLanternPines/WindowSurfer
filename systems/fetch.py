@@ -46,28 +46,35 @@ def run_fetch(account: str, market: str | None = None) -> None:
 
     for m in targets:
         symbols = resolve_symbols(client, m)
-        kraken_symbol = symbols["kraken_name"]
-        binance_symbol = symbols["binance_name"]
+        kraken_name = symbols["kraken_name"]
+        kraken_pair = symbols["kraken_pair"]
+        binance_name = symbols["binance_name"]
 
-        if "/" not in kraken_symbol:
+        addlog(
+            f"[RESOLVE][{account}][{m}] KrakenName={kraken_name} KrakenPair={kraken_pair} BinanceName={binance_name}",
+            verbose_int=1,
+            verbose_state=True,
+        )
+
+        if "/" not in kraken_name:
             addlog(
-                f"[ERROR] Kraken symbol missing '/' : {kraken_symbol}",
+                f"[ERROR] Kraken symbol missing '/' : {kraken_name}",
                 verbose_int=1,
                 verbose_state=True,
             )
             raise SystemExit(1)
-        if "/" in binance_symbol:
+        if "/" in binance_name:
             addlog(
-                f"[ERROR] Binance symbol must not contain '/' : {binance_symbol}",
+                f"[ERROR] Binance symbol must not contain '/' : {binance_name}",
                 verbose_int=1,
                 verbose_state=True,
             )
             raise SystemExit(1)
 
-        file_tag = kraken_symbol.replace("/", "_")
+        file_tag = m.replace("/", "_")
 
         # Binance full history -> SIM
-        df_sim = fetch_binance_full_history_1h(binance_symbol)
+        df_sim = fetch_binance_full_history_1h(binance_name)
         sim_path = f"data/sim/{account}_{file_tag}_1h.csv"
         tmp_sim = sim_path + ".tmp"
         os.makedirs(os.path.dirname(sim_path), exist_ok=True)
@@ -75,7 +82,7 @@ def run_fetch(account: str, market: str | None = None) -> None:
         os.replace(tmp_sim, sim_path)
 
         # Kraken last 720 -> LIVE
-        df_live = fetch_kraken_last_n_hours_1h(kraken_symbol, n=720)
+        df_live = fetch_kraken_last_n_hours_1h(kraken_name, n=720)
         live_path = f"data/live/{account}_{file_tag}_1h.csv"
         tmp_live = live_path + ".tmp"
         os.makedirs(os.path.dirname(live_path), exist_ok=True)
@@ -84,13 +91,13 @@ def run_fetch(account: str, market: str | None = None) -> None:
         rows = len(df_live)
         if rows < 720:
             addlog(
-                f"[FETCH][WARN] {account} {kraken_symbol} returned {rows} rows (<720) from kraken",
+                f"[FETCH][WARN] {account} {kraken_name} returned {rows} rows (<720) from kraken",
                 verbose_int=1,
                 verbose_state=True,
             )
 
         addlog(
-            f"[FETCH][{account}][{kraken_symbol}] saved sim/live candles",
+            f"[FETCH][{account}][{kraken_name}] saved sim/live candles",
             verbose_int=1,
             verbose_state=True,
         )
