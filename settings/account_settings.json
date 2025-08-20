@@ -1,32 +1,47 @@
 {
   "accounts": {
     "Kris": {
-      "is_live": false,
+      "is_live": true,
       "reporting": {
-        "email": "kris@example.com",
+        "email": "christiancox@verizon.net",
         "daily": true,
-        "weekly": false,
-        "monthly": false,
+        "weekly": true,
+        "monthly": true,
         "yearly": true
       },
       "market settings": {
-        "BTC/USD": { "investment_fraction": 0.65, "investment_percent": 0.01 },
-        "DOGE/USD": { "investment_fraction": 0.65, "investment_percent": 0.01 },
-        "ETH/EUR": { "investment_fraction": 0.65, "investment_percent": 0.01 }
+        "BTC/USD": {
+          "investment_fraction": 0.25,
+          "investment_percent": 0.01
+        },
+        "DOGE/USD": {
+          "investment_fraction": 0.25,
+          "investment_percent": 0.01
+        },
+        "ETH/EUR": {
+          "investment_fraction": 0.25,
+          "investment_percent": 0.01
+        }
       }
     },
     "Travis": {
       "is_live": false,
       "reporting": {
-        "email": "travis@example.com",
+        "email": "valleypapers@gmail.com",
         "daily": true,
-        "weekly": false,
-        "monthly": false,
+        "weekly": true,
+        "monthly": true,
         "yearly": true
       },
       "market settings": {
-        "DOGE/USD": { "investment_fraction": 0.65, "investment_percent": 0.01 },
-        "SOL/USDC": { "investment_fraction": 0.65, "investment_percent": 0.01 }
+        "DOGE/USD": {
+          "investment_fraction": 0.65,
+          "investment_percent": 0.01
+        },
+        "SOL/USDC": {
+          "investment_fraction": 0.65,
+          "investment_percent": 0.01
+        }
       }
     }
   }
