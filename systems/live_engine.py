@@ -52,6 +52,11 @@ def _run_iteration(
         for market, strategy_cfg in acct_cfg.get("markets", {}).items():
             if market_filter and market != market_filter:
                 continue
+            addlog(
+                f"[RUN][{acct_name}][{market}]",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
             symbols = resolve_symbols(client, market)
             kraken_name = symbols["kraken_name"]
             kraken_pair = symbols["kraken_pair"]
@@ -186,13 +191,27 @@ def _run_iteration(
             save_ledger(ledger_name, ledger_obj, tag=file_tag)
 
 
-def run_live(*, account: str, market: str | None = None, dry: bool = False, verbose: int = 0) -> None:
+def run_live(
+    *,
+    account: str | None = None,
+    market: str | None = None,
+    all_accounts: bool = False,
+    dry: bool = False,
+    verbose: int = 0,
+) -> None:
     cfg = load_config()
     runtime_states: Dict[str, Dict] = {}
     hist_cache: Dict[str, tuple[float, float]] = {}
 
-    for acct_name, acct_cfg in cfg.get("accounts", {}).items():
-        if account and acct_name != account:
+    targets = (
+        cfg.get("accounts", {}).keys()
+        if (all_accounts or not account)
+        else [account]
+    )
+
+    for acct_name in targets:
+        acct_cfg = cfg.get("accounts", {}).get(acct_name)
+        if not acct_cfg:
             continue
         os.environ["WS_ACCOUNT"] = acct_name
         client = ccxt.kraken(
@@ -205,6 +224,11 @@ def run_live(*, account: str, market: str | None = None, dry: bool = False, verb
         for mkt, strat in acct_cfg.get("markets", {}).items():
             if market and mkt != market:
                 continue
+            addlog(
+                f"[RUN][{acct_name}][{mkt}]",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
             symbols = resolve_symbols(client, mkt)
             kraken_name = symbols["kraken_name"]
             kraken_pair = symbols["kraken_pair"]
@@ -255,12 +279,13 @@ def run_live(*, account: str, market: str | None = None, dry: bool = False, verb
                     verbose_state=verbose,
                 )
 
+    account_filter = None if (all_accounts or not account) else account
     if dry:
         _run_iteration(
             cfg,
             runtime_states,
             hist_cache,
-            account_filter=account,
+            account_filter=account_filter,
             market_filter=market,
             verbose=verbose,
         )
@@ -286,7 +311,7 @@ def run_live(*, account: str, market: str | None = None, dry: bool = False, verb
             cfg,
             runtime_states,
             hist_cache,
-            account_filter=account,
+            account_filter=account_filter,
             market_filter=market,
             verbose=verbose,
         )

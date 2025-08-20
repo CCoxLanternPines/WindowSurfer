@@ -36,40 +36,19 @@ from systems.utils.resolve_symbol import (
 from systems.utils.time import parse_cutoff as parse_timeframe
 
 
-def run_simulation(
+def _run_single_sim(
     *,
+    cfg,
     account: str,
     market: str,
+    strategy_cfg,
+    client: ccxt.Exchange,
     verbose: int = 0,
     timeframe: str = "1m",
     viz: bool = True,
 ) -> None:
     os.environ["WS_MODE"] = "sim"
-    cfg = load_config()
-    acct_cfg = cfg.get("accounts", {}).get(account)
-    if not acct_cfg:
-        addlog(
-            f"[ERROR] Unknown account {account}",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-        raise SystemExit(1)
     os.environ["WS_ACCOUNT"] = account
-    strategy_cfg = acct_cfg.get("markets", {}).get(market)
-    if not strategy_cfg:
-        addlog(
-            f"[ERROR] Market {market} not configured for account {account}",
-            verbose_int=1,
-            verbose_state=verbose,
-        )
-        raise SystemExit(1)
-    client = ccxt.kraken(
-        {
-            "enableRateLimit": True,
-            "apiKey": acct_cfg.get("api_key", ""),
-            "secret": acct_cfg.get("api_secret", ""),
-        }
-    )
 
     symbols = resolve_symbols(client, market)
     kraken_name = symbols["kraken_name"]
@@ -311,7 +290,20 @@ def run_simulation(
         verbose_state=verbose,
     )
 
+    save_ledger(
+        ledger_name,
+        ledger_obj,
+        sim=True,
+        final_tick=total - 1,
+        summary=summary,
+        tag=file_tag,
+    )
     root = resolve_path("")
+    default_path = root / "data" / "tmp" / "simulation" / f"{ledger_name}.json"
+    sim_path = root / "data" / "tmp" / f"simulation_{ledger_name}.json"
+    if default_path.exists() and default_path != sim_path:
+        sim_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(default_path, sim_path)
     logs_dir = root / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -398,16 +390,54 @@ def run_simulation(
         plt.tight_layout()
         plt.show()
 
-    save_ledger(
-        ledger_name,
-        ledger_obj,
-        sim=True,
-        final_tick=total - 1,
-        summary=summary,
-        tag=file_tag,
-    )
-    default_path = root / "data" / "tmp" / "simulation" / f"{ledger_name}.json"
-    sim_path = root / "data" / "tmp" / f"simulation_{ledger_name}.json"
-    if default_path.exists() and default_path != sim_path:
-        sim_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(default_path, sim_path)
+
+def run_simulation(
+    *,
+    account: str | None = None,
+    market: str | None = None,
+    all_accounts: bool = False,
+    verbose: int = 0,
+    timeframe: str = "1m",
+    viz: bool = True,
+) -> None:
+    """Iterate configured accounts/markets and run simulations."""
+    cfg = load_config()
+    accounts = cfg.get("accounts", {})
+    targets = accounts.keys() if (all_accounts or not account) else [account]
+    for acct_name in targets:
+        acct_cfg = accounts.get(acct_name)
+        if not acct_cfg:
+            addlog(
+                f"[ERROR] Unknown account {acct_name}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            continue
+        client = ccxt.kraken(
+            {
+                "enableRateLimit": True,
+                "apiKey": acct_cfg.get("api_key", ""),
+                "secret": acct_cfg.get("api_secret", ""),
+            }
+        )
+        markets_cfg = acct_cfg.get("markets", {})
+        m_targets = [market] if market else list(markets_cfg.keys())
+        for m in m_targets:
+            strat = markets_cfg.get(m)
+            if not strat:
+                continue
+            addlog(
+                f"[RUN][{acct_name}][{m}]",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
+            _run_single_sim(
+                cfg=cfg,
+                account=acct_name,
+                market=m,
+                strategy_cfg=strat,
+                client=client,
+                verbose=verbose,
+                timeframe=timeframe,
+                viz=viz,
+            )

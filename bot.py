@@ -5,16 +5,13 @@ from __future__ import annotations
 import os
 import sys
 
-import ccxt
-
 from systems.fetch import run_fetch
 from systems.live_engine import run_live
 from systems.sim_engine import run_simulation
 from systems.scripts.wallet import show_wallet
 from systems.utils.addlog import init_logger, addlog
 from systems.utils.load_config import load_config
-from systems.utils.cli import build_parser
-from systems.utils.resolve_symbol import resolve_symbols
+from systems.utils.cli import build_parser, handle_legacy_args
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -32,6 +29,7 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     args = parser.parse_args(argv or sys.argv[1:])
+    args = handle_legacy_args(args)
     if not args.mode:
         parser.error("--mode is required")
     mode = args.mode.lower()
@@ -45,84 +43,45 @@ def main(argv: list[str] | None = None) -> None:
     verbose = args.verbose
 
     cfg = load_config()
-
-    if getattr(args, "ledger", None):
-        addlog(
-            "[DEPRECATED] --ledger is deprecated; use --account",
-            verbose_int=1,
-            verbose_state=True,
-        )
-        if not args.account:
-            args.account = args.ledger
-
-    accounts_cfg = cfg.get("accounts", {})
-    if args.all or not args.account:
-        account_list = list(accounts_cfg.keys())
-    else:
-        if args.account not in accounts_cfg:
-            addlog(
-                f"[ERROR] Unknown account {args.account}",
-                verbose_int=1,
-                verbose_state=True,
-            )
-            sys.exit(1)
-        account_list = [args.account]
-
-    run_map: dict[str, list[str]] = {}
-    for acct in account_list:
-        acct_cfg = accounts_cfg.get(acct, {})
-        client = ccxt.kraken(
-            {
-                "enableRateLimit": True,
-                "apiKey": acct_cfg.get("api_key", ""),
-                "secret": acct_cfg.get("api_secret", ""),
-            }
-        )
-        markets_cfg = acct_cfg.get("markets", {})
-        if args.market:
-            if args.market not in markets_cfg:
-                if args.account:
-                    addlog(
-                        f"[ERROR] Market {args.market} not configured for account {acct}",
-                        verbose_int=1,
-                        verbose_state=True,
-                    )
-                    sys.exit(1)
-                continue
-            markets = [args.market]
-        else:
-            markets = list(markets_cfg.keys())
-        for m in markets:
-            # validate via CCXT resolver
-            resolve_symbols(client, m)
-        if markets:
-            run_map[acct] = markets
+    run_all = args.all or not args.account
 
     if mode == "fetch":
-        for acct, markets in run_map.items():
-            for m in markets:
-                run_fetch(acct, market=m)
+        run_fetch(account=args.account, market=args.market, all_accounts=run_all)
     elif mode == "sim":
-        for acct, markets in run_map.items():
-            for m in markets:
-                run_simulation(
-                    account=acct,
-                    market=m,
-                    verbose=args.verbose,
-                    timeframe=args.time,
-                    viz=args.viz,
-                )
+        run_simulation(
+            account=args.account,
+            market=args.market,
+            all_accounts=run_all,
+            verbose=args.verbose,
+            timeframe=args.time,
+            viz=args.viz,
+        )
     elif mode == "live":
         run_live(
-            account=None if (args.all or not args.account) else args.account,
+            account=args.account,
             market=args.market,
+            all_accounts=run_all,
             dry=args.dry,
             verbose=args.verbose,
         )
     elif mode == "wallet":
-        for acct, markets in run_map.items():
-            for m in markets:
-                os.environ["WS_ACCOUNT"] = acct
+        accounts_cfg = cfg.get("accounts", {})
+        targets = accounts_cfg.keys() if run_all else [args.account]
+        for acct in targets:
+            acct_cfg = accounts_cfg.get(acct)
+            if not acct_cfg:
+                addlog(
+                    f"[ERROR] Unknown account {acct}",
+                    verbose_int=1,
+                    verbose_state=True,
+                )
+                continue
+            os.environ["WS_ACCOUNT"] = acct
+            markets_cfg = acct_cfg.get("markets", {})
+            m_targets = [args.market] if args.market else markets_cfg.keys()
+            for m in m_targets:
+                if m not in markets_cfg:
+                    continue
                 show_wallet(acct, m, verbose)
     else:
         parser.error(f"Unknown mode: {args.mode}")
