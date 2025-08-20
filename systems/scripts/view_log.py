@@ -14,6 +14,59 @@ import pandas as pd
 from systems.utils.time import parse_duration
 
 
+def export_png(log_path: Path, out_path: Path) -> None:
+    """Render ``log_path`` events to a PNG chart at ``out_path``."""
+
+    if not log_path.exists():
+        print(f"[ERROR] No log found at {log_path}")
+        return
+
+    with log_path.open() as f:
+        events = json.load(f)
+
+    if not events:
+        print(f"[EMPTY] {log_path.stem} log has no entries")
+        return
+
+    times = pd.to_datetime([e["timestamp"] for e in events])
+    prices: list[float] = []
+    colors: list[str] = []
+
+    for e in events:
+        decision = e.get("decision")
+        trades = e.get("trades") or []
+        if trades:
+            price = trades[0].get("price")
+        else:
+            price = e.get("features", {}).get("close")
+        if price is None:
+            price = 0.0
+
+        prices.append(price)
+
+        if decision == "BUY":
+            colors.append("green")
+        elif decision == "SELL":
+            colors.append("red")
+        elif decision == "FLAT":
+            colors.append("orange")
+        elif decision == "HOLD":
+            colors.append("gray")
+        else:
+            colors.append("yellow")
+
+    plt.switch_backend("Agg")
+    fig, ax = plt.subplots()
+    ax.scatter(times, prices, c=colors, marker="o")
+    ax.set_title(f"Trading Decisions for {log_path.stem}")
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Price (USDT)")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    fig.savefig(out_path, format="png")
+    plt.close(fig)
+
+
 def view_log(account_name: str, timeframe: str | None = None) -> None:
     """Render a scatter plot of decisions from ``account_name`` log."""
 
