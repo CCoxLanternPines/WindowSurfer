@@ -43,15 +43,17 @@ def main(argv: list[str] | None = None) -> None:
 
     verbose = args.verbose
 
-    if args.ledger and not args.account:
+    cfg = load_config()
+
+    if args.ledger and not args.account and not args.all:
         addlog(
             "[DEPRECATED] --ledger is deprecated; use --account",
             verbose_int=1,
             verbose_state=True,
         )
-        args.account = args.ledger
-
-    cfg = load_config()
+        first_acct = next(iter(cfg.get("accounts", {})), None)
+        if first_acct:
+            args.account = first_acct
 
     try:
         asset_pairs = load_asset_pairs()
@@ -66,27 +68,37 @@ def main(argv: list[str] | None = None) -> None:
         )
         sys.exit(1)
 
-    account_cfg = None
-    check_markets: list[str] = []
-    if args.account:
-        account_cfg = cfg.get("accounts", {}).get(args.account)
-        if not account_cfg:
+    accounts_cfg = cfg.get("accounts", {})
+    if args.all:
+        account_list = list(accounts_cfg.keys())
+    elif args.account:
+        if args.account not in accounts_cfg:
             addlog(
                 f"[ERROR] Unknown account {args.account}",
                 verbose_int=1,
                 verbose_state=True,
             )
             sys.exit(1)
-        markets = account_cfg.get("markets", {})
-        if args.market and args.market not in markets:
-            addlog(
-                f"[ERROR] Market {args.market} not configured for account {args.account}",
-                verbose_int=1,
-                verbose_state=True,
-            )
-            sys.exit(1)
-        check_markets = [args.market] if args.market else list(markets.keys())
-        for m in check_markets:
+        account_list = [args.account]
+    else:
+        addlog("Error: --account or --all required")
+        sys.exit(1)
+
+    run_map: dict[str, list[str]] = {}
+    for acct in account_list:
+        markets_cfg = accounts_cfg.get(acct, {}).get("markets", {})
+        if args.market:
+            if args.market not in markets_cfg:
+                addlog(
+                    f"[ERROR] Market {args.market} not configured for account {acct}",
+                    verbose_int=1,
+                    verbose_state=True,
+                )
+                sys.exit(1)
+            markets = [args.market]
+        else:
+            markets = list(markets_cfg.keys())
+        for m in markets:
             symbols = resolve_symbols(m)
             tag = to_tag(symbols["kraken_name"])
             if tag.upper() not in valid_pairs:
@@ -95,40 +107,35 @@ def main(argv: list[str] | None = None) -> None:
                     verbose_int=1,
                     verbose_state=True,
                 )
+                sys.exit(1)
+        run_map[acct] = markets
 
     if mode == "fetch":
-        if not args.account:
-            addlog("Error: --account is required for fetch mode")
-            sys.exit(1)
-        run_fetch(args.account, market=args.market)
+        for acct, markets in run_map.items():
+            for m in markets:
+                run_fetch(acct, market=m)
     elif mode == "sim":
-        if not args.account:
-            addlog("Error: --account is required for sim mode")
-            sys.exit(1)
-        markets_to_run = check_markets if args.account else []
-        for m in markets_to_run:
-            run_simulation(
-                account=args.account,
-                market=m,
-                verbose=args.verbose,
-                timeframe=args.time,
-                viz=args.viz,
-            )
+        for acct, markets in run_map.items():
+            for m in markets:
+                run_simulation(
+                    account=acct,
+                    market=m,
+                    verbose=args.verbose,
+                    timeframe=args.time,
+                    viz=args.viz,
+                )
     elif mode == "live":
-        if not args.account:
-            addlog("Error: --account is required for live mode")
-            sys.exit(1)
         run_live(
-            account=args.account,
+            account=None if args.all else args.account,
             market=args.market,
             dry=args.dry,
             verbose=args.verbose,
         )
     elif mode == "wallet":
-        if not args.account:
-            addlog("Error: --account is required for wallet mode")
-            sys.exit(1)
-        show_wallet(args.account, args.market, verbose)
+        for acct, markets in run_map.items():
+            for m in markets:
+                os.environ["WS_ACCOUNT"] = acct
+                show_wallet(acct, m, verbose)
     else:
         parser.error(f"Unknown mode: {args.mode}")
 

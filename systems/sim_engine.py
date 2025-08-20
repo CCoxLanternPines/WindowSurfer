@@ -53,6 +53,7 @@ def run_simulation(
             verbose_state=verbose,
         )
         raise SystemExit(1)
+    os.environ["WS_ACCOUNT"] = account
     strategy_cfg = acct_cfg.get("markets", {}).get(market)
     if not strategy_cfg:
         addlog(
