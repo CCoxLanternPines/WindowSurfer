@@ -24,7 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--ledger",
-        help="[DEPRECATED] use --account instead",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--dry",
