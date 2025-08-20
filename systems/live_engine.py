@@ -38,6 +38,10 @@ def _run_iteration(
         if account_filter and acct_name != account_filter:
             continue
 
+        if not acct_cfg.get("is_live", False):
+            print(f"[SKIP] {acct_name} (is_live = false)")
+            continue
+
         client = ccxt.kraken(
             {
                 "enableRateLimit": True,
@@ -231,6 +235,9 @@ def run_live(
     for acct_name in targets:
         acct_cfg = cfg.get("accounts", {}).get(acct_name)
         if not acct_cfg:
+            continue
+        if not acct_cfg.get("is_live", False):
+            print(f"[SKIP] {acct_name} (is_live = false)")
             continue
         for mkt, strat in acct_cfg.get("markets", {}).items():
             if market and mkt != market:

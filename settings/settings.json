@@ -32,6 +32,7 @@
       "kraken_name": "SOL/USD",
       "kraken_pair": "SOLUSD",
       "binance_name": "SOLUSDT",
+      "is_live": false,
       "reporting": {
         "email": "kris@example.com",
         "daily": false,
