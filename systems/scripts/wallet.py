@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Wallet helper functions."""
 
+import ccxt
 from systems.utils.addlog import addlog
 from systems.utils.resolve_symbol import split_tag, resolve_symbols, to_tag
 from systems.utils.load_config import load_config
@@ -30,7 +31,8 @@ def show_wallet(account: str, market: str | None, verbose: int = 0) -> None:
         )
         return
 
-    symbols = resolve_symbols(market_symbol)
+    client = ccxt.kraken()
+    symbols = resolve_symbols(client, market_symbol)
     tag = to_tag(symbols["kraken_name"])
     _, quote_asset = split_tag(tag)
     balances = get_kraken_balance(quote_asset, verbose)

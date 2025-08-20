@@ -54,13 +54,12 @@ Reusable components used by the engines:
   capital.
 - **ledger.py** – in-memory ledger with helpers to load/save trade notes to
   `data/ledgers` or simulation folders.
-- **execution_handler.py** – communicates with Kraken for live order placement
-  and snapshot loading.
+- **execution_handler.py** – communicates with Kraken for live order placement.
 - **candle_cache.py** – refreshes live candle caches and tracks historical
   high/low ranges.
 - **fetch_candles.py** – low-level Binance/Kraken OHLCV downloaders used by
   `fetch` and cache utilities.
-- **kraken_utils.py** – loads API keys, snapshots and balances from Kraken.
+- **kraken_utils.py** – loads API keys and balances from Kraken.
 - **wallet.py** – shows Kraken balances for a ledger's quote asset.
 - `sim_tuner.py` – Optuna-based parameter tuner for simulations, run separately
   from the main bot.
@@ -74,12 +73,11 @@ Utility layer shared across modules:
 - **config.py** – loads `settings/settings.json`, resolves project paths and
   warns about deprecated keys.
 - **cli.py** – central argument parser defining supported modes and options.
-- **asset_pairs.py** – caches Kraken AssetPairs metadata for pair validation.
 - **resolve_symbol.py** – converts between tags, exchange symbols and canonical
   data paths.
 - **time.py** – helpers for parsing relative durations such as `7d` or `1m`.
 - Additional helpers: `quote_norm.py`, `price_fetcher.py`, `telegram_utils.py`,
-  `snapshot.py`, `trade_eval.py`.
+  `trade_eval.py`.
 
 ### Configuration & Data
 
@@ -90,7 +88,6 @@ Utility layer shared across modules:
   - `data/sim/` – historical candles used for simulations.
   - `data/live/` – live candles updated by `fetch` and the live engine.
   - `data/ledgers/` – JSON ledgers recording open/closed notes.
-  - `data/snapshots/` – cached exchange metadata (e.g. asset pairs).
   - `data/tmp/` – transient files such as `log.txt` and simulation output.
 
 Simulation reports may also be written to `logs/`.

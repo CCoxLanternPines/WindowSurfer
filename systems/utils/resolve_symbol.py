@@ -2,29 +2,23 @@
 
 from __future__ import annotations
 
-BASE_MAP = {
-    "XBT": "BTC",
-    "XDG": "DOGE",
-}
 
+def resolve_symbols(client, config_name: str):
+    """Resolve market identifiers using CCXT's market metadata."""
 
-def resolve_symbols(kraken_name: str) -> dict[str, str]:
-    """Derive related symbol names from a Kraken CCXT pair."""
+    markets = client.load_markets()
 
-    base, quote = kraken_name.split("/")
-    base_cc = BASE_MAP.get(base, base)
+    if config_name not in markets:
+        raise RuntimeError(f"[ERROR] Invalid trading pair: {config_name}")
 
-    kraken_pair = base + quote
-
-    if quote == "USD":
-        binance = base_cc + "USDT"
-    else:
-        binance = base_cc + quote
+    m = markets[config_name]
 
     return {
-        "kraken_name": f"{base}/{quote}",
-        "kraken_pair": kraken_pair,
-        "binance_name": binance,
+        "kraken_name": m["symbol"],
+        "kraken_pair": m["id"],
+        "binance_name": (
+            f"{m['base']}USDT" if m["quote"] == "USD" else f"{m['base']}{m['quote']}"
+        ),
     }
 
 
@@ -47,20 +41,7 @@ def live_path_csv(tag: str) -> str:
 
 
 def split_tag(tag: str) -> tuple[str, str]:
-    """Return base symbol and Kraken quote asset code for ``tag``.
-
-    Parameters
-    ----------
-    tag:
-        Trading pair tag such as ``DOGEUSD`` or ``SOLUSDC``.
-
-    Returns
-    -------
-    tuple[str, str]
-        A tuple ``(base, quote_asset)`` where ``base`` is the base currency
-        symbol and ``quote_asset`` is the Kraken asset code for the quote
-        currency (e.g. ``"ZUSD"`` for USD).
-    """
+    """Return base symbol and Kraken quote asset code for ``tag``."""
 
     tag = tag.upper()
     mapping = {
@@ -75,4 +56,3 @@ def split_tag(tag: str) -> tuple[str, str]:
         if tag.endswith(suffix):
             return tag[: -len(suffix)], asset_code
     return tag, ""
-

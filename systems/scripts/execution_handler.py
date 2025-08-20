@@ -10,7 +10,6 @@ from systems.scripts.kraken_utils import get_live_price
 from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.resolve_symbol import split_tag
 from systems.utils.quote_norm import norm_quote
-from systems.utils.snapshot import load_snapshot, prime_snapshot
 from systems.scripts.trade_apply import apply_buy
 
 
@@ -26,17 +25,6 @@ def now_utc_timestamp() -> int:
     return int(time.time())
 
 
-def load_or_fetch_snapshot(tag: str) -> dict:
-    api_key, api_secret = load_kraken_keys()
-    return _get_snapshot(tag, api_key, api_secret)
-
-
-def _get_snapshot(tag: str, api_key: str, api_secret: str) -> dict:
-    snapshot = load_snapshot(tag)
-    if not snapshot or snapshot.get("timestamp", 0) < now_utc_timestamp() - 60:
-        snapshot = prime_snapshot(tag, api_key, api_secret)
-    return snapshot
-
 def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) -> dict:
     url_path = f"/0/private/{endpoint}"
     url = f"https://api.kraken.com{url_path}"
@@ -51,16 +39,14 @@ def _kraken_request(endpoint: str, data: dict, api_key: str, api_secret: str) ->
     signature = hmac.new(base64.b64decode(api_secret), message, hashlib.sha512)
     sig_digest = base64.b64encode(signature.digest())
 
-    headers = {
-        "API-Key": api_key,
-        "API-Sign": sig_digest.decode()
-    }
+    headers = {"API-Key": api_key, "API-Sign": sig_digest.decode()}
 
     resp = requests.post(url, headers=headers, data=data, timeout=10)
     result = resp.json()
     if "error" in result and result["error"]:
         raise Exception(f"Kraken API error: {result['error']}")
     return result
+
 
 def place_order(
     order_type: str,
@@ -72,8 +58,7 @@ def place_order(
     verbose: int = 0,
 ) -> dict:
     api_key, api_secret = load_kraken_keys()
-    snapshot = _get_snapshot(ledger_name, api_key, api_secret)
-    balance = snapshot.get("balance", {})
+    balance = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
 
     price_data = fetch_price_data(pair_code)
     price = float(price_data.get("c", [0])[0])
@@ -82,8 +67,12 @@ def place_order(
 
     if order_type.lower() == "buy":
         available_usd = float(balance.get(fiat_symbol, 0.0))
-        addlog(f"[DEBUG] Balance snapshot: {balance}", verbose_int=1, verbose_state=verbose)
-        addlog(f"[DEBUG] Using fiat_symbol = {fiat_symbol}", verbose_int=1, verbose_state=verbose)
+        addlog(f"[DEBUG] Balance: {balance}", verbose_int=1, verbose_state=verbose)
+        addlog(
+            f"[DEBUG] Using fiat_symbol = {fiat_symbol}",
+            verbose_int=1,
+            verbose_state=verbose,
+        )
         addlog(
             f"[DEBUG] available_usd = {available_usd} | trying to spend = {amount}",
             verbose_int=1,
@@ -141,7 +130,9 @@ def place_order(
         raise Exception(f"{order_type.capitalize()} order failed — no txid returned")
 
     if order_type.lower() == "buy":
-        post_balance = _kraken_request("Balance", {}, api_key, api_secret).get("result", {})
+        post_balance = _kraken_request("Balance", {}, api_key, api_secret).get(
+            "result", {}
+        )
         new_fiat_balance = float(post_balance.get(fiat_symbol, 0.0))
         spent = float(balance.get(fiat_symbol, 0.0)) - new_fiat_balance
         if spent < amount * 0.8:
@@ -171,6 +162,7 @@ def place_order(
         "avg_price": price,
         "timestamp": now_utc_timestamp(),
     }
+
 
 def execute_buy(
     client,

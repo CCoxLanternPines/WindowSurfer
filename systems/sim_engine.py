@@ -11,6 +11,8 @@ import os
 import pandas as pd
 from tqdm import tqdm
 
+import ccxt
+
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -62,7 +64,13 @@ def run_simulation(
             verbose_state=verbose,
         )
         raise SystemExit(1)
-    symbols = resolve_symbols(market)
+    client = ccxt.kraken()
+    symbols = resolve_symbols(client, market)
+    addlog(
+        f"[RESOLVE][{account}][{market}] KrakenName={symbols['kraken_name']} KrakenPair={symbols['kraken_pair']} BinanceName={symbols['binance_name']}",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
     kraken_symbol = symbols["kraken_name"]
     tag = to_tag(kraken_symbol)
     file_tag = kraken_symbol.replace("/", "_")
@@ -91,7 +99,11 @@ def run_simulation(
     df = df.dropna(subset=[ts_col])
 
     before = len(df)
-    df = df.sort_values(ts_col).drop_duplicates(subset=[ts_col], keep="last").reset_index(drop=True)
+    df = (
+        df.sort_values(ts_col)
+        .drop_duplicates(subset=[ts_col], keep="last")
+        .reset_index(drop=True)
+    )
     removed = before - len(df)
 
     # Optional hard check
@@ -128,6 +140,7 @@ def run_simulation(
         strategy_cfg,
         mode="sim",
         prev={"verbose": verbose},
+        client=client,
     )
     runtime_state["mode"] = "sim"
     runtime_state["symbol"] = tag
@@ -148,7 +161,9 @@ def run_simulation(
             "realized_roi_accum": 0.0,
         }
     }
-    addlog(f"[SIM] Starting simulation for {coin}", verbose_int=1, verbose_state=verbose)
+    addlog(
+        f"[SIM] Starting simulation for {coin}", verbose_int=1, verbose_state=verbose
+    )
 
     step = int(strategy_cfg.get("window_step", 1))
     window_size = int(strategy_cfg.get("window_size", 0))
@@ -184,7 +199,9 @@ def run_simulation(
                 state=runtime_state,
             )
 
-            runtime_state.setdefault("buy_unlock_p", {})["strategy"] = buy_res.get("unlock_p")
+            runtime_state.setdefault("buy_unlock_p", {})["strategy"] = buy_res.get(
+                "unlock_p"
+            )
 
             m_buy = win_metrics.get("strategy")
             if m_buy is not None:
@@ -340,38 +357,48 @@ def run_simulation(
             plt.scatter(
                 pd.to_datetime(b_t, unit="s"),
                 b_p,
-                marker="o", color="g", label="Buy", zorder=2,
+                marker="o",
+                color="g",
+                label="Buy",
+                zorder=2,
             )
-
 
         # --- Plot sells (normal vs flat) ---
         if sell_points:
             times_normal = [t for t, p, m in sell_points if m == "normal"]
             prices_normal = [p for t, p, m in sell_points if m == "normal"]
-            times_flat   = [t for t, p, m in sell_points if m == "flat"]
-            prices_flat  = [p for t, p, m in sell_points if m == "flat"]
-            times_all   = [t for t, p, m in sell_points if m == "all"]
-            prices_all  = [p for t, p, m in sell_points if m == "all"]
+            times_flat = [t for t, p, m in sell_points if m == "flat"]
+            prices_flat = [p for t, p, m in sell_points if m == "flat"]
+            times_all = [t for t, p, m in sell_points if m == "all"]
+            prices_all = [p for t, p, m in sell_points if m == "all"]
 
             if times_normal:
                 plt.scatter(
                     pd.to_datetime(times_normal, unit="s"),
                     prices_normal,
-                    marker="o", color="r", label="Sell", zorder=2,
+                    marker="o",
+                    color="r",
+                    label="Sell",
+                    zorder=2,
                 )
             if times_flat:
                 plt.scatter(
                     pd.to_datetime(times_flat, unit="s"),
                     prices_flat,
-                    marker="o", color="orange", label="Flat Sell", zorder=2,
+                    marker="o",
+                    color="orange",
+                    label="Flat Sell",
+                    zorder=2,
                 )
             if times_all:
                 plt.scatter(
                     pd.to_datetime(times_all, unit="s"),
                     prices_all,
-                    marker="x", color="red", label="All Sell", zorder=3,
+                    marker="x",
+                    color="red",
+                    label="All Sell",
+                    zorder=3,
                 )
-
 
         plt.xlabel("Time")
         plt.ylabel("Price")

@@ -20,6 +20,7 @@ from systems.utils.config import (
     load_settings,
     resolve_path,
 )
+import ccxt
 from systems.utils.resolve_symbol import split_tag, resolve_symbols, to_tag
 
 
@@ -27,7 +28,8 @@ def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
     """Run sequential Optuna tuning on each window for ``ledger``."""
 
     ledger_cfg = load_ledger_config(ledger)
-    symbols = resolve_symbols(ledger_cfg["kraken_name"])
+    client = ccxt.kraken()
+    symbols = resolve_symbols(client, ledger_cfg["kraken_name"])
     tag = to_tag(symbols["kraken_name"]).upper()
     window_settings = ledger_cfg.get("window_settings", {})
     if not window_settings:
@@ -94,18 +96,22 @@ def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
             original_load_settings = config_mod.load_settings
             original_load_ledger = config_mod.load_ledger_config
             config_mod.load_settings = lambda reload=False: trial_settings
-            config_mod.load_ledger_config = (
-                lambda name: trial_settings["ledger_settings"][name]
-            )
+            config_mod.load_ledger_config = lambda name: trial_settings[
+                "ledger_settings"
+            ][name]
 
             original_sim_loader = (
-                sim_engine.load_settings if hasattr(sim_engine, "load_settings") else None
+                sim_engine.load_settings
+                if hasattr(sim_engine, "load_settings")
+                else None
             )
             if original_sim_loader:
                 sim_engine.load_settings = lambda reload=False: trial_settings
 
             try:
-                run_simulation(ledger=ledger, verbose=verbose, window_names=[window_name])
+                run_simulation(
+                    ledger=ledger, verbose=verbose, window_names=[window_name]
+                )
             finally:
                 config_mod.load_settings = original_load_settings
                 config_mod.load_ledger_config = original_load_ledger
@@ -183,4 +189,3 @@ def run_sim_tuner(*, ledger: str, verbose: int = 0) -> None:
 
         if interrupted:
             return
-

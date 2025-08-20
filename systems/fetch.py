@@ -9,6 +9,7 @@ import sys
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+import ccxt
 from systems.utils.addlog import addlog
 from systems.utils.load_config import load_config
 from systems.utils.resolve_symbol import resolve_symbols
@@ -34,8 +35,15 @@ def run_fetch(account: str, market: str | None = None) -> None:
     markets = acct_cfg.get("markets", {})
     targets = [market] if market else list(markets.keys())
 
+    client = ccxt.kraken()
+
     for m in targets:
-        symbols = resolve_symbols(m)
+        symbols = resolve_symbols(client, m)
+        addlog(
+            f"[RESOLVE][{account}][{m}] KrakenName={symbols['kraken_name']} KrakenPair={symbols['kraken_pair']} BinanceName={symbols['binance_name']}",
+            verbose_int=1,
+            verbose_state=True,
+        )
         kraken_symbol = symbols["kraken_name"]
         binance_symbol = symbols["binance_name"]
 
@@ -58,7 +66,7 @@ def run_fetch(account: str, market: str | None = None) -> None:
 
         # Binance full history -> SIM
         df_sim = fetch_binance_full_history_1h(binance_symbol)
-        sim_path = f"data/sim/{account}_{file_tag}_1h.csv"
+        sim_path = f"data/sim/{file_tag}_1h.csv"
         tmp_sim = sim_path + ".tmp"
         os.makedirs(os.path.dirname(sim_path), exist_ok=True)
         df_sim.to_csv(tmp_sim, index=False)
@@ -66,7 +74,7 @@ def run_fetch(account: str, market: str | None = None) -> None:
 
         # Kraken last 720 -> LIVE
         df_live = fetch_kraken_last_n_hours_1h(kraken_symbol, n=720)
-        live_path = f"data/live/{account}_{file_tag}_1h.csv"
+        live_path = f"data/live/{file_tag}_1h.csv"
         tmp_live = live_path + ".tmp"
         os.makedirs(os.path.dirname(live_path), exist_ok=True)
         df_live.to_csv(tmp_live, index=False)

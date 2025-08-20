@@ -11,6 +11,8 @@ from typing import Dict
 import pandas as pd
 from tqdm import tqdm
 
+import ccxt
+
 from systems.utils.resolve_symbol import (
     to_tag,
     resolve_symbols,
@@ -32,6 +34,7 @@ def _run_iteration(
     cfg,
     runtime_states: Dict[str, Dict],
     hist_cache: Dict[str, tuple[float, float]],
+    client,
     *,
     account_filter: str | None,
     market_filter: str | None,
@@ -44,7 +47,12 @@ def _run_iteration(
         for market, strategy_cfg in acct_cfg.get("markets", {}).items():
             if market_filter and market != market_filter:
                 continue
-            symbols = resolve_symbols(market)
+            symbols = resolve_symbols(client, market)
+            addlog(
+                f"[RESOLVE][{acct_name}][{market}] KrakenName={symbols['kraken_name']} KrakenPair={symbols['kraken_pair']} BinanceName={symbols['binance_name']}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
             kraken_symbol = symbols["kraken_name"]
             kraken_pair = symbols["kraken_pair"]
             tag = to_tag(kraken_symbol)
@@ -60,7 +68,11 @@ def _run_iteration(
                 raise SystemExit(1)
             df = pd.read_csv(live_file)
             ts_col = next(
-                (c for c in df.columns if str(c).lower() in ("timestamp", "time", "date")),
+                (
+                    c
+                    for c in df.columns
+                    if str(c).lower() in ("timestamp", "time", "date")
+                ),
                 None,
             )
             if ts_col is None:
@@ -97,6 +109,7 @@ def _run_iteration(
                 strategy_cfg,
                 mode="live",
                 prev=prev,
+                client=client,
             )
             state["mode"] = "live"
             state["symbol"] = tag
@@ -176,10 +189,13 @@ def _run_iteration(
             save_ledger(ledger_name, ledger_obj, tag=file_tag)
 
 
-def run_live(*, account: str, market: str | None = None, dry: bool = False, verbose: int = 0) -> None:
+def run_live(
+    *, account: str, market: str | None = None, dry: bool = False, verbose: int = 0
+) -> None:
     cfg = load_config()
     runtime_states: Dict[str, Dict] = {}
     hist_cache: Dict[str, tuple[float, float]] = {}
+    client = ccxt.kraken()
 
     for acct_name, acct_cfg in cfg.get("accounts", {}).items():
         if account and acct_name != account:
@@ -188,7 +204,12 @@ def run_live(*, account: str, market: str | None = None, dry: bool = False, verb
         for mkt, strat in acct_cfg.get("markets", {}).items():
             if market and mkt != market:
                 continue
-            symbols = resolve_symbols(mkt)
+            symbols = resolve_symbols(client, mkt)
+            addlog(
+                f"[RESOLVE][{acct_name}][{mkt}] KrakenName={symbols['kraken_name']} KrakenPair={symbols['kraken_pair']} BinanceName={symbols['binance_name']}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
             tag = to_tag(symbols["kraken_name"])
             file_tag = symbols["kraken_name"].replace("/", "_")
             ledger_name = f"{acct_name}_{file_tag}"
@@ -198,6 +219,7 @@ def run_live(*, account: str, market: str | None = None, dry: bool = False, verb
                 strat,
                 mode="live",
                 prev={"verbose": verbose},
+                client=client,
             )
             state["buy_unlock_p"] = {}
             state["symbol"] = tag
@@ -234,6 +256,7 @@ def run_live(*, account: str, market: str | None = None, dry: bool = False, verb
             cfg,
             runtime_states,
             hist_cache,
+            client,
             account_filter=account,
             market_filter=market,
             verbose=verbose,
@@ -260,6 +283,7 @@ def run_live(*, account: str, market: str | None = None, dry: bool = False, verb
             cfg,
             runtime_states,
             hist_cache,
+            client,
             account_filter=account,
             market_filter=market,
             verbose=verbose,
