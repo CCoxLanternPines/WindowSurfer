@@ -117,6 +117,7 @@ def _run_single_sim(
     runtime_state["symbol"] = tag
     runtime_state["buy_unlock_p"] = {}
 
+
     ledger_obj = Ledger()
     ledger_obj.set_metadata({"capital": runtime_state.get("capital", 0.0)})
     buy_points: list[tuple[float, float]] = []
@@ -144,6 +145,13 @@ def _run_single_sim(
     ):
         t = start  # anchor candle for this window
         price = float(df.iloc[t]["close"])
+        ts = int(df.iloc[t]["timestamp"]) if "timestamp" in df.columns else None
+        iso_ts = (
+            datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            if ts is not None
+            else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
+        # Simulation mode does not emit structured trade logs
 
         ctx = {"ledger": ledger_obj}
         buy_res = evaluate_buy(
@@ -154,10 +162,6 @@ def _run_single_sim(
             runtime_state=runtime_state,
         )
         if buy_res:
-            ts = None
-            if "timestamp" in df.columns:
-                ts = int(df.iloc[t]["timestamp"])
-
             result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
 
             note = apply_buy(
@@ -177,6 +181,8 @@ def _run_single_sim(
                 m_buy["buys"] += 1
                 m_buy["gross_invested"] += cost
 
+            # No structured logging in simulation
+
             if viz:
                 buy_points.append((float(df.iloc[t][ts_col]), price))
 
@@ -191,16 +197,13 @@ def _run_single_sim(
         )
 
         for note in sell_notes:
-            ts = None
-            if "timestamp" in df.columns:
-                ts = int(df.iloc[t]["timestamp"])
             result = paper_execute_sell(
                 price, note.get("entry_amount", 0.0), timestamp=ts
             )
             if viz:
                 mode = note.get("sell_mode", "normal")
                 sell_points.append((float(df.iloc[t][ts_col]), price, mode))
-            apply_sell(
+            closed = apply_sell(
                 ledger=ledger_obj,
                 note=note,
                 t=t,
@@ -208,9 +211,11 @@ def _run_single_sim(
                 state=runtime_state,
             )
 
-            qty = note.get("entry_amount", 0.0)
-            buy_price = note.get("entry_price", 0.0)
-            exit_price = note.get("exit_price", 0.0)
+            # No structured logging in simulation
+
+            qty = closed.get("entry_amount", 0.0)
+            buy_price = closed.get("entry_price", 0.0)
+            exit_price = closed.get("exit_price", 0.0)
             cost = buy_price * qty
             proceeds = exit_price * qty
             roi_trade = (proceeds - cost) / cost if cost > 0 else 0.0
@@ -221,6 +226,8 @@ def _run_single_sim(
                 m_sell["realized_proceeds"] += proceeds
                 m_sell["realized_trades"] += 1
                 m_sell["realized_roi_accum"] += roi_trade
+
+        # No structured logging in simulation
 
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)
