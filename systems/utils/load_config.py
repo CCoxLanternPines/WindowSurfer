@@ -2,10 +2,16 @@ from __future__ import annotations
 
 """Unified configuration loader for accounts and strategy settings."""
 
-import json
 from typing import Any, Dict
 
-from systems.utils.config import resolve_path
+from systems.utils.config import (
+    load_general,
+    load_account_settings,
+    load_coin_settings,
+    load_keys,
+    resolve_coin_config,
+    resolve_account_market,
+)
 
 _CONFIG_CACHE: Dict[str, Any] | None = None
 
@@ -20,25 +26,23 @@ def load_config(*, reload: bool = False) -> Dict[str, Any]:
     """
     global _CONFIG_CACHE
     if _CONFIG_CACHE is None or reload:
-        settings_path = resolve_path("settings/settings.json")
-        accounts_path = resolve_path("settings/accounts.json")
-        with settings_path.open("r", encoding="utf-8") as fh:
-            settings = json.load(fh)
-        with accounts_path.open("r", encoding="utf-8") as fh:
-            accounts_raw = json.load(fh)
-        general = settings.get("general_settings", {})
-        coin_settings = settings.get("coin_settings", {})
-        default = coin_settings.get("default", {})
+        general = load_general(reload=reload)
+        coin_settings = load_coin_settings(reload=reload)
+        accounts_cfg = load_account_settings(reload=reload)
+        keys = load_keys(reload=reload)
+
         accounts: Dict[str, Any] = {}
-        for acct_name, acct_cfg in accounts_raw.items():
+        for acct_name, acct_cfg in accounts_cfg.items():
             merged_markets: Dict[str, Any] = {}
-            for market in acct_cfg.get("markets", []):
-                strat = dict(default)
-                strat.update(coin_settings.get(market, {}))
-                merged_markets[market] = strat
+            for market in acct_cfg.get("market settings", {}).keys():
+                coin_cfg = resolve_coin_config(market, coin_settings)
+                acct_mkt_cfg = resolve_account_market(acct_name, market, accounts_cfg)
+                merged_markets[market] = {**coin_cfg, **acct_mkt_cfg}
             accounts[acct_name] = {
-                "api_key": acct_cfg.get("api_key", ""),
-                "api_secret": acct_cfg.get("api_secret", ""),
+                "api_key": keys.get(acct_name, {}).get("api_key", ""),
+                "api_secret": keys.get(acct_name, {}).get("api_secret", ""),
+                "is_live": acct_cfg.get("is_live", False),
+                "reporting": acct_cfg.get("reporting", {}),
                 "markets": merged_markets,
             }
         _CONFIG_CACHE = {"accounts": accounts, "general_settings": general}

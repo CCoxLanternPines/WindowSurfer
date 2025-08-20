@@ -13,7 +13,14 @@ from systems.scripts.ledger import Ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
-from systems.utils.load_config import load_config
+from systems.utils.config import (
+    load_general,
+    load_coin_settings,
+    load_account_settings,
+    load_keys,
+    resolve_coin_config,
+    resolve_account_market,
+)
 
 
 def _parse_ledger_name(name: str) -> tuple[str, str, str, str] | None:
@@ -38,19 +45,27 @@ def run_test(ledger: str) -> int:
     account, base, quote, market = parsed
 
     try:
-        cfg = load_config()
-        acct_cfg = cfg.get("accounts", {}).get(account)
+        general = load_general()
+        coin_settings = load_coin_settings()
+        accounts_cfg = load_account_settings()
+        keys = load_keys()
+        acct_cfg = accounts_cfg.get(account)
         if not acct_cfg:
             raise ValueError(f"Unknown account '{account}'")
-        strat_cfg = acct_cfg.get("markets", {}).get(market)
-        if not strat_cfg:
+        if market not in acct_cfg.get("market settings", {}):
             raise ValueError(f"Unknown market '{market}'")
 
+        strategy_cfg = {
+            **resolve_coin_config(market, coin_settings),
+            **resolve_account_market(account, market, accounts_cfg),
+        }
+
+        keypair = keys.get(account, {})
         client = ccxt.kraken(
             {
                 "enableRateLimit": True,
-                "apiKey": acct_cfg.get("api_key", ""),
-                "secret": acct_cfg.get("api_secret", ""),
+                "apiKey": keypair.get("api_key", ""),
+                "secret": keypair.get("api_secret", ""),
             }
         )
 
@@ -61,26 +76,29 @@ def run_test(ledger: str) -> int:
             raise RuntimeError("No recent candles fetched")
 
         runtime_state = build_runtime_state(
-            cfg,
+            general,
+            coin_settings,
+            accounts_cfg,
+            account,
             market,
-            strat_cfg,
             mode="sim",
             client=client,
             prev={"verbose": 0},
         )
         runtime_state["mode"] = "test"
+        strategy_cfg = runtime_state.get("strategy", {})
 
-        window_size = int(runtime_state.get("strategy", {}).get("window_size", 0))
+        window_size = int(strategy_cfg.get("window_size", 0))
         t = max(0, len(df) - window_size)
 
         ctx: dict[str, Any] = {"ledger": Ledger()}
         decision = "HOLD"
-        buy_res = evaluate_buy(ctx, t, df, cfg=strat_cfg, runtime_state=runtime_state)
+        buy_res = evaluate_buy(ctx, t, df, cfg=strategy_cfg, runtime_state=runtime_state)
         sell_res = evaluate_sell(
             ctx,
             t,
             df,
-            cfg=strat_cfg,
+            cfg=strategy_cfg,
             open_notes=ctx["ledger"].get_open_notes(),
             runtime_state=runtime_state,
         )

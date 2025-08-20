@@ -1,0 +1,33 @@
+{
+  "accounts": {
+    "Kris": {
+      "is_live": false,
+      "reporting": {
+        "email": "kris@example.com",
+        "daily": true,
+        "weekly": false,
+        "monthly": false,
+        "yearly": true
+      },
+      "market settings": {
+        "BTC/USD": { "investment_fraction": 0.65, "investment_percent": 0.01 },
+        "DOGE/USD": { "investment_fraction": 0.65, "investment_percent": 0.01 },
+        "ETH/EUR": { "investment_fraction": 0.65, "investment_percent": 0.01 }
+      }
+    },
+    "Travis": {
+      "is_live": false,
+      "reporting": {
+        "email": "travis@example.com",
+        "daily": true,
+        "weekly": false,
+        "monthly": false,
+        "yearly": true
+      },
+      "market settings": {
+        "DOGE/USD": { "investment_fraction": 0.65, "investment_percent": 0.01 },
+        "SOL/USDC": { "investment_fraction": 0.65, "investment_percent": 0.01 }
+      }
+    }
+  }
+}

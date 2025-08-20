@@ -68,7 +68,7 @@ def export_png(log_path: Path, out_path: Path) -> None:
 
 
 def view_log(account_name: str, timeframe: str | None = None) -> None:
-    """Render a scatter plot of decisions from ``account_name`` log."""
+    """Render a scatter plot of decisions from log files."""
 
     log_path = Path(f"data/logs/{account_name}.json")
     if not log_path.exists():

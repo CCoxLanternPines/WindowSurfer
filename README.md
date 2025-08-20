@@ -22,10 +22,11 @@ local JSON logs under `data/logs/`.
 Examples:
 
 ```bash
-python bot.py --mode fetch --account Kris_Ledger
-python bot.py --mode sim --account Kris_Ledger -vv --time 7d
-python bot.py --mode live --account Kris_Ledger --dry
-python bot.py --mode wallet --account Kris_Ledger
+python bot.py --mode fetch --account Kris
+python bot.py --mode sim --account Kris -vv --time 7d
+python bot.py --mode live --account Kris --dry
+python bot.py --mode wallet --account Kris
+python bot.py --mode test --account SAMPLE
 ```
 
 ## Architecture
@@ -75,8 +76,12 @@ Utility layer shared across modules:
 
 ### Configuration & Data
 
-- **settings/settings.json** – defines ledgers and strategy defaults including
-  window parameters and capital limits.
+- **settings/settings.json** – retains ``general_settings`` such as capital limits.
+- **settings/account_settings.json** – per-account flags and per-market sizing under
+  ``"market settings"``.
+- **settings/coin_settings.json** – coin-level strategy defaults with a ``default``
+  block and optional per-symbol overrides.
+- **settings/keys.json** – API key/secret pairs (git-ignored; provide your own).
 - **Data directories**
   - `data/sim/` – historical candles used for simulations.
   - `data/live/` – live candles updated by `fetch` and the live engine.

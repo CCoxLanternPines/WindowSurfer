@@ -22,11 +22,21 @@ from systems.scripts.trade_apply import apply_sell
 from systems.scripts.execution_handler import execute_sell, process_buy_signal
 from systems.scripts.candle_loader import load_candles_df
 from systems.utils.trade_logger import init_logger as init_trade_logger, record_event
-from systems.utils.config import load_settings
+from systems.utils.config import (
+    load_general,
+    load_coin_settings,
+    load_account_settings,
+    load_keys,
+    resolve_coin_config,
+    resolve_account_market,
+)
 
 
 def _run_iteration(
-    cfg,
+    general,
+    coin_settings,
+    accounts_cfg,
+    keys,
     runtime_states: Dict[str, Dict],
     hist_cache: Dict[str, tuple[float, float]],
     *,
@@ -34,7 +44,7 @@ def _run_iteration(
     market_filter: str | None,
     verbose: int,
 ) -> None:
-    for acct_name, acct_cfg in cfg.get("accounts", {}).items():
+    for acct_name, acct_cfg in accounts_cfg.items():
         if account_filter and acct_name != account_filter:
             continue
 
@@ -42,17 +52,23 @@ def _run_iteration(
             print(f"[SKIP] {acct_name} (is_live = false)")
             continue
 
+        keypair = keys.get(acct_name, {})
         client = ccxt.kraken(
             {
                 "enableRateLimit": True,
-                "apiKey": acct_cfg.get("api_key", ""),
-                "secret": acct_cfg.get("api_secret", ""),
+                "apiKey": keypair.get("api_key", ""),
+                "secret": keypair.get("api_secret", ""),
             }
         )
 
-        for market, strategy_cfg in acct_cfg.get("markets", {}).items():
+        for market in acct_cfg.get("market settings", {}).keys():
             if market_filter and market != market_filter:
                 continue
+
+            strategy_cfg = {
+                **resolve_coin_config(market, coin_settings),
+                **resolve_account_market(acct_name, market, accounts_cfg),
+            }
 
             symbols = resolve_symbols(client, market)
             kraken_name = symbols["kraken_name"]
@@ -97,10 +113,12 @@ def _run_iteration(
             ledger_obj = load_ledger(ledger_name, tag=file_tag)
             prev = runtime_states.get(ledger_name, {"verbose": verbose})
             state = build_runtime_state(
-                cfg,
+                general,
+                coin_settings,
+                accounts_cfg,
+                acct_name,
                 market,
-                strategy_cfg,
-                mode="sim",
+                mode="live",
                 client=client,
                 prev=prev,
             )
@@ -112,6 +130,7 @@ def _run_iteration(
                 "capital", state.get("capital", 0.0)
             )
             runtime_states[ledger_name] = state
+            strategy_cfg = state.get("strategy", {})
 
             price = float(df.iloc[t]["close"])
             ctx = {"ledger": ledger_obj}
@@ -223,24 +242,25 @@ def run_live(
     dry: bool = False,
     verbose: int = 0,
 ) -> None:
-    cfg = load_settings()
+    general = load_general()
+    coin_settings = load_coin_settings()
+    accounts_cfg = load_account_settings()
+    keys = load_keys()
     runtime_states: Dict[str, Dict] = {}
     hist_cache: Dict[str, tuple[float, float]] = {}
 
     targets = (
-        cfg.get("accounts", {}).keys()
-        if (all_accounts or not account)
-        else [account]
+        accounts_cfg.keys() if (all_accounts or not account) else [account]
     )
 
     for acct_name in targets:
-        acct_cfg = cfg.get("accounts", {}).get(acct_name)
+        acct_cfg = accounts_cfg.get(acct_name)
         if not acct_cfg:
             continue
         if not acct_cfg.get("is_live", False):
             print(f"[SKIP] {acct_name} (is_live = false)")
             continue
-        for mkt, strat in acct_cfg.get("markets", {}).items():
+        for mkt in acct_cfg.get("market settings", {}).keys():
             if market and mkt != market:
                 continue
             ledger_name = f"{acct_name}_{mkt.replace('/','_')}"
@@ -249,7 +269,10 @@ def run_live(
     account_filter = None if (all_accounts or not account) else account
     if dry:
         _run_iteration(
-            cfg,
+            general,
+            coin_settings,
+            accounts_cfg,
+            keys,
             runtime_states,
             hist_cache,
             account_filter=account_filter,
@@ -275,7 +298,10 @@ def run_live(
                 pbar.update(1)
         print("[LIVE] Running top of hour")
         _run_iteration(
-            cfg,
+            general,
+            coin_settings,
+            accounts_cfg,
+            keys,
             runtime_states,
             hist_cache,
             account_filter=account_filter,

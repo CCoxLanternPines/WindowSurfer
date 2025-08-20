@@ -27,8 +27,12 @@ from systems.scripts.trade_apply import (
 from systems.utils.addlog import addlog
 from pathlib import Path
 
-from systems.utils.config import resolve_path
-from systems.utils.load_config import load_config
+from systems.utils.config import (
+    resolve_path,
+    load_general,
+    load_coin_settings,
+    load_account_settings,
+)
 from systems.utils.resolve_symbol import (
     split_tag,
     resolve_symbols,
@@ -42,10 +46,11 @@ from systems.utils.trade_logger import init_logger as init_trade_logger, record_
 
 def _run_single_sim(
     *,
-    cfg,
+    general,
+    coin_settings,
+    accounts_cfg,
     account: str,
     market: str,
-    strategy_cfg,
     client: ccxt.Exchange,
     verbose: int = 0,
     timeframe: str = "1m",
@@ -109,9 +114,11 @@ def _run_single_sim(
     total = len(df)
 
     runtime_state = build_runtime_state(
-        cfg,
+        general,
+        coin_settings,
+        accounts_cfg,
+        account,
         market,
-        strategy_cfg,
         mode="sim",
         client=client,
         prev={"verbose": verbose},
@@ -119,6 +126,7 @@ def _run_single_sim(
     runtime_state["mode"] = "sim"
     runtime_state["symbol"] = tag
     runtime_state["buy_unlock_p"] = {}
+    strategy_cfg = runtime_state.get("strategy", {})
 
 
     ledger_obj = Ledger()
@@ -436,8 +444,10 @@ def run_simulation(
     viz: bool = True,
 ) -> None:
     """Iterate configured accounts/markets and run simulations."""
-    cfg = load_config()
-    accounts = cfg.get("accounts", {})
+    general = load_general()
+    coin_settings = load_coin_settings()
+    accounts_cfg = load_account_settings()
+    accounts = accounts_cfg
     targets = accounts.keys() if (all_accounts or not account) else [account]
     for acct_name in targets:
         acct_cfg = accounts.get(acct_name)
@@ -448,18 +458,11 @@ def run_simulation(
                 verbose_state=verbose,
             )
             continue
-        client = ccxt.kraken(
-            {
-                "enableRateLimit": True,
-                "apiKey": acct_cfg.get("api_key", ""),
-                "secret": acct_cfg.get("api_secret", ""),
-            }
-        )
-        markets_cfg = acct_cfg.get("markets", {})
+        client = ccxt.kraken({"enableRateLimit": True})
+        markets_cfg = acct_cfg.get("market settings", {})
         m_targets = [market] if market else list(markets_cfg.keys())
         for m in m_targets:
-            strat = markets_cfg.get(m)
-            if not strat:
+            if m not in markets_cfg:
                 continue
             addlog(
                 f"[RUN][{acct_name}][{m}]",
@@ -467,10 +470,11 @@ def run_simulation(
                 verbose_state=verbose,
             )
             _run_single_sim(
-                cfg=cfg,
+                general=general,
+                coin_settings=coin_settings,
+                accounts_cfg=accounts_cfg,
                 account=acct_name,
                 market=m,
-                strategy_cfg=strat,
                 client=client,
                 verbose=verbose,
                 timeframe=timeframe,
