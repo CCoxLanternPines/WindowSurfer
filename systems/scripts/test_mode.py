@@ -1,5 +1,5 @@
 from __future__ import annotations
-"""Safe ledger validation without placing trades."""
+"""Safe account validation without placing trades."""
 
 import os
 import time
@@ -9,7 +9,7 @@ import ccxt
 
 from systems.scripts.fetch_candles import fetch_candles
 from systems.scripts.kraken_utils import get_kraken_balance
-from systems.scripts.ledger import Ledger
+from systems.scripts.account_book import AccountBook
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
@@ -22,39 +22,23 @@ from systems.utils.config import (
     resolve_account_market,
 )
 
+def run_test(account: str, market: str) -> int:
+    """Validate ``account``/``market`` without mutating state or placing orders."""
 
-def _parse_ledger_name(name: str) -> tuple[str, str, str, str] | None:
-    parts = name.split("_")
-    if len(parts) < 3:
-        return None
-    account = parts[0]
-    base = parts[1]
-    quote = parts[2]
-    market = f"{base}/{quote}"
-    return account, base, quote, market
+    general = load_general()
+    coin_settings = load_coin_settings()
+    accounts_cfg = load_account_settings()
+    keys = load_keys()
 
-
-def run_test(ledger: str) -> int:
-    """Validate ``ledger`` without mutating state or placing orders."""
-
-    parsed = _parse_ledger_name(ledger)
-    if not parsed:
-        print(f"[TEST][FAIL] Ledger={ledger}\nReason: Invalid ledger name")
+    acct_cfg = accounts_cfg.get(account)
+    if not acct_cfg:
+        print(f"[TEST][FAIL] Account={account}\nReason: Unknown account")
+        return 1
+    if market not in acct_cfg.get("market settings", {}):
+        print(f"[TEST][FAIL] Account={account}\nReason: Unknown market {market}")
         return 1
 
-    account, base, quote, market = parsed
-
     try:
-        general = load_general()
-        coin_settings = load_coin_settings()
-        accounts_cfg = load_account_settings()
-        keys = load_keys()
-        acct_cfg = accounts_cfg.get(account)
-        if not acct_cfg:
-            raise ValueError(f"Unknown account '{account}'")
-        if market not in acct_cfg.get("market settings", {}):
-            raise ValueError(f"Unknown market '{market}'")
-
         strategy_cfg = {
             **resolve_coin_config(market, coin_settings),
             **resolve_account_market(account, market, accounts_cfg),
@@ -91,7 +75,7 @@ def run_test(ledger: str) -> int:
         window_size = int(strategy_cfg.get("window_size", 0))
         t = max(0, len(df) - window_size)
 
-        ctx: dict[str, Any] = {"ledger": Ledger()}
+        ctx: dict[str, Any] = {"account": AccountBook()}
         decision = "HOLD"
         buy_res = evaluate_buy(ctx, t, df, cfg=strategy_cfg, runtime_state=runtime_state)
         sell_res = evaluate_sell(
@@ -99,7 +83,7 @@ def run_test(ledger: str) -> int:
             t,
             df,
             cfg=strategy_cfg,
-            open_notes=ctx["ledger"].get_open_notes(),
+            open_notes=ctx["account"].get_open_notes(),
             runtime_state=runtime_state,
         )
         if buy_res:
@@ -112,19 +96,20 @@ def run_test(ledger: str) -> int:
         vol = features.get("volatility", 0.0)
 
         os.environ["WS_ACCOUNT"] = account
+        base, quote = market.split("/")
         balances = get_kraken_balance(quote)
         quote_bal = float(balances.get(quote.upper(), 0.0))
         base_bal = float(balances.get(base.upper(), 0.0))
 
-        print(f"[TEST][PASS] Ledger={ledger}")
-        print(
-            f"Balances: {quote.upper()}={quote_bal:.2f} {base.upper()}={base_bal:.2f}"
-        )
+        print(f"[TEST][PASS] Account={account} Market={market}")
+        print(f"Balances: {quote.upper()}={quote_bal:.2f} {base.upper()}={base_bal:.2f}")
         print(
             f"Decision: {decision} (slope={slope:.2f} vol={vol:.2f})"
         )
         return 0
 
     except Exception as exc:  # pragma: no cover - best effort logging
-        print(f"[TEST][FAIL] Ledger={ledger}\nReason: {exc}")
+        print(
+            f"[TEST][FAIL] Account={account} Market={market}\nReason: {exc}"
+        )
         return 1
