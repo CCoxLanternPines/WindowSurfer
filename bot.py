@@ -82,6 +82,13 @@ def main(argv: list[str] | None = None) -> None:
         )
     elif mode == "wallet":
         show_wallet(args.ledger, verbose)
+    elif mode == "view":
+        if not args.ledger:
+            addlog("Error: --ledger is required for view mode")
+            sys.exit(1)
+        from systems.scripts.view_log import view_log
+
+        view_log(args.ledger)
     else:
         parser.error(f"Unknown mode: {args.mode}")
 

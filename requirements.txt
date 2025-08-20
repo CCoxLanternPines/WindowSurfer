@@ -6,3 +6,4 @@ ccxt
 pyyaml
 optuna
 matplotlib
+mplcursors
