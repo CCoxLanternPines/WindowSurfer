@@ -45,11 +45,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable log file output",
     )
-    parser.add_argument(
-        "--telegram",
-        action="store_true",
-        help="Enable Telegram alerts",
-    )
     return parser
 
 

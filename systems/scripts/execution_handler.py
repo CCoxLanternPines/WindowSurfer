@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 
 from systems.scripts.kraken_utils import load_kraken_keys
 from systems.scripts.kraken_utils import get_live_price
-from systems.utils.addlog import addlog, send_telegram_message
+from systems.utils.addlog import addlog
 from systems.utils.resolve_symbol import split_tag
 from systems.utils.quote_norm import norm_quote
 from systems.scripts.trade_apply import apply_buy
@@ -118,9 +118,6 @@ def place_order(
                 verbose_int=1,
                 verbose_state=verbose,
             )
-            send_telegram_message(
-                f"❗ Kraken rejected order due to insufficient funds on {ledger_name}.",
-            )
             return {}
         raise
 
@@ -221,9 +218,6 @@ def execute_buy(
             verbose_int=1,
             verbose_state=verbose,
         )
-        send_telegram_message(
-            f"⚠️ Skipped logging invalid trade for {ledger_name}: empty or failed result."
-        )
         return
     return {
         "filled_amount": result.get("filled_amount", 0.0),
@@ -279,7 +273,6 @@ def process_buy_signal(
         f"p={note.get('p_buy'):.3f} note_id={note.get('id')}"
     )
     addlog(msg, verbose_int=1, verbose_state=verbose)
-    send_telegram_message(msg)
 
     return result
 
@@ -342,9 +335,6 @@ def execute_sell(
             f"[SKIP] Trade result invalid — not logging to ledger for {ledger_name}",
             verbose_int=1,
             verbose_state=verbose,
-        )
-        send_telegram_message(
-            f"⚠️ Skipped logging invalid trade for {ledger_name}: empty or failed result."
         )
         return
     return {
