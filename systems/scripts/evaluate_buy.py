@@ -7,8 +7,7 @@ from typing import Any, Dict
 
 import numpy as np
 
-from systems.utils.addlog import addlog, send_telegram_message
-from systems.utils.telegram_utils import describe_trend, format_window_status
+from systems.utils.addlog import addlog
 
 
 # ---------------------------------------------------------------------------
@@ -150,20 +149,13 @@ def evaluate_buy(
         )
 
     buy_trigger = strategy.get("buy_trigger", 0.0)
-    sell_trigger = strategy.get("sell_trigger", 0.0)
-    symbol = runtime_state.get("symbol", "")
-    window_label = f"{window_size}h"
-    slope = features.get("slope", 0.0)
-    trend = describe_trend(slope)
-    volatility = features.get("volatility", 0.0)
-    current_pos = buy_p - sell_p
-    ledger = ctx.get("ledger") if isinstance(ctx, dict) else None
-    open_notes = len(ledger.get_open_notes()) if ledger else 0
 
     if buy_p < buy_trigger:
         if verbose >= 1:
-            send_telegram_message(
-                f"[HOLD][BUY {window_size}h] need={buy_trigger:.2f}, have={buy_p:.2f}, sell_p={sell_p:.2f}"
+            addlog(
+                f"[HOLD][BUY {window_size}h] need={buy_trigger:.2f}, have={buy_p:.2f}, sell_p={sell_p:.2f}",
+                verbose_int=1,
+                verbose_state=verbose,
             )
         return False
 
@@ -192,19 +184,6 @@ def evaluate_buy(
             verbose_int=2,
             verbose_state=verbose,
         )
-        msg = format_window_status(
-            symbol,
-            window_label,
-            trend,
-            slope,
-            volatility,
-            buy_trigger,
-            current_pos,
-            sell_trigger,
-            open_notes,
-            "HOLD (confident skip)",
-        )
-        send_telegram_message(msg)
         return False
 
     addlog(
@@ -228,28 +207,4 @@ def evaluate_buy(
         result["created_ts"] = int(candle.get("timestamp"))
     result["created_idx"] = t
 
-    action = f"BUY ${size_usd:.2f}"
-    if capital:
-        action += f" ({size_usd / capital * 100:.0f}% capital)"
-    note_id = f"{window_name}-{t}"
-    price = float(candle.get("close", 0.0))
-    note = (
-        f"id={note_id} price={price:.2f} "
-        f"buy_frac={fraction:.2f} agg={aggressiveness:.2f}"
-    )
-    msg = format_window_status(
-        symbol,
-        window_label,
-        trend,
-        slope,
-        volatility,
-        buy_trigger,
-        current_pos,
-        sell_trigger,
-        open_notes,
-        "BUY (confident entry)",
-        action,
-        note,
-    )
-    send_telegram_message(msg)
     return result

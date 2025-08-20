@@ -16,8 +16,8 @@ subsystem based on `--mode`:
 | `live`   | `systems.live_engine.run_live` | Execute the strategy on current market data; `--dry` runs once and exits. |
 | `wallet` | `systems.scripts.wallet.show_wallet` | Display Kraken balances for the ledger's quote asset. |
 
-Common options include `--ledger`, `-v/--verbose`, `--log` to write
-`data/tmp/log.txt` and `--telegram` to send alerts via `telegram.yaml`.
+Common options include `--ledger`, `-v/--verbose`, and `--log` to write
+local JSON logs under `data/logs/`.
 
 Examples:
 
@@ -68,22 +68,19 @@ Reusable components used by the engines:
 
 Utility layer shared across modules:
 
-- **addlog.py** – logging helper with optional Telegram notifications writing to
-  `data/tmp/log.txt`.
+- **addlog.py** – logging helper writing to `data/tmp/log.txt`.
 - **config.py** – loads `settings/settings.json`, resolves project paths and
   warns about deprecated keys.
 - **cli.py** – central argument parser defining supported modes and options.
 - **resolve_symbol.py** – converts between human-friendly market strings and
   exchange-specific identifiers.
 - **time.py** – helpers for parsing relative durations such as `7d` or `1m`.
-- Additional helpers: `quote_norm.py`, `price_fetcher.py`, `telegram_utils.py`,
-  `trade_eval.py`.
+- Additional helpers: `quote_norm.py`, `price_fetcher.py`, `trade_eval.py`.
 
 ### Configuration & Data
 
 - **settings/settings.json** – defines ledgers and strategy defaults including
   window parameters and capital limits.
-- **telegram.yaml** – optional Telegram bot token and chat id for alerts.
 - **Data directories**
   - `data/sim/` – historical candles used for simulations.
   - `data/live/` – live candles updated by `fetch` and the live engine.

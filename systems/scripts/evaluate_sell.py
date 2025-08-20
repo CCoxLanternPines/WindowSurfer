@@ -8,8 +8,7 @@ from systems.scripts.evaluate_buy import (
     classify_slope,
     compute_window_features,
 )
-from systems.utils.addlog import addlog, send_telegram_message
-from systems.utils.telegram_utils import describe_trend, format_window_status
+from systems.utils.addlog import addlog
 
 
 def evaluate_sell(
@@ -44,20 +43,13 @@ def evaluate_sell(
     if features is None:
         features = compute_window_features(series, t, window_size)
     slope = features.get("slope", 0.0)
-    volatility = features.get("volatility", 0.0)
-    trend = describe_trend(slope)
-
     def roi_now(note: Dict[str, Any]) -> float:
         buy = note.get("entry_price", 0.0)
         return (price - buy) / buy if buy else 0.0
 
     window_notes.sort(key=roi_now, reverse=True)
 
-    symbol = runtime_state.get("symbol", "")
-    window_label = f"{window_size}h"
-    current_pos = buy_p - sell_p
     sell_trigger = strategy.get("sell_trigger", 0.0)
-    buy_trigger = strategy.get("buy_trigger", 0.0)
 
     if sell_p >= max_p and window_notes:
         all_count = strategy.get("all_sell_count", n_notes)
@@ -73,28 +65,6 @@ def evaluate_sell(
             verbose_int=1,
             verbose_state=verbose,
         )
-        total_usd = sum(n.get("entry_amount", 0.0) * price for n in results)
-        action = f"SELL ${total_usd:.2f} ({k}/{n_notes} notes)"
-        note = (
-            f"id={results[0]['id']} price={price:.2f} count={k}/{n_notes}"
-            if results
-            else None
-        )
-        msg = format_window_status(
-            symbol,
-            window_label,
-            trend,
-            slope,
-            volatility,
-            buy_trigger,
-            current_pos,
-            sell_trigger,
-            n_notes,
-            "SELL (confident exit)",
-            action,
-            note,
-        )
-        send_telegram_message(msg)
         return results
 
     slope_cls = classify_slope(
@@ -116,48 +86,12 @@ def evaluate_sell(
                 verbose_int=1,
                 verbose_state=verbose,
             )
-            total_usd = sum(n.get("entry_amount", 0.0) * price for n in results)
-            action = f"SELL ${total_usd:.2f} ({k}/{n_notes} notes)"
-            note = (
-                f"id={results[0]['id']} price={price:.2f} count={k}/{n_notes}"
-                if results
-                else None
-            )
-            msg = format_window_status(
-                symbol,
-                window_label,
-                trend,
-                slope,
-                volatility,
-                buy_trigger,
-                current_pos,
-                sell_trigger,
-                n_notes,
-                "SELL (confident exit)",
-                action,
-                note,
-            )
-            send_telegram_message(msg)
             return results
         addlog(
             f"[HOLD][{window_name} {window_size}] flat sell condition met but no notes",
             verbose_int=2,
             verbose_state=verbose,
         )
-        if verbose >= 3:
-            msg = format_window_status(
-                symbol,
-                window_label,
-                trend,
-                slope,
-                volatility,
-                buy_trigger,
-                current_pos,
-                sell_trigger,
-                n_notes,
-                "HOLD (confident skip)",
-            )
-            send_telegram_message(msg)
         return []
 
     addlog(

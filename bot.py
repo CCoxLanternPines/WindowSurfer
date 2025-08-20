@@ -35,9 +35,8 @@ def main(argv: list[str] | None = None) -> None:
     mode = args.mode.lower()
     os.environ["WS_MODE"] = mode
     init_logger(
-        logging_enabled=False,
+        logging_enabled=args.log,
         verbose_level=args.verbose,
-        telegram_enabled=args.telegram and mode != "sim",
     )
 
     verbose = args.verbose
