@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
 
+import ccxt
 import pandas as pd
 from tqdm import tqdm
 
@@ -41,10 +42,17 @@ def _run_iteration(
         if account_filter and acct_name != account_filter:
             continue
         os.environ["WS_ACCOUNT"] = acct_name
+        client = ccxt.kraken(
+            {
+                "enableRateLimit": True,
+                "apiKey": acct_cfg.get("api_key", ""),
+                "secret": acct_cfg.get("api_secret", ""),
+            }
+        )
         for market, strategy_cfg in acct_cfg.get("markets", {}).items():
             if market_filter and market != market_filter:
                 continue
-            symbols = resolve_symbols(market)
+            symbols = resolve_symbols(client, market)
             kraken_symbol = symbols["kraken_name"]
             kraken_pair = symbols["kraken_pair"]
             tag = to_tag(kraken_symbol)
@@ -96,6 +104,7 @@ def _run_iteration(
                 market,
                 strategy_cfg,
                 mode="live",
+                client=client,
                 prev=prev,
             )
             state["mode"] = "live"
@@ -185,10 +194,17 @@ def run_live(*, account: str, market: str | None = None, dry: bool = False, verb
         if account and acct_name != account:
             continue
         os.environ["WS_ACCOUNT"] = acct_name
+        client = ccxt.kraken(
+            {
+                "enableRateLimit": True,
+                "apiKey": acct_cfg.get("api_key", ""),
+                "secret": acct_cfg.get("api_secret", ""),
+            }
+        )
         for mkt, strat in acct_cfg.get("markets", {}).items():
             if market and mkt != market:
                 continue
-            symbols = resolve_symbols(mkt)
+            symbols = resolve_symbols(client, mkt)
             tag = to_tag(symbols["kraken_name"])
             file_tag = symbols["kraken_name"].replace("/", "_")
             ledger_name = f"{acct_name}_{file_tag}"
@@ -197,6 +213,7 @@ def run_live(*, account: str, market: str | None = None, dry: bool = False, verb
                 mkt,
                 strat,
                 mode="live",
+                client=client,
                 prev={"verbose": verbose},
             )
             state["buy_unlock_p"] = {}

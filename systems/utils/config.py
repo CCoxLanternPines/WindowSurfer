@@ -6,6 +6,8 @@ from pathlib import Path
 import json
 from typing import Any, Dict
 
+import ccxt
+
 from systems.utils.addlog import addlog
 from systems.utils.resolve_symbol import resolve_symbols, to_tag
 
@@ -38,10 +40,11 @@ def resolve_ccxt_symbols_by_coin(coin: str) -> tuple[str, str]:
     from systems.utils.load_config import load_config
 
     cfg = load_config()
+    client = ccxt.kraken({"enableRateLimit": True})
     coin_up = coin.upper()
     for acct in cfg.get("accounts", {}).values():
         for market in acct.get("markets", {}).keys():
-            symbols = resolve_symbols(market)
+            symbols = resolve_symbols(client, market)
             tag = to_tag(symbols["kraken_name"])
             base = symbols["kraken_name"].split("/")[0].upper()
             if base.startswith(coin_up):

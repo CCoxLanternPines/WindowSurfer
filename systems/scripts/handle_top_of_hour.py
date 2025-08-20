@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
+import ccxt
 import pandas as pd
 
 from systems.scripts.evaluate_buy import evaluate_buy
@@ -78,7 +79,9 @@ def handle_top_of_hour(
         verbose = general_cfg.get("verbose", 0)
 
         for ledger_name, ledger_cfg in settings.get("ledger_settings", {}).items():
-            symbols = resolve_symbols(ledger_cfg["kraken_name"])
+            if client is None:
+                client = ccxt.kraken({"enableRateLimit": True})
+            symbols = resolve_symbols(client, ledger_cfg["kraken_name"])
             tag = to_tag(symbols["kraken_name"])
             file_tag = symbols["kraken_name"].replace("/", "_")
             pair_code = symbols["kraken_pair"]

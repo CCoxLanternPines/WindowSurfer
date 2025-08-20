@@ -9,6 +9,7 @@ from systems.utils.addlog import addlog, send_telegram_message
 from systems.utils.config import load_settings
 from systems.utils.resolve_symbol import split_tag, resolve_symbols
 from systems.utils.snapshot import load_snapshot
+import ccxt
 
 
 def _get_latest_price(trades: dict, pair: str) -> float:
@@ -35,7 +36,8 @@ def send_top_hour_report(
 ) -> None:
     """Load Kraken snapshot and send a formatted Telegram report."""
     ledger_cfg = settings.get("ledger_settings", {}).get(ledger_name, {})
-    symbols = resolve_symbols(ledger_cfg.get("kraken_name", tag))
+    client = ccxt.kraken({"enableRateLimit": True})
+    symbols = resolve_symbols(client, ledger_cfg.get("kraken_name", tag))
     file_tag = symbols["kraken_name"].replace("/", "_")
     snapshot = load_snapshot(file_tag)
     if not snapshot:

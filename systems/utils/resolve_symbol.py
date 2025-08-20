@@ -2,66 +2,62 @@
 
 from __future__ import annotations
 
-BASE_MAP = {
-    "XBT": "BTC",
-    "XDG": "DOGE",
-}
+import ccxt
 
 
-def resolve_symbols(kraken_name: str) -> dict[str, str]:
-    """Derive related symbol names from a Kraken CCXT pair."""
+def resolve_symbols(client: ccxt.Exchange, config_name: str) -> dict[str, str]:
+    """Validate ``config_name`` and return normalized symbols.
 
-    base, quote = kraken_name.split("/")
-    base_cc = BASE_MAP.get(base, base)
+    Parameters
+    ----------
+    client:
+        Initialized CCXT Kraken client.
+    config_name:
+        Human friendly market string such as ``"DOGE/USD"``.
+    """
+    markets = client.load_markets()
 
-    kraken_pair = base + quote
+    if config_name not in markets:
+        raise RuntimeError(f"[ERROR] Invalid trading pair: {config_name}")
 
+    m = markets[config_name]
+    kraken_name = m["symbol"]
+    kraken_pair = m["id"]
+
+    base, quote = m["base"], m["quote"]
     if quote == "USD":
-        binance = base_cc + "USDT"
+        binance_quote = "USDT"
     else:
-        binance = base_cc + quote
+        binance_quote = quote
+    binance_name = base + binance_quote
 
     return {
-        "kraken_name": f"{base}/{quote}",
+        "kraken_name": kraken_name,
         "kraken_pair": kraken_pair,
-        "binance_name": binance,
+        "binance_name": binance_name,
     }
 
 
+# ---------------------------------------------------------------------------
+# Legacy helpers retained for compatibility
+
 def to_tag(symbol: str) -> str:
     """Normalize exchange symbol to uppercase tag without separators."""
-
     return symbol.replace("/", "").replace(" ", "").upper()
 
 
 def sim_path_csv(tag: str) -> str:
     """Return canonical SIM CSV path for ``tag``."""
-
     return f"data/sim/{tag}_1h.csv"
 
 
 def live_path_csv(tag: str) -> str:
     """Return canonical LIVE CSV path for ``tag``."""
-
     return f"data/live/{tag}_1h.csv"
 
 
 def split_tag(tag: str) -> tuple[str, str]:
-    """Return base symbol and Kraken quote asset code for ``tag``.
-
-    Parameters
-    ----------
-    tag:
-        Trading pair tag such as ``DOGEUSD`` or ``SOLUSDC``.
-
-    Returns
-    -------
-    tuple[str, str]
-        A tuple ``(base, quote_asset)`` where ``base`` is the base currency
-        symbol and ``quote_asset`` is the Kraken asset code for the quote
-        currency (e.g. ``"ZUSD"`` for USD).
-    """
-
+    """Return base symbol and Kraken quote asset code for ``tag``."""
     tag = tag.upper()
     mapping = {
         "USDT": "USDT",
@@ -75,4 +71,3 @@ def split_tag(tag: str) -> tuple[str, str]:
         if tag.endswith(suffix):
             return tag[: -len(suffix)], asset_code
     return tag, ""
-

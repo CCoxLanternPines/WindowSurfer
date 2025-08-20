@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 import sys
 
+import ccxt
+
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -34,8 +36,16 @@ def run_fetch(account: str, market: str | None = None) -> None:
     markets = acct_cfg.get("markets", {})
     targets = [market] if market else list(markets.keys())
 
+    client = ccxt.kraken(
+        {
+            "enableRateLimit": True,
+            "apiKey": acct_cfg.get("api_key", ""),
+            "secret": acct_cfg.get("api_secret", ""),
+        }
+    )
+
     for m in targets:
-        symbols = resolve_symbols(m)
+        symbols = resolve_symbols(client, m)
         kraken_symbol = symbols["kraken_name"]
         binance_symbol = symbols["binance_name"]
 

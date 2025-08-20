@@ -12,6 +12,7 @@ def build_runtime_state(
     strategy_cfg: Dict[str, Any],
     mode: str,
     *,
+    client,
     prev: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build and refresh runtime state for engines."""
@@ -45,7 +46,7 @@ def build_runtime_state(
     buy_unlock_p = prev.get("buy_unlock_p", {})
     verbose = prev.get("verbose", 0)
 
-    symbols = resolve_symbols(market)
+    symbols = resolve_symbols(client, market)
     tag = to_tag(symbols["kraken_name"])
     file_tag = symbols["kraken_name"].replace("/", "_")
     if mode == "sim":
