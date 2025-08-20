@@ -26,15 +26,21 @@ def view_log(ledger_name: str) -> None:
         print(f"[EMPTY] {ledger_name} log has no entries")
         return
 
-    times = pd.to_datetime([e["timestamp"] for e in events])
-    prices: list[float | None] = []
-    colors: list[str] = []
-    annotations: list[str] = []
+    times = []
+    prices = []
+    colors = []
+    annotations = []
 
     for e in events:
         decision = e["decision"]
         trades = e.get("trades") or []
-        price = trades[0].get("price") if trades else None
+
+        # Prefer trade price, fallback to candle close
+        price = trades[0].get("price") if trades else e.get("features", {}).get("close")
+        if price is None:
+            continue  # skip events with no price info
+
+        times.append(pd.to_datetime(e["timestamp"]))
         prices.append(price)
         colors.append(
             "green"
@@ -45,10 +51,12 @@ def view_log(ledger_name: str) -> None:
             if decision == "FLAT"
             else "gray"
         )
+
         features = e.get("features", {})
         annotations.append(
             f"{e['timestamp']}\n"
             f"Decision: {decision}\n"
+            f"Price: {price}\n"
             f"Slope: {features.get('slope')}\n"
             f"Volatility: {features.get('volatility')}\n"
             f"BuyP: {features.get('buy_pressure')} | "
@@ -77,4 +85,3 @@ if __name__ == "__main__":
     parser.add_argument("--ledger", required=True)
     args = parser.parse_args()
     view_log(args.ledger)
-

@@ -196,6 +196,7 @@ def _run_iteration(
 
         save_ledger(name, ledger_obj, tag=ledger_cfg["tag"])
 
+        # record structured event
         features = state.get("last_features", {}).get("strategy", {})
         pressures = state.get("pressures", {})
         event = {
@@ -205,6 +206,7 @@ def _run_iteration(
             "window": f"{strategy_cfg.get('window_size', 0)}h",
             "decision": decision,
             "features": {
+                "close": float(df.iloc[t]["close"]),  # ✅ include close price
                 "slope": features.get("slope"),
                 "volatility": features.get("volatility"),
                 "buy_pressure": pressures.get("buy", {}).get("strategy", 0.0),
@@ -215,6 +217,7 @@ def _run_iteration(
             "trades": trades_log,
         }
         record_event(event)
+
 
 
 def run_live(*, ledger: str | None = None, dry: bool = False, verbose: int = 0) -> None:

@@ -10,6 +10,8 @@ import os
 
 import pandas as pd
 from tqdm import tqdm
+from typing import Any, Dict
+from pathlib import Path
 
 from systems.scripts.ledger import Ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
@@ -22,8 +24,6 @@ from systems.scripts.trade_apply import (
     paper_execute_sell,
 )
 from systems.utils.addlog import addlog
-from pathlib import Path
-
 from systems.utils.config import load_settings, load_ledger_config, resolve_path
 from systems.utils.resolve_symbol import (
     split_tag,
@@ -32,6 +32,7 @@ from systems.utils.resolve_symbol import (
     sim_path_csv,
 )
 from systems.utils.time import parse_cutoff as parse_timeframe
+from systems.utils.trade_logger import record_event
 
 
 def run_simulation(
@@ -53,7 +54,7 @@ def run_simulation(
     csv_path = sim_path_csv(tag)
     if not Path(csv_path).exists():
         print(
-            f"[ERROR] Missing data file: {csv_path}. Run: python bot.py --mode fetch --ledger {ledger}"
+            f"[ERROR] Missing data file: {csv_path}. Run: python bot.py --mode fetch --account {ledger}"
         )
         raise SystemExit(1)
     df = pd.read_csv(csv_path)
@@ -113,10 +114,9 @@ def run_simulation(
     runtime_state["symbol"] = ledger_cfg.get("tag", "")
     runtime_state["buy_unlock_p"] = {}
 
-
     ledger_obj = Ledger()
     buy_points: list[tuple[float, float]] = []
-    sell_points: list[tuple[float, float]] = []
+    sell_points: list[tuple[float, float, str]] = []
     win_metrics = {
         "strategy": {
             "window_size": str(strategy_cfg.get("window_size", "")),
@@ -146,9 +146,11 @@ def run_simulation(
             if ts is not None
             else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         )
-        # Simulation mode does not emit structured trade logs
-
+        decision = "HOLD"
+        trades_log: list[dict[str, Any]] = []
         ctx = {"ledger": ledger_obj}
+
+        # --- Buy evaluation ---
         buy_res = evaluate_buy(
             ctx,
             t,
@@ -158,7 +160,6 @@ def run_simulation(
         )
         if buy_res:
             result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
-
             note = apply_buy(
                 ledger=ledger_obj,
                 window_name="strategy",
@@ -167,7 +168,6 @@ def run_simulation(
                 result=result,
                 state=runtime_state,
             )
-
             runtime_state.setdefault("buy_unlock_p", {})["strategy"] = buy_res.get("unlock_p")
 
             m_buy = win_metrics.get("strategy")
@@ -176,11 +176,20 @@ def run_simulation(
                 m_buy["buys"] += 1
                 m_buy["gross_invested"] += cost
 
-            # No structured logging in simulation
+            trades_log.append(
+                {
+                    "action": "BUY",
+                    "amount": result["filled_amount"] * result["avg_price"],
+                    "price": result["avg_price"],
+                    "note_id": note.get("id"),
+                }
+            )
+            decision = "BUY"
 
             if viz:
                 buy_points.append((float(df.iloc[t][ts_col]), price))
 
+        # --- Sell evaluation ---
         open_notes = ledger_obj.get_open_notes()
         sell_notes = evaluate_sell(
             ctx,
@@ -190,6 +199,12 @@ def run_simulation(
             open_notes=open_notes,
             runtime_state=runtime_state,
         )
+        if sell_notes:
+            decision = (
+                "FLAT"
+                if any(n.get("sell_mode") == "flat" for n in sell_notes)
+                else "SELL"
+            )
 
         for note in sell_notes:
             result = paper_execute_sell(
@@ -205,8 +220,14 @@ def run_simulation(
                 result=result,
                 state=runtime_state,
             )
-
-            # No structured logging in simulation
+            trades_log.append(
+                {
+                    "action": "SELL",
+                    "amount": result["filled_amount"] * result["avg_price"],
+                    "price": result["avg_price"],
+                    "note_id": closed.get("id"),
+                }
+            )
 
             qty = closed.get("entry_amount", 0.0)
             buy_price = closed.get("entry_price", 0.0)
@@ -222,8 +243,29 @@ def run_simulation(
                 m_sell["realized_trades"] += 1
                 m_sell["realized_roi_accum"] += roi_trade
 
-        # No structured logging in simulation
+        # --- Structured event logging ---
+        features = runtime_state.get("last_features", {}).get("strategy", {})
+        pressures = runtime_state.get("pressures", {})
+        event = {
+            "timestamp": iso_ts,
+            "ledger": ledger,
+            "pair": tag,
+            "window": f"{strategy_cfg.get('window_size', 0)}h",
+            "decision": decision,
+            "features": {
+                "close": price,  # ✅ ensure close price logged
+                "slope": features.get("slope"),
+                "volatility": features.get("volatility"),
+                "buy_pressure": pressures.get("buy", {}).get("strategy", 0.0),
+                "sell_pressure": pressures.get("sell", {}).get("strategy", 0.0),
+                "buy_trigger": strategy_cfg.get("buy_trigger", 0.0),
+                "sell_trigger": strategy_cfg.get("sell_trigger", 0.0),
+            },
+            "trades": trades_log,
+        }
+        record_event(event)
 
+    # --- Reporting + plots (unchanged below) ---
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
     summary = ledger_obj.get_account_summary(final_price)
 
