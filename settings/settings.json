@@ -2,7 +2,7 @@
   "general_settings": {
     "max_note_usdt": 99999.0,
     "minimum_note_size": 10,
-    "simulation_capital": 55000
+    "simulation_capital": 1000
   },
   "coin_settings": {
     "default": {
@@ -19,10 +19,6 @@
       "range_min": 0.08,
       "volume_skew_bias": 0.4,
       "flat_band_deg": 8.0
-    },
-    "SOL/USD": {
-      "buy_trigger": 2,
-      "investment_fraction": 0.8
     },
     "DOGE/USD": {
       "buy_trigger": 4,
