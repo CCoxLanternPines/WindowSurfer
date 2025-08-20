@@ -65,6 +65,14 @@ def main(argv: list[str] | None = None) -> None:
             verbose=args.verbose,
         )
 
+    elif mode == "test":
+        from systems.scripts.trade_test import run_trade_test
+
+        if not args.account:
+            addlog("Error: --account is required for test mode")
+            sys.exit(1)
+        run_trade_test(args.account)
+
     elif mode == "wallet":
         accounts_cfg = cfg.get("accounts", {})
         targets = accounts_cfg.keys() if run_all else [args.account]
