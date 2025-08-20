@@ -65,12 +65,13 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     elif mode == "test":
-        from systems.scripts.trade_test import run_trade_test
+        from systems.scripts.test_mode import run_test
 
-        if not args.account:
-            addlog("Error: --account is required for test mode")
+        if not args.ledger:
+            addlog("Error: --ledger is required for test mode")
             sys.exit(1)
-        run_trade_test(args.account)
+        exit_code = run_test(args.ledger)
+        sys.exit(exit_code)
 
     elif mode == "wallet":
         accounts_cfg = cfg.get("accounts", {})
