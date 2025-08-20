@@ -27,6 +27,12 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Enable visualization plotting",
     )
+    parser.add_argument(
+        "--period",
+        type=str,
+        default="daily",
+        help="Report period for email mode (daily|weekly|monthly|yearly|test)",
+    )
 
     args = parser.parse_args(argv or sys.argv[1:])
     if not args.mode:
@@ -98,6 +104,14 @@ def main(argv: list[str] | None = None) -> None:
             sys.exit(1)
         from systems.scripts.view_log import view_log
         view_log(args.account, timeframe=args.time)
+
+    elif mode == "email":
+        from systems.scripts.report import run_report
+
+        if not args.account:
+            addlog("Error: --account is required for email mode")
+            sys.exit(1)
+        run_report(args.account, args.period)
 
     else:
         parser.error(f"Unknown mode: {args.mode}")
