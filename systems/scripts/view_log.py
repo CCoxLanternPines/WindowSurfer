@@ -5,16 +5,19 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from datetime import datetime
 
 import matplotlib.pyplot as plt
 import mplcursors
 import pandas as pd
 
+from systems.utils.time import parse_duration
 
-def view_log(ledger_name: str) -> None:
-    """Render a scatter plot of decisions from ``ledger_name`` log."""
 
-    log_path = Path(f"data/logs/{ledger_name}.json")
+def view_log(account_name: str, timeframe: str | None = None) -> None:
+    """Render a scatter plot of decisions from ``account_name`` log."""
+
+    log_path = Path(f"data/logs/{account_name}.json")
     if not log_path.exists():
         print(f"[ERROR] No log found at {log_path}")
         return
@@ -22,8 +25,13 @@ def view_log(ledger_name: str) -> None:
     with log_path.open() as f:
         events = json.load(f)
 
+    if timeframe:
+        delta = parse_duration(timeframe)
+        cutoff = datetime.utcnow() - delta
+        events = [e for e in events if pd.to_datetime(e["timestamp"]) >= cutoff]
+
     if not events:
-        print(f"[EMPTY] {ledger_name} log has no entries")
+        print(f"[EMPTY] {account_name} log has no entries")
         return
 
     times = pd.to_datetime([e["timestamp"] for e in events])
@@ -64,7 +72,7 @@ def view_log(ledger_name: str) -> None:
     def on_hover(sel):
         sel.annotation.set(text=annotations[sel.index])
 
-    ax.set_title(f"Trading Decisions for {ledger_name}")
+    ax.set_title(f"Trading Decisions for {account_name}")
     ax.set_xlabel("Time")
     ax.set_ylabel("Price (USDT)")
     plt.xticks(rotation=45)
@@ -74,7 +82,8 @@ def view_log(ledger_name: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ledger", required=True)
+    parser.add_argument("--account", required=True)
+    parser.add_argument("--time", type=str, default=None)
     args = parser.parse_args()
-    view_log(args.ledger)
+    view_log(args.account, timeframe=args.time)
 
