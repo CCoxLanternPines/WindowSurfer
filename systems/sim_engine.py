@@ -32,6 +32,7 @@ from systems.utils.resolve_symbol import (
     resolve_symbols,
     to_tag,
     sim_path_csv,
+    candle_filename,
 )
 from systems.utils.time import parse_cutoff as parse_timeframe
 
@@ -66,8 +67,15 @@ def _run_single_sim(
     ledger_name = f"{account}_{file_tag}"
     base, _ = split_tag(tag)
     coin = base.upper()
-    csv_path = sim_path_csv(tag)
+    csv_path = candle_filename(account, market)
     if not Path(csv_path).exists():
+        legacy = sim_path_csv(tag)
+        if Path(legacy).exists():
+            addlog(
+                f"[DEPRECATED] Found legacy file {legacy}, use {csv_path}",
+                verbose_int=1,
+                verbose_state=verbose,
+            )
         print(
             f"[ERROR] Missing data file: {csv_path}. Run: python bot.py --mode fetch --account {account} --market {market}"
         )

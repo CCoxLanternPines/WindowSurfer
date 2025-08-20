@@ -3,7 +3,6 @@ from __future__ import annotations
 """Live engine mirroring the simulation strategy."""
 
 import os
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
@@ -17,8 +16,9 @@ from systems.utils.resolve_symbol import (
     resolve_symbols,
     live_path_csv,
     sim_path_csv,
+    candle_filename,
 )
-from systems.scripts.candle_cache import refresh_live_kraken_720, load_sim_for_high_low
+from systems.scripts.fetch_candles import fetch_kraken_last_n_hours_1h
 from systems.scripts.ledger import load_ledger, save_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
@@ -65,9 +65,20 @@ def _run_iteration(
             file_tag = market.replace("/", "_")
             ledger_name = f"{acct_name}_{file_tag}"
             base = kraken_name.split("/")[0]
-            refresh_live_kraken_720(kraken_name)
-            live_file = live_path_csv(tag)
+            live_file = candle_filename(acct_name, market, live=True)
+            df_live = fetch_kraken_last_n_hours_1h(kraken_name, n=720)
+            tmp_live = live_file + ".tmp"
+            os.makedirs(os.path.dirname(live_file), exist_ok=True)
+            df_live.to_csv(tmp_live, index=False)
+            os.replace(tmp_live, live_file)
             if not Path(live_file).exists():
+                legacy_live = live_path_csv(tag)
+                if Path(legacy_live).exists():
+                    addlog(
+                        f"[DEPRECATED] Found legacy file {legacy_live}, use {live_file}",
+                        verbose_int=1,
+                        verbose_state=verbose,
+                    )
                 print(
                     f"[ERROR] Missing data file: {live_file}. Run: python bot.py --mode fetch --account {acct_name} --market {market}"
                 )
@@ -89,19 +100,28 @@ def _run_iteration(
                 "%Y-%m-%dT%H:%M:%SZ",
             )
             print(f"[DATA][LIVE] file={live_file} rows={len(df)} last={last_iso}")
-            if tag not in hist_cache:
-                sim_file = sim_path_csv(tag)
+            if ledger_name not in hist_cache:
+                sim_file = candle_filename(acct_name, market)
                 if not Path(sim_file).exists():
+                    legacy_sim = sim_path_csv(tag)
+                    if Path(legacy_sim).exists():
+                        addlog(
+                            f"[DEPRECATED] Found legacy file {legacy_sim}, use {sim_file}",
+                            verbose_int=1,
+                            verbose_state=verbose,
+                        )
                     print(
                         f"[ERROR] Missing data file: {sim_file}. Run: python bot.py --mode fetch --account {acct_name} --market {market}"
                     )
                     raise SystemExit(1)
-                hist_low, hist_high = load_sim_for_high_low(tag)
-                hist_cache[tag] = (hist_low, hist_high)
+                df_sim = pd.read_csv(sim_file)
+                hist_low = float(df_sim["low"].min())
+                hist_high = float(df_sim["high"].max())
+                hist_cache[ledger_name] = (hist_low, hist_high)
                 print(
                     f"[STATS][LIVE] hist_low={hist_low:.2f} hist_high={hist_high:.2f} from={sim_file}"
                 )
-            hist_low, hist_high = hist_cache[tag]
+            hist_low, hist_high = hist_cache[ledger_name]
             t = len(df) - 1
             ledger_obj = load_ledger(ledger_name, tag=file_tag)
             prev = runtime_states.get(ledger_name, {"verbose": verbose})

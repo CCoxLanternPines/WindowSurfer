@@ -24,6 +24,14 @@ def resolve_symbols(client: ccxt.Exchange, config_name: str) -> dict[str, str]:
     }
 
 
+def candle_filename(account: str, market: str, live: bool = False) -> str:
+    """Return canonical candle CSV path for ``account``/``market``."""
+
+    base = f"{account}_{market.replace('/', '_')}_1h.csv"
+    folder = "data/live" if live else "data/sim"
+    return f"{folder}/{base}"
+
+
 # ---------------------------------------------------------------------------
 # Legacy helpers retained for compatibility
 

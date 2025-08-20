@@ -13,7 +13,7 @@ if __package__ is None or __package__ == "":
 
 from systems.utils.addlog import addlog
 from systems.utils.load_config import load_config
-from systems.utils.resolve_symbol import resolve_symbols, to_tag
+from systems.utils.resolve_symbol import resolve_symbols, candle_filename
 from systems.scripts.fetch_candles import (
     fetch_binance_full_history_1h,
     fetch_kraken_last_n_hours_1h,
@@ -82,11 +82,9 @@ def run_fetch(
                 )
                 raise SystemExit(1)
 
-            tag = to_tag(kraken_name)
-
             # Binance full history -> SIM
             df_sim = fetch_binance_full_history_1h(binance_name)
-            sim_path = f"data/sim/{tag}_1h.csv"
+            sim_path = candle_filename(acct_name, m)
             tmp_sim = sim_path + ".tmp"
             os.makedirs(os.path.dirname(sim_path), exist_ok=True)
             df_sim.to_csv(tmp_sim, index=False)
@@ -94,7 +92,7 @@ def run_fetch(
 
             # Kraken last 720 -> LIVE
             df_live = fetch_kraken_last_n_hours_1h(kraken_name, n=720)
-            live_path = f"data/live/{tag}_1h.csv"
+            live_path = candle_filename(acct_name, m, live=True)
             tmp_live = live_path + ".tmp"
             os.makedirs(os.path.dirname(live_path), exist_ok=True)
             df_live.to_csv(tmp_live, index=False)
