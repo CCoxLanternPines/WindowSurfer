@@ -13,6 +13,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from systems.scripts.ledger import Ledger, save_ledger
+from systems.scripts.candle_loader import load_candles_df
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
@@ -50,6 +51,11 @@ def _run_single_sim(
 ) -> None:
     os.environ["WS_MODE"] = "sim"
     os.environ["WS_ACCOUNT"] = account
+    addlog(
+        "[PARITY] Running in sim mode — strategy knobs identical, only execution differs",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
 
     symbols = resolve_symbols(client, market)
     kraken_name = symbols["kraken_name"]
@@ -68,36 +74,8 @@ def _run_single_sim(
     base, _ = split_tag(tag)
     coin = base.upper()
     csv_path = candle_filename(account, market)
-    if not Path(csv_path).exists():
-        legacy = sim_path_csv(tag)
-        if Path(legacy).exists():
-            addlog(
-                f"[DEPRECATED] Found legacy file {legacy}, use {csv_path}",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-        print(
-            f"[ERROR] Missing data file: {csv_path}. Run: python bot.py --mode fetch --account {account} --market {market}"
-        )
-        raise SystemExit(1)
-    df = pd.read_csv(csv_path)
-
-    # Normalize + guard
-    ts_col = None
-    for c in df.columns:
-        lc = str(c).lower()
-        if lc in ("timestamp", "time", "date"):
-            ts_col = c
-            break
-    if ts_col is None:
-        raise ValueError(f"No timestamp column in {csv_path}")
-
-    df[ts_col] = pd.to_numeric(df[ts_col], errors="coerce")
-    df = df.dropna(subset=[ts_col])
-
-    before = len(df)
-    df = df.sort_values(ts_col).drop_duplicates(subset=[ts_col], keep="last").reset_index(drop=True)
-    removed = before - len(df)
+    df, removed = load_candles_df(account, market, verbose=verbose)
+    ts_col = "timestamp"
 
     # Optional hard check
     if not df[ts_col].is_monotonic_increasing:
@@ -140,6 +118,7 @@ def _run_single_sim(
     runtime_state["buy_unlock_p"] = {}
 
     ledger_obj = Ledger()
+    ledger_obj.set_metadata({"capital": runtime_state.get("capital", 0.0)})
     buy_points: list[tuple[float, float]] = []
     sell_points: list[tuple[float, float]] = []
     win_metrics = {
@@ -297,7 +276,7 @@ def _run_single_sim(
         verbose_int=1,
         verbose_state=verbose,
     )
-
+    ledger_obj.set_metadata({"capital": runtime_state.get("capital", 0.0)})
     save_ledger(
         ledger_name,
         ledger_obj,
