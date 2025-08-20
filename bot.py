@@ -45,15 +45,14 @@ def main(argv: list[str] | None = None) -> None:
 
     cfg = load_config()
 
-    if args.ledger and not args.account and not args.all:
+    if getattr(args, "ledger", None):
         addlog(
             "[DEPRECATED] --ledger is deprecated; use --account",
             verbose_int=1,
             verbose_state=True,
         )
-        first_acct = next(iter(cfg.get("accounts", {})), None)
-        if first_acct:
-            args.account = first_acct
+        if not args.account:
+            args.account = args.ledger
 
     try:
         asset_pairs = load_asset_pairs()
@@ -69,9 +68,9 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(1)
 
     accounts_cfg = cfg.get("accounts", {})
-    if args.all:
+    if args.all or not args.account:
         account_list = list(accounts_cfg.keys())
-    elif args.account:
+    else:
         if args.account not in accounts_cfg:
             addlog(
                 f"[ERROR] Unknown account {args.account}",
@@ -80,21 +79,20 @@ def main(argv: list[str] | None = None) -> None:
             )
             sys.exit(1)
         account_list = [args.account]
-    else:
-        addlog("Error: --account or --all required")
-        sys.exit(1)
 
     run_map: dict[str, list[str]] = {}
     for acct in account_list:
         markets_cfg = accounts_cfg.get(acct, {}).get("markets", {})
         if args.market:
             if args.market not in markets_cfg:
-                addlog(
-                    f"[ERROR] Market {args.market} not configured for account {acct}",
-                    verbose_int=1,
-                    verbose_state=True,
-                )
-                sys.exit(1)
+                if args.account:
+                    addlog(
+                        f"[ERROR] Market {args.market} not configured for account {acct}",
+                        verbose_int=1,
+                        verbose_state=True,
+                    )
+                    sys.exit(1)
+                continue
             markets = [args.market]
         else:
             markets = list(markets_cfg.keys())
@@ -108,7 +106,8 @@ def main(argv: list[str] | None = None) -> None:
                     verbose_state=True,
                 )
                 sys.exit(1)
-        run_map[acct] = markets
+        if markets:
+            run_map[acct] = markets
 
     if mode == "fetch":
         for acct, markets in run_map.items():
@@ -126,7 +125,7 @@ def main(argv: list[str] | None = None) -> None:
                 )
     elif mode == "live":
         run_live(
-            account=None if args.all else args.account,
+            account=None if (args.all or not args.account) else args.account,
             market=args.market,
             dry=args.dry,
             verbose=args.verbose,

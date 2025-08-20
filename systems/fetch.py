@@ -11,12 +11,7 @@ if __package__ is None or __package__ == "":
 
 from systems.utils.addlog import addlog
 from systems.utils.load_config import load_config
-from systems.utils.resolve_symbol import (
-    resolve_symbols,
-    to_tag,
-    live_path_csv,
-    sim_path_csv,
-)
+from systems.utils.resolve_symbol import resolve_symbols
 from systems.scripts.fetch_candles import (
     fetch_binance_full_history_1h,
     fetch_kraken_last_n_hours_1h,
@@ -59,24 +54,19 @@ def run_fetch(account: str, market: str | None = None) -> None:
             )
             raise SystemExit(1)
 
-        tag = to_tag(kraken_symbol)
+        file_tag = kraken_symbol.replace("/", "_")
 
         # Binance full history -> SIM
         df_sim = fetch_binance_full_history_1h(binance_symbol)
-        sim_path = sim_path_csv(tag)
+        sim_path = f"data/sim/{account}_{file_tag}_1h.csv"
         tmp_sim = sim_path + ".tmp"
         os.makedirs(os.path.dirname(sim_path), exist_ok=True)
         df_sim.to_csv(tmp_sim, index=False)
         os.replace(tmp_sim, sim_path)
-        addlog(
-            f"[FETCH][SIM] source=binance symbol={binance_symbol} tag={tag} rows={len(df_sim)} path={sim_path}",
-            verbose_int=1,
-            verbose_state=True,
-        )
 
         # Kraken last 720 -> LIVE
         df_live = fetch_kraken_last_n_hours_1h(kraken_symbol, n=720)
-        live_path = live_path_csv(tag)
+        live_path = f"data/live/{account}_{file_tag}_1h.csv"
         tmp_live = live_path + ".tmp"
         os.makedirs(os.path.dirname(live_path), exist_ok=True)
         df_live.to_csv(tmp_live, index=False)
@@ -84,12 +74,13 @@ def run_fetch(account: str, market: str | None = None) -> None:
         rows = len(df_live)
         if rows < 720:
             addlog(
-                f"[FETCH][LIVE][WARN] source=kraken symbol={kraken_symbol} returned {rows} rows (<720)",
+                f"[FETCH][WARN] {account} {kraken_symbol} returned {rows} rows (<720) from kraken",
                 verbose_int=1,
                 verbose_state=True,
             )
+
         addlog(
-            f"[FETCH][LIVE] source=kraken symbol={kraken_symbol} tag={tag} rows={rows} path={live_path}",
+            f"[FETCH][{account}][{kraken_symbol}] saved sim/live candles",
             verbose_int=1,
             verbose_state=True,
         )
