@@ -49,6 +49,11 @@ def apply_buy(
     ledger.open_note(note)
     cost = result.get("filled_amount", 0.0) * result.get("avg_price", 0.0)
     state["capital"] = state.get("capital", 0.0) - cost
+    # Persist remaining capital on the ledger for live-mode parity
+    try:
+        ledger.set_metadata({"capital": state.get("capital", 0.0)})
+    except AttributeError:
+        pass
     return note
 
 
@@ -73,4 +78,9 @@ def apply_sell(
     note["gain_pct"] = (note["gain"] / entry_usdt) if entry_usdt else 0.0
     ledger.close_note(note)
     state["capital"] = state.get("capital", 0.0) + exit_usdt
+    # Persist capital back to ledger after the sale
+    try:
+        ledger.set_metadata({"capital": state.get("capital", 0.0)})
+    except AttributeError:
+        pass
     return note

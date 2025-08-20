@@ -43,7 +43,10 @@ class Ledger:
         self.closed_notes.append(note)
 
     def set_metadata(self, metadata: Dict) -> None:
-        self.metadata = metadata
+        """Merge ``metadata`` into the ledger metadata."""
+        if not isinstance(metadata, dict):
+            return
+        self.metadata.update(metadata)
 
     def get_metadata(self) -> Dict:
         return dict(self.metadata)

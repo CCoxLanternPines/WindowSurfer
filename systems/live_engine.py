@@ -4,18 +4,14 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Dict
 
 import ccxt
-import pandas as pd
 from tqdm import tqdm
 
 from systems.utils.resolve_symbol import (
     to_tag,
     resolve_symbols,
-    live_path_csv,
-    sim_path_csv,
     candle_filename,
 )
 from systems.scripts.fetch_candles import fetch_kraken_last_n_hours_1h
@@ -25,6 +21,7 @@ from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
 from systems.scripts.trade_apply import apply_sell
 from systems.scripts.execution_handler import execute_sell, process_buy_signal
+from systems.scripts.candle_loader import load_candles_df
 from systems.utils.addlog import addlog
 from systems.utils.load_config import load_config
 
@@ -71,53 +68,20 @@ def _run_iteration(
             os.makedirs(os.path.dirname(live_file), exist_ok=True)
             df_live.to_csv(tmp_live, index=False)
             os.replace(tmp_live, live_file)
-            if not Path(live_file).exists():
-                legacy_live = live_path_csv(tag)
-                if Path(legacy_live).exists():
-                    addlog(
-                        f"[DEPRECATED] Found legacy file {legacy_live}, use {live_file}",
-                        verbose_int=1,
-                        verbose_state=verbose,
-                    )
-                print(
-                    f"[ERROR] Missing data file: {live_file}. Run: python bot.py --mode fetch --account {acct_name} --market {market}"
-                )
-                raise SystemExit(1)
-            df = pd.read_csv(live_file)
-            ts_col = next(
-                (c for c in df.columns if str(c).lower() in ("timestamp", "time", "date")),
-                None,
-            )
-            if ts_col is None:
-                print(f"[ERROR] Missing timestamp column in {live_file}")
-                raise SystemExit(1)
-            df[ts_col] = pd.to_numeric(df[ts_col], errors="coerce")
-            df = df.dropna(subset=[ts_col])
+            df, _ = load_candles_df(acct_name, market, live=True, verbose=verbose)
             if df.empty:
                 continue
-            last_ts = int(df[ts_col].iloc[-1])
+            last_ts = int(df["timestamp"].iloc[-1])
             last_iso = datetime.fromtimestamp(last_ts, tz=timezone.utc).strftime(
                 "%Y-%m-%dT%H:%M:%SZ",
             )
             print(f"[DATA][LIVE] file={live_file} rows={len(df)} last={last_iso}")
             if ledger_name not in hist_cache:
-                sim_file = candle_filename(acct_name, market)
-                if not Path(sim_file).exists():
-                    legacy_sim = sim_path_csv(tag)
-                    if Path(legacy_sim).exists():
-                        addlog(
-                            f"[DEPRECATED] Found legacy file {legacy_sim}, use {sim_file}",
-                            verbose_int=1,
-                            verbose_state=verbose,
-                        )
-                    print(
-                        f"[ERROR] Missing data file: {sim_file}. Run: python bot.py --mode fetch --account {acct_name} --market {market}"
-                    )
-                    raise SystemExit(1)
-                df_sim = pd.read_csv(sim_file)
+                df_sim, _ = load_candles_df(acct_name, market, verbose=verbose)
                 hist_low = float(df_sim["low"].min())
                 hist_high = float(df_sim["high"].max())
                 hist_cache[ledger_name] = (hist_low, hist_high)
+                sim_file = candle_filename(acct_name, market)
                 print(
                     f"[STATS][LIVE] hist_low={hist_low:.2f} hist_high={hist_high:.2f} from={sim_file}"
                 )
@@ -129,7 +93,7 @@ def _run_iteration(
                 cfg,
                 market,
                 strategy_cfg,
-                mode="live",
+                mode="sim",
                 client=client,
                 prev=prev,
             )
@@ -137,6 +101,7 @@ def _run_iteration(
             state["symbol"] = tag
             state["hist_low"] = hist_low
             state["hist_high"] = hist_high
+            state["capital"] = ledger_obj.get_metadata().get("capital", state.get("capital", 0.0))
             runtime_states[ledger_name] = state
 
             price = float(df.iloc[t]["close"])
@@ -160,7 +125,7 @@ def _run_iteration(
                     wallet_code=base,
                     verbose=state.get("verbose", 0),
                 )
-            sell_orders = evaluate_sell(
+            sell_notes = evaluate_sell(
                 {"ledger": ledger_obj},
                 t,
                 df,
@@ -168,46 +133,26 @@ def _run_iteration(
                 open_notes=ledger_obj.get_open_notes(),
                 runtime_state=state,
             )
-            for order in sell_orders:
-                note = order["note"]
-                amt = order["sell_amount"]
-                mode = order.get("sell_mode", "normal")
-                entry_price = note.get("entry_price", 0.0)
+            for note in sell_notes:
+                ts = int(df.iloc[t]["timestamp"])
                 result = execute_sell(
                     None,
                     pair_code=kraken_pair,
-                    coin_amount=amt,
+                    coin_amount=note.get("entry_amount", 0.0),
                     price=price,
                     ledger_name=tag,
-                    wallet_code=base,
                     verbose=state.get("verbose", 0),
                 )
                 if result and not result.get("error"):
-                    if amt >= note.get("entry_amount", 0.0) - 1e-9:
-                        note["sell_mode"] = mode
-                        apply_sell(
-                            ledger=ledger_obj,
-                            note=note,
-                            t=t,
-                            result=result,
-                            state=state,
-                        )
-                    else:
-                        partial = note.copy()
-                        partial["entry_amount"] = amt
-                        partial["entry_usdt"] = amt * entry_price
-                        partial["sell_mode"] = mode
-                        ledger_obj.open_note(partial)
-                        apply_sell(
-                            ledger=ledger_obj,
-                            note=partial,
-                            t=t,
-                            result=result,
-                            state=state,
-                        )
-                        note["entry_amount"] -= amt
-                        note["entry_usdt"] -= amt * entry_price
+                    apply_sell(
+                        ledger=ledger_obj,
+                        note=note,
+                        t=t,
+                        result=result,
+                        state=state,
+                    )
 
+            ledger_obj.set_metadata({"capital": state.get("capital", 0.0)})
             save_ledger(ledger_name, ledger_obj, tag=file_tag)
 
 
@@ -220,6 +165,11 @@ def run_live(
     verbose: int = 0,
 ) -> None:
     cfg = load_config()
+    addlog(
+        "[PARITY] Running in live mode — strategy knobs identical, only execution differs",
+        verbose_int=1,
+        verbose_state=verbose,
+    )
     runtime_states: Dict[str, Dict] = {}
     hist_cache: Dict[str, tuple[float, float]] = {}
 
@@ -265,15 +215,17 @@ def run_live(
                 cfg,
                 mkt,
                 strat,
-                mode="live",
+                mode="sim",
                 client=client,
                 prev={"verbose": verbose},
             )
+            state["mode"] = "live"
             state["buy_unlock_p"] = {}
             state["symbol"] = tag
+            ledger_obj = load_ledger(ledger_name, tag=file_tag)
+            state["capital"] = ledger_obj.get_metadata().get("capital", state.get("capital", 0.0))
             runtime_states[ledger_name] = state
 
-            ledger_obj = load_ledger(ledger_name, tag=file_tag)
             open_notes = ledger_obj.get_open_notes()
             total = len(open_notes)
             last_ts = None
