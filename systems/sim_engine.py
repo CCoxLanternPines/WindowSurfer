@@ -8,6 +8,7 @@ import csv
 import json
 import os
 
+import ccxt
 import pandas as pd
 from tqdm import tqdm
 
@@ -62,7 +63,15 @@ def run_simulation(
             verbose_state=verbose,
         )
         raise SystemExit(1)
-    symbols = resolve_symbols(market)
+    client = ccxt.kraken(
+        {
+            "enableRateLimit": True,
+            "apiKey": acct_cfg.get("api_key", ""),
+            "secret": acct_cfg.get("api_secret", ""),
+        }
+    )
+
+    symbols = resolve_symbols(client, market)
     kraken_symbol = symbols["kraken_name"]
     tag = to_tag(kraken_symbol)
     file_tag = kraken_symbol.replace("/", "_")
@@ -127,6 +136,7 @@ def run_simulation(
         market,
         strategy_cfg,
         mode="sim",
+        client=client,
         prev={"verbose": verbose},
     )
     runtime_state["mode"] = "sim"

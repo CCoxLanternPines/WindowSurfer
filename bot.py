@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 import sys
-from systems.utils.asset_pairs import load_asset_pairs
+
+import ccxt
 
 from systems.fetch import run_fetch
 from systems.live_engine import run_live
@@ -13,7 +14,7 @@ from systems.scripts.wallet import show_wallet
 from systems.utils.addlog import init_logger, addlog
 from systems.utils.load_config import load_config
 from systems.utils.cli import build_parser
-from systems.utils.resolve_symbol import resolve_symbols, to_tag
+from systems.utils.resolve_symbol import resolve_symbols
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -54,19 +55,6 @@ def main(argv: list[str] | None = None) -> None:
         if not args.account:
             args.account = args.ledger
 
-    try:
-        asset_pairs = load_asset_pairs()
-        valid_pairs = {
-            to_tag(pair_info.get("wsname", "")) for pair_info in asset_pairs.values()
-        }
-    except Exception:
-        addlog(
-            "[ERROR] Failed to load Kraken AssetPairs",
-            verbose_int=1,
-            verbose_state=True,
-        )
-        sys.exit(1)
-
     accounts_cfg = cfg.get("accounts", {})
     if args.all or not args.account:
         account_list = list(accounts_cfg.keys())
@@ -82,7 +70,15 @@ def main(argv: list[str] | None = None) -> None:
 
     run_map: dict[str, list[str]] = {}
     for acct in account_list:
-        markets_cfg = accounts_cfg.get(acct, {}).get("markets", {})
+        acct_cfg = accounts_cfg.get(acct, {})
+        client = ccxt.kraken(
+            {
+                "enableRateLimit": True,
+                "apiKey": acct_cfg.get("api_key", ""),
+                "secret": acct_cfg.get("api_secret", ""),
+            }
+        )
+        markets_cfg = acct_cfg.get("markets", {})
         if args.market:
             if args.market not in markets_cfg:
                 if args.account:
@@ -97,15 +93,8 @@ def main(argv: list[str] | None = None) -> None:
         else:
             markets = list(markets_cfg.keys())
         for m in markets:
-            symbols = resolve_symbols(m)
-            tag = to_tag(symbols["kraken_name"])
-            if tag.upper() not in valid_pairs:
-                addlog(
-                    f"[ERROR] Invalid trading pair: {m} — Not found in Kraken altname list",
-                    verbose_int=1,
-                    verbose_state=True,
-                )
-                sys.exit(1)
+            # validate via CCXT resolver
+            resolve_symbols(client, m)
         if markets:
             run_map[acct] = markets
 

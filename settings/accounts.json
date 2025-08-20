@@ -2,7 +2,7 @@
   "Kris": {
     "api_key": "YOUR_KRAKEN_API_KEY",
     "api_secret": "YOUR_KRAKEN_API_SECRET",
-    "markets": ["SOL/USD", "XMR/USD"]
+    "markets": ["BTC/USD", "DOGE/USD", "ETH/EUR"]
   },
   "Travis": {
     "api_key": "ANOTHER_KEY",

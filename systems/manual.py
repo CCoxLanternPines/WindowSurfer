@@ -11,6 +11,7 @@ from systems.utils.cli import build_parser
 from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.scripts.ledger import load_ledger, save_ledger
 from systems.utils.resolve_symbol import resolve_symbols, to_tag
+import ccxt
 def _coin_label(tag: str) -> str:
     for suffix in ["USD", "USDT", "USDC", "EUR", "GBP", "DAI"]:
         if tag.endswith(suffix):
@@ -48,7 +49,8 @@ def main(argv: Optional[list[str]] = None) -> None:
             f"[ERROR] Snapshot unavailable for ledger '{args.ledger}'"
         )
 
-    symbols = resolve_symbols(ledger_cfg["kraken_name"])
+    client = ccxt.kraken({"enableRateLimit": True})
+    symbols = resolve_symbols(client, ledger_cfg["kraken_name"])
     tag = to_tag(symbols["kraken_name"])
     file_tag = symbols["kraken_name"].replace("/", "_")
     kraken_pair = symbols["kraken_pair"]
