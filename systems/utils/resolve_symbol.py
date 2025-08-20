@@ -6,35 +6,21 @@ import ccxt
 
 
 def resolve_symbols(client: ccxt.Exchange, config_name: str) -> dict[str, str]:
-    """Validate ``config_name`` and return normalized symbols.
+    """Return exchange identifiers for ``config_name`` using CCXT."""
 
-    Parameters
-    ----------
-    client:
-        Initialized CCXT Kraken client.
-    config_name:
-        Human friendly market string such as ``"DOGE/USD"``.
-    """
     markets = client.load_markets()
 
     if config_name not in markets:
         raise RuntimeError(f"[ERROR] Invalid trading pair: {config_name}")
 
     m = markets[config_name]
-    kraken_name = m["symbol"]
-    kraken_pair = m["id"]
-
-    base, quote = m["base"], m["quote"]
-    if quote == "USD":
-        binance_quote = "USDT"
-    else:
-        binance_quote = quote
-    binance_name = base + binance_quote
 
     return {
-        "kraken_name": kraken_name,
-        "kraken_pair": kraken_pair,
-        "binance_name": binance_name,
+        "kraken_name": m["symbol"],
+        "kraken_pair": m["id"],
+        "binance_name": (
+            f"{m['base']}USDT" if m["quote"] == "USD" else f"{m['base']}{m['quote']}"
+        ),
     }
 
 

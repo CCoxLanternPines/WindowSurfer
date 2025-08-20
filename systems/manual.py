@@ -6,7 +6,7 @@ from typing import Optional
 
 from systems.utils.config import load_settings, resolve_path
 from systems.utils.addlog import addlog
-from systems.scripts.kraken_utils import ensure_snapshot, get_live_price
+from systems.scripts.kraken_utils import get_live_price
 from systems.utils.cli import build_parser
 from systems.scripts.execution_handler import execute_buy, execute_sell
 from systems.scripts.ledger import load_ledger, save_ledger
@@ -41,13 +41,6 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     if args.usd <= 0:
         raise SystemExit("[ERROR] --usd must be positive")
-
-    # Ensure snapshot exists
-    snapshot = ensure_snapshot(file_tag)
-    if not snapshot:
-        raise SystemExit(
-            f"[ERROR] Snapshot unavailable for ledger '{args.ledger}'"
-        )
 
     client = ccxt.kraken({"enableRateLimit": True})
     symbols = resolve_symbols(client, ledger_cfg["kraken_name"])
