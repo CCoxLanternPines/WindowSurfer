@@ -18,6 +18,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Specific market symbol to operate on (default: all for account)",
     )
     parser.add_argument(
+        "--ledger",
+        help="Ledger name to validate in test mode",
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
         help="Run all configured accounts and their markets",
