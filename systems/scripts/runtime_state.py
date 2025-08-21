@@ -2,34 +2,28 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from systems.scripts.execution_handler import load_or_fetch_snapshot
-from systems.utils.resolve_symbol import split_tag
+from systems.utils.config import (
+    load_settings,
+    load_account_settings,
+    load_coin_settings,
+)
 
 
-def build_runtime_state(
-    settings: Dict[str, Any],
-    ledger_cfg: Dict[str, Any],
+def build_state(
+    account_name: str,
+    market: str,
     mode: str,
     *,
     prev: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Build and refresh runtime state for engines.
-
-    Parameters
-    ----------
-    settings:
-        Global settings dictionary.
-    ledger_cfg:
-        Ledger configuration mapping containing at least ``tag``.
-    mode:
-        Either ``"sim"`` or ``"live"``.
-    prev:
-        Previous runtime state to carry over verbose level and unlock map.
-    """
+    """Build and refresh runtime state for engines."""
 
     prev = prev or {}
-    general = settings.get("general_settings", {})
+    settings = load_settings()
+    accounts = load_account_settings()
+    coins = load_coin_settings()
 
+    general = settings.get("general_settings", {})
     limits = prev.get(
         "limits",
         {
@@ -58,14 +52,11 @@ def build_runtime_state(
 
     if mode == "sim":
         capital = float(settings.get("simulation_capital", 0.0))
-    elif mode == "live":
-        tag = ledger_cfg.get("tag", "")
-        snapshot = load_or_fetch_snapshot(tag)
-        _, quote = split_tag(tag)
-        balance = snapshot.get("balance", {})
-        capital = float(balance.get(quote, 0.0))
     else:
-        capital = prev.get("capital", 0.0)
+        account_cfg = accounts.get(account_name, {})
+        capital = float(account_cfg.get("capital", 0.0))
+
+    coin_cfg = coins.get(market, {})
 
     state = {
         "capital": capital,
@@ -73,6 +64,7 @@ def build_runtime_state(
         "verbose": verbose,
         "limits": limits,
         "strategy": strategy_cfg,
+        "symbol": coin_cfg.get("tag", ""),
     }
 
     state.setdefault("pressures", prev.get("pressures", {"buy": {}, "sell": {}}))

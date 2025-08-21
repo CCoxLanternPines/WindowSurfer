@@ -1,0 +1,7 @@
+{
+  "DOGE/USD": {
+    "tag": "DOGEUSD",
+    "kraken_pair": "DOGEUSD",
+    "binance_name": "DOGEUSDT"
+  }
+}

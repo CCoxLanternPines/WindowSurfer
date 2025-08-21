@@ -4,43 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
-from typing import Any, Dict, List
-
-from systems.utils.addlog import addlog
+from typing import Any, Dict
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _SETTINGS_CACHE: Dict[str, Any] | None = None
-_DEPRECATION_WARNED = False
-
-_DEPRECATED_KEYS = {
-    "buy_cooldown",
-    "sell_cooldown",
-    "maturity_multiplier",
-    "buy_multiplier_scale",
-    "buy_cooldown_multiplier_scale",
-    "sell_cooldown_multiplier_scale",
-    "dead_zone_pct",
-    "buy_floor",
-    "sell_ceiling",
-    "cooldown",
-}
-
-
-def _warn_deprecated(settings: Dict[str, Any]) -> None:
-    global _DEPRECATION_WARNED
-    if _DEPRECATION_WARNED:
-        return
-    found = set()
-    for ledger in settings.get("ledger_settings", {}).values():
-        for win in ledger.get("window_settings", {}).values():
-            found.update(key for key in win if key in _DEPRECATED_KEYS)
-    if found:
-        addlog(
-            f"[WARN] Deprecated config keys detected: {', '.join(sorted(found))}",
-            verbose_int=1,
-            verbose_state=True,
-        )
-        _DEPRECATION_WARNED = True
+_ACCOUNT_CACHE: Dict[str, Any] | None = None
+_COIN_CACHE: Dict[str, Any] | None = None
 
 
 def resolve_path(rel_path: str) -> Path:
@@ -49,84 +18,30 @@ def resolve_path(rel_path: str) -> Path:
 
 
 def load_settings(*, reload: bool = False) -> Dict[str, Any]:
-    """Load settings from ``settings/settings.json`` with optional caching."""
+    """Load global settings from ``settings/settings.json``."""
     global _SETTINGS_CACHE
     if _SETTINGS_CACHE is None or reload:
         settings_path = resolve_path("settings/settings.json")
         with settings_path.open("r", encoding="utf-8") as fh:
-            raw = fh.read()
-
-        dup_flag = False
-
-        def _convert(obj: Any, path: List[str]) -> Any:
-            nonlocal dup_flag
-            if isinstance(obj, list):
-                d: Dict[str, Any] = {}
-                seen: List[str] = []
-                for k, v in obj:
-                    if k in d and path and path[-1] == "window_settings":
-                        dup_flag = True
-                    seen.append(k)
-                    d[k] = _convert(v, path + [k])
-                return d
-            return obj
-
-        parsed = json.loads(raw, object_pairs_hook=list)
-        _SETTINGS_CACHE = _convert(parsed, [])
-        _warn_deprecated(_SETTINGS_CACHE)
-        if dup_flag:
-            addlog(
-                "[WARN] window_settings contains duplicate keys; only the last occurrence is kept by JSON. Ensure unique names (e.g., minnow, fish, dolphin, whale).",
-                verbose_int=1,
-                verbose_state=True,
-            )
+            _SETTINGS_CACHE = json.load(fh)
     return _SETTINGS_CACHE
 
 
-def load_ledger_config(ledger_name: str) -> Dict[str, Any]:
-    """Return the configuration dictionary for a given ledger.
-
-    Parameters
-    ----------
-    ledger_name: str
-        Name of the ledger to load from settings.
-
-    Raises
-    ------
-    ValueError
-        If the requested ledger does not exist in ``settings.json``.
-    """
-
-    settings = load_settings()
-    ledgers = settings.get("ledger_settings", {})
-    if ledger_name not in ledgers:
-        raise ValueError(f"Ledger '{ledger_name}' not found in settings")
-    return ledgers[ledger_name]
+def load_account_settings(*, reload: bool = False) -> Dict[str, Any]:
+    """Return account configuration mapping from ``account_settings.json``."""
+    global _ACCOUNT_CACHE
+    if _ACCOUNT_CACHE is None or reload:
+        acct_path = resolve_path("settings/account_settings.json")
+        with acct_path.open("r", encoding="utf-8") as fh:
+            _ACCOUNT_CACHE = json.load(fh)
+    return _ACCOUNT_CACHE
 
 
-def resolve_ccxt_symbols_by_coin(coin: str) -> tuple[str, str]:
-    """Return Kraken and Binance symbols for ``coin``.
-
-    The first ledger whose tag starts with ``coin`` (case-insensitive) is used.
-    Logs which ledger tag was matched.
-    """
-
-    settings = load_settings()
-    coin_up = coin.upper()
-    for cfg in settings.get("ledger_settings", {}).values():
-        tag = cfg.get("tag", "")
-        if tag.upper().startswith(coin_up):
-            kraken = cfg.get("kraken_name", "")
-            binance = cfg.get("binance_name", "")
-            addlog(
-                f"[CONFIG] coin={coin_up} resolved using tag={tag}",
-                verbose_int=1,
-                verbose_state=True,
-            )
-            return kraken, binance
-    msg = (
-        f"[ERROR] No ledger maps coin={coin_up} to exchange symbols. "
-        f"Add a ledger with tag starting '{coin_up}' including kraken_name/binance_name."
-    )
-    addlog(msg, verbose_int=1, verbose_state=True)
-    raise ValueError(msg)
+def load_coin_settings(*, reload: bool = False) -> Dict[str, Any]:
+    """Return coin configuration mapping from ``coin_settings.json``."""
+    global _COIN_CACHE
+    if _COIN_CACHE is None or reload:
+        coin_path = resolve_path("settings/coin_settings.json")
+        with coin_path.open("r", encoding="utf-8") as fh:
+            _COIN_CACHE = json.load(fh)
+    return _COIN_CACHE
