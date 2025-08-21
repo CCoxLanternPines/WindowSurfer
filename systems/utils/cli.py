@@ -12,7 +12,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mode",
         choices=["fetch", "sim", "live", "wallet", "view", "test", "email"],
-        help="Execution mode: fetch, sim, live, wallet, view, test, or email",
+        help=(
+            "Execution mode: fetch, sim, live, wallet, view, test (use --real --budget N --confirm LIVE for live smoke trade), or email"
+        ),
     )
     parser.add_argument(
         "--account",
@@ -43,5 +45,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--log",
         action="store_true",
         help="Enable log file output",
+    )
+    parser.add_argument(
+        "--real",
+        action="store_true",
+        help="Enable live smoke trade in test mode (requires --confirm LIVE)",
+    )
+    parser.add_argument(
+        "--budget",
+        type=float,
+        default=5.0,
+        help="USD budget for smoke trade",
+    )
+    parser.add_argument(
+        "--confirm",
+        type=str,
+        default="",
+        help="Extra confirmation guard; must be 'LIVE' to execute real orders",
     )
     return parser

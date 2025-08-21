@@ -71,12 +71,23 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     elif mode == "test":
-        from systems.scripts.test_mode import run_test
-
         if not args.account or not args.market:
             addlog("Error: --account and --market are required for test mode")
             sys.exit(1)
-        exit_code = run_test(args.account, args.market, args.time)
+        if args.real:
+            from systems.scripts.smoke_trade import run_smoke_trade
+
+            exit_code = run_smoke_trade(
+                account=args.account,
+                market=args.market,
+                budget=args.budget,
+                confirm=args.confirm,
+                verbose=args.verbose,
+            )
+        else:
+            from systems.scripts.test_mode import run_test
+
+            exit_code = run_test(args.account, args.market, args.time)
         sys.exit(exit_code)
 
     elif mode == "wallet":
