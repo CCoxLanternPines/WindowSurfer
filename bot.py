@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> None:
         if not args.account or not args.market:
             addlog("Error: --account and --market are required for test mode")
             sys.exit(1)
-        exit_code = run_test(args.account, args.market)
+        exit_code = run_test(args.account, args.market, args.time)
         sys.exit(exit_code)
 
     elif mode == "wallet":
