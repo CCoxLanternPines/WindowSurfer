@@ -29,6 +29,16 @@ python bot.py --mode wallet --account Kris
 python bot.py --mode test --account SAMPLE
 ```
 
+### Live Smoke Trade (keys sanity check)
+
+```bash
+# Dry logic test (no orders)
+python bot.py --mode test --account Kris --market DOGE/USD
+
+# Live smoke trade: $5 buy then immediate sell (requires is_live=true)
+python bot.py --mode test --account Kris --market DOGE/USD --real --budget 5 --confirm LIVE
+```
+
 ## Architecture
 
 ### systems package
