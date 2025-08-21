@@ -135,118 +135,15 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
 
     os.makedirs(os.path.dirname(FEATURES_CSV), exist_ok=True)
 
-    for start in range(0, len(df) - WINDOW_SIZE, WINDOW_STEP):
-        end = start + WINDOW_SIZE
-        sub = df.iloc[start:end]
+    for t in range(WINDOW_SIZE - 1, len(df), WINDOW_STEP):
+        start_idx = t - WINDOW_SIZE + 1
+        end_idx = t + 1
+        sub = df.iloc[start_idx:end_idx]
 
+        # --- Extract features from backward-looking window ---
         low = float(sub["low"].min()) if "low" in sub else float(sub["close"].min())
         high = float(sub["high"].max()) if "high" in sub else float(sub["close"].max())
-        level = float(df.iloc[start]["close"])
-
-        pred: int | None = None
-        slope_cls: int | None = None
-        if last_features is not None:
-            pred = rule_predict(last_features)
-            slope_cls = classify_slope(last_features.get("slope", 0.0), FLAT_BAND_DEG)
-
-            if pred > 0:  # upward prediction
-                buy_pressure = min(MAX_PRESSURE, buy_pressure + 1)
-                sell_pressure = max(0.0, sell_pressure - 2)
-            elif pred < 0:  # downward prediction
-                sell_pressure = min(MAX_PRESSURE, sell_pressure + 1)
-                buy_pressure = max(0.0, buy_pressure - 2)
-            else:  # neutral
-                if slope_cls == 0:
-                    sell_pressure = min(MAX_PRESSURE, sell_pressure + 0.5)
-                    buy_pressure = max(0.0, buy_pressure - 0.5)
-                else:
-                    buy_pressure = max(0.0, buy_pressure - 0.5)
-                    sell_pressure = max(0.0, sell_pressure - 0.5)
-
-            candle = df.iloc[start]
-            print(
-                f"[PRESSURE] candle={candle['candle_index']} buy={buy_pressure:.1f} sell={sell_pressure:.1f}"
-            )
-
-            if buy_pressure >= BUY_TRIGGER:
-                trade_size = buy_pressure / MAX_PRESSURE
-                open_notes.append((candle["close"], trade_size))
-                if viz:
-                    ax1.scatter(
-                        candle["candle_index"],
-                        candle["close"],
-                        color="green",
-                        s=120,
-                        zorder=6,
-                    )
-                print(
-                    f"[BUY] candle={candle['candle_index']} price={candle['close']} size={trade_size:.2f}"
-                )
-                buy_pressure = 0.0
-
-            flat_trigger = SELL_TRIGGER * FLAT_SELL_THRESHOLD
-            if sell_pressure >= SELL_TRIGGER and open_notes:
-                total_size = sum(size for _, size in open_notes)
-                sell_frac = sell_pressure / MAX_PRESSURE
-                trade_size = sell_frac * total_size
-                remaining = trade_size
-                pnl = 0.0
-                while remaining > 1e-9 and open_notes:
-                    entry_price, entry_size = open_notes[0]
-                    if entry_size <= remaining:
-                        pnl += (candle["close"] - entry_price) * entry_size
-                        remaining -= entry_size
-                        open_notes.pop(0)
-                    else:
-                        pnl += (candle["close"] - entry_price) * remaining
-                        open_notes[0] = (entry_price, entry_size - remaining)
-                        remaining = 0.0
-                realized_pnl += pnl
-                if viz:
-                    ax1.scatter(
-                        candle["candle_index"],
-                        candle["close"],
-                        color="red",
-                        s=120,
-                        zorder=6,
-                    )
-                print(
-                    f"[SELL] candle={candle['candle_index']} price={candle['close']} size={trade_size:.2f} pnl={pnl:.2f} total={realized_pnl:.2f}"
-                )
-                sell_pressure = 0.0
-            elif (
-                slope_cls == 0
-                and sell_pressure >= flat_trigger
-                and open_notes
-            ):
-                total_size = sum(size for _, size in open_notes)
-                trade_size = FLAT_SELL_FRACTION * total_size
-                remaining = trade_size
-                pnl = 0.0
-                while remaining > 1e-9 and open_notes:
-                    entry_price, entry_size = open_notes[0]
-                    if entry_size <= remaining:
-                        pnl += (candle["close"] - entry_price) * entry_size
-                        remaining -= entry_size
-                        open_notes.pop(0)
-                    else:
-                        pnl += (candle["close"] - entry_price) * remaining
-                        open_notes[0] = (entry_price, entry_size - remaining)
-                        remaining = 0.0
-                realized_pnl += pnl
-                if viz:
-                    ax1.scatter(
-                        candle["candle_index"],
-                        candle["close"],
-                        color="orange",
-                        s=90,
-                        zorder=6,
-                    )
-                print(
-                    f"[FLAT SELL] candle={candle['candle_index']} price={candle['close']:.2f} size={trade_size:.2f} pnl={pnl:+.2f} total={realized_pnl:+.2f}"
-                )
-                sell_pressure = 0.0
-
+        level = float(df.iloc[start_idx]["close"])
         closes = sub["close"].values
         x = np.arange(len(closes))
         slope = float(np.polyfit(x, closes, 1)[0]) if len(closes) > 1 else 0.0
@@ -257,10 +154,18 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         early = float(sub["volume"].iloc[:mid].mean()) if mid and "volume" in sub else 0.0
         late = float(sub["volume"].iloc[mid:].mean()) if mid and "volume" in sub else 0.0
         volume_skew = ((late - early) / early) if early else 0.0
-        exit_price = float(sub.iloc[-1]["close"])
-        pct_change = (exit_price - level) / level if level else 0.0
+        
+        # Strictly forward outcome
+        future_window = df.iloc[t : t + WINDOW_SIZE]  # candles t ... t+W-1
+        if len(future_window) == WINDOW_SIZE:
+            exit_price = float(future_window.iloc[-1]["close"])
+            start_price = float(df.iloc[t]["close"])
+            pct_change = (exit_price - start_price) / start_price
+        else:
+            pct_change = 0.0  # not enough future data at end of sim
 
-        label: int
+
+        # --- Label actual move for accuracy stats ---
         if pct_change <= -STRONG_MOVE_THRESHOLD:
             label = -2
         elif pct_change < 0:
@@ -272,25 +177,48 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         else:
             label = 0
 
-        actual = label
-        if pred is not None:
-            results.append((pred, actual))
-            pred_str = {
-                -2: "STRONG DOWN",
-                -1: "MILD DOWN",
-                0: "FLAT",
-                1: "MILD UP",
-                2: "STRONG UP",
-            }[pred]
-            act_str = {
-                -2: "STRONG DOWN",
-                -1: "MILD DOWN",
-                0: "FLAT",
-                1: "MILD UP",
-                2: "STRONG UP",
-            }[actual]
-            print(f"start={start} predicted {pred_str} actual {act_str}")
+        # --- Multi-window crowd vote (replaces slope-flip) ---
+        decision, confidence = multi_window_vote(
+            df, t,
+            window_sizes=[8, 12, 24, 48],
+        )
+        
+        # --- Reversal detection using extreme disagreement ---
+        turn_decision, turn_conf = multi_window_turnvote(
+            df, t,
+            window_sizes=[8, 16, 24]
+        )
 
+        if turn_decision == 1:  # bottom
+            if viz:
+                ax1.scatter(candle["candle_index"], candle["close"], color="lime", s=200, marker="^", zorder=7)
+            print(f"[BOTTOM?] candle={candle['candle_index']} price={candle['close']:.2f} conf={turn_conf:.4f}")
+
+        elif turn_decision == -1:  # top
+            if viz:
+                ax1.scatter(candle["candle_index"], candle["close"], color="magenta", s=200, marker="v", zorder=7)
+            print(f"[TOP?] candle={candle['candle_index']} price={candle['close']:.2f} conf={turn_conf:.4f}")
+
+
+        candle = df.iloc[t]
+        if decision == 1:
+            if viz:
+                ax1.scatter(candle["candle_index"], candle["close"], color="green", s=120, zorder=6)
+            print(f"[BUY]  candle={candle['candle_index']} price={candle['close']:.2f} confidence={confidence:.4f}")
+
+        elif decision == -1:
+            if viz:
+                ax1.scatter(candle["candle_index"], candle["close"], color="red", s=120, zorder=6)
+            print(f"[SELL] candle={candle['candle_index']} price={candle['close']:.2f} confidence={confidence:.4f}")
+
+        # --- Record decision vs actual for stats ---
+        if decision != 0:  # only log when we actually made a call
+            results.append((decision, label, confidence))
+            pred_str = { -1:"SELL", 0:"HOLD", 1:"BUY" }.get(decision, str(decision))
+            act_str  = { -2:"STRONG DOWN", -1:"MILD DOWN", 0:"FLAT", 1:"MILD UP", 2:"STRONG UP" }[label]
+            print(f"t={t} predicted {pred_str} actual {act_str}")
+
+        # --- Write features to CSV for later analysis ---
         features = {
             "slope": slope,
             "volatility": volatility,
@@ -320,16 +248,21 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         ax1.legend(loc="upper left")
         ax1.grid(True)
 
-    made = sum(1 for p, _ in results if p != 0)
-    correct = sum(1 for p, a in results if p != 0 and p == a)
-    acc = 100 * correct / made if made else 0.0
-    weights = {0: 1, 1: 1, -1: 1, 2: 2, -2: 2}
-    total_w = sum(weights.get(a, 1) for p, a in results if p != 0)
-    correct_w = sum(weights.get(a, 1) for p, a in results if p != 0 and p == a)
-    w_acc = 100 * correct_w / total_w if total_w else 0.0
-    print(
-        f"Predictions made: {made} Correct: {correct} Accuracy: {acc:.2f}% Weighted: {w_acc:.2f}%"
-    )
+    # --- Evaluate accuracy ---
+    made = sum(1 for p, l, c in results if p != 0)
+    correct = sum(1 for p, l, c in results if (p > 0 and l > 0) or (p < 0 and l < 0))
+    total = len(results)
+    accuracy = correct / total if total else 0
+
+    # weighted accuracy using confidence
+    weighted_correct = sum(c for p, l, c in results if (p > 0 and l > 0) or (p < 0 and l < 0))
+    weighted_total   = sum(c for _, _, c in results)
+    weighted_accuracy = weighted_correct / weighted_total if weighted_total else 0
+
+    print(f"Predictions made: {made} Correct: {correct} "
+      f"Accuracy: {accuracy*100:.2f}% Weighted: {weighted_accuracy*100:.2f}%")
+
+
     print(
         f"Skipped: slope={SLOPE_SKIPS} volatility={VOLATILITY_SKIPS} range={RANGE_SKIPS} skew_hits={SKEW_HITS}"
     )
@@ -338,6 +271,80 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
 
     if viz:
         plt.show()
+
+def multi_window_vote(df, t, window_sizes, slope_thresh=0.001, range_thresh=0.05):
+    votes = []
+    strengths = []
+
+    for W in window_sizes:
+        if t - W < 0:
+            continue
+        sub = df.iloc[t - W : t]
+        closes = sub["close"].values
+        x = np.arange(len(closes))
+        slope = float(np.polyfit(x, closes, 1)[0]) if len(closes) > 1 else 0.0
+        rng = float(sub["close"].max() - sub["close"].min())
+
+        # --- filtering ---
+        if abs(slope) < slope_thresh:
+            continue
+        if rng < range_thresh:
+            continue
+
+        # --- vote ---
+        direction = 1 if slope > 0 else -1
+        votes.append(direction)
+
+        # --- confidence contribution ---
+        strength = abs(slope) * rng
+        strengths.append(strength)
+
+    score = sum(votes)
+    confidence = sum(strengths) / max(1, len(strengths))  # average strength
+
+    if score >= 2:
+        return 1, confidence   # BUY
+    elif score <= -2:
+        return -1, confidence  # SELL
+    else:
+        return 0, confidence   # HOLD
+
+def multi_window_turnvote(df, t, window_sizes, slope_thresh=0.001, range_thresh=0.05):
+    slopes = {}
+    strengths = {}
+
+    for W in window_sizes:
+        if t - W < 0: 
+            continue
+        sub = df.iloc[t-W:t]
+        closes = sub["close"].values
+        x = np.arange(len(closes))
+        slope = float(np.polyfit(x, closes, 1)[0]) if len(closes) > 1 else 0.0
+        rng = float(sub["close"].max() - sub["close"].min())
+
+        if abs(slope) < slope_thresh or rng < range_thresh:
+            continue
+
+        slopes[W] = np.sign(slope)
+        strengths[W] = abs(slope) * rng
+
+    if not slopes:
+        return 0, 0.0
+
+    shortest = min(slopes.keys())
+    longest  = max(slopes.keys())
+
+    short_dir = slopes[shortest]
+    long_dir  = slopes[longest]
+
+    # Detect disagreement at extremes
+    if short_dir > 0 and long_dir < 0:
+        return 1, strengths[shortest]   # bottom candidate
+    elif short_dir < 0 and long_dir > 0:
+        return -1, strengths[shortest]  # top candidate
+    else:
+        return 0, np.mean(list(strengths.values()))
+
 
 
 def main() -> None:
