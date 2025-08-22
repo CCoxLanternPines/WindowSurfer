@@ -43,6 +43,7 @@ def _run_iteration(
     account_filter: str | None,
     market_filter: str | None,
     verbose: int,
+    brain_name: str | None = None,
 ) -> None:
     for acct_name, acct_cfg in accounts_cfg.items():
         if account_filter and acct_name != account_filter:
@@ -131,6 +132,17 @@ def _run_iteration(
             )
             runtime_states[ledger_name] = state
             strategy_cfg = state.get("strategy", {})
+
+            if brain_name:
+                from systems.brains import get_brain
+
+                brain = get_brain(brain_name)
+                settings = {
+                    "general_settings": general,
+                    "coin_settings": coin_settings,
+                    "account_settings": accounts_cfg,
+                }
+                brain.compute(df, settings)
 
             price = float(df.iloc[t]["close"])
             ctx = {"ledger": ledger_obj}
@@ -241,6 +253,7 @@ def run_live(
     all_accounts: bool = False,
     dry: bool = False,
     verbose: int = 0,
+    brain: str | None = None,
 ) -> None:
     general = load_general()
     coin_settings = load_coin_settings()
@@ -278,6 +291,7 @@ def run_live(
             account_filter=account_filter,
             market_filter=market,
             verbose=verbose,
+            brain_name=brain,
         )
         return
 
@@ -307,4 +321,5 @@ def run_live(
             account_filter=account_filter,
             market_filter=market,
             verbose=verbose,
+            brain_name=brain,
         )

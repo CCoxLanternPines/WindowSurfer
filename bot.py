@@ -59,6 +59,7 @@ def main(argv: list[str] | None = None) -> None:
             verbose=args.verbose,
             timeframe=args.time,
             viz=args.viz,
+            brain=args.brain,
         )
 
     elif mode == "live":
@@ -68,6 +69,7 @@ def main(argv: list[str] | None = None) -> None:
             all_accounts=run_all,
             dry=args.dry,
             verbose=args.verbose,
+            brain=args.brain,
         )
 
     elif mode == "test":

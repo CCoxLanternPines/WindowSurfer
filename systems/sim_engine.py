@@ -55,6 +55,7 @@ def _run_single_sim(
     verbose: int = 0,
     timeframe: str = "1m",
     viz: bool = True,
+    brain_name: str | None = None,
 ) -> None:
     os.environ["WS_MODE"] = "sim"
     os.environ["WS_ACCOUNT"] = account
@@ -112,6 +113,25 @@ def _run_single_sim(
     )
 
     total = len(df)
+
+    brain_out = None
+    if brain_name:
+        from systems.brains import get_brain
+
+        brain = get_brain(brain_name)
+        settings = {
+            "general_settings": general,
+            "coin_settings": coin_settings,
+            "account_settings": accounts_cfg,
+        }
+        brain_out = brain.compute(df, settings)
+        if viz:
+            import matplotlib.pyplot as plt
+
+            fig, ax = plt.subplots(figsize=(12, 6))
+            brain.visualize(df, brain_out, ax)
+            plt.title(f"Price with {brain.name} features")
+            plt.show()
 
     runtime_state = build_runtime_state(
         general,
@@ -442,6 +462,7 @@ def run_simulation(
     verbose: int = 0,
     timeframe: str = "1m",
     viz: bool = True,
+    brain: str | None = None,
 ) -> None:
     """Iterate configured accounts/markets and run simulations."""
     general = load_general()
@@ -479,4 +500,5 @@ def run_simulation(
                 verbose=verbose,
                 timeframe=timeframe,
                 viz=viz,
+                brain_name=brain,
             )

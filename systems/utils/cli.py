@@ -63,4 +63,9 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Extra confirmation guard; must be 'LIVE' to execute real orders",
     )
+    parser.add_argument(
+        "--brain",
+        default=None,
+        help="Which brain to run/visualize (e.g., exhaustion)",
+    )
     return parser
