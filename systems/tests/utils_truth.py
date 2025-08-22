@@ -1,12 +1,23 @@
 import pandas as pd
 import numpy as np
 
+"""Shared helpers for truth-testing harness."""
+
 from systems.sim_engine import parse_timeframe, apply_time_filter, WINDOW_SIZE
 
 
-def load_candles(tag: str, timeframe: str) -> pd.DataFrame:
-    """Load CSV candles for a market tag and apply timeframe filtering."""
-    file_path = f"data/sim/{tag}_1h.csv"
+def load_candles(file_path: str, timeframe: str) -> pd.DataFrame:
+    """Load candles from ``file_path`` applying timeframe filter.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the CSV file containing candles.
+    timeframe : str
+        Time window to keep (e.g. ``"6m"``). Uses the same parsing
+        logic as the simulation engine.
+    """
+
     df = pd.read_csv(file_path)
 
     # Apply timeframe filtering to maintain sim/live parity.
@@ -33,13 +44,12 @@ def slope(series) -> float:
     return float(np.polyfit(x, series, 1)[0])
 
 
-def percent_results(results: dict) -> str:
-    """Format hits/total pairs into percentage strings."""
-    lines = []
-    for question, (hits, total) in results.items():
-        pct = (hits / total * 100) if total else 0.0
-        lines.append(f"{question} = {pct:.0f}%")
-    return "\n".join(lines)
+def percent_results(results: dict) -> dict:
+    """Convert ``question -> (hits,total)`` into percentages."""
+    return {
+        q: (h / tot * 100) if tot else 0.0
+        for q, (h, tot) in results.items()
+    }
 
 
 def run_truth(df: pd.DataFrame, questions, context_fn) -> dict:
@@ -66,10 +76,12 @@ def run_truth(df: pd.DataFrame, questions, context_fn) -> dict:
     for t in range(len(df)):
         for q, fn in questions:
             try:
-                hit = bool(fn(t, df, ctx))
+                res = fn(t, df, ctx)
             except Exception:
-                hit = False
-            if hit:
+                res = None
+            if res is None:
+                continue
+            if res:
                 results[q][0] += 1
             results[q][1] += 1
 
