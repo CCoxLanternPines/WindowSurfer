@@ -2,19 +2,17 @@ from __future__ import annotations
 
 """Minimal command-line entry point for discovery simulation."""
 
-import argparse
-
+from systems.utils.cli import build_parser
 from systems import sim_engine
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="WindowSurfer discovery bot")
-    parser.add_argument("--mode", required=True, help="Mode to run (sim)")
+    parser = build_parser()
     parser.add_argument("--time", default="1m", help="Time window for simulation")
     args = parser.parse_args()
 
-    if args.mode.lower() == "sim":
-        sim_engine.run_simulation(timeframe=args.time)
+    if args.mode and args.mode.lower() == "sim":
+        sim_engine.run_simulation(timeframe=args.time, brain=args.brain)
     else:
         raise ValueError(f"Unknown mode: {args.mode}")
 

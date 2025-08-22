@@ -10,6 +10,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from systems.utils.config import load_settings
 
 # ===================== Parameters =====================
 WINDOW_SIZE   = 24        # candles per box (for exhaustion voting)
@@ -110,7 +111,7 @@ def multi_window_vote(df, t, window_sizes, slope_thresh=0.001, range_thresh=0.05
     return 0, confidence, score
 
 # ===================== Main =====================
-def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
+def run_simulation(*, timeframe: str = "1m", viz: bool = True, brain: str | None = None) -> None:
     # Load hourly candles
     file_path = "data/sim/SOLUSD_1h.csv"
     df = pd.read_csv(file_path)
@@ -122,6 +123,18 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
 
     df = df.reset_index(drop=True)
     df["candle_index"] = range(len(df))
+
+    settings = load_settings()
+    if brain:
+        from systems.brains import get_brain
+        brain_obj = get_brain(brain)
+        out = brain_obj.compute(df, settings)
+        if viz:
+            fig, ax = plt.subplots(figsize=(12,6))
+            brain_obj.visualize(df, out, ax)
+            plt.title(f"Price with {brain_obj.name} features")
+            plt.show()
+        return
 
     # ----- Precompute ATR(14) and Z-score(50) -----
     have_hl = all(col in df.columns for col in ["high", "low", "close"])

@@ -1,6 +1,17 @@
 {
-  "flat_band_deg": 10,
-  "buy_threshold": 1.0,
-  "sell_threshold": 1.0,
-  "pressure_decay": 0.1
+  "general_settings": {
+    "strategy_settings": {
+      "flat_band_deg": 10,
+      "buy_threshold": 1.0,
+      "sell_threshold": 1.0,
+      "pressure_decay": 0.1,
+      "max_pressure": 12,
+      "window_size": 24
+    }
+  },
+  "ledger_settings": {
+    "Kris_Ledger": {
+      "tag": "SOLUSD"
+    }
+  }
 }
