@@ -65,6 +65,7 @@ class ExhaustionBrain(Brain):
         self._last_idx = defaultdict(lambda: -10)
         self._have_hl = False
         self._meta_done = False
+        self._cluster_events: list[tuple[int, int, str]] = []  # (t, strength, color)
 
     def warmup(self) -> int:
         return WINDOW_SIZE - 1
@@ -100,6 +101,7 @@ class ExhaustionBrain(Brain):
             self._pts["exhaustion_red"]["x"].append(x)
             self._pts["exhaustion_red"]["y"].append(y)
             self._pts["exhaustion_red"]["s"].append(size)
+            self._cluster_events.append((t, cluster_strength, "red"))
         elif decision == -1:  # BUY exhaustion
             self._recent_sells.append(t)
             cluster_strength = sum(1 for idx in self._recent_sells if t - idx <= CLUSTER_WINDOW)
@@ -107,6 +109,7 @@ class ExhaustionBrain(Brain):
             self._pts["exhaustion_green"]["x"].append(x)
             self._pts["exhaustion_green"]["y"].append(y)
             self._pts["exhaustion_green"]["s"].append(size)
+            self._cluster_events.append((t, cluster_strength, "green"))
 
         # Key 2: Reversals (yellow) on color flip
         if self._last_exh is not None and decision != 0 and decision != self._last_exh:
@@ -252,3 +255,104 @@ class ExhaustionBrain(Brain):
                     j += 1
             self._meta_done = True
         return self._pts
+
+    # ===================== Stats =====================
+    def compute_stats(
+        self, df: pd.DataFrame, trend_state: list[int], slopes: list[float]
+    ) -> dict[str, dict[str, float | int]]:
+        TREND_MIN_LEN = 50
+        POST_FLIP_WINDOW = 92
+
+        n = len(trend_state)
+        segments: list[tuple[int, int, int]] = []  # (dir, start, end)
+        if n:
+            start = 0
+            cur = trend_state[0]
+            for i in range(1, n):
+                if trend_state[i] != cur:
+                    segments.append((cur, start, i - 1))
+                    start = i
+                    cur = trend_state[i]
+            segments.append((cur, start, n - 1))
+
+        up_durations, down_durations = [], []
+        up_bubbles, down_bubbles = [], []
+        total_up_seg = total_down_seg = 0
+
+        for dir_, s, e in segments:
+            length = e - s + 1
+            if dir_ == 1:
+                total_up_seg += 1
+                if length >= TREND_MIN_LEN:
+                    up_durations.append(length - TREND_MIN_LEN)
+                max_strength = 0
+                for t, strength, color in self._cluster_events:
+                    if s <= t <= e and color == "red" and strength > max_strength:
+                        max_strength = strength
+                up_bubbles.append(max_strength)
+            elif dir_ == -1:
+                total_down_seg += 1
+                if length >= TREND_MIN_LEN:
+                    down_durations.append(length - TREND_MIN_LEN)
+                max_strength = 0
+                for t, strength, color in self._cluster_events:
+                    if s <= t <= e and color == "green" and strength > max_strength:
+                        max_strength = strength
+                down_bubbles.append(max_strength)
+
+        def _avg(vals):
+            return float(np.mean(vals)) if vals else 0.0
+
+        angles = slopes
+        down_deltas, up_deltas = [], []
+        down_triggers = up_triggers = 0
+        down_points = up_points = 0
+        for i in range(1, n):
+            if trend_state[i - 1] == -1 and trend_state[i] != -1:
+                angle_flip = angles[i]
+                window = angles[i + 1 : i + 1 + POST_FLIP_WINDOW]
+                down_triggers += 1
+                down_points += len(window)
+                if len(window) > 0:
+                    down_deltas.append(float(np.mean([a - angle_flip for a in window])))
+            if trend_state[i - 1] == 1 and trend_state[i] != 1:
+                angle_flip = angles[i]
+                window = angles[i + 1 : i + 1 + POST_FLIP_WINDOW]
+                up_triggers += 1
+                up_points += len(window)
+                if len(window) > 0:
+                    up_deltas.append(float(np.mean([a - angle_flip for a in window])))
+
+        stats = {
+            "avg_uptrend_duration_past50": {
+                "value": _avg(up_durations),
+                "triggers": total_up_seg,
+                "results": len(up_durations),
+            },
+            "avg_downtrend_duration_past50": {
+                "value": _avg(down_durations),
+                "triggers": total_down_seg,
+                "results": len(down_durations),
+            },
+            "avg_down_slope_angle_delta_post_flip_92": {
+                "value": _avg(down_deltas),
+                "triggers": down_triggers,
+                "results": down_points,
+            },
+            "avg_up_slope_angle_delta_post_flip_92": {
+                "value": _avg(up_deltas),
+                "triggers": up_triggers,
+                "results": up_points,
+            },
+            "avg_max_pressure_up_bubble": {
+                "value": _avg(up_bubbles),
+                "triggers": total_up_seg,
+                "results": len(up_bubbles),
+            },
+            "avg_max_pressure_down_bubble": {
+                "value": _avg(down_bubbles),
+                "triggers": total_down_seg,
+                "results": len(down_bubbles),
+            },
+        }
+        return stats
