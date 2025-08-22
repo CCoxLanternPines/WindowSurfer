@@ -259,7 +259,7 @@ class ExhaustionBrain(Brain):
     # ===================== Stats =====================
     def compute_stats(
         self, df: pd.DataFrame, trend_state: list[int], slopes: list[float]
-    ) -> dict[str, float]:
+    ) -> dict[str, dict[str, float | int]]:
         TREND_MIN_LEN = 50
         POST_FLIP_WINDOW = 92
 
@@ -314,12 +314,47 @@ class ExhaustionBrain(Brain):
                 if len(window) > 0:
                     up_deltas.append(float(np.mean([a - angle_flip for a in window])))
 
+        up_total = sum(1 for dir_, _, _ in segments if dir_ == 1)
+        down_total = sum(1 for dir_, _, _ in segments if dir_ == -1)
+        down_flip_total = sum(
+            1 for i in range(1, n) if trend_state[i - 1] == -1 and trend_state[i] != -1
+        )
+        up_flip_total = sum(
+            1 for i in range(1, n) if trend_state[i - 1] == 1 and trend_state[i] != 1
+        )
+        up_bubble_nonzero = sum(1 for v in up_bubbles if v > 0)
+        down_bubble_nonzero = sum(1 for v in down_bubbles if v > 0)
+
         stats = {
-            "avg_uptrend_duration_past50": _avg(up_durations),
-            "avg_downtrend_duration_past50": _avg(down_durations),
-            "avg_down_slope_angle_delta_post_flip_92": _avg(down_deltas),
-            "avg_up_slope_angle_delta_post_flip_92": _avg(up_deltas),
-            "avg_max_pressure_up_bubble": _avg(up_bubbles),
-            "avg_max_pressure_down_bubble": _avg(down_bubbles),
+            "avg_uptrend_duration_past50": {
+                "value": _avg(up_durations),
+                "count": len(up_durations),
+                "total": up_total,
+            },
+            "avg_downtrend_duration_past50": {
+                "value": _avg(down_durations),
+                "count": len(down_durations),
+                "total": down_total,
+            },
+            "avg_down_slope_angle_delta_post_flip_92": {
+                "value": _avg(down_deltas),
+                "count": len(down_deltas),
+                "total": down_flip_total,
+            },
+            "avg_up_slope_angle_delta_post_flip_92": {
+                "value": _avg(up_deltas),
+                "count": len(up_deltas),
+                "total": up_flip_total,
+            },
+            "avg_max_pressure_up_bubble": {
+                "value": _avg(up_bubbles),
+                "count": up_bubble_nonzero,
+                "total": up_total,
+            },
+            "avg_max_pressure_down_bubble": {
+                "value": _avg(down_bubbles),
+                "count": down_bubble_nonzero,
+                "total": down_total,
+            },
         }
         return stats
