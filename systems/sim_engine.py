@@ -1,361 +1,250 @@
 from __future__ import annotations
 
-"""Very small historical simulation engine."""
-
 import argparse
-import csv
-import json
-import os
 import re
 from datetime import timedelta
+from collections import deque
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from systems.scripts.math.slope_score import classify_slope
 
+# --- Parameters ---
+WINDOW_SIZE = 24       # candles per box
+WINDOW_STEP = 2        # step between boxes
+CLUSTER_WINDOW = 10    # lookback to count exhaustion density
+BASE_SIZE = 10         # base dot size
+SCALE_POWER = 2        # exhaustion growth
 
-# Box / rolling window parameters
-WINDOW_SIZE = 24  # candles per box
-WINDOW_STEP = 2   # rolling step
-
-# Percent-change grading
-STRONG_MOVE_THRESHOLD = 0.15   # slightly easier "strong move"
-
-# Prediction filters
-RANGE_MIN = 0.08               # only 8%+ range windows matter
-VOLUME_SKEW_BIAS = 0.4         # allow moderate skew to count
-
-# Load optional configuration knobs
-try:
-    with open("settings/config.json", "r") as _cfg:
-        CONFIG = json.load(_cfg)
-except FileNotFoundError:  # pragma: no cover - optional config
-    CONFIG = {}
-
-FLAT_BAND_DEG = float(CONFIG.get("flat_band_deg", 10.0))
-
-MAX_PRESSURE = 10.0
-BUY_TRIGGER = 3.0
-SELL_TRIGGER = 10
-
-FLAT_SELL_FRACTION = float(CONFIG.get("flat_sell_fraction", 0.2))
-FLAT_SELL_THRESHOLD = float(CONFIG.get("flat_sell_threshold", 0.5))
-
-FEATURES_CSV = "data/window_features.csv"
-
-
-# Debug counters for filter skips
-SLOPE_SKIPS = 0
-VOLATILITY_SKIPS = 0
-RANGE_SKIPS = 0
-SKEW_HITS = 0
-
-
+# --- Helpers ---
 def parse_timeframe(tf: str) -> timedelta | None:
-    match = re.match(r"(\d+)([dhmw])", tf)
-    if not match:
+    m = re.match(r"(\d+)([dhmw])", tf)
+    if not m:
         return None
-    val, unit = int(match.group(1)), match.group(2)
-    if unit == "d":
-        return timedelta(days=val)
-    if unit == "w":
-        return timedelta(weeks=val)
-    if unit == "m":
-        return timedelta(days=30 * val)  # rough month
-    if unit == "h":
-        return timedelta(hours=val)
-    return None
+    n, u = int(m.group(1)), m.group(2)
+    return {
+        'h': timedelta(hours=n),
+        'd': timedelta(days=n),
+        'w': timedelta(weeks=n),
+        'm': timedelta(days=30*n)  # rough
+    }[u]
 
+def multi_window_vote(df, t, window_sizes, slope_thresh=0.001, range_thresh=0.05):
+    votes, strengths = [], []
+    for W in window_sizes:
+        if t - W < 0:
+            continue
+        sub = df.iloc[t-W:t]
+        closes = sub['close'].values
+        x = np.arange(len(closes))
+        slope = float(np.polyfit(x, closes, 1)[0]) if len(closes) > 1 else 0.0
+        rng = float(sub['close'].max() - sub['close'].min())
+        if abs(slope) < slope_thresh or rng < range_thresh:
+            continue
+        direction = 1 if slope > 0 else -1
+        votes.append(direction)
+        strengths.append(abs(slope) * rng)
+    score = sum(votes)
+    confidence = (sum(strengths) / max(1, len(strengths))) if strengths else 0.0
+    if score >= 2:   # momentum up
+        return 1, confidence, score
+    if score <= -2:  # momentum down
+        return -1, confidence, score
+    return 0, confidence, score
 
-def rule_predict(features: dict[str, float]) -> int:
-    """Classify next window move with multi-feature rules."""
-    global SLOPE_SKIPS, RANGE_SKIPS, SKEW_HITS
-
-    slope = features.get("slope", 0.0)
-    rng = features.get("range", 0.0)
-
-    slope_cls = classify_slope(slope, FLAT_BAND_DEG)
-    if slope_cls == 0:
-        SLOPE_SKIPS += 1
-        return 0
-    if rng < RANGE_MIN:
-        RANGE_SKIPS += 1
-        return 0
-
-    skew = features.get("volume_skew", 0.0)
-    if skew > VOLUME_SKEW_BIAS and slope_cls > 0:
-        SKEW_HITS += 1
-        return 1
-    if skew < -VOLUME_SKEW_BIAS and slope_cls < 0:
-        SKEW_HITS += 1
-        return -1
-
-    pct = features.get("pct_change", 0.0)
-
-    if pct >= STRONG_MOVE_THRESHOLD:
-        return 2
-    if pct > 0:
-        return 1
-    if pct <= -STRONG_MOVE_THRESHOLD:
-        return -2
-    if pct < 0:
-        return -1
-    return 0
-
-
+# --- Main ---
 def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
-    """Run a simple simulation over SOLUSD candles."""
-    file_path = "data/sim/SOLUSD_1h.csv"
-    df = pd.read_csv(file_path)
-
+    df = pd.read_csv("data/sim/SOLUSD_1h.csv")
     if timeframe:
         delta = parse_timeframe(timeframe)
         if delta:
             cutoff = (pd.Timestamp.utcnow().tz_localize(None) - delta).timestamp()
-            df = df[df["timestamp"] >= cutoff]
-
+            df = df[df['timestamp'] >= cutoff]
     df = df.reset_index(drop=True)
-    df["candle_index"] = range(len(df))
+    df['candle_index'] = range(len(df))
 
     if viz:
         fig, ax1 = plt.subplots(figsize=(12, 6))
-        ax1.plot(df["candle_index"], df["close"], color="blue", label="Close Price")
-    else:
-        ax1 = None
+        ax1.plot(df['candle_index'], df['close'], lw=1, label='Close Price', color='blue')
 
-    last_features: dict[str, float] | None = None
-    results: list[tuple[int, int]] = []  # (pred, actual)
+    # State
+    recent_buys = deque(maxlen=CLUSTER_WINDOW)
+    recent_sells = deque(maxlen=CLUSTER_WINDOW)
+    exhaustion_handles: list = []
+    reversal_handles: list = []
+    inflection_handles: list = []   # key 3
+    bottom_handles: list = []       # key 4
+    top5_handles: list = []         # key 5 (Divergence)
+    top6_handles: list = []         # key 6 (Rolling peak)
+    top7_handles: list = []         # key 7 (Compression->Expansion)
+    top8_handles: list = []         # key 8 (Meta-filter: reversal + divergence)
 
-    buy_pressure = 0.0
-    sell_pressure = 0.0
+    last_exhaustion_decision: int | None = None
 
-    open_notes: list[tuple[float, float]] = []  # (price, size)
-    realized_pnl = 0.0
-
-    os.makedirs(os.path.dirname(FEATURES_CSV), exist_ok=True)
-
+    # Iterate
     for t in range(WINDOW_SIZE - 1, len(df), WINDOW_STEP):
-        start_idx = t - WINDOW_SIZE + 1
-        end_idx = t + 1
-        sub = df.iloc[start_idx:end_idx]
-
-        # --- Extract features from backward-looking window ---
-        low = float(sub["low"].min()) if "low" in sub else float(sub["close"].min())
-        high = float(sub["high"].max()) if "high" in sub else float(sub["close"].max())
-        level = float(df.iloc[start_idx]["close"])
-        closes = sub["close"].values
-        x = np.arange(len(closes))
-        slope = float(np.polyfit(x, closes, 1)[0]) if len(closes) > 1 else 0.0
-        volatility = float(np.std(closes)) if len(closes) else 0.0
-        rng = high - low
-        vol_mean = float(sub["volume"].mean()) if "volume" in sub else 0.0
-        mid = len(sub) // 2
-        early = float(sub["volume"].iloc[:mid].mean()) if mid and "volume" in sub else 0.0
-        late = float(sub["volume"].iloc[mid:].mean()) if mid and "volume" in sub else 0.0
-        volume_skew = ((late - early) / early) if early else 0.0
-        
-        # Strictly forward outcome
-        future_window = df.iloc[t : t + WINDOW_SIZE]  # candles t ... t+W-1
-        if len(future_window) == WINDOW_SIZE:
-            exit_price = float(future_window.iloc[-1]["close"])
-            start_price = float(df.iloc[t]["close"])
-            pct_change = (exit_price - start_price) / start_price
-        else:
-            pct_change = 0.0  # not enough future data at end of sim
-
-
-        # --- Label actual move for accuracy stats ---
-        if pct_change <= -STRONG_MOVE_THRESHOLD:
-            label = -2
-        elif pct_change < 0:
-            label = -1
-        elif pct_change >= STRONG_MOVE_THRESHOLD:
-            label = 2
-        elif pct_change > 0:
-            label = 1
-        else:
-            label = 0
-
-        # --- Multi-window crowd vote (replaces slope-flip) ---
-        decision, confidence = multi_window_vote(
-            df, t,
-            window_sizes=[8, 12, 24, 48],
-        )
-        
-        # --- Reversal detection using extreme disagreement ---
-        turn_decision, turn_conf = multi_window_turnvote(
-            df, t,
-            window_sizes=[8, 16, 24]
-        )
-
-        if turn_decision == 1:  # bottom
-            if viz:
-                ax1.scatter(candle["candle_index"], candle["close"], color="lime", s=200, marker="^", zorder=7)
-            print(f"[BOTTOM?] candle={candle['candle_index']} price={candle['close']:.2f} conf={turn_conf:.4f}")
-
-        elif turn_decision == -1:  # top
-            if viz:
-                ax1.scatter(candle["candle_index"], candle["close"], color="magenta", s=200, marker="v", zorder=7)
-            print(f"[TOP?] candle={candle['candle_index']} price={candle['close']:.2f} conf={turn_conf:.4f}")
-
-
         candle = df.iloc[t]
-        if decision == 1:
+        decision, confidence, score = multi_window_vote(df, t, window_sizes=[8, 12, 24, 48])
+
+        # --- Exhaustion (Key 1 baseline, but toggleable) ---
+        if decision == 1:  # SELL exhaustion
+            recent_buys.append(t)
+            cluster_strength = sum(1 for idx in recent_buys if t - idx <= CLUSTER_WINDOW)
+            size = BASE_SIZE * (cluster_strength ** SCALE_POWER)
             if viz:
-                ax1.scatter(candle["candle_index"], candle["close"], color="green", s=120, zorder=6)
-            print(f"[BUY]  candle={candle['candle_index']} price={candle['close']:.2f} confidence={confidence:.4f}")
-
-        elif decision == -1:
+                h = ax1.scatter(candle['candle_index'], candle['close'], color='red', s=size, zorder=6)
+                exhaustion_handles.append(h)
+        elif decision == -1:  # BUY exhaustion
+            recent_sells.append(t)
+            cluster_strength = sum(1 for idx in recent_sells if t - idx <= CLUSTER_WINDOW)
+            size = BASE_SIZE * (cluster_strength ** SCALE_POWER)
             if viz:
-                ax1.scatter(candle["candle_index"], candle["close"], color="red", s=120, zorder=6)
-            print(f"[SELL] candle={candle['candle_index']} price={candle['close']:.2f} confidence={confidence:.4f}")
+                h = ax1.scatter(candle['candle_index'], candle['close'], color='green', s=size, zorder=6)
+                exhaustion_handles.append(h)
 
-        # --- Record decision vs actual for stats ---
-        if decision != 0:  # only log when we actually made a call
-            results.append((decision, label, confidence))
-            pred_str = { -1:"SELL", 0:"HOLD", 1:"BUY" }.get(decision, str(decision))
-            act_str  = { -2:"STRONG DOWN", -1:"MILD DOWN", 0:"FLAT", 1:"MILD UP", 2:"STRONG UP" }[label]
-            print(f"t={t} predicted {pred_str} actual {act_str}")
+        # --- Reversals (Key 2: yellow) ---
+        if last_exhaustion_decision is not None and decision != 0 and decision != last_exhaustion_decision:
+            if viz:
+                h2 = ax1.scatter(candle['candle_index'], candle['close'],
+                                  color='yellow', s=120, zorder=7, edgecolor='black')
+                reversal_handles.append(h2)
+        if decision != 0:
+            last_exhaustion_decision = decision
 
-        # --- Write features to CSV for later analysis ---
-        features = {
-            "slope": slope,
-            "volatility": volatility,
-            "range": rng,
-            "volume_mean": vol_mean,
-            "volume_skew": volume_skew,
-            "pct_change": pct_change,
-            "label": label,
-        }
-        file_exists = os.path.exists(FEATURES_CSV)
-        with open(FEATURES_CSV, "a", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=features.keys())
-            if not file_exists:
-                writer.writeheader()
-            writer.writerow(features)
+        # Precompute slopes for 24c windows (used by several keys)
+        slope_now = 0.0
+        slope_prev = 0.0
+        if t >= 48:
+            sub_now = df['close'].iloc[t-24:t]
+            sub_prev = df['close'].iloc[t-48:t-24]
+            slope_now = float(np.polyfit(np.arange(len(sub_now)), sub_now, 1)[0]) if len(sub_now) > 1 else 0.0
+            slope_prev = float(np.polyfit(np.arange(len(sub_prev)), sub_prev, 1)[0]) if len(sub_prev) > 1 else 0.0
 
-        last_features = {k: v for k, v in features.items() if k != "label"}
+        # --- Key 3: Momentum Inflection (from prior 6) ---
+        # Mark when slope weakens sharply or flips sign
+        if t >= 48:
+            if (slope_prev > 0 and slope_now < 0) or (slope_prev < 0 and slope_now > 0) or (abs(slope_now) < 0.6 * abs(slope_prev)):
+                if viz:
+                    h3 = ax1.scatter(candle['candle_index'], candle['close'], color='orange', marker='^', s=80, zorder=5)
+                    inflection_handles.append(h3)
+
+        # --- Key 4: Bottom Catcher (from prior 7) ---
+        # Local minimum with improving slope
+        if t >= 36:
+            lookback = 12
+            window = df['close'].iloc[t-lookback:t+1]
+            if candle['close'] == window.min() and slope_now > slope_prev:
+                if viz:
+                    h4 = ax1.scatter(candle['candle_index'], candle['close'], color='cyan', marker='v', s=100, zorder=6)
+                    bottom_handles.append(h4)
+
+        # --- Key 5: Divergence (Top catcher - confirmation) ---
+        if t >= 48:
+            price_now = df['close'].iloc[t-1]
+            price_prev = df['close'].iloc[t-25]
+            # Bearish divergence: higher price, weaker momentum
+            if price_now > price_prev and slope_now < slope_prev:
+                if viz:
+                    h5 = ax1.scatter(candle['candle_index'], candle['close'], color='orange', marker='s', s=110, zorder=6)
+                    top5_handles.append(h5)
+
+        # --- Key 6: Rolling Peak Detection (Top catcher - swing high) ---
+        if t >= 12:
+            lookback = 12
+            win = df['close'].iloc[t-lookback:t+1]
+            if candle['close'] == win.max():
+                if viz:
+                    h6 = ax1.scatter(candle['candle_index'], candle['close'], color='red', marker='*', s=140, zorder=6)
+                    top6_handles.append(h6)
+
+        # --- Key 7: Compression -> Expansion at highs (Top catcher - predictive) ---
+        if t >= 18:
+            rng_window = 12
+            sub_rng = df['close'].iloc[t-rng_window:t]
+            rng = float(sub_rng.max() - sub_rng.min())
+            # Squeeze threshold (looser so it actually shows)
+            if rng < 0.02 * float(sub_rng.mean()) and decision == 1:
+                if viz:
+                    h7 = ax1.scatter(candle['candle_index'], candle['close'], color='purple', marker='^', s=110, zorder=6)
+                    top7_handles.append(h7)
+
+        # --- Key 8: Meta-Filter (high conviction overlap: reversal + divergence) ---
+        if viz and len(reversal_handles) > 0 and len(top5_handles) > 0:
+            # If most recent reversal is near most recent divergence -> star
+            x_rev, y_rev = reversal_handles[-1].get_offsets()[0]
+            x_div, y_div = top5_handles[-1].get_offsets()[0]
+            if abs(x_rev - x_div) <= 2:
+                h8 = ax1.scatter(x_rev, y_rev, color='magenta', marker='P', s=160, zorder=7)
+                top8_handles.append(h8)
 
     if viz:
-        ax1.scatter([], [], color="green", s=120, label="Buy")
-        ax1.scatter([], [], color="red", s=120, label="Sell")
-        ax1.scatter([], [], color="orange", s=90, label="Flat Sell")
-
-        ax1.set_title("Price with Trades")
-        ax1.set_xlabel("Candles (Index)")
-        ax1.set_ylabel("Price")
-        ax1.legend(loc="upper left")
+        ax1.set_title('Price with Exhaustion + Predictors (Keys 1–8)')
+        ax1.set_xlabel('Candles (Index)')
+        ax1.set_ylabel('Price')
         ax1.grid(True)
 
-    # --- Evaluate accuracy ---
-    made = sum(1 for p, l, c in results if p != 0)
-    correct = sum(1 for p, l, c in results if (p > 0 and l > 0) or (p < 0 and l < 0))
-    total = len(results)
-    accuracy = correct / total if total else 0
+        state = {
+            'exhaustion_on': True,
+            'reversal_on': True,
+            'inflection_on': True,
+            'bottom_on': True,
+            'top5_on': True,
+            'top6_on': True,
+            'top7_on': True,
+            'top8_on': True,
+        }
 
-    # weighted accuracy using confidence
-    weighted_correct = sum(c for p, l, c in results if (p > 0 and l > 0) or (p < 0 and l < 0))
-    weighted_total   = sum(c for _, _, c in results)
-    weighted_accuracy = weighted_correct / weighted_total if weighted_total else 0
+        def on_key(event):
+            if event.key == '1':
+                state['exhaustion_on'] = not state['exhaustion_on']
+                for h in exhaustion_handles:
+                    h.set_visible(state['exhaustion_on'])
+                print(f"[TOGGLE] Exhaustion {'ON' if state['exhaustion_on'] else 'OFF'}"); plt.draw()
+            elif event.key == '2':
+                state['reversal_on'] = not state['reversal_on']
+                for h in reversal_handles:
+                    h.set_visible(state['reversal_on'])
+                print(f"[TOGGLE] Reversals {'ON' if state['reversal_on'] else 'OFF'}"); plt.draw()
+            elif event.key == '3':
+                state['inflection_on'] = not state['inflection_on']
+                for h in inflection_handles:
+                    h.set_visible(state['inflection_on'])
+                print(f"[TOGGLE] Inflection {'ON' if state['inflection_on'] else 'OFF'}"); plt.draw()
+            elif event.key == '4':
+                state['bottom_on'] = not state['bottom_on']
+                for h in bottom_handles:
+                    h.set_visible(state['bottom_on'])
+                print(f"[TOGGLE] Bottom Catcher {'ON' if state['bottom_on'] else 'OFF'}"); plt.draw()
+            elif event.key == '5':
+                state['top5_on'] = not state['top5_on']
+                for h in top5_handles:
+                    h.set_visible(state['top5_on'])
+                print(f"[TOGGLE] Top 5 (Divergence) {'ON' if state['top5_on'] else 'OFF'}"); plt.draw()
+            elif event.key == '6':
+                state['top6_on'] = not state['top6_on']
+                for h in top6_handles:
+                    h.set_visible(state['top6_on'])
+                print(f"[TOGGLE] Top 6 (Rolling Peak) {'ON' if state['top6_on'] else 'OFF'}"); plt.draw()
+            elif event.key == '7':
+                state['top7_on'] = not state['top7_on']
+                for h in top7_handles:
+                    h.set_visible(state['top7_on'])
+                print(f"[TOGGLE] Top 7 (Compression) {'ON' if state['top7_on'] else 'OFF'}"); plt.draw()
+            elif event.key == '8':
+                state['top8_on'] = not state['top8_on']
+                for h in top8_handles:
+                    h.set_visible(state['top8_on'])
+                print(f"[TOGGLE] Top 8 (Meta) {'ON' if state['top8_on'] else 'OFF'}"); plt.draw()
 
-    print(f"Predictions made: {made} Correct: {correct} "
-      f"Accuracy: {accuracy*100:.2f}% Weighted: {weighted_accuracy*100:.2f}%")
-
-
-    print(
-        f"Skipped: slope={SLOPE_SKIPS} volatility={VOLATILITY_SKIPS} range={RANGE_SKIPS} skew_hits={SKEW_HITS}"
-    )
-
-    print(f"[RESULT] PnL={realized_pnl:.2f}, Remaining Notes={len(open_notes)}")
-
-    if viz:
+        fig.canvas.mpl_connect('key_press_event', on_key)
         plt.show()
 
-def multi_window_vote(df, t, window_sizes, slope_thresh=0.001, range_thresh=0.05):
-    votes = []
-    strengths = []
-
-    for W in window_sizes:
-        if t - W < 0:
-            continue
-        sub = df.iloc[t - W : t]
-        closes = sub["close"].values
-        x = np.arange(len(closes))
-        slope = float(np.polyfit(x, closes, 1)[0]) if len(closes) > 1 else 0.0
-        rng = float(sub["close"].max() - sub["close"].min())
-
-        # --- filtering ---
-        if abs(slope) < slope_thresh:
-            continue
-        if rng < range_thresh:
-            continue
-
-        # --- vote ---
-        direction = 1 if slope > 0 else -1
-        votes.append(direction)
-
-        # --- confidence contribution ---
-        strength = abs(slope) * rng
-        strengths.append(strength)
-
-    score = sum(votes)
-    confidence = sum(strengths) / max(1, len(strengths))  # average strength
-
-    if score >= 2:
-        return 1, confidence   # BUY
-    elif score <= -2:
-        return -1, confidence  # SELL
-    else:
-        return 0, confidence   # HOLD
-
-def multi_window_turnvote(df, t, window_sizes, slope_thresh=0.001, range_thresh=0.05):
-    slopes = {}
-    strengths = {}
-
-    for W in window_sizes:
-        if t - W < 0: 
-            continue
-        sub = df.iloc[t-W:t]
-        closes = sub["close"].values
-        x = np.arange(len(closes))
-        slope = float(np.polyfit(x, closes, 1)[0]) if len(closes) > 1 else 0.0
-        rng = float(sub["close"].max() - sub["close"].min())
-
-        if abs(slope) < slope_thresh or rng < range_thresh:
-            continue
-
-        slopes[W] = np.sign(slope)
-        strengths[W] = abs(slope) * rng
-
-    if not slopes:
-        return 0, 0.0
-
-    shortest = min(slopes.keys())
-    longest  = max(slopes.keys())
-
-    short_dir = slopes[shortest]
-    long_dir  = slopes[longest]
-
-    # Detect disagreement at extremes
-    if short_dir > 0 and long_dir < 0:
-        return 1, strengths[shortest]   # bottom candidate
-    elif short_dir < 0 and long_dir > 0:
-        return -1, strengths[shortest]  # top candidate
-    else:
-        return 0, np.mean(list(strengths.values()))
-
-
-
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--time", type=str, default="1m")
-    parser.add_argument("--viz", action="store_true", help="Enable visualization")
-    args = parser.parse_args()
-
+    p = argparse.ArgumentParser()
+    p.add_argument('--time', type=str, default='1m')
+    p.add_argument('--viz', action='store_true')
+    args = p.parse_args()
     run_simulation(timeframe=args.time, viz=args.viz)
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
-
