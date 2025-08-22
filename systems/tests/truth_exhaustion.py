@@ -11,12 +11,18 @@ from systems.sim_engine import run_simulation
 from systems.tests.utils_truth import (
     load_candles,
     slope,
-    percent_results,
     run_truth,
 )
 
 TAG = "SOLUSD"
 VOLATILITY_THRESH = 0.02
+
+
+def _slope_toward_zero(df, t):
+    """Return True if slope after ``t`` moves toward zero."""
+    prev = slope(df["close"].iloc[t - 64 : t])
+    nxt = slope(df["close"].iloc[t : t + 64])
+    return (prev > 0 and nxt < prev) or (prev < 0 and nxt > prev)
 
 
 QUESTIONS = [
@@ -41,6 +47,31 @@ QUESTIONS = [
         lambda t, df, ctx: (
             slope(df["close"].iloc[t : t + 6]) < 0
             if ctx["is_exhaustion"][t] and ctx["bars_since_exh"][t] > 10
+            else None
+        ),
+    ),
+    (
+        "Slope decay: after long trend, 64-candle slope moves toward zero after exhaustion?",
+        lambda t, df, ctx: (
+            _slope_toward_zero(df, t)
+            if (
+                ctx["is_exhaustion"][t]
+                and ctx["pressure_len"][t] > 8
+                and t >= 64
+                and t + 64 < len(df)
+            )
+            else None
+        ),
+    ),
+    (
+        "Bubble size: larger exhaustion bubble → higher reversal chance?",
+        lambda t, df, ctx: (
+            slope(df["close"].iloc[t : t + 64]) < 0
+            if (
+                ctx["is_exhaustion"][t]
+                and ctx["pressure_len"][t] > 12
+                and t + 64 < len(df)
+            )
             else None
         ),
     ),
@@ -98,8 +129,9 @@ def main(timeframe: str, vis: bool) -> None:
     file_path = f"data/sim/{TAG}_1h.csv"
     df = load_candles(file_path, timeframe)
     results = run_truth(df, QUESTIONS, build_context)
-    for q, pct in percent_results(results).items():
-        print(f"{q} = {pct:.0f}%")
+    for q, (hits, total) in results.items():
+        pct = (hits / total * 100) if total else 0.0
+        print(f"{q} → ({hits}/{total}) {pct:.2f}%")
 
 
 if __name__ == "__main__":
