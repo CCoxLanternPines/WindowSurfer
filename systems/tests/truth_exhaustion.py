@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import numpy as np
 
 # Ensure repository root on path for direct execution
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -11,67 +12,68 @@ from systems.sim_engine import run_simulation
 from systems.tests.utils_truth import (
     load_candles,
     slope,
-    run_truth,
 )
 
+
 TAG = "SOLUSD"
-VOLATILITY_THRESH = 0.02
-
-
-def _slope_toward_zero(df, t):
-    """Return True if slope after ``t`` moves toward zero."""
-    prev = slope(df["close"].iloc[t - 64 : t])
-    nxt = slope(df["close"].iloc[t : t + 64])
-    return (prev > 0 and nxt < prev) or (prev < 0 and nxt > prev)
 
 
 QUESTIONS = [
     (
-        "Trend vs noise: exhaustion fires more in chop?",
+        "Average uptrend duration (>50 bars)",
         lambda t, df, ctx: (
-            ctx["volatility"][t] > ctx["volatility_thresh"]
+            ctx["trend_len"][t]
             if ctx["is_exhaustion"][t]
+            and ctx["trend_dir"][t] == "up"
+            and ctx["trend_len"][t] > 50
             else None
         ),
     ),
     (
-        "Reversal trigger: first exhaustion after long pressure → reversal?",
+        "Average downtrend duration (>50 bars)",
         lambda t, df, ctx: (
-            slope(df["close"].iloc[t : t + 6]) < 0
-            if ctx["is_exhaustion"][t] and ctx["pressure_len"][t] > 8
+            ctx["trend_len"][t]
+            if ctx["is_exhaustion"][t]
+            and ctx["trend_dir"][t] == "down"
+            and ctx["trend_len"][t] > 50
             else None
         ),
     ),
     (
-        "Nervousness factor: longer since last exhaustion → higher reversal chance?",
+        "Slope delta after uptrend reversal (64 bars)",
         lambda t, df, ctx: (
-            slope(df["close"].iloc[t : t + 6]) < 0
-            if ctx["is_exhaustion"][t] and ctx["bars_since_exh"][t] > 10
+            slope(df["close"].iloc[t : t + 64]) - slope(df["close"].iloc[t - 64 : t])
+            if ctx["is_exhaustion"][t]
+            and ctx["trend_dir"][t] == "up"
+            and t >= 64
+            and t + 64 < len(df)
             else None
         ),
     ),
     (
-        "Slope decay: after long trend, 64-candle slope moves toward zero after exhaustion?",
+        "Slope delta after downtrend reversal (64 bars)",
         lambda t, df, ctx: (
-            _slope_toward_zero(df, t)
-            if (
-                ctx["is_exhaustion"][t]
-                and ctx["pressure_len"][t] > 8
-                and t >= 64
-                and t + 64 < len(df)
-            )
+            slope(df["close"].iloc[t : t + 64]) - slope(df["close"].iloc[t - 64 : t])
+            if ctx["is_exhaustion"][t]
+            and ctx["trend_dir"][t] == "down"
+            and t >= 64
+            and t + 64 < len(df)
             else None
         ),
     ),
     (
-        "Bubble size: larger exhaustion bubble → higher reversal chance?",
+        "Max bubble size before uptrend reversal",
         lambda t, df, ctx: (
-            slope(df["close"].iloc[t : t + 64]) < 0
-            if (
-                ctx["is_exhaustion"][t]
-                and ctx["pressure_len"][t] > 12
-                and t + 64 < len(df)
-            )
+            ctx["pressure_len"][t]
+            if ctx["is_exhaustion"][t] and ctx["trend_dir"][t] == "up"
+            else None
+        ),
+    ),
+    (
+        "Max bubble size before downtrend reversal",
+        lambda t, df, ctx: (
+            ctx["pressure_len"][t]
+            if ctx["is_exhaustion"][t] and ctx["trend_dir"][t] == "down"
             else None
         ),
     ),
@@ -79,14 +81,36 @@ QUESTIONS = [
 
 
 def build_context(df):
-    """Precompute exhaustion markers, pressure, and volatility."""
+    """Precompute exhaustion markers, pressure, volatility, and trend info."""
     prices = df["close"]
 
-    # Rolling volatility as coefficient of variation.
-    rolling_std = prices.rolling(window=20, min_periods=1).std()
-    rolling_mean = prices.rolling(window=20, min_periods=1).mean()
-    volatility = (rolling_std / rolling_mean).fillna(0).tolist()
+    # Track trend direction and length
+    trend_dir = ["flat"] * len(df)
+    trend_len = [0] * len(df)
 
+    cur_dir = "flat"
+    cur_len = 0
+    for i in range(1, len(df)):
+        if prices.iloc[i] > prices.iloc[i - 1]:
+            if cur_dir == "up":
+                cur_len += 1
+            else:
+                cur_dir = "up"
+                cur_len = 1
+        elif prices.iloc[i] < prices.iloc[i - 1]:
+            if cur_dir == "down":
+                cur_len += 1
+            else:
+                cur_dir = "down"
+                cur_len = 1
+        else:
+            cur_dir = "flat"
+            cur_len = 0
+
+        trend_dir[i] = cur_dir
+        trend_len[i] = cur_len
+
+    # Compute exhaustion markers = end of long pressure
     pressure_len = [0] * len(df)
     is_exhaustion = [False] * len(df)
     pressure = 0
@@ -103,22 +127,28 @@ def build_context(df):
             pressure_len[i] = pressure
             is_exhaustion[i] = False
 
-    bars_since_exh = [0] * len(df)
-    last = -1
-    for i in range(len(df)):
-        if is_exhaustion[i]:
-            bars_since_exh[i] = 0
-            last = i
-        else:
-            bars_since_exh[i] = i - last if last != -1 else i + 1
-
     return {
         "is_exhaustion": is_exhaustion,
         "pressure_len": pressure_len,
-        "volatility": volatility,
-        "volatility_thresh": VOLATILITY_THRESH,
-        "bars_since_exh": bars_since_exh,
+        "trend_dir": trend_dir,
+        "trend_len": trend_len,
     }
+
+
+def run_truth(df, questions, build_context_fn):
+    ctx = build_context_fn(df)
+    results = {}
+    for q, fn in questions:
+        values = []
+        for t in range(len(df)):
+            try:
+                val = fn(t, df, ctx)
+                if val is not None:
+                    values.append(val)
+            except Exception:
+                continue
+        results[q] = values
+    return results
 
 
 def main(timeframe: str, vis: bool) -> None:
@@ -129,9 +159,14 @@ def main(timeframe: str, vis: bool) -> None:
     file_path = f"data/sim/{TAG}_1h.csv"
     df = load_candles(file_path, timeframe)
     results = run_truth(df, QUESTIONS, build_context)
-    for q, (hits, total) in results.items():
-        pct = (hits / total * 100) if total else 0.0
-        print(f"{q} → ({hits}/{total}) {pct:.2f}%")
+
+    for q, values in results.items():
+        if not values:
+            print(f"{q} → no samples")
+            continue
+        avg_val = np.mean(values)
+        median_val = np.median(values)
+        print(f"{q} → avg={avg_val:.3f}, median={median_val:.3f}, N={len(values)}")
 
 
 if __name__ == "__main__":
@@ -140,4 +175,3 @@ if __name__ == "__main__":
     parser.add_argument("--vis", action="store_true", default=False)
     args = parser.parse_args()
     main(args.time, args.vis)
-
