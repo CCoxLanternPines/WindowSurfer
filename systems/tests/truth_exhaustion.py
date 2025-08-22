@@ -44,6 +44,33 @@ QUESTIONS = [
             else None
         ),
     ),
+    (
+        "Slope decay: after long uptrend, 64-candle slope weakens after exhaustion?",
+        lambda t, df, ctx: (
+            slope(df["close"].iloc[t - 64 : t]) > 0
+            and slope(df["close"].iloc[t : t + 64])
+            < slope(df["close"].iloc[t - 64 : t])
+            if (
+                ctx["is_exhaustion"][t]
+                and ctx["pressure_len"][t] > 8
+                and t >= 64
+                and t + 64 < len(df)
+            )
+            else None
+        ),
+    ),
+    (
+        "Bubble size: larger exhaustion bubble → higher reversal chance?",
+        lambda t, df, ctx: (
+            slope(df["close"].iloc[t : t + 64]) < 0
+            if (
+                ctx["is_exhaustion"][t]
+                and ctx["pressure_len"][t] > 12
+                and t + 64 < len(df)
+            )
+            else None
+        ),
+    ),
 ]
 
 
