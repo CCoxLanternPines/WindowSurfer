@@ -10,7 +10,11 @@ from systems import sim_engine
 def main() -> None:
     parser = argparse.ArgumentParser(description="WindowSurfer discovery bot")
     parser.add_argument("--mode", required=True, help="Mode to run (sim)")
-    parser.add_argument("--time", default="1m", help="Time window for simulation")
+    parser.add_argument(
+        "--time",
+        default="1m",
+        help="Time window for simulation (e.g. '3m' for three months)",
+    )
     args = parser.parse_args()
 
     if args.mode.lower() == "sim":
