@@ -135,6 +135,8 @@ def run(brain_name: str, timeframe: str, viz: bool = True) -> dict[str, float]:
         brain.step(df, t)
 
     pts = brain.overlays()
+    if brain_name == "exhaustion":
+        pts = {k: v for k, v in pts.items() if k.startswith("exhaustion")}
 
     stats = brain.compute_stats(df, trend_state, angles)
 
