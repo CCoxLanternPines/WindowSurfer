@@ -23,14 +23,15 @@ _INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
 
 UNIT_SECONDS = {
     's': 1,
-    'm': 60,
+    # interpret 'm' as months (~30 days)
+    'm': 30 * 24 * 3600,
     'h': 3600,
     'd': 86400,
     'w': 604800,
 }
 
 def parse_timeframe(tf: str) -> timedelta | None:
-    """Parse strings like '12h', '3d', '6w' into timedelta."""
+    """Parse strings like '12h', '3d', '6w', '3m' into timedelta."""
     if not tf:
         return None
     m = re.match(r'(?i)^\s*(\d+)\s*([smhdw])\s*$', tf)
@@ -433,7 +434,12 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--time", type=str, default="1m")
+    p.add_argument(
+        "--time",
+        type=str,
+        default="1m",
+        help="Time window (e.g. '3m' for three months)",
+    )
     p.add_argument("--viz", action="store_true")
     args = p.parse_args()
     run_simulation(timeframe=args.time, viz=args.viz)
