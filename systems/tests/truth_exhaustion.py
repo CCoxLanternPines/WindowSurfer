@@ -16,22 +16,31 @@ from systems.tests.utils_truth import (
 )
 
 TAG = "SOLUSD"
+VOLATILITY_THRESH = 0.02
 
 
 QUESTIONS = [
     (
-        "Does exhaustion after long pressure → reversal?",
+        "Trend vs noise: exhaustion fires more in chop?",
         lambda t, df, ctx: (
-            slope(df["close"].iloc[t : t + 6]) < 0
+            ctx["volatility"][t] > ctx["volatility_thresh"]
             if ctx["is_exhaustion"][t]
             else None
         ),
     ),
     (
-        "Do long gaps without exhaustion align with trending?",
+        "Reversal trigger: first exhaustion after long pressure → reversal?",
         lambda t, df, ctx: (
-            abs(slope(df["close"].iloc[max(0, t - 12) : t])) > 0.01
-            if ctx["since_exhaustion"][t] >= 24
+            slope(df["close"].iloc[t : t + 6]) < 0
+            if ctx["is_exhaustion"][t] and ctx["pressure_len"][t] > 8
+            else None
+        ),
+    ),
+    (
+        "Nervousness factor: longer since last exhaustion → higher reversal chance?",
+        lambda t, df, ctx: (
+            slope(df["close"].iloc[t : t + 6]) < 0
+            if ctx["is_exhaustion"][t] and ctx["bars_since_exh"][t] > 10
             else None
         ),
     ),
@@ -39,25 +48,46 @@ QUESTIONS = [
 
 
 def build_context(df):
-    """Precompute exhaustion markers and streak / gap lengths."""
-    streak = [0] * len(df)
-    for i in range(1, len(df)):
-        streak[i] = streak[i - 1] + 1 if df["close"].iloc[i] > df["close"].iloc[i - 1] else 0
+    """Precompute exhaustion markers, pressure, and volatility."""
+    prices = df["close"]
 
+    # Rolling volatility as coefficient of variation.
+    rolling_std = prices.rolling(window=20, min_periods=1).std()
+    rolling_mean = prices.rolling(window=20, min_periods=1).mean()
+    volatility = (rolling_std / rolling_mean).fillna(0).tolist()
+
+    pressure_len = [0] * len(df)
     is_exhaustion = [False] * len(df)
+    pressure = 0
     for i in range(1, len(df)):
-        is_exhaustion[i] = streak[i - 1] >= 5 and df["close"].iloc[i] < df["close"].iloc[i - 1]
+        if prices.iloc[i] > prices.iloc[i - 1]:
+            pressure += 1
+            is_exhaustion[i] = False
+            pressure_len[i] = pressure
+        elif prices.iloc[i] < prices.iloc[i - 1]:
+            pressure_len[i] = pressure
+            is_exhaustion[i] = pressure >= 5
+            pressure = 0
+        else:
+            pressure_len[i] = pressure
+            is_exhaustion[i] = False
 
-    since_exhaustion = [0] * len(df)
+    bars_since_exh = [0] * len(df)
     last = -1
     for i in range(len(df)):
         if is_exhaustion[i]:
-            since_exhaustion[i] = 0
+            bars_since_exh[i] = 0
             last = i
         else:
-            since_exhaustion[i] = i - last if last != -1 else i + 1
+            bars_since_exh[i] = i - last if last != -1 else i + 1
 
-    return {"streak": streak, "is_exhaustion": is_exhaustion, "since_exhaustion": since_exhaustion}
+    return {
+        "is_exhaustion": is_exhaustion,
+        "pressure_len": pressure_len,
+        "volatility": volatility,
+        "volatility_thresh": VOLATILITY_THRESH,
+        "bars_since_exh": bars_since_exh,
+    }
 
 
 def main(timeframe: str, vis: bool) -> None:
