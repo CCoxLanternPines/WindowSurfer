@@ -11,7 +11,6 @@ from systems.sim_engine import run_simulation
 from systems.tests.utils_truth import (
     load_candles,
     slope,
-    percent_results,
     run_truth,
 )
 
@@ -125,8 +124,9 @@ def main(timeframe: str, vis: bool) -> None:
     file_path = f"data/sim/{TAG}_1h.csv"
     df = load_candles(file_path, timeframe)
     results = run_truth(df, QUESTIONS, build_context)
-    for q, pct in percent_results(results).items():
-        print(f"{q} = {pct:.0f}%")
+    for q, (hits, total) in results.items():
+        pct = (hits / total * 100) if total else 0.0
+        print(f"{q} → ({hits}/{total}) {pct:.2f}%")
 
 
 if __name__ == "__main__":
