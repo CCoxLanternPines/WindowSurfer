@@ -115,6 +115,18 @@ def run_simulation(*, timeframe: str = "1m", brain_name: str = "exhaustion", viz
     if not viz:
         return
 
+    if brain_name == "exhaustion":
+        xr, yr, sr = pts["exhaustion_red"]["x"], pts["exhaustion_red"]["y"], pts["exhaustion_red"]["s"]
+        xg, yg, sg = pts["exhaustion_green"]["x"], pts["exhaustion_green"]["y"], pts["exhaustion_green"]["s"]
+        ax1.scatter(xr, yr, s=sr, c="red", zorder=6)
+        ax1.scatter(xg, yg, s=sg, c="green", zorder=6)
+        ax1.set_title("Price with Exhaustion overlays")
+        ax1.set_xlabel("Candles (Index)")
+        ax1.set_ylabel("Price")
+        ax1.grid(True)
+        plt.show()
+        return
+
     # ===================== Plot & Toggles (lazy create) =====================
     ax1.set_title("Price with Exhaustion + Predictors (Keys 1–2,3,4–8; Letters W/E/R/T)")
     ax1.set_xlabel("Candles (Index)")
