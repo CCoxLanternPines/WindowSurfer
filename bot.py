@@ -9,7 +9,7 @@ from systems import sim_engine, brain_engine
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="WindowSurfer discovery bot")
-    parser.add_argument("--mode", required=True, help="Mode to run (sim, brain, metabrain)")
+    parser.add_argument("--mode", required=True, help="Mode to run (sim, brain, live)")
     parser.add_argument(
         "--time",
         default="1m",
@@ -25,7 +25,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.mode.lower() == "sim":
-        sim_engine.run_simulation(timeframe=args.time)
+        sim_engine.run_simulation(timeframe=args.time, viz=args.viz)
     elif args.mode.lower() == "brain":
         if not args.brain:
             print("Available brains:")
@@ -33,10 +33,10 @@ def main() -> None:
                 print(f"- {name}")
             return
         brain_engine.run_brain(args.brain, args.time, args.viz)
-    elif args.mode.lower() == "metabrain":
-        from systems.meta_engine import run_metabrain
+    elif args.mode.lower() == "live":
+        from systems.live_engine import run_live
 
-        run_metabrain(timeframe=args.time, viz=args.viz)
+        run_live(timeframe=args.time)
     else:
         raise ValueError(f"Unknown mode: {args.mode}")
 
