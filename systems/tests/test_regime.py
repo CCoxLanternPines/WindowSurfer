@@ -53,7 +53,8 @@ def main() -> None:
     df = define_regimes(df)
 
     cfg = _load_config()
-    window = int(cfg.get("window", 50))
+    det_cfg = cfg.get("detector", {})
+    window = max(int(det_cfg.get("slope_window", 30)), int(det_cfg.get("vol_window", 30)))
 
     guesses: list[str] = []
     for t in range(len(df)):
