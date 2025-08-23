@@ -30,13 +30,15 @@ UNIT_SECONDS = {
 }
 
 def parse_timeframe(tf: str) -> timedelta | None:
-    """Parse strings like '12h', '3d', '6w' into timedelta."""
+    """Parse strings like '12h', '3d', '6w', or '1m' (month) into timedelta."""
     if not tf:
         return None
     m = re.match(r'(?i)^\s*(\d+)\s*([smhdw])\s*$', tf)
     if not m:
         return None
     n, u = int(m.group(1)), m.group(2).lower()
+    if u == 'm':
+        return timedelta(days=n * 30)
     return timedelta(seconds=n * UNIT_SECONDS[u])
 
 def infer_candle_seconds_from_filename(path: str) -> int | None:
@@ -433,7 +435,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--time", type=str, default="1m")
+    p.add_argument("--time", type=str, default="1m", help="Time window (e.g. 1m for one month)")
     p.add_argument("--viz", action="store_true")
     args = p.parse_args()
     run_simulation(timeframe=args.time, viz=args.viz)
