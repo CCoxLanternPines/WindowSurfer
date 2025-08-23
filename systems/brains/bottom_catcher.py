@@ -10,7 +10,6 @@ import pandas as pd
 
 from ..sim_engine import WINDOW_SIZE, WINDOW_STEP, multi_window_vote
 
-
 ALIGN_WINDOW = 5  # ±5 candles for extrema alignment
 
 
@@ -83,7 +82,6 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
             max_future = float(future_highs.max())
             rec_mag = (max_future / price - 1) * 100
         else:
-            max_future = price
             rec_mag = 0.0
         recovery_mags.append(rec_mag)
 
@@ -123,6 +121,7 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
             if abs(min_pos - idx) <= ALIGN_WINDOW:
                 extrema_align += 1
 
+    # Aggregates
     recovery_mag = float(np.mean(recovery_mags)) if recovery_mags else 0.0
     time_to_recovery = float(np.mean(recovery_times)) if recovery_times else 0.0
     durable_low_pct = int(round(100 * durable_lows / total)) if total else 0
@@ -131,6 +130,7 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     continuation_lift_pct = int(round(100 * continuation / total)) if total else 0
     extrema_align_pct = int(round(100 * extrema_align / total)) if total else 0
 
+    # Slope bias for engine compatibility
     ud_total = up_count + down_count
     if ud_total:
         pct = int(round(100 * max(up_count, down_count) / ud_total))
@@ -140,6 +140,7 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
         direction = "neutral"
     slope_bias = f"{direction} {pct}%"
 
+    # Console output
     print("[BRAIN][bottom_catcher][stats]")
     print(f"  Avg recovery magnitude: {recovery_mag:+.1f}%")
     print(f"  Time-to-recovery (2%): {time_to_recovery:.0f}c")
