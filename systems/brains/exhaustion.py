@@ -157,6 +157,92 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     avg_down_reversal_slope24 = _mean(down_slopes)
 
     # ------------------------------------------------------------------
+    # Additional high-value statistics
+    # ------------------------------------------------------------------
+
+    # Edge accuracy: exhaustion near local extrema within ±5 candles
+    highs = df["close"].rolling(window=11, center=True).max().eq(df["close"])
+    lows = df["close"].rolling(window=11, center=True).min().eq(df["close"])
+    edge_hits = 0
+    for s in signals:
+        idx = int(s["candle_index"])
+        start = max(0, idx - 5)
+        end = min(len(df), idx + 6)
+        if s["direction"] == "sell":
+            if highs.iloc[start:end].any():
+                edge_hits += 1
+        else:
+            if lows.iloc[start:end].any():
+                edge_hits += 1
+    edge_accuracy = int(round(100 * edge_hits / count)) if count else 0
+
+    # Persistence risk: price continues ≥2% in same direction within 24 candles
+    persistence_fails = 0
+    valid_persist = 0
+    closes_arr = df["close"].to_numpy()
+    for s in signals:
+        idx = int(s["candle_index"])
+        if idx + 24 >= len(closes_arr):
+            continue
+        valid_persist += 1
+        price = closes_arr[idx]
+        future = closes_arr[idx + 1 : idx + 25]
+        if s["direction"] == "sell":
+            if future.max() >= price * 1.02:
+                persistence_fails += 1
+        else:
+            if future.min() <= price * 0.98:
+                persistence_fails += 1
+    persistence_fail_pct = (
+        int(round(100 * persistence_fails / valid_persist)) if valid_persist else 0
+    )
+
+    # Cluster strength correlation: size vs slope quality (12-24 candles)
+    sizes: List[float] = []
+    qualities: List[float] = []
+    for s in signals:
+        idx = int(s["candle_index"])
+        if idx + 24 >= len(closes_arr) or idx + 12 >= len(closes_arr):
+            continue
+        y = closes_arr[idx + 12 : idx + 25]
+        if len(y) < 2:
+            continue
+        x_vals = np.arange(len(y))
+        slope = float(np.polyfit(x_vals, y, 1)[0])
+        direction_val = -1 if s["direction"] == "sell" else 1
+        sizes.append(float(s["size"]))
+        qualities.append(slope * direction_val)
+
+    cluster_corr = 0.0
+    if sizes and qualities:
+        df_bins = pd.DataFrame({"size": sizes, "quality": qualities})
+        try:
+            df_bins["bin"] = pd.qcut(df_bins["size"], q=3, duplicates="drop")
+            grouped = df_bins.groupby("bin").mean()
+            if len(grouped) >= 2:
+                cluster_corr = float(
+                    np.corrcoef(grouped["size"], grouped["quality"])[0, 1]
+                )
+        except ValueError:
+            cluster_corr = 0.0
+
+    # Exhaustion-to-flip lag: distance to nearest Brain-2 flip
+    from . import reversal
+    import contextlib
+    import io
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        rev_signals = reversal.run(df, viz=False)
+    rev_indices = [int(s["index"]) for s in rev_signals]
+    lags: List[int] = []
+    if rev_indices:
+        for s in signals:
+            idx = int(s["candle_index"])
+            nearest = min(abs(idx - r) for r in rev_indices)
+            lags.append(nearest)
+    avg_lag = float(np.mean(lags)) if lags else 0.0
+
+    # ------------------------------------------------------------------
     # Console output
     # ------------------------------------------------------------------
     import sys
@@ -175,6 +261,12 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     print(f"  avg_uptrend_pressure={avg_uptrend_pressure:.2f}")
     print(f"  avg_downtrend_pressure={avg_downtrend_pressure:.2f}")
 
+    print("[EXH][stats]")
+    print(f"  Edge accuracy: {edge_accuracy}%")
+    print(f"  Persistence fails: {persistence_fail_pct}%")
+    print(f"  Cluster-size correlation: {cluster_corr:.2f}")
+    print(f"  Exhaustion-to-flip lag: {avg_lag:.2f} candles")
+
     return {
         "count": count,
         "avg_gap": avg_gap,
@@ -185,4 +277,8 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
         "avg_down_reversal_slope24": avg_down_reversal_slope24,
         "avg_uptrend_pressure": avg_uptrend_pressure,
         "avg_downtrend_pressure": avg_downtrend_pressure,
+        "edge_accuracy_pct": edge_accuracy,
+        "persistence_fail_pct": persistence_fail_pct,
+        "cluster_size_correlation": cluster_corr,
+        "exhaustion_to_flip_lag": avg_lag,
     }
