@@ -33,9 +33,11 @@ def run_brain(name: str, timeframe: str, viz: bool) -> None:
 
     mod = importlib.import_module(f"systems.brains.{name}")
     signals = mod.run(df, viz)
-    stats: dict[str, Any] = mod.summarize(signals, df)
+    summary: dict[str, Any] = mod.summarize(signals, df)
+    stats: dict[str, Any] = summary.get("stats", summary)
+    brain_name = summary.get("brain", name)
     print(
-        f"[BRAIN][{name}][{timeframe}] "
-        f"count={stats['count']} avg_gap={stats['avg_gap']}c "
-        f"slope_bias={stats['slope_bias']}"
+        f"[BRAIN][{brain_name}][{timeframe}] "
+        f"count={stats.get('count')} avg_gap={stats.get('avg_gap')}c "
+        f"slope_bias={stats.get('slope_bias')}"
     )

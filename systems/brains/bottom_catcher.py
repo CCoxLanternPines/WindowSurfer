@@ -152,14 +152,17 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     print(f"  Extrema alignment: {extrema_align_pct}%")
 
     return {
-        "count": total,
-        "avg_gap": avg_gap,
-        "slope_bias": slope_bias,
-        "recovery_mag": round(recovery_mag, 3),
-        "time_to_recovery": round(time_to_recovery, 3),
-        "durable_low_pct": durable_low_pct,
-        "trend_bias_up": round(trend_bias_up, 3),
-        "trend_bias_down": round(trend_bias_down, 3),
-        "continuation_lift_pct": continuation_lift_pct,
-        "extrema_align_pct": extrema_align_pct,
+        "brain": "bottom_catcher",
+        "stats": {
+            "count": total,
+            "avg_gap": avg_gap,
+            "slope_bias": slope_bias,
+            "recovery_mag": round(recovery_mag, 3),
+            "time_to_recovery": round(time_to_recovery, 3),
+            "durable_low_pct": durable_low_pct,
+            "trend_bias_up": round(trend_bias_up, 3),
+            "trend_bias_down": round(trend_bias_down, 3),
+            "continuation_lift_pct": continuation_lift_pct,
+            "extrema_align_pct": extrema_align_pct,
+        },
     }
