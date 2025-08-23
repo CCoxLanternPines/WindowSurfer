@@ -1,7 +1,9 @@
 from .exhaustion import ExhaustionBrain
+from .velocity import VelocityBrain
 
 REGISTRY = {
     "exhaustion": ExhaustionBrain,
+    "velocity": VelocityBrain,
 }
 
 def list_brains() -> list[str]:

@@ -6,6 +6,7 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -147,8 +148,21 @@ def run(brain_name: str, timeframe: str, viz: bool = True) -> dict[str, float]:
         json.dump(stats, f, indent=2)
 
     print("Brain statistics:")
-    for k, d in stats.items():
-        print(f"{k:40s} [{d['count']}/{d['total']}] {d['value']:.4f}")
+
+    def _print_stats(d, indent=0):
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    print(" " * indent + f"{k}:")
+                    _print_stats(v, indent + 2)
+                elif isinstance(v, float):
+                    print(" " * indent + f"{k}: {v:.4f}")
+                else:
+                    print(" " * indent + f"{k}: {v}")
+        else:
+            print(" " * indent + str(d))
+
+    _print_stats(stats)
 
     if not viz:
         return stats
@@ -167,8 +181,10 @@ def run(brain_name: str, timeframe: str, viz: bool = True) -> dict[str, float]:
         "valley_e": dict(c="deepskyblue", marker="D", s=110, zorder=7),
         "valley_r": dict(c="darkcyan", marker="s", s=100, zorder=7),
         "valley_t": dict(c="turquoise", marker="P", s=150, zorder=8),
+        "vel_reversal": dict(c="cyan", s=180, edgecolors="black", zorder=7, visible=False),
     }
 
+    scatters: dict[str, Any] = {}
     for name, data in pts.items():
         x = data.get("x", [])
         y = data.get("y", [])
@@ -180,7 +196,32 @@ def run(brain_name: str, timeframe: str, viz: bool = True) -> dict[str, float]:
         marker = style.get("marker", "o")
         edgecolors = style.get("edgecolors")
         zorder = style.get("zorder", 6)
-        ax1.scatter(x, y, s=s, c=c, marker=marker, edgecolors=edgecolors, zorder=zorder)
+        visible = style.get("visible", True)
+        scatters[name] = ax1.scatter(
+            x,
+            y,
+            s=s,
+            c=c,
+            marker=marker,
+            edgecolors=edgecolors,
+            zorder=zorder,
+            visible=visible,
+        )
+
+    def _toggle(names):
+        for n in names:
+            sc = scatters.get(n)
+            if sc is not None:
+                sc.set_visible(not sc.get_visible())
+        fig.canvas.draw_idle()
+
+    def on_key(event):
+        if event.key == "v":
+            _toggle(["vel_up", "vel_down", "vel_flat"])
+        elif event.key == "x":
+            _toggle(["vel_reversal"])
+
+    fig.canvas.mpl_connect("key_press_event", on_key)
 
     ax1.set_title(f"Price with {brain_name.title()} overlays")
     ax1.set_xlabel("Candles (Index)")
