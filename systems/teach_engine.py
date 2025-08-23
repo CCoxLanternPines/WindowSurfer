@@ -86,6 +86,11 @@ def apply_time_filter(df: pd.DataFrame, delta: timedelta, file_path: str) -> pd.
 # Data loading and feature engineering
 # -----------------------------------------------------------------------------
 
+def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Force lowercase column names for consistency."""
+    return df.rename(columns={c: c.lower() for c in df.columns})
+
+
 def load_candles(symbol: str) -> tuple[pd.DataFrame, str]:
     """Load full-resolution candles for ``symbol`` with 1h fallback."""
     base = Path("data/sim")
@@ -93,16 +98,36 @@ def load_candles(symbol: str) -> tuple[pd.DataFrame, str]:
     if not csv.exists():
         csv = base / f"{symbol}_1h.csv"
     df = pd.read_csv(csv)
+    df = normalize_columns(df)
     return df, str(csv)
+
+
+def pick_price_column(df: pd.DataFrame, candidates: list[str], fallback: str | None = None) -> str:
+    """Find a usable price column among candidates, else fallback."""
+    for c in candidates:
+        if c in df.columns:
+            return c
+    if fallback and fallback in df.columns:
+        return fallback
+    # last resort: first numeric column
+    for c in df.columns:
+        if pd.api.types.is_numeric_dtype(df[c]):
+            print(f"[WARN] Falling back to column '{c}' as price source")
+            return c
+    raise ValueError("No usable price column found in candles DataFrame")
 
 
 def enrich_features(df: pd.DataFrame) -> pd.DataFrame:
     """Add common vectorized features to ``df``."""
     df = df.copy()
-    df["return"] = df["close"].pct_change()
-    df["ema_12"] = df["close"].ewm(span=12, adjust=False).mean()
-    df["ema_26"] = df["close"].ewm(span=26, adjust=False).mean()
-    delta = df["close"].diff()
+    close_col = pick_price_column(df, ["close", "closing_price", "c"])
+    high_col = pick_price_column(df, ["high", "h"], close_col)
+    low_col = pick_price_column(df, ["low", "l"], close_col)
+
+    df["return"] = df[close_col].pct_change()
+    df["ema_12"] = df[close_col].ewm(span=12, adjust=False).mean()
+    df["ema_26"] = df[close_col].ewm(span=26, adjust=False).mean()
+    delta = df[close_col].diff()
     up = delta.clip(lower=0)
     down = -delta.clip(upper=0)
     roll_up = up.rolling(14).mean()
@@ -110,18 +135,18 @@ def enrich_features(df: pd.DataFrame) -> pd.DataFrame:
     rs = roll_up / roll_down
     df["rsi"] = 100 - (100 / (1 + rs))
     df["volatility"] = df["return"].rolling(20).std()
-    rolling_mean = df["close"].rolling(20).mean()
-    rolling_std = df["close"].rolling(20).std()
-    df["zscore"] = (df["close"] - rolling_mean) / rolling_std
-    high_col = "high" if "high" in df.columns else "close"
-    low_col = "low" if "low" in df.columns else "close"
+    rolling_mean = df[close_col].rolling(20).mean()
+    rolling_std = df[close_col].rolling(20).std()
+    df["zscore"] = (df[close_col] - rolling_mean) / rolling_std
     df["rolling_high"] = df[high_col].rolling(20).max()
     df["rolling_low"] = df[low_col].rolling(20).min()
+    # unify reference for downstream
+    df["price"] = df[close_col]
     return df
 
 
 # -----------------------------------------------------------------------------
-# Teaching engine
+# Teaching engine core
 # -----------------------------------------------------------------------------
 
 FEATURE_COLS = [
@@ -135,9 +160,7 @@ FEATURE_COLS = [
     "rolling_low",
 ]
 
-
-def run_teach(brain: str, timeframe: str, mode: str = "audit") -> None:
-    """Run teaching/audit loop for a given brain."""
+def _run(brain: str, timeframe: str, viz: bool, mode: str) -> None:
     df, file_path = load_candles("SOLUSD")
     delta = parse_timeframe(timeframe)
     if delta is not None:
@@ -148,6 +171,8 @@ def run_teach(brain: str, timeframe: str, mode: str = "audit") -> None:
 
     mod = importlib.import_module(f"systems.brains.{brain}")
     signals = mod.run(df, viz=False)
+
+    print(f"[DEBUG] Brain '{brain}' produced {len(signals)} signals")
 
     idx_map: Dict[int, Dict[str, float]] = {}
     for s in signals:
@@ -161,69 +186,31 @@ def run_teach(brain: str, timeframe: str, mode: str = "audit") -> None:
             continue
         feat = df.loc[t, FEATURE_COLS].to_dict()
         feat["index"] = int(df["candle_index"].iloc[t])
-        feat["price"] = float(df["close"].iloc[t])
+        feat["price"] = float(df["price"].iloc[t])
         rows.append(feat)
 
     counts = {"BUY": 0, "SELL": 0, "HOLD": 0}
 
     if mode == "audit":
-        feat_df = pd.DataFrame(rows)
-        if not feat_df.empty:
+        if not rows:
+            print(f"[WARN] No matching candles found for brain '{brain}'")
+        else:
+            feat_df = pd.DataFrame(rows)
             print(feat_df.describe())
             print("Correlations:")
             print(feat_df.corr(numeric_only=True))
-        counts["HOLD"] = len(rows)
+            counts["HOLD"] = len(rows)
 
-    elif mode == "teach":
-        import matplotlib.pyplot as plt
 
-        labels_path = Path(f"data/labels/{brain}.jsonl")
-        labels_path.parent.mkdir(parents=True, exist_ok=True)
+# -----------------------------------------------------------------------------
+# Public entrypoints
+# -----------------------------------------------------------------------------
 
-        indices = [r["index"] for r in rows]
-        prices = [r["price"] for r in rows]
+def run_audit(brain: str, timeframe: str):
+    _run(brain, timeframe, viz=False, mode="audit")
 
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.plot(df["candle_index"], df["close"], lw=1, color="blue")
-        ax.scatter(indices, prices, color="orange", marker="o")
+def run_teach(brain: str, timeframe: str, viz: bool):
+    _run(brain, timeframe, viz=viz, mode="teach")
 
-        state = {"i": 0}
-        highlight = ax.scatter([], [], s=200, facecolors="none", edgecolors="green")
-
-        if indices:
-            highlight.set_offsets([[indices[0], prices[0]]])
-
-        def on_key(event):
-            if not indices:
-                return
-            i = state["i"]
-            key = event.key.lower()
-            if key in ("b", "s", "h"):
-                label = {"b": "BUY", "s": "SELL", "h": "HOLD"}[key]
-                out = rows[i].copy()
-                out["label"] = label
-                with labels_path.open("a") as fh:
-                    fh.write(json.dumps(out) + "\n")
-                counts[label] += 1
-                state["i"] = min(len(indices) - 1, i + 1)
-                new_i = state["i"]
-                highlight.set_offsets([[indices[new_i], prices[new_i]]])
-                fig.canvas.draw_idle()
-
-        fig.canvas.mpl_connect("key_press_event", on_key)
-        plt.show()
-
-    elif mode == "correct":
-        labels_path = Path(f"data/labels/{brain}.jsonl")
-        if labels_path.exists():
-            lines = labels_path.read_text().splitlines()
-            print(f"Loaded {len(lines)} existing labels for correction (not implemented)")
-        else:
-            print("No existing labels to correct.")
-
-    total = sum(counts.values())
-    print(
-        f"[TEACH][{brain}][{timeframe}] "
-        f"count={total} buy={counts['BUY']} sell={counts['SELL']} hold={counts['HOLD']}"
-    )
-
+def run_correct(brain: str, timeframe: str, viz: bool):
+    _run(brain, timeframe, viz=viz, mode="correct")
