@@ -3,7 +3,9 @@ from __future__ import annotations
 import time
 import pandas as pd
 
-from .metabrain.engine_utils import cache_all_brains, trade_all_brains
+from .metabrain.engine_utils import cache_all_brains, extract_features_at_t as _extract_features_at_t
+from .metabrain.arbiter import run_arbiter
+from .utils.regime import tag_regime_at, load_regime_settings
 
 
 def get_recent_candles(timeframe: str) -> pd.DataFrame:
@@ -23,8 +25,17 @@ def sleep_until_next_candle() -> None:
 def run_live(timeframe: str = "1m") -> None:
     while True:
         df = get_recent_candles(timeframe)
-        all_brains = cache_all_brains(df)
+        regime_cfg = load_regime_settings()
+        brain_cache = cache_all_brains(df)
+        idx = len(df) - 1
+        features = _extract_features_at_t(brain_cache, idx)
+        features["regime"] = tag_regime_at(df, idx=idx, **regime_cfg)
+        decision, _, _, feat_snapshot = run_arbiter(
+            features, position_state="flat", return_score=True
+        )
         last_candle = df.iloc[-1]
-        decision = trade_all_brains(all_brains, last_candle, position_state="flat")
-        print(f"[LIVE] Decision={decision} at candle={last_candle['candle_index']}")
+        print(
+            f"[LIVE] Decision={decision} at candle={last_candle['candle_index']} "
+            f"regime={feat_snapshot.get('regime')}"
+        )
         sleep_until_next_candle()

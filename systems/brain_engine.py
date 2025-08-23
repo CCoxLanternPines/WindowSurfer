@@ -9,6 +9,7 @@ import pandas as pd
 from pathlib import Path
 
 from .sim_engine import parse_timeframe, apply_time_filter
+from .utils.regime import compute_regimes, load_regime_settings
 
 
 def list_brains() -> list[str]:
@@ -41,3 +42,25 @@ def run_brain(name: str, timeframe: str, viz: bool) -> None:
         f"count={stats.get('count')} avg_gap={stats.get('avg_gap')}c "
         f"slope_bias={stats.get('slope_bias')}"
     )
+
+    regime_cfg = load_regime_settings()
+    regime_df = compute_regimes(df, **regime_cfg)
+    counts: dict[str, int] = {}
+    for s in signals:
+        idx = s.get("index") or s.get("candle_index")
+        if idx is None or idx not in regime_df.index:
+            continue
+        trend = regime_df.loc[idx, "trend"]
+        vol = regime_df.loc[idx, "vol"]
+        key = f"{trend}/{vol}"
+        counts[key] = counts.get(key, 0) + 1
+    total = sum(counts.values())
+    if total:
+        rev = stats.get("reversal_pct")
+        cont = stats.get("continuation_pct")
+        if rev is not None and cont is not None:
+            print(f"  Global resolution: {rev}% rev / {cont}% cont")
+        print("  By regime:")
+        for key, cnt in sorted(counts.items(), key=lambda x: (-x[1], x[0])):
+            pct = 100 * cnt / total
+            print(f"    {key}: {pct:.0f}% ({cnt}/{total})")
