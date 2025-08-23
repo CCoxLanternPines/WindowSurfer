@@ -17,6 +17,7 @@ from ..sim_engine import (
     SCALE_POWER,
     multi_window_vote,
 )
+from ..regimes import definer
 
 
 def run(df: pd.DataFrame, viz: bool):
@@ -64,101 +65,109 @@ def run(df: pd.DataFrame, viz: bool):
 
 
 def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
-    """Compute exhaustion run and reversal statistics."""
+    """Compute exhaustion statistics broken down by regime."""
 
-    # ------------------------------------------------------------------
-    # Basic stats maintained for compatibility with ``brain_engine``.
-    # ------------------------------------------------------------------
-    count = len(signals)
-    indices = [s["candle_index"] for s in signals]
-    avg_gap = int(np.mean(np.diff(indices))) if len(indices) > 1 else 0
-    up = sum(1 for s in signals if s["direction"] == "sell")
-    down = sum(1 for s in signals if s["direction"] == "buy")
-    total = up + down
-    if total:
-        pct = int(round(100 * up / total))
-        direction = "uptrend" if up >= down else "downtrend"
-    else:
-        pct = 0
-        direction = "flat"
+    add_regimes = getattr(definer, "add_regimes", definer.define_regimes)
+    df = add_regimes(df)
 
-    # ------------------------------------------------------------------
-    # Trend run tracking
-    # ------------------------------------------------------------------
-    runs: List[Dict[str, float]] = []
-    current_dir: int | None = None
-    start_idx: int | None = None
-    max_pressure = 0.0
+    def _compute_stats(sub_signals: List[Dict[str, float]]):
+        count = len(sub_signals)
+        indices = [s["candle_index"] for s in sub_signals]
+        avg_gap = int(np.mean(np.diff(indices))) if len(indices) > 1 else 0
+        up = sum(1 for s in sub_signals if s["direction"] == "sell")
+        down = sum(1 for s in sub_signals if s["direction"] == "buy")
+        total = up + down
+        if total:
+            pct = int(round(100 * up / total))
+            direction = "uptrend" if up >= down else "downtrend"
+        else:
+            pct = 0
+            direction = "flat"
 
-    for s in sorted(signals, key=lambda x: x["candle_index"]):
-        idx = int(s["candle_index"])
-        direction_val = 1 if s["direction"] == "buy" else -1
-        size = float(s["size"])
+        runs: List[Dict[str, float]] = []
+        current_dir: int | None = None
+        start_idx: int | None = None
+        max_pressure = 0.0
 
-        if current_dir is None:
+        for s in sorted(sub_signals, key=lambda x: x["candle_index"]):
+            idx = int(s["candle_index"])
+            direction_val = 1 if s["direction"] == "buy" else -1
+            size = float(s["size"])
+
+            if current_dir is None:
+                current_dir = direction_val
+                start_idx = idx
+                max_pressure = size
+                continue
+
+            if direction_val == current_dir:
+                if size > max_pressure:
+                    max_pressure = size
+                continue
+
+            if start_idx is not None:
+                runs.append(
+                    {
+                        "dir": current_dir,
+                        "length": idx - start_idx,
+                        "max_pressure": max_pressure,
+                        "reversal_idx": idx,
+                    }
+                )
+
             current_dir = direction_val
             start_idx = idx
             max_pressure = size
+
+        up_runs = [r for r in runs if r["dir"] == 1]
+        down_runs = [r for r in runs if r["dir"] == -1]
+
+        def _mean(values: List[float]) -> float:
+            return float(np.mean(values)) if values else 0.0
+
+        avg_uptrend_duration = _mean([r["length"] for r in up_runs if r["length"] > 12])
+        avg_downtrend_duration = _mean([r["length"] for r in down_runs if r["length"] > 12])
+        avg_uptrend_pressure = _mean([r["max_pressure"] for r in up_runs])
+        avg_downtrend_pressure = _mean([r["max_pressure"] for r in down_runs])
+
+        up_slopes: List[float] = []
+        down_slopes: List[float] = []
+        closes = df["close"].tolist()
+        for r in runs:
+            idx = int(r["reversal_idx"])
+            if idx + 24 <= len(closes):
+                y = closes[idx : idx + 24]
+                x = list(range(len(y)))
+                slope = float(np.polyfit(x, y, 1)[0])
+                if r["dir"] == 1:
+                    up_slopes.append(slope)
+                else:
+                    down_slopes.append(slope)
+
+        avg_up_reversal_slope24 = _mean(up_slopes)
+        avg_down_reversal_slope24 = _mean(down_slopes)
+
+        return {
+            "count": count,
+            "avg_gap": avg_gap,
+            "slope_bias": f"{direction} {pct}%",
+            "avg_uptrend_duration": avg_uptrend_duration,
+            "avg_downtrend_duration": avg_downtrend_duration,
+            "avg_up_reversal_slope24": avg_up_reversal_slope24,
+            "avg_down_reversal_slope24": avg_down_reversal_slope24,
+            "avg_uptrend_pressure": avg_uptrend_pressure,
+            "avg_downtrend_pressure": avg_downtrend_pressure,
+        }
+
+    regime_map: Dict[str, List[Dict[str, float]]] = {}
+    for s in signals:
+        idx = s["candle_index"]
+        row = df.loc[df["candle_index"] == idx]
+        if row.empty:
             continue
+        regime = str(row["regime_true"].iloc[0])
+        regime_map.setdefault(regime, []).append(s)
 
-        if direction_val == current_dir:
-            if size > max_pressure:
-                max_pressure = size
-            continue
-
-        # Direction flipped – close out previous run
-        if start_idx is not None:
-            runs.append(
-                {
-                    "dir": current_dir,
-                    "length": idx - start_idx,
-                    "max_pressure": max_pressure,
-                    "reversal_idx": idx,
-                }
-            )
-
-        # Start new run
-        current_dir = direction_val
-        start_idx = idx
-        max_pressure = size
-
-    # ------------------------------------------------------------------
-    # Aggregate statistics
-    # ------------------------------------------------------------------
-    up_runs = [r for r in runs if r["dir"] == 1]
-    down_runs = [r for r in runs if r["dir"] == -1]
-
-    def _mean(values: List[float]) -> float:
-        return float(np.mean(values)) if values else 0.0
-
-    avg_uptrend_duration = _mean([r["length"] for r in up_runs if r["length"] > 12])
-    avg_downtrend_duration = _mean([r["length"] for r in down_runs if r["length"] > 12])
-    avg_uptrend_pressure = _mean([r["max_pressure"] for r in up_runs])
-    avg_downtrend_pressure = _mean([r["max_pressure"] for r in down_runs])
-
-    # ------------------------------------------------------------------
-    # Reversal slope statistics (24 candles after flip)
-    # ------------------------------------------------------------------
-    up_slopes: List[float] = []
-    down_slopes: List[float] = []
-    closes = df["close"].tolist()
-    for r in runs:
-        idx = int(r["reversal_idx"])
-        if idx + 24 <= len(closes):
-            y = closes[idx : idx + 24]
-            x = list(range(len(y)))
-            slope = float(np.polyfit(x, y, 1)[0])
-            if r["dir"] == 1:
-                up_slopes.append(slope)
-            else:
-                down_slopes.append(slope)
-
-    avg_up_reversal_slope24 = _mean(up_slopes)
-    avg_down_reversal_slope24 = _mean(down_slopes)
-
-    # ------------------------------------------------------------------
-    # Console output
-    # ------------------------------------------------------------------
     import sys
 
     timeframe = "unknown"
@@ -167,22 +176,16 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
         if idx + 1 < len(sys.argv):
             timeframe = sys.argv[idx + 1]
 
-    print(f"[BRAIN][exhaustion][{timeframe}]")
-    print(f"  avg_uptrend_duration={avg_uptrend_duration:.2f}")
-    print(f"  avg_downtrend_duration={avg_downtrend_duration:.2f}")
-    print(f"  avg_up_reversal_slope24={avg_up_reversal_slope24:.5f}")
-    print(f"  avg_down_reversal_slope24={avg_down_reversal_slope24:.5f}")
-    print(f"  avg_uptrend_pressure={avg_uptrend_pressure:.2f}")
-    print(f"  avg_downtrend_pressure={avg_downtrend_pressure:.2f}")
+    stats_by_regime: Dict[str, Dict[str, float]] = {}
+    for regime, sigs in regime_map.items():
+        stats = _compute_stats(sigs)
+        stats_by_regime[regime] = stats
+        print(f"[BRAIN][exhaustion][{timeframe}][{regime}]")
+        print(f"  avg_uptrend_duration={stats['avg_uptrend_duration']:.2f}")
+        print(f"  avg_downtrend_duration={stats['avg_downtrend_duration']:.2f}")
+        print(f"  avg_up_reversal_slope24={stats['avg_up_reversal_slope24']:.5f}")
+        print(f"  avg_down_reversal_slope24={stats['avg_down_reversal_slope24']:.5f}")
+        print(f"  avg_uptrend_pressure={stats['avg_uptrend_pressure']:.2f}")
+        print(f"  avg_downtrend_pressure={stats['avg_downtrend_pressure']:.2f}")
 
-    return {
-        "count": count,
-        "avg_gap": avg_gap,
-        "slope_bias": f"{direction} {pct}%",
-        "avg_uptrend_duration": avg_uptrend_duration,
-        "avg_downtrend_duration": avg_downtrend_duration,
-        "avg_up_reversal_slope24": avg_up_reversal_slope24,
-        "avg_down_reversal_slope24": avg_down_reversal_slope24,
-        "avg_uptrend_pressure": avg_uptrend_pressure,
-        "avg_downtrend_pressure": avg_downtrend_pressure,
-    }
+    return {"brain": "exhaustion", "stats_by_regime": stats_by_regime}
