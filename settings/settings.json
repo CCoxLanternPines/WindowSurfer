@@ -1,7 +1,16 @@
 {
   "regime_settings": {
-    "slope_eps": 0.001,
-    "vol_eps": 0.01,
-    "window": 50
+    "definer": {
+      "slope_window": 100,
+      "vol_window": 100,
+      "slope_eps": 0.0008,
+      "vol_eps": 0.012
+    },
+    "detector": {
+      "slope_window": 30,
+      "vol_window": 30,
+      "slope_eps": 0.0012,
+      "vol_eps": 0.010
+    }
   }
 }

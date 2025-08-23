@@ -11,19 +11,20 @@ import pandas as pd
 
 
 def _load_config() -> dict[str, Any]:
-    """Return regime settings from ``settings/settings.json``."""
+    """Return definer settings from ``settings/settings.json``."""
     path = Path("settings/settings.json")
     with path.open("r", encoding="utf-8") as fh:
         data = json.load(fh)
-    return data.get("regime_settings", {})
+    return data.get("regime_settings", {}).get("definer", {})
 
 
 def define_regimes(df: pd.DataFrame) -> pd.DataFrame:
     """Annotate ``df`` with a ``regime_true`` column."""
     cfg = _load_config()
-    window = int(cfg.get("window", 50))
-    slope_eps = float(cfg.get("slope_eps", 0.001))
-    vol_eps = float(cfg.get("vol_eps", 0.01))
+    slope_window = int(cfg.get("slope_window", 100))
+    vol_window = int(cfg.get("vol_window", 100))
+    slope_eps = float(cfg.get("slope_eps", 0.0008))
+    vol_eps = float(cfg.get("vol_eps", 0.012))
 
     closes = df["close"]
 
@@ -33,9 +34,9 @@ def define_regimes(df: pd.DataFrame) -> pd.DataFrame:
         x = np.arange(series.size)
         return float(np.polyfit(x, series.values, 1)[0])
 
-    slope = closes.rolling(window, min_periods=1).apply(_slope, raw=False)
+    slope = closes.rolling(slope_window, min_periods=1).apply(_slope, raw=False)
     returns = closes.pct_change()
-    vol = returns.rolling(window, min_periods=1).std()
+    vol = returns.rolling(vol_window, min_periods=1).std()
 
     df = df.copy()
     df["regime_true"] = np.where(
@@ -44,7 +45,7 @@ def define_regimes(df: pd.DataFrame) -> pd.DataFrame:
         np.where(
             slope < -slope_eps,
             "trend_down",
-            np.where(vol >= vol_eps, "chop", "flat"),
+            np.where((abs(slope) <= slope_eps) & (vol >= vol_eps), "chop", "flat"),
         ),
     )
     return df
