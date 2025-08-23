@@ -76,12 +76,31 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     gap_tight_pct = int(round(100 * np.sum(gaps < 10) / len(gaps))) if len(gaps) else 0
     gap_wide_pct = int(round(100 * np.sum(gaps > 30) / len(gaps))) if len(gaps) else 0
 
+    cluster_dips: List[float] = []
+    if transitions:
+        lows = df["low"] if "low" in df.columns else df["close"]
+        for i in range(transitions):
+            gap = indices[i + 1] - indices[i]
+            if gap <= 10:
+                star_price = prices[i]
+                between = lows.iloc[indices[i] + 1 : indices[i + 1]]
+                trough = float(between.min()) if not between.empty else star_price
+                cluster_dips.append((trough / star_price - 1) * 100)
+
     up = sum(1 for i in range(transitions) if prices[i + 1] >= prices[i])
     down = transitions - up
     slope_bias = (
         f"{'uptrend' if up >= down else 'downtrend'} {int(round(100 * max(up, down) / transitions))}%"
         if transitions
         else "flat 0%"
+    )
+
+    avg_cluster_dip = float(np.mean(cluster_dips)) if cluster_dips else 0.0
+    median_cluster_dip = float(np.median(cluster_dips)) if cluster_dips else 0.0
+    gt2pct_dip_pct = (
+        int(round(100 * np.sum(np.array(cluster_dips) <= -2) / len(cluster_dips)))
+        if cluster_dips
+        else 0
     )
 
     overlap_div_pct = 0
@@ -125,6 +144,9 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     print(
         f"  Overlaps: Divergence {overlap_div_pct}% | Combo {overlap_combo_pct}%"
     )
+    print(f"  Avg dip in tight clusters: {avg_cluster_dip:.1f}%")
+    print(f"  Median dip: {median_cluster_dip:.1f}%")
+    print(f"  >2% dips: {gt2pct_dip_pct}%")
 
     return {
         "count": total,
@@ -138,4 +160,7 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
         "gap_wide_pct": gap_wide_pct,
         "overlap_div_pct": overlap_div_pct,
         "overlap_combo_pct": overlap_combo_pct,
+        "avg_cluster_dip": avg_cluster_dip,
+        "median_cluster_dip": median_cluster_dip,
+        "gt2pct_dip_pct": gt2pct_dip_pct,
     }
