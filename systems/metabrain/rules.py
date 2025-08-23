@@ -1,57 +1,41 @@
-def buy_decision(features, weights, debug=False):
+def buy_decision(features, debug=False):
     reasons = []
-    checks = []
+    val1 = features.get("exh_edge_accuracy", 0)
+    thresh1 = 60
+    cond1 = val1 > thresh1
+    if debug:
+        reasons.append(
+            f"exh_edge_accuracy - {val1:.2f} > {thresh1} {'PASS' if cond1 else 'FAIL'}"
+        )
 
-    if weights.get("exh_edge_accuracy", 1) > 0:
-        val = features.get("exh_edge_accuracy")
-        ok = (val or 0) > 60
-        checks.append(ok)
-        if debug:
-            reasons.append(
-                f"exh_edge_accuracy={val} {'OK' if ok else 'FAIL'}"
-            )
-    elif debug:
-        reasons.append("exh_edge_accuracy ignored")
+    val2 = features.get("flip_extrema_pct", 0)
+    thresh2 = 50
+    cond2 = val2 > thresh2
+    if debug:
+        reasons.append(
+            f"flip_extrema_pct - {val2:.2f} > {thresh2} {'PASS' if cond2 else 'FAIL'}"
+        )
 
-    if weights.get("flip_extrema_pct", 1) > 0:
-        val = features.get("flip_extrema_pct")
-        ok = (val or 0) > 50
-        checks.append(ok)
-        if debug:
-            reasons.append(
-                f"flip_extrema_pct={val} {'OK' if ok else 'FAIL'}"
-            )
-    elif debug:
-        reasons.append("flip_extrema_pct ignored")
-
-    return (all(checks) if checks else False), reasons
+    return (cond1 and cond2), reasons
 
 
-def sell_decision(features, weights, debug=False):
+def sell_decision(features, debug=False):
     reasons = []
-    checks = []
+    val1 = features.get("divergence_to_top", 0)
+    thresh1 = 70
+    cond1 = val1 > thresh1
+    if debug:
+        reasons.append(
+            f"divergence_to_top - {val1:.2f} > {thresh1} {'PASS' if cond1 else 'FAIL'}"
+        )
 
-    if weights.get("divergence_to_top", 1) > 0:
-        val = features.get("divergence_to_top")
-        ok = (val or 0) > 70
-        checks.append(ok)
-        if debug:
-            reasons.append(
-                f"divergence_to_top={val} {'OK' if ok else 'FAIL'}"
-            )
-    elif debug:
-        reasons.append("divergence_to_top ignored")
+    val2 = features.get("peak_continuation", 100)
+    thresh2 = 30
+    cond2 = val2 < thresh2
+    if debug:
+        reasons.append(
+            f"peak_continuation - {val2:.2f} < {thresh2} {'PASS' if cond2 else 'FAIL'}"
+        )
 
-    if weights.get("peak_continuation", 1) > 0:
-        val = features.get("peak_continuation", 100)
-        ok = (val or 100) < 30
-        checks.append(ok)
-        if debug:
-            reasons.append(
-                f"peak_continuation={val} {'OK' if ok else 'FAIL'}"
-            )
-    elif debug:
-        reasons.append("peak_continuation ignored")
-
-    return (all(checks) if checks else False), reasons
+    return (cond1 and cond2), reasons
 
