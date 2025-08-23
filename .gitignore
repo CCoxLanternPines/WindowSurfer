@@ -58,6 +58,7 @@ data/cache/
 logs/
 *.log
 *.tmp
+data/brain_logs/**/*.json
 
 # Common large artifacts
 *.parquet

@@ -22,6 +22,7 @@ def main() -> None:
         help="Name of brain module to run",
     )
     parser.add_argument("--viz", action="store_true", help="Show plot for the run")
+    parser.add_argument("--symbol", help="Trading symbol", default="unknown")
     args = parser.parse_args()
 
     if args.mode.lower() == "sim":
