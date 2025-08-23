@@ -8,12 +8,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from ..sim_engine import WINDOW_SIZE, WINDOW_STEP
+from ..sim_engine import WINDOW_SIZE, WINDOW_STEP, multi_window_vote
 
 
 ALIGN_WINDOW = 5  # ±5 candles for extrema alignment
-SLOPE_DELTA_THRESH = 0.002
-ATR_MED_WINDOW = 100
 
 
 def run(df: pd.DataFrame, viz: bool):
@@ -54,7 +52,7 @@ def run(df: pd.DataFrame, viz: bool):
 
 
 def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
-    """Compute valley-quality statistics for ▼ signals."""
+    """Compute recovery-quality statistics for ▼ signals."""
     total = len(signals)
     indices = [int(s["index"]) for s in signals]
     avg_gap = int(np.mean(np.diff(indices))) if len(indices) > 1 else 0
@@ -63,53 +61,58 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     lows = df["low"].to_numpy()
     closes = df["close"].to_numpy()
 
-    # ATR(14) and its rolling median for volatility context
-    prev_close = np.roll(closes, 1)
-    tr = np.maximum(highs - lows, np.maximum(np.abs(highs - prev_close), np.abs(lows - prev_close)))
-    tr[0] = highs[0] - lows[0]
-    atr14 = pd.Series(tr).rolling(14).mean()
-    atr_median = atr14.rolling(ATR_MED_WINDOW).median()
-
-    sharp = 0
-    slope_deltas: List[float] = []
-    strong_slope = 0
-    multi_confirm = 0
-    high_vol = 0
+    recovery_mags: List[float] = []
+    recovery_times: List[int] = []
+    durable_lows = 0
+    up_recovs: List[float] = []
+    down_recovs: List[float] = []
+    up_count = 0
+    down_count = 0
+    continuation = 0
     extrema_align = 0
 
     for idx in indices:
         if idx >= len(closes):
             continue
 
-        # Valley sharpness via lower wick ratio
-        rng = highs[idx] - lows[idx]
-        if rng > 0:
-            wick_ratio = (closes[idx] - lows[idx]) / rng
-            if wick_ratio >= 0.5:
-                sharp += 1
+        price = closes[idx]
 
-        # Slope delta between two 12-candle windows
-        if idx >= 24:
-            sub_now = closes[idx-12:idx]
-            sub_prev = closes[idx-24:idx-12]
-            slope_now = float(np.polyfit(np.arange(len(sub_now)), sub_now, 1)[0]) if len(sub_now) > 1 else 0.0
-            slope_prev = float(np.polyfit(np.arange(len(sub_prev)), sub_prev, 1)[0]) if len(sub_prev) > 1 else 0.0
-            delta = slope_now - slope_prev
+        # Recovery magnitude (max high within next 48 candles)
+        future_highs = highs[idx + 1 : idx + 49]
+        if future_highs.size:
+            max_future = float(future_highs.max())
+            rec_mag = (max_future / price - 1) * 100
         else:
-            delta = 0.0
-        slope_deltas.append(delta)
-        if delta >= SLOPE_DELTA_THRESH:
-            strong_slope += 1
+            max_future = price
+            rec_mag = 0.0
+        recovery_mags.append(rec_mag)
 
-        # Multi-window confirmation (12c & 48c minima)
-        win12 = closes[max(0, idx-11):idx+1]
-        win48 = closes[max(0, idx-47):idx+1]
-        if win12.size and win48.size and win12[-1] == float(win12.min()) and win48[-1] == float(win48.min()):
-            multi_confirm += 1
+        # Time-to-Recovery: candles to +2% close within 48 candles
+        target = price * 1.02
+        future_closes = closes[idx + 1 : idx + 49]
+        for j, c in enumerate(future_closes, start=1):
+            if c >= target:
+                recovery_times.append(j)
+                break
 
-        # ATR context
-        if not np.isnan(atr14.iloc[idx]) and not np.isnan(atr_median.iloc[idx]) and atr14.iloc[idx] > atr_median.iloc[idx]:
-            high_vol += 1
+        # Follow-through Probability: low not revisited within 24 candles
+        future_lows = lows[idx + 1 : idx + 25]
+        if future_lows.size and future_lows.min() > lows[idx]:
+            durable_lows += 1
+
+        # Trend context via multi-window vote
+        decision, _, _ = multi_window_vote(df, idx, window_sizes=[8, 12, 24, 48])
+        if decision == 1:
+            up_recovs.append(rec_mag)
+            up_count += 1
+        elif decision == -1:
+            down_recovs.append(rec_mag)
+            down_count += 1
+
+        # Continuation Lift: exceed prior swing high within 48 candles
+        prev_high = highs[max(0, idx - 48) : idx].max() if idx > 0 else price
+        if future_highs.size and future_highs.max() > prev_high:
+            continuation += 1
 
         # Extrema alignment within ±5 candles
         start = max(0, idx - ALIGN_WINDOW)
@@ -120,27 +123,42 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
             if abs(min_pos - idx) <= ALIGN_WINDOW:
                 extrema_align += 1
 
-    sharp_valley_pct = int(round(100 * sharp / total)) if total else 0
-    slope_delta_avg = float(np.mean(slope_deltas)) if slope_deltas else 0.0
-    slope_delta_strong_pct = int(round(100 * strong_slope / total)) if total else 0
-    multiwin_confirm_pct = int(round(100 * multi_confirm / total)) if total else 0
-    highvol_pct = int(round(100 * high_vol / total)) if total else 0
+    recovery_mag = float(np.mean(recovery_mags)) if recovery_mags else 0.0
+    time_to_recovery = float(np.mean(recovery_times)) if recovery_times else 0.0
+    durable_low_pct = int(round(100 * durable_lows / total)) if total else 0
+    trend_bias_up = float(np.mean(up_recovs)) if up_recovs else 0.0
+    trend_bias_down = float(np.mean(down_recovs)) if down_recovs else 0.0
+    continuation_lift_pct = int(round(100 * continuation / total)) if total else 0
     extrema_align_pct = int(round(100 * extrema_align / total)) if total else 0
 
+    ud_total = up_count + down_count
+    if ud_total:
+        pct = int(round(100 * max(up_count, down_count) / ud_total))
+        direction = "uptrend" if up_count >= down_count else "downtrend"
+    else:
+        pct = 0
+        direction = "neutral"
+    slope_bias = f"{direction} {pct}%"
+
     print("[BRAIN][bottom_catcher][stats]")
-    print(f"  Sharp valleys (wick ≥50%): {sharp_valley_pct}%")
-    print(f"  Strong slope deltas (≥{SLOPE_DELTA_THRESH}): {slope_delta_strong_pct}%")
-    print(f"  Multi-window confirmations: {multiwin_confirm_pct}%")
-    print(f"  High-volatility context: {highvol_pct}%")
-    print(f"  Extrema alignment (±{ALIGN_WINDOW}c): {extrema_align_pct}%")
+    print(f"  Avg recovery magnitude: {recovery_mag:+.1f}%")
+    print(f"  Time-to-recovery (2%): {time_to_recovery:.0f}c")
+    print(f"  Durable lows: {durable_low_pct}%")
+    print(
+        f"  Trend bias: uptrend {trend_bias_up:.1f}% avg bounce, downtrend {trend_bias_down:.1f}% avg bounce"
+    )
+    print(f"  Continuation lift: {continuation_lift_pct}%")
+    print(f"  Extrema alignment: {extrema_align_pct}%")
 
     return {
         "count": total,
         "avg_gap": avg_gap,
-        "sharp_valley_pct": sharp_valley_pct,
-        "slope_delta_avg": round(slope_delta_avg, 6),
-        "slope_delta_strong_pct": slope_delta_strong_pct,
-        "multiwin_confirm_pct": multiwin_confirm_pct,
-        "highvol_pct": highvol_pct,
+        "slope_bias": slope_bias,
+        "recovery_mag": round(recovery_mag, 3),
+        "time_to_recovery": round(time_to_recovery, 3),
+        "durable_low_pct": durable_low_pct,
+        "trend_bias_up": round(trend_bias_up, 3),
+        "trend_bias_down": round(trend_bias_down, 3),
+        "continuation_lift_pct": continuation_lift_pct,
         "extrema_align_pct": extrema_align_pct,
     }
