@@ -260,7 +260,7 @@ class ExhaustionBrain(Brain):
     def compute_stats(
         self, df: pd.DataFrame, trend_state: list[int], slopes: list[float]
     ) -> dict[str, dict[str, float | int]]:
-        TREND_MIN_LEN = 50
+        TREND_MIN_LEN = 12
         POST_FLIP_WINDOW = 92
 
         n = len(trend_state)
@@ -326,12 +326,12 @@ class ExhaustionBrain(Brain):
         down_bubble_nonzero = sum(1 for v in down_bubbles if v > 0)
 
         stats = {
-            "avg_uptrend_duration_past50": {
+            "avg_uptrend_duration_past12": {
                 "value": _avg(up_durations),
                 "count": len(up_durations),
                 "total": up_total,
             },
-            "avg_downtrend_duration_past50": {
+            "avg_downtrend_duration_past12": {
                 "value": _avg(down_durations),
                 "count": len(down_durations),
                 "total": down_total,
