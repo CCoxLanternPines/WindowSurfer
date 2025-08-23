@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from systems import sim_engine
+from systems import sim_engine, brain_engine
 
 
 def main() -> None:
@@ -15,9 +15,10 @@ def main() -> None:
         default="1m",
         help="Time window for simulation (e.g., 1m for one month)",
     )
+    brains = brain_engine.list_brains()
     parser.add_argument(
         "--brain",
-        choices=["exhaustion", "reversal"],
+        choices=brains,
         help="Name of brain module to run",
     )
     parser.add_argument("--viz", action="store_true", help="Show plot for the run")
@@ -26,8 +27,11 @@ def main() -> None:
     if args.mode.lower() == "sim":
         sim_engine.run_simulation(timeframe=args.time)
     elif args.mode.lower() == "brain":
-        from systems import brain_engine
-
+        if not args.brain:
+            print("Available brains:")
+            for name in brains:
+                print(f"- {name}")
+            return
         brain_engine.run_brain(args.brain, args.time, args.viz)
     else:
         raise ValueError(f"Unknown mode: {args.mode}")
