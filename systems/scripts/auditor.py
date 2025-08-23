@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-"""Simple weights auditor that ranks features by outcome skew."""
+"""Export per-candle feature statistics for brains."""
 
 import argparse
 import json
-import shutil
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
@@ -31,7 +29,7 @@ from systems.sim_engine import apply_time_filter, parse_timeframe
 from systems.utils.regime import compute_regimes, load_regime_settings
 
 DATA_SIM_PATH = ROOT / "data" / "sim" / "SOLUSD_1h.csv"
-DEFAULT_WEIGHTS_PATH = ROOT / "data" / "weights" / "weights.json"
+DEFAULT_OUT_DIR = ROOT / "data" / "stats"
 
 
 def feature_brain(name: str) -> str:
@@ -44,96 +42,7 @@ def feature_brain(name: str) -> str:
     return name
 
 
-def compute_weights(df: pd.DataFrame, brains: Iterable[str]) -> dict:
-    regime_cfg = load_regime_settings()
-    regime_df = compute_regimes(df, **regime_cfg)
-
-    brain_cache = cache_all_brains(df)
-
-    records: list[dict] = []
-    for t in range(len(df) - 1):
-        feats = extract_features_at_t(brain_cache, t)
-        trend = regime_df.loc[t, "trend"] if t < len(regime_df) else "unknown"
-        vol = regime_df.loc[t, "vol"] if t < len(regime_df) else "unknown"
-        feats["regime_key"] = f"{trend}.{vol}"
-        feats["label"] = 1 if df["close"].iloc[t + 1] > df["close"].iloc[t] else 0
-        records.append(feats)
-
-    data = pd.DataFrame(records).dropna()
-    if data.empty:
-        return {}
-
-    regimes = data["regime_key"].unique().tolist()
-    feature_weights: dict[str, dict[str, float]] = {}
-    for feat in [c for c in data.columns if c not in ("label", "regime_key")]:
-        if brains and feature_brain(feat) not in brains:
-            continue
-        feat_data = data[[feat, "label", "regime_key"]].dropna()
-        if feat_data.empty:
-            continue
-
-        weights_by_regime: dict[str, float] = {}
-
-        # Global weight
-        total = len(feat_data)
-        weight_global = 0.0
-        try:
-            bins = pd.qcut(feat_data[feat], 5, duplicates="drop")
-        except ValueError:
-            bins = None
-        if bins is not None:
-            for _, grp in feat_data.groupby(bins):
-                count = len(grp)
-                if count < 20:
-                    continue
-                rev_pct = grp["label"].mean()
-                deviation = rev_pct - 0.5
-                if abs(deviation) < 0.05:
-                    continue
-                sample_fraction = count / total
-                weight_global += deviation * sample_fraction
-        weights_by_regime["global"] = round(weight_global, 2)
-
-        for reg in regimes:
-            sub = feat_data[feat_data["regime_key"] == reg]
-            total_reg = len(sub)
-            if total_reg < 20:
-                continue
-            weight_reg = 0.0
-            try:
-                bins_reg = pd.qcut(sub[feat], 5, duplicates="drop")
-            except ValueError:
-                continue
-            for _, grp in sub.groupby(bins_reg):
-                count = len(grp)
-                if count < 20:
-                    continue
-                rev_pct = grp["label"].mean()
-                deviation = rev_pct - 0.5
-                if abs(deviation) < 0.05:
-                    continue
-                sample_fraction = count / total_reg
-                weight_reg += deviation * sample_fraction
-            if abs(weight_reg) >= 0.05:
-                weights_by_regime[reg] = round(weight_reg, 2)
-
-        feature_weights[feat] = weights_by_regime
-        print(f"[AUDITOR] {feat}")
-        for reg, w in weights_by_regime.items():
-            if reg == "global":
-                continue
-            sub = feat_data[feat_data["regime_key"] == reg]
-            rev_pct = sub["label"].mean() * 100 if len(sub) else 0
-            dev = rev_pct - 50
-            sign = "+" if dev >= 0 else "-"
-            print(
-                f"  {reg}: rev={rev_pct:.0f}% ({sign}{abs(dev):.0f} over baseline) weight={w:+.2f}"
-            )
-
-    return feature_weights
-
-
-def run_auditor(brains: Iterable[str], timeframe: str, out_path: Path) -> None:
+def export_stats(brains: Iterable[str], timeframe: str, out_dir: Path) -> None:
     df = pd.read_csv(DATA_SIM_PATH)
     delta = parse_timeframe(timeframe)
     if delta is not None:
@@ -141,43 +50,90 @@ def run_auditor(brains: Iterable[str], timeframe: str, out_path: Path) -> None:
     df = df.reset_index(drop=True)
     df["candle_index"] = range(len(df))
 
-    weights = compute_weights(df, brains)
-    now = datetime.utcnow().replace(microsecond=0).isoformat()
-    payload = {
-        "version": now,
-        "defaults": {"T_buy": 1.0, "T_sell": 1.0},
-        "features": weights,
-    }
+    regime_cfg = load_regime_settings()
+    regime_df = compute_regimes(df, **regime_cfg)
 
-    out_dir = out_path.parent
-    backup_path = out_path.with_name("weights.prev.json")
-    log_path = out_path.with_name("audit_log.jsonl")
+    brain_cache = cache_all_brains(df)
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    if out_path.exists():
-        shutil.copy(out_path, backup_path)
-    with out_path.open("w", encoding="utf-8") as fh:
-        json.dump(payload, fh, indent=2)
-        fh.write("\n")
 
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    with log_path.open("a", encoding="utf-8") as log:
-        log.write(json.dumps({"timestamp": now, "brains": list(brains), "time": timeframe}) + "\n")
+    for brain in brains:
+        out_jsonl = out_dir / f"{brain}_{timeframe}.jsonl"
+        summary_path = out_dir / f"{brain}_{timeframe}_summary.json"
 
-    print(f"[AUDITOR] Weights saved to {out_path} (v{now})")
+        rows: list[dict] = []
+        for t in range(len(df)):
+            features_all = extract_features_at_t(brain_cache, t)
+            features_brain = {
+                k: v for k, v in features_all.items() if feature_brain(k) == brain
+            }
+            regime = {
+                "trend": regime_df.loc[t, "trend"] if t < len(regime_df) else "unknown",
+                "vol": regime_df.loc[t, "vol"] if t < len(regime_df) else "unknown",
+            }
+            row = {
+                "idx": int(t),
+                "timestamp": df["timestamp"].iloc[t],
+                "price": float(df["close"].iloc[t]),
+                "regime": regime,
+                "features": features_brain,
+            }
+            rows.append(row)
+
+        with out_jsonl.open("w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r) + "\n")
+
+        summary: dict[str, float] = {}
+        if rows:
+            feats_df = pd.DataFrame([r["features"] for r in rows])
+            for col in feats_df.columns:
+                series = pd.to_numeric(feats_df[col], errors="coerce").dropna()
+                if series.empty:
+                    continue
+                if "slowdown_ratio" in col:
+                    summary["avg_slowdown_ratio"] = float(series.mean())
+                    summary["collapse_rate"] = float((series < 0.3).mean())
+                elif "lead_time" in col:
+                    summary["lead_time_mean"] = float(series.mean())
+                elif "resolution_rev" in col:
+                    summary["resolution_rev"] = float(series.mean())
+                elif "resolution_cont" in col:
+                    summary["resolution_cont"] = float(series.mean())
+                else:
+                    summary[f"avg_{col}"] = float(series.mean())
+
+        payload = {"brain": brain, "time": timeframe, "summary": summary}
+        with summary_path.open("w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2)
+            fh.write("\n")
+
+        print(
+            f"[AUDITOR] Exporting stats for {brain} ({timeframe}) → {out_jsonl.relative_to(ROOT)}"
+        )
+        feature_count = len(feats_df.columns) if rows else 0
+        print(f"  {len(rows)} candles processed, {feature_count} features exported")
+        if "avg_slowdown_ratio" in summary:
+            pct = round(summary.get("collapse_rate", 0) * 100)
+            lead = summary.get("lead_time_mean", 0)
+            print(
+                f"  Summary: slowdown_ratio collapse<0.3 = {pct}%, lead_time={lead:.1f}c"
+            )
+
+    print("[AUDITOR] Done")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Weights Auditor")
+    parser = argparse.ArgumentParser(description="Statistics Exporter")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--brain", action="append", help="Brain to audit; can repeat")
-    group.add_argument("--all", action="store_true", help="Audit all brains")
+    group.add_argument("--brain", action="append", help="Brain to export; can repeat")
+    group.add_argument("--all", action="store_true", help="Export all brains")
     parser.add_argument("--time", default="1y", help="Lookback timeframe (e.g. 1y, 6m)")
-    parser.add_argument("--out", default=str(DEFAULT_WEIGHTS_PATH), help="Output weights JSON path")
+    parser.add_argument("--out", default=str(DEFAULT_OUT_DIR), help="Output directory")
     args = parser.parse_args()
 
     brains = BRAIN_MODULES if args.all else args.brain
-    run_auditor(brains, args.time, Path(args.out))
+    export_stats(brains, args.time, Path(args.out))
 
 
 if __name__ == "__main__":
