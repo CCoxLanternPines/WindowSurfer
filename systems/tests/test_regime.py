@@ -31,7 +31,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Regime detector harness")
     parser.add_argument("--symbol", required=True)
     parser.add_argument("--time", default="")
+    parser.add_argument("--auto", action="store_true", help="Re-audit thresholds before run")
     args = parser.parse_args()
+
+    if args.auto:
+        from systems.regimes.auditor import audit_history
+
+        audit_history(args.symbol, args.time)
+        try:
+            resp = input("Continue with current settings? [Y/n]: ").strip().lower()
+        except EOFError:
+            resp = ""
+        if resp.startswith("n"):
+            print("Aborted.")
+            return
 
     data_dir = Path("data/sim")
     file_path = data_dir / f"{args.symbol}_1h.csv"
