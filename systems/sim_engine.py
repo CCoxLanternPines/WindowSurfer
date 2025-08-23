@@ -120,13 +120,13 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
 
     for t in range(50, len(df)):
         features = extract_features_at_t(brain_cache, t)
-        decision, reasons, score = run_arbiter(
+        decision, reasons, score, feat_snapshot = run_arbiter(
             features, state, debug=True, return_score=True
         )
 
         x = int(df["candle_index"].iloc[t])
         y = float(df["close"].iloc[t])
-        payload = (decision, x, y, reasons, score)
+        payload = (decision, x, y, reasons, score, feat_snapshot)
 
         if decision == "BUY":
             decisions_buy.append(payload)
@@ -200,11 +200,17 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
             else:
                 d = decisions_hold[ind]
 
-            decision, x, y, reasons, score = d
+            decision, x, y, reasons, score, feats = d
+            feat_lines = [f"{k}={v}" for k, v in feats.items()]
+            if len(feat_lines) > 20:
+                remaining = len(feat_lines) - 20
+                feat_lines = feat_lines[:20] + [f"... (+{remaining} more)"]
+
             info_box.set_text(
-                f"Decision={decision} | Score={score:+.3f}\n"
-                f"idx={x} price={y:.2f}\n"
-                + "\n".join(reasons)
+                f"{decision} @ idx={x} price={y:.2f}\n"
+                f"Score={score:+.3f}\n\n"
+                "[ARB CHECKS]\n" + "\n".join(reasons) + "\n\n"
+                "[FEATURES]\n" + "\n".join(feat_lines)
             )
             fig.canvas.draw_idle()
 

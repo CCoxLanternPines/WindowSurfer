@@ -38,7 +38,11 @@ def run_arbiter(
     debug: bool = False,
     return_score: bool = False,
 ):
-    """Return a decision, reasons, and optionally the weighted score."""
+    """Return a decision, reasons, and optionally the weighted score.
+
+    The caller may also retrieve the feature snapshot used for the decision
+    by enabling ``return_score``.
+    """
 
     score = weighted_score(features, WEIGHTS)
     reasons: list[str] = []
@@ -56,6 +60,6 @@ def run_arbiter(
             decision = "SELL"
 
     if return_score:
-        return decision, reasons, score
-    return decision, reasons
+        return decision, reasons, score, features
+    return decision, reasons, features
 
