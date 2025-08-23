@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 
 
 DATA_DIR = Path("data")
-CANDLES_DIR = DATA_DIR / "candles"
+CANDLES_DIR = DATA_DIR / "candles" / "sim"
 LABELS_DIR = DATA_DIR / "labels"
 
 
