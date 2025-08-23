@@ -5,7 +5,8 @@ from __future__ import annotations
 This utility analyses historical candle data to suggest balanced
 ``slope_eps`` and ``vol_eps`` thresholds. Suggestions are written to
 ``settings/regime_suggestions.json`` so users may manually apply them to
-``settings/settings.json``.
+``settings/settings.json``. A dynamic, data-driven approach is used so
+that the resulting regimes are roughly balanced across large datasets.
 """
 
 import argparse
@@ -27,17 +28,28 @@ from systems.sim_engine import (
 )
 
 
-def _load_config() -> tuple[int, int, int]:
-    """Return (window, slope_percentile, vol_percentile)."""
+def _load_config() -> tuple[int, int, int, int]:
+    """Return configuration for the auditor.
+
+    Returns
+    -------
+    tuple
+        ``(slope_window, vol_window, slope_percentile, vol_percentile)``
+    """
     path = Path("settings/settings.json")
     with path.open("r", encoding="utf-8") as fh:
         data = json.load(fh)
+
     regime = data.get("regime_settings", {})
+    detector = regime.get("detector", {})
     audit = data.get("regime_audit", {})
-    window = int(regime.get("window", 50))
-    slope_pct = int(audit.get("slope_percentile", 60))
-    vol_pct = int(audit.get("vol_percentile", 70))
-    return window, slope_pct, vol_pct
+
+    slope_window = int(detector.get("slope_window", 30))
+    vol_window = int(detector.get("vol_window", 30))
+    slope_pct = int(audit.get("slope_percentile", 65))
+    vol_pct = int(audit.get("vol_percentile", 60))
+
+    return slope_window, vol_window, slope_pct, vol_pct
 
 
 def _calc_slope(series: pd.Series) -> float:
@@ -47,9 +59,20 @@ def _calc_slope(series: pd.Series) -> float:
     return float(np.polyfit(x, series.values, 1)[0])
 
 
-def audit_history(symbol: str, time: str = "") -> dict[str, Any]:
-    """Audit candle history for ``symbol`` and return suggestions."""
-    window, slope_pct, vol_pct = _load_config()
+def audit_history(symbol: str, time: str = "", apply: bool = False) -> dict[str, Any]:
+    """Audit candle history for ``symbol`` and return suggestions.
+
+    Parameters
+    ----------
+    symbol:
+        Market symbol to audit.
+    time:
+        Optional timeframe limitation (e.g. ``"2y"``).
+    apply:
+        If ``True``, suggested thresholds are written back to
+        ``settings/settings.json``.
+    """
+    slope_window, vol_window, slope_pct, vol_pct = _load_config()
 
     data_dir = Path("data/sim")
     file_path = data_dir / f"{symbol}_1h.csv"
@@ -68,12 +91,22 @@ def audit_history(symbol: str, time: str = "") -> dict[str, Any]:
         df = filtered
 
     closes = df["close"]
-    slope = closes.rolling(window, min_periods=1).apply(_calc_slope, raw=False)
-    returns = closes.pct_change()
-    vol = returns.rolling(window, min_periods=1).std()
 
-    slope_eps = float(slope.abs().quantile(slope_pct / 100.0))
-    vol_eps = float(vol.quantile(vol_pct / 100.0))
+    slope_short = closes.rolling(slope_window, min_periods=1).apply(
+        _calc_slope, raw=False
+    )
+    slope_long = closes.rolling(slope_window * 3, min_periods=1).apply(
+        _calc_slope, raw=False
+    )
+
+    use_long = slope_long.abs() > slope_short.abs()
+    slope = slope_short.where(~use_long, slope_long)
+
+    returns = closes.pct_change()
+    vol = returns.rolling(vol_window, min_periods=1).std()
+
+    slope_eps = float(np.percentile(slope.abs().dropna(), slope_pct))
+    vol_eps = float(np.percentile(vol.dropna(), vol_pct))
 
     regimes = np.where(
         slope > slope_eps,
@@ -101,6 +134,19 @@ def audit_history(symbol: str, time: str = "") -> dict[str, Any]:
     out_path = Path("settings/regime_suggestions.json")
     with out_path.open("w", encoding="utf-8") as fh:
         json.dump(suggestions, fh, indent=2)
+
+    if apply:
+        settings_path = Path("settings/settings.json")
+        with settings_path.open("r", encoding="utf-8") as fh:
+            cfg = json.load(fh)
+        cfg.setdefault("regime_settings", {})["slope_eps"] = slope_eps
+        cfg["regime_settings"]["vol_eps"] = vol_eps
+        det = cfg["regime_settings"].setdefault("detector", {})
+        det["slope_eps"] = slope_eps
+        det["vol_eps"] = vol_eps
+        with settings_path.open("w", encoding="utf-8") as fh:
+            json.dump(cfg, fh, indent=2)
+
     return suggestions
 
 
@@ -108,9 +154,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Regime threshold auditor")
     parser.add_argument("--symbol", required=True)
     parser.add_argument("--time", default="")
+    parser.add_argument("--apply", action="store_true", help="Write suggestions to settings.json")
     args = parser.parse_args()
 
-    audit_history(args.symbol, args.time)
+    audit_history(args.symbol, args.time, args.apply)
 
 
 if __name__ == "__main__":
