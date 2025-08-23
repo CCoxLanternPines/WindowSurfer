@@ -116,10 +116,11 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
     brain_cache = cache_all_brains(df)
     state = "flat"
     buy_signals, sell_signals = [], []
+    decisions = []
 
     for t in range(50, len(df)):
         features = extract_features_at_t(brain_cache, t)
-        decision = run_arbiter(features, state)
+        decision, reasons = run_arbiter(features, state, debug=True)
 
         x = int(df["candle_index"].iloc[t])
         y = float(df["close"].iloc[t])
@@ -130,15 +131,37 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
             sell_signals.append((x, y))
             state = "flat"
 
+        decisions.append((x, y, decision, reasons))
+
     if viz:
         import matplotlib.pyplot as plt
-        plt.plot(df["candle_index"], df["close"], lw=1, color="blue")
-        if buy_signals:
-            bx, by = zip(*buy_signals)
-            plt.scatter(bx, by, color="green", marker="^", s=120, zorder=6)
-        if sell_signals:
-            sx, sy = zip(*sell_signals)
-            plt.scatter(sx, sy, color="red", marker="v", s=120, zorder=6)
+        import mplcursors
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.plot(df["candle_index"], df["close"], lw=1, color="blue")
+
+        scatters = []
+        for x, y, decision, _ in decisions:
+            if decision == "BUY":
+                sc = ax.scatter(x, y, color="green", marker="^", s=120, zorder=6)
+            elif decision == "SELL":
+                sc = ax.scatter(x, y, color="red", marker="v", s=120, zorder=6)
+            else:
+                sc = ax.scatter(
+                    x, y, color="gray", marker="o", s=40, alpha=0.3, zorder=4
+                )
+            scatters.append(sc)
+
+        cursor = mplcursors.cursor(scatters, hover=True)
+
+        @cursor.connect("add")
+        def on_hover(sel):
+            idx = scatters.index(sel.artist)
+            x, y, decision, reasons = decisions[idx]
+            sel.annotation.set_text(
+                f"{decision} @ {x}\nPrice={y:.2f}\n" + "\n".join(reasons)
+            )
+
         plt.show()
 
     print(f"[SIM][{timeframe}] buys={len(buy_signals)} sells={len(sell_signals)}")
