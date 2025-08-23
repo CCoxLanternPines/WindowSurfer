@@ -89,14 +89,8 @@ def run(df: pd.DataFrame, viz: bool):
 
 
 def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
-    """Aggregate reversal classification statistics."""
+    """Aggregate reversal signal statistics."""
     total = len(signals)
-    sym = sum(1 for s in signals if s["category"] == "symmetry")
-    over = sum(1 for s in signals if s["category"] == "overshoot")
-    fail = total - sym - over
-    sym_pct = int(round(100 * sym / total)) if total else 0
-    over_pct = int(round(100 * over / total)) if total else 0
-    fail_pct = int(round(100 * fail / total)) if total else 0
 
     indices = [int(s["index"]) for s in signals]
     avg_gap = int(np.mean(np.diff(indices))) if len(indices) > 1 else 0
@@ -147,9 +141,6 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     slope_agree_pct = int(round(100 * slope_agree / total)) if total else 0
 
     print("[REV][stats]")
-    print("  Symmetric reversals: {}%".format(sym_pct))
-    print("  Overshoots: {}%".format(over_pct))
-    print("  Fails: {}%".format(fail_pct))
     print("  Flip-extrema accuracy: {}%".format(flip_extrema_pct))
     print("  Follow-through >= before: {}%".format(followthrough_pct))
     print("  Next-slope agreement: {}%".format(slope_agree_pct))
