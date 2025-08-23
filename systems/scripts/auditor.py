@@ -5,9 +5,19 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable
+
+SCRIPTS_DIR = Path(__file__).resolve().parent
+sys.path = [p for p in sys.path if Path(p).resolve() != SCRIPTS_DIR]
+sys.modules.pop("math", None)
+import importlib
+sys.modules["math"] = importlib.import_module("math")
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 
 import pandas as pd
 
@@ -20,12 +30,8 @@ from systems.metabrain.registry import QUESTION_REGISTRY
 from systems.sim_engine import apply_time_filter, parse_timeframe
 from systems.utils.regime import compute_regimes, load_regime_settings
 
-ROOT = Path(__file__).resolve().parents[2]
 DATA_SIM_PATH = ROOT / "data" / "sim" / "SOLUSD_1h.csv"
-WEIGHTS_DIR = ROOT / "data" / "weights"
-WEIGHTS_PATH = WEIGHTS_DIR / "weights.json"
-BACKUP_PATH = WEIGHTS_DIR / "weights.prev.json"
-LOG_PATH = WEIGHTS_DIR / "audit_log.jsonl"
+DEFAULT_WEIGHTS_PATH = ROOT / "data" / "weights" / "weights.json"
 
 
 def feature_brain(name: str) -> str:
@@ -82,9 +88,11 @@ def compute_weights(df: pd.DataFrame, brains: Iterable[str]) -> dict:
                     continue
                 rev_pct = grp["label"].mean()
                 deviation = rev_pct - 0.5
+                if abs(deviation) < 0.05:
+                    continue
                 sample_fraction = count / total
                 weight_global += deviation * sample_fraction
-        weights_by_regime["global"] = round(weight_global, 3)
+        weights_by_regime["global"] = round(weight_global, 2)
 
         for reg in regimes:
             sub = feat_data[feat_data["regime_key"] == reg]
@@ -102,9 +110,12 @@ def compute_weights(df: pd.DataFrame, brains: Iterable[str]) -> dict:
                     continue
                 rev_pct = grp["label"].mean()
                 deviation = rev_pct - 0.5
+                if abs(deviation) < 0.05:
+                    continue
                 sample_fraction = count / total_reg
                 weight_reg += deviation * sample_fraction
-            weights_by_regime[reg] = round(weight_reg, 3)
+            if abs(weight_reg) >= 0.05:
+                weights_by_regime[reg] = round(weight_reg, 2)
 
         feature_weights[feat] = weights_by_regime
         print(f"[AUDITOR] {feat}")
@@ -115,12 +126,14 @@ def compute_weights(df: pd.DataFrame, brains: Iterable[str]) -> dict:
             rev_pct = sub["label"].mean() * 100 if len(sub) else 0
             dev = rev_pct - 50
             sign = "+" if dev >= 0 else "-"
-            print(f"  {reg}: rev={rev_pct:.0f}% ({sign}{abs(dev):.0f}) weight={w:+.3f}")
+            print(
+                f"  {reg}: rev={rev_pct:.0f}% ({sign}{abs(dev):.0f} over baseline) weight={w:+.2f}"
+            )
 
     return feature_weights
 
 
-def run_auditor(brains: Iterable[str], timeframe: str) -> None:
+def run_auditor(brains: Iterable[str], timeframe: str, out_path: Path) -> None:
     df = pd.read_csv(DATA_SIM_PATH)
     delta = parse_timeframe(timeframe)
     if delta is not None:
@@ -136,16 +149,22 @@ def run_auditor(brains: Iterable[str], timeframe: str) -> None:
         "features": weights,
     }
 
-    WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
-    if WEIGHTS_PATH.exists():
-        shutil.copy(WEIGHTS_PATH, BACKUP_PATH)
-    with WEIGHTS_PATH.open("w", encoding="utf-8") as fh:
+    out_dir = out_path.parent
+    backup_path = out_path.with_name("weights.prev.json")
+    log_path = out_path.with_name("audit_log.jsonl")
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if out_path.exists():
+        shutil.copy(out_path, backup_path)
+    with out_path.open("w", encoding="utf-8") as fh:
         json.dump(payload, fh, indent=2)
         fh.write("\n")
 
-    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with LOG_PATH.open("a", encoding="utf-8") as log:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as log:
         log.write(json.dumps({"timestamp": now, "brains": list(brains), "time": timeframe}) + "\n")
+
+    print(f"[AUDITOR] Weights saved to {out_path} (v{now})")
 
 
 def main() -> None:
@@ -154,10 +173,11 @@ def main() -> None:
     group.add_argument("--brain", action="append", help="Brain to audit; can repeat")
     group.add_argument("--all", action="store_true", help="Audit all brains")
     parser.add_argument("--time", default="1y", help="Lookback timeframe (e.g. 1y, 6m)")
+    parser.add_argument("--out", default=str(DEFAULT_WEIGHTS_PATH), help="Output weights JSON path")
     args = parser.parse_args()
 
     brains = BRAIN_MODULES if args.all else args.brain
-    run_auditor(brains, args.time)
+    run_auditor(brains, args.time, Path(args.out))
 
 
 if __name__ == "__main__":
