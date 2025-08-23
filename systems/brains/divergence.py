@@ -165,12 +165,15 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     print(f"  Strength correlation: {strength_corr:.2f}")
 
     return {
-        "count": total,
-        "avg_gap": avg_gap,
-        "slope_bias": slope_bias,
-        "div_to_top_pct": div_to_top_pct,
-        "leadtime_mean": leadtime_mean,
-        "leadtime_median": leadtime_median,
-        "false_cont_pct": false_cont_pct,
-        "strength_corr": strength_corr,
+        "brain": "divergence",
+        "stats": {
+            "count": total,
+            "avg_gap": avg_gap,
+            "slope_bias": slope_bias,
+            "div_to_top_pct": div_to_top_pct,
+            "leadtime_mean": leadtime_mean,
+            "leadtime_median": leadtime_median,
+            "false_cont_pct": false_cont_pct,
+            "strength_corr": strength_corr,
+        },
     }

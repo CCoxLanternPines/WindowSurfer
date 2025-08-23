@@ -127,15 +127,18 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     )
 
     return {
-        "count": total,
-        "avg_gap": avg_gap,
-        "slope_bias": slope_bias,
-        "continuation_pct": continuation_pct,
-        "reversal_pct": reversal_pct,
-        "avg_drawdown": avg_drawdown,
-        "gap_avg": gap_avg,
-        "gap_tight_pct": gap_tight_pct,
-        "gap_wide_pct": gap_wide_pct,
-        "overlap_div_pct": overlap_div_pct,
-        "overlap_combo_pct": overlap_combo_pct,
+        "brain": "rolling_peak",
+        "stats": {
+            "count": total,
+            "avg_gap": avg_gap,
+            "slope_bias": slope_bias,
+            "continuation_pct": continuation_pct,
+            "reversal_pct": reversal_pct,
+            "avg_drawdown": avg_drawdown,
+            "gap_avg": gap_avg,
+            "gap_tight_pct": gap_tight_pct,
+            "gap_wide_pct": gap_wide_pct,
+            "overlap_div_pct": overlap_div_pct,
+            "overlap_combo_pct": overlap_combo_pct,
+        },
     }

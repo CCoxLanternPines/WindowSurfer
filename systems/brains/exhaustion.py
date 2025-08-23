@@ -268,17 +268,20 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     print(f"  Exhaustion-to-flip lag: {avg_lag:.2f} candles")
 
     return {
-        "count": count,
-        "avg_gap": avg_gap,
-        "slope_bias": f"{direction} {pct}%",
-        "avg_uptrend_duration": avg_uptrend_duration,
-        "avg_downtrend_duration": avg_downtrend_duration,
-        "avg_up_reversal_slope24": avg_up_reversal_slope24,
-        "avg_down_reversal_slope24": avg_down_reversal_slope24,
-        "avg_uptrend_pressure": avg_uptrend_pressure,
-        "avg_downtrend_pressure": avg_downtrend_pressure,
-        "edge_accuracy_pct": edge_accuracy,
-        "persistence_fail_pct": persistence_fail_pct,
-        "cluster_size_correlation": cluster_corr,
-        "exhaustion_to_flip_lag": avg_lag,
+        "brain": "exhaustion",
+        "stats": {
+            "count": count,
+            "avg_gap": avg_gap,
+            "slope_bias": f"{direction} {pct}%",
+            "avg_uptrend_duration": avg_uptrend_duration,
+            "avg_downtrend_duration": avg_downtrend_duration,
+            "avg_up_reversal_slope24": avg_up_reversal_slope24,
+            "avg_down_reversal_slope24": avg_down_reversal_slope24,
+            "avg_uptrend_pressure": avg_uptrend_pressure,
+            "avg_downtrend_pressure": avg_downtrend_pressure,
+            "edge_accuracy": edge_accuracy,
+            "persistence_fail_pct": persistence_fail_pct,
+            "cluster_size_correlation": cluster_corr,
+            "exhaustion_to_flip_lag": avg_lag,
+        },
     }

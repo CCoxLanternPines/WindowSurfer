@@ -147,11 +147,14 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     print("  Median gap: {} candles".format(median_gap))
 
     return {
-        "count": total,
-        "avg_gap": avg_gap,
-        "slope_bias": f"{slope_agree_pct}%",
-        "flip_extrema_pct": flip_extrema_pct,
-        "followthrough_pct": followthrough_pct,
-        "slope_agree_pct": slope_agree_pct,
-        "median_gap": median_gap,
+        "brain": "reversal",
+        "stats": {
+            "count": total,
+            "avg_gap": avg_gap,
+            "slope_bias": f"{slope_agree_pct}%",
+            "flip_extrema_pct": flip_extrema_pct,
+            "followthrough_pct": followthrough_pct,
+            "slope_agree_pct": slope_agree_pct,
+            "median_gap": median_gap,
+        },
     }

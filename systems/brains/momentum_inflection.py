@@ -192,15 +192,18 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     )
 
     return {
-        "count": count,
-        "avg_gap": avg_gap,
-        "slope_bias": slope_bias,
-        "slowdown_ratio_avg": slowdown_ratio_avg,
-        "slowdown_collapse_pct": slowdown_collapse_pct,
-        "leadtime_mean": leadtime_mean,
-        "leadtime_median": leadtime_median,
-        "continuation_pct": continuation_pct,
-        "reversal_pct": reversal_pct,
-        "high_vol_pct": high_vol_pct,
-        "low_vol_pct": low_vol_pct,
+        "brain": "inflection",
+        "stats": {
+            "count": count,
+            "avg_gap": avg_gap,
+            "slope_bias": slope_bias,
+            "slowdown_ratio_avg": slowdown_ratio_avg,
+            "slowdown_collapse_pct": slowdown_collapse_pct,
+            "leadtime_mean": leadtime_mean,
+            "leadtime_median": leadtime_median,
+            "continuation_pct": continuation_pct,
+            "reversal_pct": reversal_pct,
+            "high_vol_pct": high_vol_pct,
+            "low_vol_pct": low_vol_pct,
+        },
     }
