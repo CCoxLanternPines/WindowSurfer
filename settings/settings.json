@@ -1,18 +1,18 @@
 {
   "regime_settings": {
-    "slope_eps": 0.0012,
-    "vol_eps": 0.010,
+    "slope_eps": 0.0008,
+    "vol_eps": 0.008,
     "window": 50,
     "label_shift": 10,
     "detector": {
       "slope_window": 30,
       "vol_window": 30,
-      "slope_eps": 0.0012,
-      "vol_eps": 0.010,
-      "wick_eps": 0.003,
-      "range_eps": 0.02,
-      "consistency_up": 0.65,
-      "consistency_down": 0.35
+      "slope_eps": 0.0008,
+      "vol_eps": 0.008,
+      "wick_eps": 0.004,
+      "range_eps": 0.015,
+      "consistency_up": 0.55,
+      "consistency_down": 0.45
     }
   },
   "regime_audit": {

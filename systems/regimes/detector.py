@@ -46,11 +46,11 @@ def detect_regime(df: pd.DataFrame) -> str:
     ).mean() / window["close"].mean()
     consistency = (window["close"] > window["open"]).mean()
 
-    if slope > slope_eps and consistency > consistency_up:
+    if slope > slope_eps and consistency >= consistency_up:
         regime = "trend_up"
-    elif slope < -slope_eps and consistency < consistency_down:
+    elif slope < -slope_eps and consistency <= consistency_down:
         regime = "trend_down"
-    elif vol > vol_eps or wick > wick_eps or rng > range_eps:
+    elif vol > vol_eps and (wick > wick_eps or rng > range_eps):
         regime = "chop"
     else:
         regime = "flat"
