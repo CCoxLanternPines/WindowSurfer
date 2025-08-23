@@ -1,0 +1,7 @@
+{
+  "regime_settings": {
+    "slope_eps": 0.001,
+    "vol_eps": 0.01,
+    "window": 50
+  }
+}
