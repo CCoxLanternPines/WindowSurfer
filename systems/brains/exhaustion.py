@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from ..sim_engine import (
+from ..utils.brain_math import (
     WINDOW_SIZE,
     WINDOW_STEP,
     CLUSTER_WINDOW,

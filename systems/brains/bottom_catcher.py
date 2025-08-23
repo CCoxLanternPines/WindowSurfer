@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from ..sim_engine import WINDOW_SIZE, WINDOW_STEP, multi_window_vote
+from ..utils.brain_math import WINDOW_SIZE, WINDOW_STEP, multi_window_vote
 
 ALIGN_WINDOW = 5  # ±5 candles for extrema alignment
 
