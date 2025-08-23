@@ -21,7 +21,17 @@ SCALE_POWER   = 2         # exhaustion growth scale
 # ===================== Helpers =====================
 _INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
 
-UNIT_SECONDS = {
+# Seconds mapping for user-facing timeframes where ``m`` means months.
+TIMEFRAME_SECONDS = {
+    's': 1,
+    'm': 30 * 24 * 3600,  # month (≈30 days)
+    'h': 3600,
+    'd': 86400,
+    'w': 604800,
+}
+
+# Separate mapping for candle intervals in filenames where ``m`` means minutes.
+INTERVAL_SECONDS = {
     's': 1,
     'm': 60,
     'h': 3600,
@@ -30,14 +40,17 @@ UNIT_SECONDS = {
 }
 
 def parse_timeframe(tf: str) -> timedelta | None:
-    """Parse strings like '12h', '3d', '6w' into timedelta."""
+    """Parse strings like '12h', '3d', '1m', '6w' into ``timedelta``.
+
+    "m" is interpreted as months (approximately 30 days).
+    """
     if not tf:
         return None
     m = re.match(r'(?i)^\s*(\d+)\s*([smhdw])\s*$', tf)
     if not m:
         return None
     n, u = int(m.group(1)), m.group(2).lower()
-    return timedelta(seconds=n * UNIT_SECONDS[u])
+    return timedelta(seconds=n * TIMEFRAME_SECONDS[u])
 
 def infer_candle_seconds_from_filename(path: str) -> int | None:
     """Try to infer candle interval from filename like *_1h.csv, *_15m.csv, *_1d.csv."""
@@ -45,7 +58,7 @@ def infer_candle_seconds_from_filename(path: str) -> int | None:
     if not m:
         return None
     n, u = int(m.group(2)), m.group(3).lower()
-    return n * UNIT_SECONDS[u]
+    return n * INTERVAL_SECONDS[u]
 
 def apply_time_filter(df: pd.DataFrame, delta: timedelta, file_path: str) -> pd.DataFrame:
     """Robust timeframe filtering:
@@ -433,7 +446,12 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--time", type=str, default="1m")
+    p.add_argument(
+        "--time",
+        type=str,
+        default="1m",
+        help="Simulation window (e.g., 1m for one month)",
+    )
     p.add_argument("--viz", action="store_true")
     args = p.parse_args()
     run_simulation(timeframe=args.time, viz=args.viz)
