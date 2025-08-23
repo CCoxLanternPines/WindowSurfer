@@ -117,57 +117,58 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
     state = "flat"
     buy_signals, sell_signals = [], []
     decisions_buy, decisions_sell, decisions_hold = [], [], []
-    bx, by, sx, sy, hx, hy = [], [], [], [], [], []
-    hold_counter = 0
 
     for t in range(50, len(df)):
         features = extract_features_at_t(brain_cache, t)
-        decision, reasons = run_arbiter(features, state, debug=True)
+        decision, reasons, score = run_arbiter(
+            features, state, debug=True, return_score=True
+        )
 
         x = int(df["candle_index"].iloc[t])
         y = float(df["close"].iloc[t])
-        include = True
-        if state == "flat" and decision == "BUY":
+        payload = (decision, x, y, reasons, score)
+
+        if decision == "BUY":
+            decisions_buy.append(payload)
             buy_signals.append((x, y))
             state = "long"
-        elif state == "long" and decision == "SELL":
+        elif decision == "SELL":
+            decisions_sell.append(payload)
             sell_signals.append((x, y))
             state = "flat"
-        else:
-            if decision == "HOLD":
-                hold_counter += 1
-                if hold_counter % 10 != 0:
-                    include = False
-
-        if include:
-            if decision == "BUY":
-                bx.append(x)
-                by.append(y)
-                decisions_buy.append((decision, reasons))
-            elif decision == "SELL":
-                sx.append(x)
-                sy.append(y)
-                decisions_sell.append((decision, reasons))
-            else:
-                hx.append(x)
-                hy.append(y)
-                decisions_hold.append((decision, reasons))
+        else:  # HOLD
+            if t % 10 == 0:
+                decisions_hold.append(payload)
 
     if viz:
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots(figsize=(12, 6))
+        fig.tight_layout()
+        fig.subplots_adjust(top=0.96, bottom=0.065, left=0.06, right=0.775)
         ax.plot(df["candle_index"], df["close"], lw=1, color="blue")
 
         scatter_buy = ax.scatter(
-            bx, by, color="green", marker="^", s=120, label="BUY", picker=True
+            [d[1] for d in decisions_buy],
+            [d[2] for d in decisions_buy],
+            color="green",
+            marker="^",
+            s=120,
+            label="BUY",
+            picker=True,
         )
         scatter_sell = ax.scatter(
-            sx, sy, color="red", marker="v", s=120, label="SELL", picker=True
+            [d[1] for d in decisions_sell],
+            [d[2] for d in decisions_sell],
+            color="red",
+            marker="v",
+            s=120,
+            label="SELL",
+            picker=True,
         )
         scatter_hold = ax.scatter(
-            hx,
-            hy,
+            [d[1] for d in decisions_hold],
+            [d[2] for d in decisions_hold],
             color="gray",
             marker="o",
             s=40,
@@ -175,7 +176,7 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
             label="HOLD",
             picker=True,
         )
-        ax.legend(loc="upper left")
+        ax.legend()
 
         info_box = ax.text(
             1.02,
@@ -193,13 +194,18 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
             artist = event.artist
 
             if artist == scatter_buy:
-                decision, reasons = decisions_buy[ind]
+                d = decisions_buy[ind]
             elif artist == scatter_sell:
-                decision, reasons = decisions_sell[ind]
+                d = decisions_sell[ind]
             else:
-                decision, reasons = decisions_hold[ind]
+                d = decisions_hold[ind]
 
-            info_box.set_text(f"{decision}\n" + "\n".join(reasons[:12]))
+            decision, x, y, reasons, score = d
+            info_box.set_text(
+                f"Decision={decision} | Score={score:+.3f}\n"
+                f"idx={x} price={y:.2f}\n"
+                + "\n".join(reasons)
+            )
             fig.canvas.draw_idle()
 
         fig.canvas.mpl_connect("pick_event", on_pick)
