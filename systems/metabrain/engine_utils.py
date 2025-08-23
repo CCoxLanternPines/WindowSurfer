@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import importlib
-from .extractor import extract_features
-from .arbiter import run_arbiter
+
+from .registry import QUESTION_REGISTRY
 
 BRAIN_MODULES = [
     "exhaustion",
@@ -14,64 +14,37 @@ BRAIN_MODULES = [
 ]
 
 def cache_all_brains(df):
-    """Run all brains on a dataframe, return dict of summaries and signals."""
-    all_brains = {}
+    """Run all brains once across full df, store per-candle signals + summaries."""
+    brain_cache: dict[str, dict[str, object]] = {}
     for mod_name in BRAIN_MODULES:
         mod = importlib.import_module(f"systems.brains.{mod_name}")
         signals = mod.run(df, viz=False)
         summary = mod.summarize(signals, df)
-        key = summary.get("brain", mod_name)
-        all_brains[key] = summary
-    return all_brains
+        brain_cache[mod_name] = {"signals": signals, "summary": summary}
+    return brain_cache
 
-def trade_all_candles(all_brains, df):
-    """SIM mode: walk candles and generate decision timeline."""
-    features = extract_features(all_brains)
-    # For now just apply arbiter once on whole set, expand later to step-by-step
-    decision = run_arbiter(features, position_state="flat")
-    return decision
+def extract_features_at_t(brain_cache, t):
+    """Extract feature dict at candle t from cached brain signals."""
+    features: dict[str, object] = {}
 
-def trade_all_brains(all_brains, last_candle, position_state="flat"):
-    """LIVE mode: decide based on most recent candle only."""
-    features = extract_features(all_brains)
-    decision = run_arbiter(features, position_state=position_state)
-    return decision
+    for qid, (brain, key) in QUESTION_REGISTRY.items():
+        val = brain_cache.get(brain, {}).get("summary", {}).get("stats", {}).get(key)
+        features[qid] = val
 
-
-def simulate_metabrain(df, position_state="flat"):
-    """Step through candles, make MetaBrain decisions at each step."""
-    brain_modules = [
-        "exhaustion",
-        "reversal",
-        "momentum_inflection",
-        "bottom_catcher",
-        "divergence",
-        "rolling_peak",
-    ]
-
-    buy_signals, sell_signals = [], []
-    state = position_state
-
-    for t in range(50, len(df)):
-        sub_df = df.iloc[: t + 1].reset_index(drop=True)
-        all_brains = {}
-        for mod_name in brain_modules:
-            mod = importlib.import_module(f"systems.brains.{mod_name}")
-            signals = mod.run(sub_df, viz=False)
-            summary = mod.summarize(signals, sub_df)
-            key = summary.get("brain", mod_name)
-            all_brains[key] = summary
-
-        features = extract_features(all_brains)
-        decision = run_arbiter(features, state)
-
-        x = int(df["candle_index"].iloc[t])
-        y = float(df["close"].iloc[t])
-        if state == "flat" and decision == "BUY":
-            buy_signals.append((x, y))
-            state = "long"
-        elif state == "long" and decision == "SELL":
-            sell_signals.append((x, y))
-            state = "flat"
-
-    return buy_signals, sell_signals
+    for brain, data in brain_cache.items():
+        valid = []
+        for s in data["signals"]:
+            idx = s.get("index", s.get("candle_index"))
+            if idx is None:
+                continue
+            if idx <= t:
+                valid.append((idx, s))
+        if not valid:
+            continue
+        _, last_signal = max(valid, key=lambda x: x[0])
+        stats = data["summary"]
+        brain_name = stats.get("brain", brain)
+        for k, v in last_signal.items():
+            if k not in ("index", "candle_index"):
+                features[f"{brain_name}_{k}"] = v
+    return features
