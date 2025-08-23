@@ -1,14 +1,14 @@
 {
   "regime_settings": {
-    "slope_eps": 0.0008,
-    "vol_eps": 0.008,
+    "slope_eps": 0.00016443289294974702,
+    "vol_eps": 0.008887691405560397,
     "window": 50,
     "label_shift": 10,
     "detector": {
       "slope_window": 30,
       "vol_window": 30,
-      "slope_eps": 0.0008,
-      "vol_eps": 0.008,
+      "slope_eps": 0.00016443289294974702,
+      "vol_eps": 0.008887691405560397,
       "wick_eps": 0.004,
       "range_eps": 0.015,
       "consistency_up": 0.55,
@@ -16,7 +16,7 @@
     }
   },
   "regime_audit": {
-    "slope_percentile": 60,
-    "vol_percentile": 70
+    "slope_percentile": 65,
+    "vol_percentile": 60
   }
 }
