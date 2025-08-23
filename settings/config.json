@@ -2,5 +2,10 @@
   "flat_band_deg": 10,
   "buy_threshold": 1.0,
   "sell_threshold": 1.0,
-  "pressure_decay": 0.1
+  "pressure_decay": 0.1,
+  "regime": {
+    "slope_window": 20,
+    "vol_window": 20,
+    "slope_thresh": 0.001
+  }
 }

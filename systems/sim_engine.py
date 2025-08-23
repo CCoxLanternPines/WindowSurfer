@@ -6,8 +6,9 @@ import os
 
 import pandas as pd
 
-from .metabrain.engine_utils import cache_all_brains, extract_features_at_t
+from .metabrain.engine_utils import cache_all_brains, extract_features_at_t as _extract_features_at_t
 from .metabrain.arbiter import run_arbiter
+from .utils.regime import compute_regimes, load_regime_settings
 
 _INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
 
@@ -113,13 +114,25 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
     df = df.reset_index(drop=True)
     df["candle_index"] = range(len(df))
 
+    regime_cfg = load_regime_settings()
+    regime_df = compute_regimes(df, **regime_cfg)
+
     brain_cache = cache_all_brains(df)
     state = "flat"
     buy_signals, sell_signals = [], []
     decisions_buy, decisions_sell, decisions_hold = [], [], []
 
+    def features_at_t(t: int) -> dict:
+        feats = _extract_features_at_t(brain_cache, t)
+        if 0 <= t < len(regime_df):
+            feats["regime"] = {
+                "trend": regime_df.loc[t, "trend"],
+                "vol": regime_df.loc[t, "vol"],
+            }
+        return feats
+
     for t in range(50, len(df)):
-        features = extract_features_at_t(brain_cache, t)
+        features = features_at_t(t)
         decision, reasons, score, feat_snapshot = run_arbiter(
             features, state, debug=True, return_score=True
         )
