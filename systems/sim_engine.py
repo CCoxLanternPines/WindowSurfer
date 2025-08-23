@@ -6,7 +6,7 @@ import os
 
 import pandas as pd
 
-from .metabrain.engine_utils import cache_all_brains, trade_all_candles
+from .metabrain.engine_utils import simulate_metabrain
 
 _INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
 
@@ -111,6 +111,17 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
         df = apply_time_filter(df, delta, file_path)
     df = df.reset_index(drop=True)
     df["candle_index"] = range(len(df))
-    all_brains = cache_all_brains(df)
-    decision = trade_all_candles(all_brains, df)
-    print(f"[SIM][{timeframe}] MetaBrain decision={decision}")
+    buy_signals, sell_signals = simulate_metabrain(df)
+
+    if viz:
+        import matplotlib.pyplot as plt
+        plt.plot(df["candle_index"], df["close"], lw=1, color="blue")
+        if buy_signals:
+            bx, by = zip(*buy_signals)
+            plt.scatter(bx, by, color="green", marker="^", s=120, zorder=6)
+        if sell_signals:
+            sx, sy = zip(*sell_signals)
+            plt.scatter(sx, sy, color="red", marker="v", s=120, zorder=6)
+        plt.show()
+
+    print(f"[SIM][{timeframe}] buys={len(buy_signals)} sells={len(sell_signals)}")

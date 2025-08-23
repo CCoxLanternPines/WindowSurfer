@@ -36,3 +36,42 @@ def trade_all_brains(all_brains, last_candle, position_state="flat"):
     features = extract_features(all_brains)
     decision = run_arbiter(features, position_state=position_state)
     return decision
+
+
+def simulate_metabrain(df, position_state="flat"):
+    """Step through candles, make MetaBrain decisions at each step."""
+    brain_modules = [
+        "exhaustion",
+        "reversal",
+        "momentum_inflection",
+        "bottom_catcher",
+        "divergence",
+        "rolling_peak",
+    ]
+
+    buy_signals, sell_signals = [], []
+    state = position_state
+
+    for t in range(50, len(df)):
+        sub_df = df.iloc[: t + 1].reset_index(drop=True)
+        all_brains = {}
+        for mod_name in brain_modules:
+            mod = importlib.import_module(f"systems.brains.{mod_name}")
+            signals = mod.run(sub_df, viz=False)
+            summary = mod.summarize(signals, sub_df)
+            key = summary.get("brain", mod_name)
+            all_brains[key] = summary
+
+        features = extract_features(all_brains)
+        decision = run_arbiter(features, state)
+
+        x = int(df["candle_index"].iloc[t])
+        y = float(df["close"].iloc[t])
+        if state == "flat" and decision == "BUY":
+            buy_signals.append((x, y))
+            state = "long"
+        elif state == "long" and decision == "SELL":
+            sell_signals.append((x, y))
+            state = "flat"
+
+    return buy_signals, sell_signals
