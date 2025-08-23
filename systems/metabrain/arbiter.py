@@ -6,14 +6,20 @@ from pathlib import Path
 from .rules import buy_decision, sell_decision
 
 ROOT = Path(__file__).resolve().parents[2]
-WEIGHTS_PATH = ROOT / "settings" / "weights.json"
+WEIGHTS_DIR = ROOT / "data" / "weights"
+WEIGHTS_PATH = WEIGHTS_DIR / "weights.json"
+
+_FALLBACK = {"defaults": {"T_buy": 1.0, "T_sell": 1.0}, "features": {}}
 try:
-    with open(WEIGHTS_PATH) as fh:
+    with WEIGHTS_PATH.open() as fh:
         _WEIGHTS = json.load(fh)
 except Exception:
-    _WEIGHTS = {}
+    _WEIGHTS = _FALLBACK
 
-_DEFAULTS = _WEIGHTS.get("defaults", {})
+version = _WEIGHTS.get("version", "missing")
+print(f"[ARBITER] using weights v{version}")
+
+_DEFAULTS = _WEIGHTS.get("defaults", _FALLBACK["defaults"])
 _FEATURE_WEIGHTS = _WEIGHTS.get("features", {})
 
 

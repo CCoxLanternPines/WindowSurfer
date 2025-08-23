@@ -1,4 +1,16 @@
-def buy_decision(features, debug=False):
+"""Guardrail rule implementations for MetaBrain decisions.
+
+These simple heuristics act as safety checks before weighted scoring. The
+behavior remains unchanged from prior iterations.
+"""
+
+
+from __future__ import annotations
+
+from typing import Dict, List, Tuple
+
+
+def buy_decision(features: Dict[str, float], debug: bool = False) -> Tuple[bool, List[str]]:
     """Return (decision, reasons) for BUY guardrail."""
     reasons = []
     val1 = features.get("exh_edge_accuracy", 0)
@@ -21,7 +33,7 @@ def buy_decision(features, debug=False):
     return decision, reasons
 
 
-def sell_decision(features, debug=False):
+def sell_decision(features: Dict[str, float], debug: bool = False) -> Tuple[bool, List[str]]:
     """Return (decision, reasons) for SELL guardrail."""
     reasons = []
     val1 = features.get("divergence_to_top", 0)
