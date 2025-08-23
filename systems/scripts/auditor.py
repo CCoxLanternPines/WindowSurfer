@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 import pandas as pd
+import numpy as np
 
 from systems.metabrain.engine_utils import (
     BRAIN_MODULES,
@@ -30,6 +31,16 @@ from systems.utils.regime import compute_regimes, load_regime_settings
 
 DATA_SIM_PATH = ROOT / "data" / "sim" / "SOLUSD_1h.csv"
 DEFAULT_OUT_DIR = ROOT / "data" / "stats"
+
+
+def to_native(o):
+    if isinstance(o, (np.integer,)):
+        return int(o)
+    if isinstance(o, (np.floating,)):
+        return float(o)
+    if isinstance(o, (np.ndarray,)):
+        return o.tolist()
+    return o
 
 
 def feature_brain(name: str) -> str:
@@ -82,7 +93,7 @@ def export_stats(brains: Iterable[str], timeframe: str, out_dir: Path) -> None:
 
         with out_jsonl.open("w", encoding="utf-8") as fh:
             for r in rows:
-                fh.write(json.dumps(r) + "\n")
+                fh.write(json.dumps(r, default=to_native) + "\n")
 
         summary: dict[str, float] = {}
         if rows:
