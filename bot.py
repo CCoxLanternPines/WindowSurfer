@@ -15,7 +15,11 @@ def main() -> None:
         default="1m",
         help="Time window for simulation (e.g., 1m for one month)",
     )
-    parser.add_argument("--brain", help="Name of brain module to run")
+    parser.add_argument(
+        "--brain",
+        choices=["exhaustion", "reversal"],
+        help="Name of brain module to run",
+    )
     parser.add_argument("--viz", action="store_true", help="Show plot for the run")
     args = parser.parse_args()
 
