@@ -32,21 +32,30 @@ def weighted_score(features: dict, weights: dict) -> float:
     return score
 
 
-def run_arbiter(features: dict, position_state: str, debug: bool = False):
-    score = weighted_score(features, WEIGHTS)
-    reasons = [f"score={score:.3f}"] if debug else []
+def run_arbiter(
+    features: dict,
+    position_state: str,
+    debug: bool = False,
+    return_score: bool = False,
+):
+    """Return a decision, reasons, and optionally the weighted score."""
 
+    score = weighted_score(features, WEIGHTS)
+    reasons: list[str] = []
+
+    decision = "HOLD"
     if position_state == "flat":
         buy, why = buy_decision(features, debug=debug)
         reasons.extend(why)
         if buy:
-            return "BUY", reasons
-
-    if position_state == "long":
+            decision = "BUY"
+    elif position_state == "long":
         sell, why = sell_decision(features, debug=debug)
         reasons.extend(why)
         if sell:
-            return "SELL", reasons
+            decision = "SELL"
 
-    return "HOLD", reasons
+    if return_score:
+        return decision, reasons, score
+    return decision, reasons
 
