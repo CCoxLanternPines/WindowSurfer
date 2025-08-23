@@ -1,4 +1,5 @@
 def buy_decision(features, debug=False):
+    """Return (decision, reasons) for BUY guardrail."""
     reasons = []
     val1 = features.get("exh_edge_accuracy", 0)
     thresh1 = 60
@@ -16,10 +17,12 @@ def buy_decision(features, debug=False):
             f"flip_extrema_pct - {val2:.2f} > {thresh2} {'PASS' if cond2 else 'FAIL'}"
         )
 
-    return (cond1 and cond2), reasons
+    decision = cond1 and cond2
+    return decision, reasons
 
 
 def sell_decision(features, debug=False):
+    """Return (decision, reasons) for SELL guardrail."""
     reasons = []
     val1 = features.get("divergence_to_top", 0)
     thresh1 = 70
@@ -37,5 +40,5 @@ def sell_decision(features, debug=False):
             f"peak_continuation - {val2:.2f} < {thresh2} {'PASS' if cond2 else 'FAIL'}"
         )
 
-    return (cond1 and cond2), reasons
-
+    decision = cond1 and cond2
+    return decision, reasons

@@ -1,0 +1,14 @@
+{
+  "defaults": { "T_buy": 1.0, "T_sell": 1.0 },
+  "features": {
+    "inflection.slowdown_ratio": {
+      "global": 0.2,
+      "chop.high-vol": 0.5,
+      "uptrend.low-vol": -0.3
+    },
+    "divergence.top_conf": {
+      "global": 0.8,
+      "downtrend.high-vol": 1.2
+    }
+  }
+}

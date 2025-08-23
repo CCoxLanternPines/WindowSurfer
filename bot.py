@@ -2,6 +2,9 @@ from __future__ import annotations
 
 """Minimal command-line entry point for discovery simulation."""
 
+# This entry script routes simulation runs through the MetaBrain arbiter
+# which now supports regime-aware weighted scoring.
+
 import argparse
 
 from systems import sim_engine, brain_engine

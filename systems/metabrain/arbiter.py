@@ -5,31 +5,41 @@ from pathlib import Path
 
 from .rules import buy_decision, sell_decision
 
-
-WEIGHTS_PATH = Path(__file__).with_name("weights.json")
+ROOT = Path(__file__).resolve().parents[2]
+WEIGHTS_PATH = ROOT / "settings" / "weights.json"
 try:
     with open(WEIGHTS_PATH) as fh:
-        WEIGHTS = json.load(fh)
+        _WEIGHTS = json.load(fh)
 except Exception:
-    WEIGHTS = {}
+    _WEIGHTS = {}
+
+_DEFAULTS = _WEIGHTS.get("defaults", {})
+_FEATURE_WEIGHTS = _WEIGHTS.get("features", {})
 
 
-def normalize(key: str, val: float | int | None) -> float:
-    try:
-        return float(val) / 100.0
-    except Exception:
-        return 0.0
-
-
-def weighted_score(features: dict, weights: dict) -> float:
+def compute_weighted_score(features: dict) -> tuple[float, list[tuple[str, float, float, str, float]]]:
+    regime = features.get("regime_key", "")
     score = 0.0
-    for key, w in weights.items():
-        if not w:
+    contributions: list[tuple[str, float, float, str, float]] = []
+    for name, val in features.items():
+        if name in ("regime", "regime_key"):
             continue
-        val = features.get(key)
-        if val is not None:
-            score += w * normalize(key, val)
-    return score
+        if not isinstance(val, (int, float)):
+            continue
+        weight_info = _FEATURE_WEIGHTS.get(name, {})
+        weight = 0.0
+        regime_used = "unused"
+        if isinstance(weight_info, dict):
+            if regime in weight_info:
+                weight = weight_info[regime]
+                regime_used = regime
+            elif "global" in weight_info:
+                weight = weight_info["global"]
+                regime_used = "global"
+        contrib = val * weight
+        contributions.append((name, val, weight, regime_used, contrib))
+        score += contrib
+    return score, contributions
 
 
 def run_arbiter(
@@ -38,28 +48,41 @@ def run_arbiter(
     debug: bool = False,
     return_score: bool = False,
 ):
-    """Return a decision, reasons, and optionally the weighted score.
+    """Return a decision, reasons, and optionally the weighted score."""
 
-    The caller may also retrieve the feature snapshot used for the decision
-    by enabling ``return_score``.
-    """
+    score, contribs = compute_weighted_score(features)
+    t_buy = float(_DEFAULTS.get("T_buy", 0.0))
+    t_sell = float(_DEFAULTS.get("T_sell", 0.0))
 
-    score = weighted_score(features, WEIGHTS)
+    decision_from_score = "HOLD"
+    if score >= t_buy:
+        decision_from_score = "BUY"
+    elif score <= -t_sell:
+        decision_from_score = "SELL"
+
     reasons: list[str] = []
-
-    decision = "HOLD"
+    guard_decision: str | None = None
     if position_state == "flat":
         buy, why = buy_decision(features, debug=debug)
         reasons.extend(why)
         if buy:
-            decision = "BUY"
+            guard_decision = "BUY"
     elif position_state == "long":
         sell, why = sell_decision(features, debug=debug)
         reasons.extend(why)
         if sell:
-            decision = "SELL"
+            guard_decision = "SELL"
+
+    decision = guard_decision or decision_from_score
+
+    if debug:
+        print(f"[ARBITER] Score={score:+.2f} {decision}")
+        print("  Contributions:")
+        top = sorted(contribs, key=lambda x: abs(x[4]), reverse=True)[:5]
+        for name, val, weight, reg_used, contrib in top:
+            tag = reg_used if reg_used != "unused" else "unused"
+            print(f"    {name} x{weight:.2f} ({tag}) = {contrib:+.2f}")
 
     if return_score:
         return decision, reasons, score, features
     return decision, reasons, features
-
