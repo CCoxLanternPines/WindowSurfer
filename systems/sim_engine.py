@@ -116,7 +116,8 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
     brain_cache = cache_all_brains(df)
     state = "flat"
     buy_signals, sell_signals = [], []
-    decisions = []
+    decisions_buy, decisions_sell, decisions_hold = [], [], []
+    bx, by, sx, sy, hx, hy = [], [], [], [], [], []
     hold_counter = 0
 
     for t in range(50, len(df)):
@@ -139,40 +140,69 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
                     include = False
 
         if include:
-            decisions.append((x, y, decision, reasons, features))
+            if decision == "BUY":
+                bx.append(x)
+                by.append(y)
+                decisions_buy.append((decision, reasons))
+            elif decision == "SELL":
+                sx.append(x)
+                sy.append(y)
+                decisions_sell.append((decision, reasons))
+            else:
+                hx.append(x)
+                hy.append(y)
+                decisions_hold.append((decision, reasons))
 
     if viz:
         import matplotlib.pyplot as plt
-        import mplcursors
 
         fig, ax = plt.subplots(figsize=(12, 6))
         ax.plot(df["candle_index"], df["close"], lw=1, color="blue")
 
-        scatters = []
-        for x, y, decision, _, _ in decisions:
-            if decision == "BUY":
-                sc = ax.scatter(x, y, color="green", marker="^", s=120, zorder=6)
-            elif decision == "SELL":
-                sc = ax.scatter(x, y, color="red", marker="v", s=120, zorder=6)
+        scatter_buy = ax.scatter(
+            bx, by, color="green", marker="^", s=120, label="BUY", picker=True
+        )
+        scatter_sell = ax.scatter(
+            sx, sy, color="red", marker="v", s=120, label="SELL", picker=True
+        )
+        scatter_hold = ax.scatter(
+            hx,
+            hy,
+            color="gray",
+            marker="o",
+            s=40,
+            alpha=0.3,
+            label="HOLD",
+            picker=True,
+        )
+        ax.legend(loc="upper left")
+
+        info_box = ax.text(
+            1.02,
+            0.95,
+            "Click a marker",
+            transform=ax.transAxes,
+            va="top",
+            ha="left",
+            fontsize=9,
+            bbox=dict(facecolor="white", edgecolor="black", alpha=0.7),
+        )
+
+        def on_pick(event):
+            ind = event.ind[0]
+            artist = event.artist
+
+            if artist == scatter_buy:
+                decision, reasons = decisions_buy[ind]
+            elif artist == scatter_sell:
+                decision, reasons = decisions_sell[ind]
             else:
-                sc = ax.scatter(
-                    x, y, color="gray", marker="o", s=40, alpha=0.3, zorder=4
-                )
-            scatters.append(sc)
+                decision, reasons = decisions_hold[ind]
 
-        cursor = mplcursors.cursor(scatters, hover=True)
+            info_box.set_text(f"{decision}\n" + "\n".join(reasons[:12]))
+            fig.canvas.draw_idle()
 
-        @cursor.connect("add")
-        def on_hover(sel):
-            idx = scatters.index(sel.artist)
-            x, y, decision, reasons, feats = decisions[idx]
-            lines = [f"{decision} @ {x}", f"Price={y:.2f}"]
-            lines.extend(reasons)
-            lines.append("features:")
-            for k, v in sorted(feats.items()):
-                lines.append(f"{k}={v}")
-            sel.annotation.set_text("\n".join(lines))
-
+        fig.canvas.mpl_connect("pick_event", on_pick)
         plt.show()
 
     print(f"[SIM][{timeframe}] buys={len(buy_signals)} sells={len(sell_signals)}")

@@ -37,13 +37,13 @@ def run_arbiter(features: dict, position_state: str, debug: bool = False):
     reasons = [f"score={score:.3f}"] if debug else []
 
     if position_state == "flat":
-        buy, why = buy_decision(features, WEIGHTS, debug=debug)
+        buy, why = buy_decision(features, debug=debug)
         reasons.extend(why)
         if buy:
             return "BUY", reasons
 
     if position_state == "long":
-        sell, why = sell_decision(features, WEIGHTS, debug=debug)
+        sell, why = sell_decision(features, debug=debug)
         reasons.extend(why)
         if sell:
             return "SELL", reasons
