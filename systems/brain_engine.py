@@ -6,8 +6,17 @@ import importlib
 from typing import Any
 
 import pandas as pd
+from pathlib import Path
 
 from .sim_engine import parse_timeframe, apply_time_filter
+
+
+def list_brains() -> list[str]:
+    """Return sorted list of available brain modules."""
+    brains_dir = Path(__file__).parent / "brains"
+    return sorted(
+        p.stem for p in brains_dir.glob("*.py") if not p.name.startswith("_")
+    )
 
 
 def run_brain(name: str, timeframe: str, viz: bool) -> None:
