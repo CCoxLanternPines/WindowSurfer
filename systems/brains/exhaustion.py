@@ -8,6 +8,8 @@ from typing import List, Dict
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import os, json
+from datetime import datetime
 
 from ..sim_engine import (
     WINDOW_SIZE,
@@ -176,6 +178,12 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
         if idx + 1 < len(sys.argv):
             timeframe = sys.argv[idx + 1]
 
+    symbol = "unknown"
+    if "--symbol" in sys.argv:
+        idx = sys.argv.index("--symbol")
+        if idx + 1 < len(sys.argv):
+            symbol = sys.argv[idx + 1]
+
     stats_by_regime: Dict[str, Dict[str, float]] = {}
     for regime, sigs in regime_map.items():
         stats = _compute_stats(sigs)
@@ -188,4 +196,41 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
         print(f"  avg_uptrend_pressure={stats['avg_uptrend_pressure']:.2f}")
         print(f"  avg_downtrend_pressure={stats['avg_downtrend_pressure']:.2f}")
 
-    return {"brain": "exhaustion", "stats_by_regime": stats_by_regime}
+    stats_global = _compute_stats(signals)
+    print(f"[BRAIN][exhaustion][{timeframe}][global]")
+    print(f"  count={stats_global['count']}")
+    print(f"  avg_gap={stats_global['avg_gap']}")
+    print(f"  slope_bias={stats_global['slope_bias']}")
+    print(f"  avg_uptrend_duration={stats_global['avg_uptrend_duration']:.2f}")
+    print(f"  avg_downtrend_duration={stats_global['avg_downtrend_duration']:.2f}")
+    print(f"  avg_up_reversal_slope24={stats_global['avg_up_reversal_slope24']:.5f}")
+    print(f"  avg_down_reversal_slope24={stats_global['avg_down_reversal_slope24']:.5f}")
+    print(f"  avg_uptrend_pressure={stats_global['avg_uptrend_pressure']:.2f}")
+    print(f"  avg_downtrend_pressure={stats_global['avg_downtrend_pressure']:.2f}")
+
+    count = stats_global["count"]
+    avg_gap = stats_global["avg_gap"]
+    direction, pct_str = stats_global["slope_bias"].split()
+    pct = pct_str.rstrip("%")
+
+    out = {
+        "brain": "exhaustion",
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%SZ"),
+        "stats_global": {
+            "count": count,
+            "avg_gap": avg_gap,
+            "slope_bias": f"{direction} {pct}%",
+        },
+        "stats_by_regime": stats_by_regime,
+    }
+
+    log_dir = os.path.join("data", "brain_logs", "exhaustion")
+    os.makedirs(log_dir, exist_ok=True)
+    fname = f"exhaustion_{symbol}_{timeframe}_{out['created_at']}.json"
+    fpath = os.path.join(log_dir, fname)
+    with open(fpath, "w") as f:
+        json.dump(out, f, indent=2)
+
+    return out
