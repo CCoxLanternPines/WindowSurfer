@@ -12,6 +12,8 @@ from typing import Dict, List
 
 import pandas as pd
 
+from .auditor import audit_brain
+
 # -----------------------------------------------------------------------------
 # Timeframe helpers (cloned from systems.sim_engine)
 # -----------------------------------------------------------------------------
@@ -86,6 +88,7 @@ def apply_time_filter(df: pd.DataFrame, delta: timedelta, file_path: str) -> pd.
 # Data loading and feature engineering
 # -----------------------------------------------------------------------------
 
+
 def load_candles(symbol: str) -> tuple[pd.DataFrame, str]:
     """Load full-resolution candles for ``symbol`` with 1h fallback."""
     base = Path("data/sim")
@@ -136,9 +139,20 @@ FEATURE_COLS = [
 ]
 
 
-def run_teach(brain: str, timeframe: str, mode: str = "audit") -> None:
-    """Run teaching/audit loop for a given brain."""
-    df, file_path = load_candles("SOLUSD")
+def _run(
+    brain: str,
+    timeframe: str,
+    mode: str,
+    viz: bool = False,
+    *,
+    symbol: str = "SOLUSD",
+    chart: bool = False,
+    horizon: int = 12,
+    use_labels: bool = False,
+    reaudit: bool = False,
+) -> None:
+    """Internal runner handling audit/teach/correct flows."""
+    df, file_path = load_candles(symbol)
     delta = parse_timeframe(timeframe)
     if delta is not None:
         df = apply_time_filter(df, delta, file_path)
@@ -149,6 +163,28 @@ def run_teach(brain: str, timeframe: str, mode: str = "audit") -> None:
     mod = importlib.import_module(f"systems.brains.{brain}")
     signals = mod.run(df, viz=False)
 
+    if mode == "audit":
+        report = audit_brain(
+            brain,
+            df,
+            signals,
+            use_labels=use_labels,
+            horizon=horizon,
+            n_bins=12,
+            chart=chart,
+            symbol=symbol,
+            timeframe_tag=timeframe,
+        )
+        top = report.get("summary", {}).get("top_features", [])[:8]
+        msg = ", ".join(f"{f}(+{s:.2f})" for f, s in top)
+        if msg:
+            print(f"[AUDIT] top features: {msg}")
+        audit_path = Path(f"data/audit/{brain}_{symbol}_{timeframe}.json")
+        weights_path = Path(f"data/weights/{brain}.json")
+        print(f"[AUDIT] saved: {audit_path} and {weights_path}")
+        return
+
+    # Teaching/correct flows below
     idx_map: Dict[int, Dict[str, float]] = {}
     for s in signals:
         idx = s.get("index") or s.get("candle_index")
@@ -165,20 +201,16 @@ def run_teach(brain: str, timeframe: str, mode: str = "audit") -> None:
         rows.append(feat)
 
     counts = {"BUY": 0, "SELL": 0, "HOLD": 0}
+    appended = 0
 
-    if mode == "audit":
-        feat_df = pd.DataFrame(rows)
-        if not feat_df.empty:
-            print(feat_df.describe())
-            print("Correlations:")
-            print(feat_df.corr(numeric_only=True))
-        counts["HOLD"] = len(rows)
-
-    elif mode == "teach":
+    if mode == "teach":
         import matplotlib.pyplot as plt
 
         labels_path = Path(f"data/labels/{brain}.jsonl")
         labels_path.parent.mkdir(parents=True, exist_ok=True)
+        before_count = (
+            len(labels_path.read_text().splitlines()) if labels_path.exists() else 0
+        )
 
         indices = [r["index"] for r in rows]
         prices = [r["price"] for r in rows]
@@ -211,7 +243,13 @@ def run_teach(brain: str, timeframe: str, mode: str = "audit") -> None:
                 fig.canvas.draw_idle()
 
         fig.canvas.mpl_connect("key_press_event", on_key)
-        plt.show()
+        if viz:
+            plt.show()
+
+        after_count = (
+            len(labels_path.read_text().splitlines()) if labels_path.exists() else 0
+        )
+        appended = max(0, after_count - before_count)
 
     elif mode == "correct":
         labels_path = Path(f"data/labels/{brain}.jsonl")
@@ -221,9 +259,83 @@ def run_teach(brain: str, timeframe: str, mode: str = "audit") -> None:
         else:
             print("No existing labels to correct.")
 
+    counts["HOLD"] = len(rows)
     total = sum(counts.values())
     print(
         f"[TEACH][{brain}][{timeframe}] "
         f"count={total} buy={counts['BUY']} sell={counts['SELL']} hold={counts['HOLD']}"
     )
+    if mode == "teach":
+        print(
+            f"[TEACH] Appended {appended} labels. Run: python brain.py --brain {brain} "
+            f"--audit --symbol {symbol} --time {timeframe} --use-labels --chart"
+        )
+        if reaudit:
+            report = audit_brain(
+                brain,
+                df,
+                signals,
+                use_labels=True,
+                horizon=horizon,
+                n_bins=12,
+                chart=True,
+                symbol=symbol,
+                timeframe_tag=timeframe,
+            )
+            top = report.get("summary", {}).get("top_features", [])[:8]
+            msg = ", ".join(f"{f}(+{s:.2f})" for f, s in top)
+            if msg:
+                print(f"[AUDIT] top features: {msg}")
+            audit_path = Path(f"data/audit/{brain}_{symbol}_{timeframe}.json")
+            weights_path = Path(f"data/weights/{brain}.json")
+            print(f"[AUDIT] saved: {audit_path} and {weights_path}")
 
+
+def run_audit(
+    brain: str,
+    timeframe: str,
+    *,
+    symbol: str = "SOLUSD",
+    chart: bool = False,
+    horizon: int = 12,
+    use_labels: bool = False,
+) -> None:
+    _run(
+        brain,
+        timeframe,
+        mode="audit",
+        symbol=symbol,
+        chart=chart,
+        horizon=horizon,
+        use_labels=use_labels,
+    )
+
+
+def run_teach(
+    brain: str,
+    timeframe: str,
+    viz: bool = False,
+    *,
+    symbol: str = "SOLUSD",
+    horizon: int = 12,
+    reaudit: bool = False,
+) -> None:
+    _run(
+        brain,
+        timeframe,
+        mode="teach",
+        viz=viz,
+        symbol=symbol,
+        horizon=horizon,
+        reaudit=reaudit,
+    )
+
+
+def run_correct(
+    brain: str,
+    timeframe: str,
+    viz: bool = False,
+    *,
+    symbol: str = "SOLUSD",
+) -> None:
+    _run(brain, timeframe, mode="correct", viz=viz, symbol=symbol)
