@@ -1,8 +1,12 @@
 {
   "regime_settings": {
-    "slope_eps": 0.001,
-    "vol_eps": 0.01,
+    "slope_eps": 0.000222,
+    "vol_eps": 0.010251,
     "window": 50,
     "label_shift": 10
+  },
+  "regime_audit": {
+    "slope_percentile": 60,
+    "vol_percentile": 70
   }
 }
