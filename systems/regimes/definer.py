@@ -19,11 +19,20 @@ def _load_config() -> dict[str, Any]:
 
 
 def define_regimes(df: pd.DataFrame) -> pd.DataFrame:
-    """Annotate ``df`` with a ``regime_true`` column."""
+    """Annotate ``df`` with regime labels.
+
+    The ``regime_true`` column represents the regime determined using all
+    available data up to that candle. To prevent the regime detector from
+    peeking at the same candle used for labeling, the labels are shifted
+    forward by ``label_shift`` candles, producing ``regime_true_shifted``.
+    The last ``label_shift`` rows are dropped because no future label is
+    available for them.
+    """
     cfg = _load_config()
     window = int(cfg.get("window", 50))
     slope_eps = float(cfg.get("slope_eps", 0.001))
     vol_eps = float(cfg.get("vol_eps", 0.01))
+    label_shift = int(cfg.get("label_shift", 0))
 
     closes = df["close"]
 
@@ -47,6 +56,13 @@ def define_regimes(df: pd.DataFrame) -> pd.DataFrame:
             np.where(vol >= vol_eps, "chop", "flat"),
         ),
     )
+    df["regime_true_shifted"] = (
+        df["regime_true"].shift(-label_shift)
+        if label_shift
+        else df["regime_true"]
+    )
+    if label_shift > 0:
+        df = df.iloc[:-label_shift].copy()
     return df
 
 
