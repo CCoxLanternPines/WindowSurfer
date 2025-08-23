@@ -1,5 +1,9 @@
 {
-  "defaults": { "T_buy": 1.0, "T_sell": 1.0 },
+  "version": "2024-01-01T00:00:00",
+  "defaults": {
+    "T_buy": 1.0,
+    "T_sell": 1.0
+  },
   "features": {
     "inflection.slowdown_ratio": {
       "global": 0.2,
