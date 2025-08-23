@@ -1,9 +1,19 @@
 {
   "regime_settings": {
-    "slope_eps": 0.000222,
-    "vol_eps": 0.010251,
+    "slope_eps": 0.0012,
+    "vol_eps": 0.010,
     "window": 50,
-    "label_shift": 10
+    "label_shift": 10,
+    "detector": {
+      "slope_window": 30,
+      "vol_window": 30,
+      "slope_eps": 0.0012,
+      "vol_eps": 0.010,
+      "wick_eps": 0.003,
+      "range_eps": 0.02,
+      "consistency_up": 0.65,
+      "consistency_down": 0.35
+    }
   },
   "regime_audit": {
     "slope_percentile": 60,
