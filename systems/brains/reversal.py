@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import List, Dict
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from ..sim_engine import (
@@ -97,8 +98,69 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     over_pct = int(round(100 * over / total)) if total else 0
     fail_pct = int(round(100 * fail / total)) if total else 0
 
+    indices = [int(s["index"]) for s in signals]
+    avg_gap = int(np.mean(np.diff(indices))) if len(indices) > 1 else 0
+    median_gap = int(np.median(np.diff(indices))) if len(indices) > 1 else 0
+
+    # --------------------------------------------------------------
+    # Flip-to-extrema accuracy within ±5 candles
+    # --------------------------------------------------------------
+    highs = (
+        df["close"].rolling(window=11, center=True).max().eq(df["close"])
+    )
+    lows = (
+        df["close"].rolling(window=11, center=True).min().eq(df["close"])
+    )
+    extrema_hits = 0
+    for s in signals:
+        idx = int(s["index"])
+        if s["delta_after"] < 0:  # flip down -> near local high
+            if highs.iloc[idx - 5 : idx + 6].any():
+                extrema_hits += 1
+        elif s["delta_after"] > 0:  # flip up -> near local low
+            if lows.iloc[idx - 5 : idx + 6].any():
+                extrema_hits += 1
+    flip_extrema_pct = int(round(100 * extrema_hits / total)) if total else 0
+
+    # --------------------------------------------------------------
+    # Follow-through strength Δ_after >= Δ_before
+    # --------------------------------------------------------------
+    followthrough = sum(
+        1 for s in signals if abs(s["delta_after"]) >= abs(s["delta_before"])
+    )
+    followthrough_pct = int(round(100 * followthrough / total)) if total else 0
+
+    # --------------------------------------------------------------
+    # Next-window slope agreement (next 12 candles)
+    # --------------------------------------------------------------
+    slope_agree = 0
+    closes = df["close"].to_numpy()
+    for s in signals:
+        idx = int(s["index"])
+        y = closes[idx + 1 : idx + 13]
+        if len(y) < 2:
+            continue
+        x_vals = np.arange(len(y))
+        slope = float(np.polyfit(x_vals, y, 1)[0])
+        if slope * s["delta_after"] > 0:
+            slope_agree += 1
+    slope_agree_pct = int(round(100 * slope_agree / total)) if total else 0
+
+    print("[REV][stats]")
     print("  Symmetric reversals: {}%".format(sym_pct))
     print("  Overshoots: {}%".format(over_pct))
     print("  Fails: {}%".format(fail_pct))
+    print("  Flip-extrema accuracy: {}%".format(flip_extrema_pct))
+    print("  Follow-through >= before: {}%".format(followthrough_pct))
+    print("  Next-slope agreement: {}%".format(slope_agree_pct))
+    print("  Median gap: {} candles".format(median_gap))
 
-    return {"count": total, "avg_gap": 0, "slope_bias": 0}
+    return {
+        "count": total,
+        "avg_gap": avg_gap,
+        "slope_bias": f"{slope_agree_pct}%",
+        "flip_extrema_pct": flip_extrema_pct,
+        "followthrough_pct": followthrough_pct,
+        "slope_agree_pct": slope_agree_pct,
+        "median_gap": median_gap,
+    }
