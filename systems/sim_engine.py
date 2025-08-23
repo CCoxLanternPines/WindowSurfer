@@ -6,7 +6,8 @@ import os
 
 import pandas as pd
 
-from .metabrain.engine_utils import simulate_metabrain
+from .metabrain.engine_utils import cache_all_brains, extract_features_at_t
+from .metabrain.arbiter import run_arbiter
 
 _INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
 
@@ -111,7 +112,23 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
         df = apply_time_filter(df, delta, file_path)
     df = df.reset_index(drop=True)
     df["candle_index"] = range(len(df))
-    buy_signals, sell_signals = simulate_metabrain(df)
+
+    brain_cache = cache_all_brains(df)
+    state = "flat"
+    buy_signals, sell_signals = [], []
+
+    for t in range(50, len(df)):
+        features = extract_features_at_t(brain_cache, t)
+        decision = run_arbiter(features, state)
+
+        x = int(df["candle_index"].iloc[t])
+        y = float(df["close"].iloc[t])
+        if state == "flat" and decision == "BUY":
+            buy_signals.append((x, y))
+            state = "long"
+        elif state == "long" and decision == "SELL":
+            sell_signals.append((x, y))
+            state = "flat"
 
     if viz:
         import matplotlib.pyplot as plt
