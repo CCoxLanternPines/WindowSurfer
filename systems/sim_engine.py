@@ -117,6 +117,7 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
     state = "flat"
     buy_signals, sell_signals = [], []
     decisions = []
+    hold_counter = 0
 
     for t in range(50, len(df)):
         features = extract_features_at_t(brain_cache, t)
@@ -124,14 +125,21 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
 
         x = int(df["candle_index"].iloc[t])
         y = float(df["close"].iloc[t])
+        include = True
         if state == "flat" and decision == "BUY":
             buy_signals.append((x, y))
             state = "long"
         elif state == "long" and decision == "SELL":
             sell_signals.append((x, y))
             state = "flat"
+        else:
+            if decision == "HOLD":
+                hold_counter += 1
+                if hold_counter % 10 != 0:
+                    include = False
 
-        decisions.append((x, y, decision, reasons))
+        if include:
+            decisions.append((x, y, decision, reasons, features))
 
     if viz:
         import matplotlib.pyplot as plt
@@ -141,7 +149,7 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
         ax.plot(df["candle_index"], df["close"], lw=1, color="blue")
 
         scatters = []
-        for x, y, decision, _ in decisions:
+        for x, y, decision, _, _ in decisions:
             if decision == "BUY":
                 sc = ax.scatter(x, y, color="green", marker="^", s=120, zorder=6)
             elif decision == "SELL":
@@ -157,10 +165,13 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
         @cursor.connect("add")
         def on_hover(sel):
             idx = scatters.index(sel.artist)
-            x, y, decision, reasons = decisions[idx]
-            sel.annotation.set_text(
-                f"{decision} @ {x}\nPrice={y:.2f}\n" + "\n".join(reasons)
-            )
+            x, y, decision, reasons, feats = decisions[idx]
+            lines = [f"{decision} @ {x}", f"Price={y:.2f}"]
+            lines.extend(reasons)
+            lines.append("features:")
+            for k, v in sorted(feats.items()):
+                lines.append(f"{k}={v}")
+            sel.annotation.set_text("\n".join(lines))
 
         plt.show()
 

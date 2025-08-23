@@ -1,0 +1,8 @@
+{
+  "exh_edge_accuracy": 1.0,
+  "flip_extrema_pct": 0.0,
+  "flip_followthrough_pct": 1.0,
+  "bottom_recovery_mag": 0.5,
+  "divergence_to_top": 1.5,
+  "peak_continuation": 1.0
+}
