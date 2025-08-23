@@ -63,13 +63,17 @@ def main() -> None:
         guesses.append(guess)
     df["regime_guess"] = guesses
 
-    total = len(df)
-    accuracy = (df["regime_guess"] == df["regime_true"]).mean() * 100
+    valid = df["regime_true_shifted"].notna()
+    total = int(valid.sum())
+    accuracy = (
+        df.loc[valid, "regime_guess"]
+        == df.loc[valid, "regime_true_shifted"]
+    ).mean() * 100
 
     regimes = ["trend_up", "trend_down", "chop", "flat"]
     cm = pd.crosstab(
-        df["regime_true"],
-        df["regime_guess"],
+        df.loc[valid, "regime_true_shifted"],
+        df.loc[valid, "regime_guess"],
         rownames=["true"],
         colnames=["pred"],
     ).reindex(index=regimes, columns=regimes, fill_value=0)
