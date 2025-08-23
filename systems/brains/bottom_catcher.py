@@ -76,6 +76,8 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     multi_confirm = 0
     high_vol = 0
     extrema_align = 0
+    downtrend = 0
+    uptrend = 0
 
     for idx in indices:
         if idx >= len(closes):
@@ -96,8 +98,13 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
             slope_prev = float(np.polyfit(np.arange(len(sub_prev)), sub_prev, 1)[0]) if len(sub_prev) > 1 else 0.0
             delta = slope_now - slope_prev
         else:
+            slope_now = 0.0
             delta = 0.0
         slope_deltas.append(delta)
+        if slope_now < 0:
+            downtrend += 1
+        else:
+            uptrend += 1
         if delta >= SLOPE_DELTA_THRESH:
             strong_slope += 1
 
@@ -127,6 +134,18 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     highvol_pct = int(round(100 * high_vol / total)) if total else 0
     extrema_align_pct = int(round(100 * extrema_align / total)) if total else 0
 
+    if total:
+        if downtrend > uptrend:
+            pct = int(round(100 * downtrend / total))
+            slope_bias = f"downtrend {pct}%"
+        elif uptrend > downtrend:
+            pct = int(round(100 * uptrend / total))
+            slope_bias = f"uptrend {pct}%"
+        else:
+            slope_bias = "flat"
+    else:
+        slope_bias = "flat"
+
     print("[BRAIN][bottom_catcher][stats]")
     print(f"  Sharp valleys (wick ≥50%): {sharp_valley_pct}%")
     print(f"  Strong slope deltas (≥{SLOPE_DELTA_THRESH}): {slope_delta_strong_pct}%")
@@ -137,6 +156,7 @@ def summarize(signals: List[Dict[str, float]], df: pd.DataFrame):
     return {
         "count": total,
         "avg_gap": avg_gap,
+        "slope_bias": slope_bias,
         "sharp_valley_pct": sharp_valley_pct,
         "slope_delta_avg": round(slope_delta_avg, 6),
         "slope_delta_strong_pct": slope_delta_strong_pct,
