@@ -8,17 +8,15 @@ The ``--time`` parameter specifies the window using whole-day units
 (D, W, M, Y) and does **not** alter the filename that is loaded.
 """
 
-from datetime import datetime, timedelta
-import re
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 
+from utilities.time import parse_time_window
+
 DATA_DIR = Path("data")
 CANDLES_DIR = DATA_DIR / "candles" / "sim"
-
-_TIME_RE = re.compile(r"^[1-9]\d*[DWMY]$")
-_UNIT_DAYS = {"D": 1, "W": 7, "M": 30, "Y": 365}
 
 
 def _format_market(symbol: str) -> str:
@@ -27,19 +25,6 @@ def _format_market(symbol: str) -> str:
     if s.endswith("USDC") or s.endswith("USDT"):
         return f"{s[:-4]}/{s[-4:]}"
     return f"{s[:-3]}/{s[-3:]}"
-
-
-def _parse_window(value: str | None) -> timedelta | None:
-    """Parse ``--time`` values like ``1W`` or ``3M`` into ``timedelta``."""
-    if value is None:
-        return None
-    if not _TIME_RE.fullmatch(value):
-        print(f"[ERROR] Bad --time value: \"{value}\" (expected e.g. 7D | 2W | 3M | 1Y)")
-        raise SystemExit(1)
-    num = int(value[:-1])
-    unit = value[-1]
-    days = num * _UNIT_DAYS[unit]
-    return timedelta(days=days)
 
 
 def load(symbol: str, window: str | None = None) -> pd.DataFrame:
@@ -54,6 +39,7 @@ def load(symbol: str, window: str | None = None) -> pd.DataFrame:
         dataset is returned.
     """
 
+    # path = CANDLES_DIR / (f"{symbol}_{window}.csv" if window else f"{symbol}.csv")  # // ROLLBACK_PRE_TIMEFILTER
     path = CANDLES_DIR / f"{symbol}.csv"
     abs_path = path.resolve()
     if not path.exists():
@@ -71,7 +57,14 @@ def load(symbol: str, window: str | None = None) -> pd.DataFrame:
     t_max = int(df["timestamp"].max()) if rows_in else 0
     t_max_dt = datetime.utcfromtimestamp(t_max)
 
-    delta = _parse_window(window)
+    delta = None
+    if window is not None:
+        try:
+            delta = parse_time_window(window)
+        except ValueError:
+            print(f"[ERROR] Bad --time value: \"{window}\" (expected e.g. 7D | 2W | 3M | 1Y)")
+            raise SystemExit(1)
+
     cutoff_ts = t_max
     if delta is not None:
         cutoff_ts = t_max - int(delta.total_seconds())
