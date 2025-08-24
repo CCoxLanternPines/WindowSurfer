@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from systems.utils.resolve_symbol import to_tag, resolve_symbols, candle_filename
 from systems.scripts.fetch_candles import fetch_kraken_last_n_hours_1h
-from systems.scripts.ledger import load_ledger, save_ledger
+from systems.scripts.ledger import load_ledger as load_state_ledger, save_ledger as save_state_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.runtime_state import build_runtime_state
@@ -29,6 +29,12 @@ from systems.utils.config import (
     load_keys,
     resolve_coin_config,
     resolve_account_market,
+)
+from systems.utils.ledger import (
+    init_ledger as ledger_init,
+    append_entry as ledger_append,
+    save_ledger as ledger_save,
+    load_ledger as ledger_load,
 )
 
 
@@ -81,6 +87,14 @@ def _run_iteration(
             # init log file for this ledger
             init_trade_logger(ledger_name)
 
+            # load state ledger for open/closed notes separately
+            state_ledger_name = f"{ledger_name}_state"
+            ledger_obj = load_state_ledger(state_ledger_name, tag=f"{file_tag}_state")
+
+            # load or init trading ledger for reporting
+            ledger_path = Path("data") / "ledgers" / f"{ledger_name}.json"
+            trade_ledger = ledger_load(str(ledger_path)) or ledger_init(acct_name, market, "live")
+
             # refresh last 720h from kraken
             live_file = candle_filename(acct_name, market, live=True)
             df_live = fetch_kraken_last_n_hours_1h(kraken_name, n=720)
@@ -110,7 +124,6 @@ def _run_iteration(
             hist_low, hist_high = hist_cache[ledger_name]
 
             t = len(df) - 1
-            ledger_obj = load_ledger(ledger_name, tag=file_tag)
             prev = runtime_states.get(ledger_name, {"verbose": verbose})
             state = build_runtime_state(
                 general,
@@ -136,6 +149,9 @@ def _run_iteration(
             ctx = {"ledger": ledger_obj}
             decision = "HOLD"
             trades_log: list[dict[str, Any]] = []
+            size_usd = 0.0
+            entry_price_val = 0.0
+            roi_val = 0.0
 
             # BUY
             buy_res = evaluate_buy(
@@ -158,6 +174,8 @@ def _run_iteration(
                     verbose=state.get("verbose", 0),
                 )
                 decision = "BUY"
+                size_usd = buy_res.get("size_usd", 0.0)
+                entry_price_val = (buy_result or {}).get("avg_price", price)
                 trades_log.append(
                     {
                         "action": "BUY",
@@ -207,9 +225,18 @@ def _run_iteration(
                             "note_id": closed.get("id"),
                         }
                     )
+            if sell_notes:
+                total_cost = sum(
+                    n.get("entry_amount", 0.0) * n.get("entry_price", 0.0)
+                    for n in sell_notes
+                )
+                total_amount = sum(n.get("entry_amount", 0.0) for n in sell_notes)
+                entry_price_val = (total_cost / total_amount) if total_amount else 0.0
+                size_usd = total_cost
+                roi_val = ((price - entry_price_val) / entry_price_val) if entry_price_val else 0.0
 
             ledger_obj.set_metadata({"capital": state.get("capital", 0.0)})
-            save_ledger(ledger_name, ledger_obj, tag=file_tag)
+            save_state_ledger(state_ledger_name, ledger_obj, tag=f"{file_tag}_state")
 
             # record structured event
             features = state.get("last_features", {}).get("strategy", {})
@@ -231,6 +258,20 @@ def _run_iteration(
                 },
                 "trades": trades_log,
             }
+            ledger_entry = {
+                "candle_idx": t,
+                "timestamp": last_ts,
+                "side": "BUY" if decision == "BUY" else ("SELL" if sell_notes else "PASS"),
+                "price": price,
+                "size_usd": size_usd,
+                "entry_price": entry_price_val,
+                "roi": roi_val,
+                "pressure_buy": pressures.get("buy", {}).get("strategy", 0.0),
+                "pressure_sell": pressures.get("sell", {}).get("strategy", 0.0),
+                "features": features,
+            }
+            ledger_append(trade_ledger, ledger_entry)
+            ledger_save(trade_ledger, str(ledger_path))
             record_event(event)
 
 

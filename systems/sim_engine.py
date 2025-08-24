@@ -42,6 +42,7 @@ from systems.utils.resolve_symbol import (
 )
 from systems.utils.time import parse_cutoff as parse_timeframe
 from systems.utils.trade_logger import init_logger as init_trade_logger, record_event
+from systems.utils.ledger import init_ledger as ledger_init, append_entry as ledger_append, save_ledger as ledger_save
 
 
 def _run_single_sim(
@@ -128,6 +129,9 @@ def _run_single_sim(
     runtime_state["buy_unlock_p"] = {}
     strategy_cfg = runtime_state.get("strategy", {})
 
+    # simple ledger for reporting/graphing
+    trade_ledger = ledger_init(account, market, "sim")
+
 
     ledger_obj = Ledger()
     ledger_obj.set_metadata({"capital": runtime_state.get("capital", 0.0)})
@@ -165,6 +169,9 @@ def _run_single_sim(
         decision = "HOLD"
         trades_log: list[dict[str, Any]] = []
         ctx = {"ledger": ledger_obj}
+        size_usd = 0.0
+        entry_price_val = 0.0
+        roi_val = 0.0
         buy_res = evaluate_buy(
             ctx,
             t,
@@ -201,6 +208,8 @@ def _run_single_sim(
                 }
             )
             decision = "BUY"
+            size_usd = buy_res.get("size_usd", 0.0)
+            entry_price_val = result.get("avg_price", 0.0)
 
             if viz:
                 buy_points.append((float(df.iloc[t][ts_col]), price))
@@ -257,6 +266,15 @@ def _run_single_sim(
                 m_sell["realized_proceeds"] += proceeds
                 m_sell["realized_trades"] += 1
                 m_sell["realized_roi_accum"] += roi_trade
+        if sell_notes:
+            total_cost = sum(
+                n.get("entry_amount", 0.0) * n.get("entry_price", 0.0)
+                for n in sell_notes
+            )
+            total_amount = sum(n.get("entry_amount", 0.0) for n in sell_notes)
+            entry_price_val = (total_cost / total_amount) if total_amount else 0.0
+            size_usd = total_cost
+            roi_val = ((price - entry_price_val) / entry_price_val) if entry_price_val else 0.0
         features = runtime_state.get("last_features", {}).get("strategy", {})
         pressures = runtime_state.get("pressures", {})
         event = {
@@ -276,6 +294,19 @@ def _run_single_sim(
             },
             "trades": trades_log,
         }
+        ledger_entry = {
+            "candle_idx": t,
+            "timestamp": ts,
+            "side": "BUY" if decision == "BUY" else ("SELL" if sell_notes else "PASS"),
+            "price": price,
+            "size_usd": size_usd,
+            "entry_price": entry_price_val,
+            "roi": roi_val,
+            "pressure_buy": pressures.get("buy", {}).get("strategy", 0.0),
+            "pressure_sell": pressures.get("sell", {}).get("strategy", 0.0),
+            "features": features,
+        }
+        ledger_append(trade_ledger, ledger_entry)
         record_event(event)
 
     final_price = float(df.iloc[-1]["close"]) if total else 0.0
@@ -347,6 +378,10 @@ def _run_single_sim(
     if default_path.exists() and default_path != sim_path:
         sim_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(default_path, sim_path)
+    ledger_save(
+        trade_ledger,
+        str(resolve_path("data/ledgers/ledger_simulation.json")),
+    )
     logs_dir = root / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
