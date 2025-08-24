@@ -170,32 +170,37 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     }
     angles = {"x": [], "y": [], "v": []}
     angle_by_idx = {}
+    angle_lines = []  # (x0, y0, x1, y1, v)
 
     for t in range(LOOKBACK, len(df), WINDOW_STEP):
-        now_price = float(df["close"].iloc[t])
-        past_price = float(df["close"].iloc[t - LOOKBACK])
+        start_idx = int(df["candle_index"].iloc[t - LOOKBACK])
+        end_idx = int(df["candle_index"].iloc[t])
+        start_price = float(df["close"].iloc[t - LOOKBACK])
+        end_price = float(df["close"].iloc[t])
 
         window_series = df["close"].iloc[t - LOOKBACK : t + 1]
         ang = normalized_angle(window_series, LOOKBACK)
-        angles["x"].append(int(df["candle_index"].iloc[t]))
-        angles["y"].append(now_price)
-        angles["v"].append(ang)
-        angle_by_idx[int(df["candle_index"].iloc[t])] = ang
 
-        if now_price > past_price:
-            delta_up = now_price - past_price
-            norm = delta_up / max(1e-9, past_price)
+        angle_lines.append((start_idx, start_price, end_idx, end_price, ang))
+        angles["x"].append(end_idx)
+        angles["y"].append(end_price)
+        angles["v"].append(ang)
+        angle_by_idx[end_idx] = ang
+
+        if end_price > start_price:
+            delta_up = end_price - start_price
+            norm = delta_up / max(1e-9, start_price)
             size = SIZE_SCALAR * (norm ** SIZE_POWER)
-            pts["exhaustion_up"]["x"].append(int(df["candle_index"].iloc[t]))
-            pts["exhaustion_up"]["y"].append(now_price)
+            pts["exhaustion_up"]["x"].append(end_idx)
+            pts["exhaustion_up"]["y"].append(end_price)
             pts["exhaustion_up"]["s"].append(size)
 
-        elif now_price < past_price:
-            delta_down = past_price - now_price
-            norm = delta_down / max(1e-9, past_price)
+        elif end_price < start_price:
+            delta_down = start_price - end_price
+            norm = delta_down / max(1e-9, start_price)
             size = SIZE_SCALAR * (norm ** SIZE_POWER)
-            pts["exhaustion_down"]["x"].append(int(df["candle_index"].iloc[t]))
-            pts["exhaustion_down"]["y"].append(now_price)
+            pts["exhaustion_down"]["x"].append(end_idx)
+            pts["exhaustion_down"]["y"].append(end_price)
             pts["exhaustion_down"]["s"].append(size)
 
     # ===== Candle-by-candle simulation =====
@@ -263,6 +268,16 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         ax1.set_xlabel("Candles (Index)")
         ax1.set_ylabel("Price")
         ax1.grid(True)
+
+        # Plot angle direction lines
+        for (x0, y0, x1, y1, v) in angle_lines:
+            if v > 0.05:
+                color = "orange"
+            elif v < -0.05:
+                color = "purple"
+            else:
+                color = "gray"
+            ax1.plot([x0, x1], [y0, y1], color=color, linewidth=2, alpha=0.7)
 
         # Plot exhaustion bubbles
         ax1.scatter(pts["exhaustion_down"]["x"], pts["exhaustion_down"]["y"],
