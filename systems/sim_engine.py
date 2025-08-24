@@ -104,7 +104,8 @@ def _run_single_sim(
 
     if timeframe:
         delta = parse_timeframe(timeframe)
-        cutoff_ts = (datetime.now(tz=timezone.utc) - delta).timestamp()
+        end_ts = df[ts_col].max()
+        cutoff_ts = end_ts - delta.total_seconds()
         df = df[df[ts_col] >= cutoff_ts].reset_index(drop=True)
 
     # Log one line so we always know what we ran on

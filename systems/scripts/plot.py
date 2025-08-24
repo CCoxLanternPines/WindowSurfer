@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import json
 import sys
+from math import atan, degrees
 from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt  # type: ignore
 import pandas as pd
 
-from systems.utils.config import load_account_settings
+from systems.utils.config import (
+    load_account_settings,
+    load_coin_settings,
+    resolve_coin_config,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +43,13 @@ def plot_trades_from_ledger(
     account: str, market: str, mode: str, ledger_path: str | None = None
 ) -> None:
     """Plot candles with BUY/SELL/PASS markers from ledger data."""
+    market = market.replace("/", "").upper()
     _validate(account, market)
+
+    coin_cfg = resolve_coin_config(market, load_coin_settings())
+    buy_trigger = float(coin_cfg.get("buy_trigger", 0.0))
+    sell_trigger = float(coin_cfg.get("sell_trigger", 0.0))
+    flat_band = float(coin_cfg.get("flat_band_deg", 0.0))
 
     if ledger_path is None:
         if mode == "sim":
@@ -78,8 +89,7 @@ def plot_trades_from_ledger(
     buys_x, buys_y = [], []
     sells_x, sells_y = [], []
     pass_x, pass_y = [], []
-    press_buy_x, press_buy_y = [], []
-    press_sell_x, press_sell_y = [], []
+    slope_x, slope_y = [], []
 
     for entry in ledger.get("entries", []):
         ts = entry.get("timestamp")
@@ -97,12 +107,11 @@ def plot_trades_from_ledger(
             pass_x.append(ts)
             pass_y.append(price)
 
-        if "pressure_buy" in entry:
-            press_buy_x.append(ts)
-            press_buy_y.append(entry["pressure_buy"])
-        if "pressure_sell" in entry:
-            press_sell_x.append(ts)
-            press_sell_y.append(entry["pressure_sell"])
+        feats = entry.get("features", {})
+        slope_val = feats.get("slope")
+        if slope_val is not None:
+            slope_x.append(ts)
+            slope_y.append(degrees(atan(float(slope_val))))
 
     if buys_x:
         ax.scatter(pd.to_datetime(buys_x, unit="s"), buys_y, color="green", marker="^", label="BUY")
@@ -111,13 +120,15 @@ def plot_trades_from_ledger(
     if pass_x:
         ax.scatter(pd.to_datetime(pass_x, unit="s"), pass_y, color="gray", marker=".", label="PASS")
 
-    if press_buy_x or press_sell_x:
+    if slope_x:
         ax2 = ax.twinx()
-        if press_buy_x:
-            ax2.plot(pd.to_datetime(press_buy_x, unit="s"), press_buy_y, color="purple", alpha=0.3, label="pressure_buy")
-        if press_sell_x:
-            ax2.plot(pd.to_datetime(press_sell_x, unit="s"), press_sell_y, color="orange", alpha=0.3, label="pressure_sell")
-        ax2.set_ylabel("Pressure")
+        slope_times = pd.to_datetime(slope_x, unit="s")
+        ax2.plot(slope_times, slope_y, color="gray", label="slope")
+        ax2.axhline(buy_trigger, color="green", linestyle="--", label="buy_trigger")
+        ax2.axhline(sell_trigger, color="red", linestyle="--", label="sell_trigger")
+        if flat_band:
+            ax2.fill_between(slope_times, -flat_band, flat_band, color="gray", alpha=0.1, label="flat_band")
+        ax2.set_ylabel("Slope (deg)")
         ax2.legend(loc="upper right")
 
     ax.legend(loc="upper left")
