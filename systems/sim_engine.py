@@ -108,6 +108,14 @@ def sell_target_from_bubble(entry_price: float, s: float) -> float:
     maturity = MIN_MATURITY + frac * (MAX_MATURITY - MIN_MATURITY)
     return entry_price * (1 + maturity)
 
+
+def normalized_angle(series: pd.Series, lookback: int) -> float:
+    dy = series.iloc[-1] - series.iloc[0]
+    dx = lookback
+    angle = np.arctan2(dy, dx)
+    norm = angle / (np.pi / 4)
+    return max(-1, min(1, norm))
+
 # ===================== Exhaustion Plot + Trades =====================
 def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     file_path = "data/sim/SOLUSD_1h.csv"
@@ -120,15 +128,22 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     df = df.reset_index(drop=True)
     df["candle_index"] = range(len(df))
 
-    # ----- Exhaustion points -----
+    # ----- Exhaustion points and angles -----
     pts = {
         "exhaustion_up":   {"x": [], "y": [], "s": []},
         "exhaustion_down": {"x": [], "y": [], "s": []},
     }
+    angles = {"x": [], "y": [], "v": []}
 
     for t in range(LOOKBACK, len(df), WINDOW_STEP):
         now_price = float(df["close"].iloc[t])
         past_price = float(df["close"].iloc[t - LOOKBACK])
+
+        window_series = df["close"].iloc[t - LOOKBACK : t + 1]
+        ang = normalized_angle(window_series, LOOKBACK)
+        angles["x"].append(int(df["candle_index"].iloc[t]))
+        angles["y"].append(now_price)
+        angles["v"].append(ang)
 
         if now_price > past_price:
             delta_up = now_price - past_price
@@ -212,6 +227,17 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         # Plot exhaustion bubbles
         ax1.scatter(pts["exhaustion_down"]["x"], pts["exhaustion_down"]["y"],
                     s=pts["exhaustion_down"]["s"], c="green", alpha=0.3, edgecolor="black")
+
+        # Plot normalized angles
+        for x, y, v in zip(angles["x"], angles["y"], angles["v"]):
+            if v > 0.1:
+                marker, color = "^", "orange"
+            elif v < -0.1:
+                marker, color = "v", "purple"
+            else:
+                marker, color = "o", "gray"
+            size = 40 * abs(v) + 10
+            ax1.scatter(x, y, marker=marker, c=color, s=size, zorder=5)
 
         # Plot trades
         for t in trades:
