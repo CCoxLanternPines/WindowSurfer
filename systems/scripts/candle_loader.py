@@ -8,12 +8,6 @@ from typing import Tuple
 import pandas as pd
 
 from systems.utils.addlog import addlog
-from systems.utils.resolve_symbol import (
-    candle_filename,
-    sim_path_csv,
-    live_path_csv,
-    to_tag,
-)
 
 
 def load_candles_df(
@@ -30,9 +24,9 @@ def load_candles_df(
     account: str
         Account name used for the candle filename.
     market: str
-        Market pair in CCXT format, e.g. ``"SOL/USD"``.
+        Market pair without slash, e.g. ``"SOLUSD"``.
     live: bool, optional
-        If ``True``, load from ``data/live`` else ``data/sim``.
+        If ``True``, load from ``data/candles/live`` else ``data/candles/sim``.
     verbose: int, optional
         Verbosity level forwarded to ``addlog``.
 
@@ -42,19 +36,23 @@ def load_candles_df(
         Normalised dataframe and number of duplicate rows removed.
     """
 
-    csv_path = candle_filename(account, market, live=live)
-    if not Path(csv_path).exists():
-        tag = to_tag(market)
-        legacy = live_path_csv(tag) if live else sim_path_csv(tag)
-        if Path(legacy).exists():
+    market = market.replace("/", "").upper()
+    base_dir = Path("data/candles/live" if live else "data/candles/sim")
+    csv_path = base_dir / f"{market}.csv"
+    if not csv_path.exists():
+        legacy_dir = Path("data/live" if live else "data/sim")
+        legacy = legacy_dir / f"{market}.csv"
+        if legacy.exists():
             addlog(
                 f"[DEPRECATED] Found legacy file {legacy}, use {csv_path}",
                 verbose_int=1,
                 verbose_state=verbose,
             )
-        raise FileNotFoundError(
-            f"Missing data file: {csv_path}. Run: python bot.py --mode fetch --account {account} --market {market}"
-        )
+            csv_path = legacy
+        else:
+            raise FileNotFoundError(
+                f"Missing data file: {csv_path}. Run: python bot.py --mode fetch --account {account} --market {market}"
+            )
 
     df = pd.read_csv(csv_path)
 

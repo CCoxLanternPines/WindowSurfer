@@ -12,7 +12,7 @@ from typing import Dict, Any
 import ccxt
 from tqdm import tqdm
 
-from systems.utils.resolve_symbol import to_tag, resolve_symbols, candle_filename
+from systems.utils.resolve_symbol import to_tag, resolve_symbols
 from systems.scripts.fetch_candles import fetch_kraken_last_n_hours_1h
 from systems.scripts.ledger import load_ledger as load_state_ledger, save_ledger as save_state_ledger
 from systems.scripts.evaluate_buy import evaluate_buy
@@ -27,7 +27,6 @@ from systems.utils.config import (
     load_coin_settings,
     load_account_settings,
     load_keys,
-    resolve_coin_config,
     resolve_account_market,
 )
 from systems.utils.ledger import (
@@ -36,6 +35,16 @@ from systems.utils.ledger import (
     save_ledger as ledger_save,
     load_ledger as ledger_load,
 )
+
+
+def _to_ccxt(market: str) -> str:
+    """Convert a noslash market like ``DOGEUSD`` to ``DOGE/USD``."""
+    market = market.upper()
+    for quote in ("USDT", "USDC", "USD", "EUR", "GBP"):
+        if market.endswith(quote):
+            base = market[: -len(quote)]
+            return f"{base}/{quote}"
+    return market
 
 
 def _run_iteration(
@@ -50,6 +59,8 @@ def _run_iteration(
     market_filter: str | None,
     verbose: int,
 ) -> None:
+    if market_filter:
+        market_filter = market_filter.replace("/", "").upper()
     for acct_name, acct_cfg in accounts_cfg.items():
         if account_filter and acct_name != account_filter:
             continue
@@ -67,21 +78,18 @@ def _run_iteration(
             }
         )
 
-        for market in acct_cfg.get("market settings", {}).keys():
+        for m in acct_cfg.get("market settings", {}).keys():
+            market = m.replace("/", "").upper()
             if market_filter and market != market_filter:
                 continue
 
-            strategy_cfg = {
-                **resolve_coin_config(market, coin_settings),
-                **resolve_account_market(acct_name, market, accounts_cfg),
-            }
-
-            symbols = resolve_symbols(client, market)
+            ccxt_market = _to_ccxt(market)
+            symbols = resolve_symbols(client, ccxt_market)
             kraken_name = symbols["kraken_name"]
             kraken_pair = symbols["kraken_pair"]
             binance_name = symbols["binance_name"]
             tag = to_tag(kraken_name)
-            file_tag = market.replace("/", "_")
+            file_tag = market
             ledger_name = f"{acct_name}_{file_tag}"
 
             # init log file for this ledger
@@ -96,10 +104,10 @@ def _run_iteration(
             trade_ledger = ledger_load(str(ledger_path)) or ledger_init(acct_name, market, "live")
 
             # refresh last 720h from kraken
-            live_file = candle_filename(acct_name, market, live=True)
+            live_file = Path("data/candles/live") / f"{market}.csv"
             df_live = fetch_kraken_last_n_hours_1h(kraken_name, n=720)
-            tmp_live = live_file + ".tmp"
-            os.makedirs(os.path.dirname(live_file), exist_ok=True)
+            tmp_live = str(live_file) + ".tmp"
+            os.makedirs(live_file.parent, exist_ok=True)
             df_live.to_csv(tmp_live, index=False)
             os.replace(tmp_live, live_file)
 
@@ -130,10 +138,13 @@ def _run_iteration(
                 coin_settings,
                 accounts_cfg,
                 acct_name,
-                market,
+                ccxt_market,
                 mode="live",
                 client=client,
                 prev=prev,
+            )
+            state["strategy"].update(
+                resolve_account_market(acct_name, market, accounts_cfg)
             )
             state["mode"] = "live"
             state["symbol"] = tag
@@ -290,6 +301,9 @@ def run_live(
     runtime_states: Dict[str, Dict] = {}
     hist_cache: Dict[str, tuple[float, float]] = {}
 
+    if market:
+        market = market.replace("/", "").upper()
+
     targets = (
         accounts_cfg.keys() if (all_accounts or not account) else [account]
     )
@@ -302,9 +316,10 @@ def run_live(
             print(f"[SKIP] {acct_name} (is_live = false)")
             continue
         for mkt in acct_cfg.get("market settings", {}).keys():
-            if market and mkt != market:
+            m_clean = mkt.replace("/", "").upper()
+            if market and m_clean != market:
                 continue
-            ledger_name = f"{acct_name}_{mkt.replace('/','_')}"
+            ledger_name = f"{acct_name}_{m_clean}"
             init_trade_logger(ledger_name)
 
     account_filter = None if (all_accounts or not account) else account
