@@ -118,6 +118,15 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
     buy_signals, sell_signals = [], []
     decisions_buy, decisions_sell, decisions_hold = [], [], []
 
+    pts = {
+        "a_up": {"x": [], "y": []},
+        "a_down": {"x": [], "y": []},
+    }
+
+    trend_state = "neutral"
+    up_keys = {"1", "5", "6", "7", "8"}
+    down_keys = {"w", "e", "r", "t", "y", "3", "4"}
+
     for t in range(50, len(df)):
         features = extract_features_at_t(brain_cache, t)
         decision, reasons, score, feat_snapshot = run_arbiter(
@@ -131,10 +140,18 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
         if decision == "BUY":
             decisions_buy.append(payload)
             buy_signals.append((x, y))
+            if trend_state == "down":
+                pts["a_up"]["x"].append(x)
+                pts["a_up"]["y"].append(y)
+            trend_state = "up"
             state = "long"
         elif decision == "SELL":
             decisions_sell.append(payload)
             sell_signals.append((x, y))
+            if trend_state == "up":
+                pts["a_down"]["x"].append(x)
+                pts["a_down"]["y"].append(y)
+            trend_state = "down"
             state = "flat"
         else:  # HOLD
             if t % 10 == 0:
@@ -143,12 +160,12 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
     if viz:
         import matplotlib.pyplot as plt
 
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax1 = plt.subplots(figsize=(12, 6))
         fig.tight_layout()
         fig.subplots_adjust(top=0.96, bottom=0.065, left=0.06, right=0.775)
-        ax.plot(df["candle_index"], df["close"], lw=1, color="blue")
+        ax1.plot(df["candle_index"], df["close"], lw=1, color="blue")
 
-        scatter_buy = ax.scatter(
+        scatter_buy = ax1.scatter(
             [d[1] for d in decisions_buy],
             [d[2] for d in decisions_buy],
             color="green",
@@ -157,7 +174,7 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
             label="BUY",
             picker=True,
         )
-        scatter_sell = ax.scatter(
+        scatter_sell = ax1.scatter(
             [d[1] for d in decisions_sell],
             [d[2] for d in decisions_sell],
             color="red",
@@ -166,7 +183,7 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
             label="SELL",
             picker=True,
         )
-        scatter_hold = ax.scatter(
+        scatter_hold = ax1.scatter(
             [d[1] for d in decisions_hold],
             [d[2] for d in decisions_hold],
             color="gray",
@@ -176,18 +193,50 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
             label="HOLD",
             picker=True,
         )
-        ax.legend()
+        ax1.legend()
 
-        info_box = ax.text(
+        info_box = ax1.text(
             1.02,
             0.95,
             "Click a marker",
-            transform=ax.transAxes,
+            transform=ax1.transAxes,
             va="top",
             ha="left",
             fontsize=9,
             bbox=dict(facecolor="white", edgecolor="black", alpha=0.7),
         )
+
+        artists: dict[str, object] = {}
+
+        def ensure_artist(name: str):
+            if name not in artists:
+                if name == "a_up":
+                    artists[name] = ax1.scatter(
+                        pts["a_up"]["x"],
+                        pts["a_up"]["y"],
+                        marker="^",
+                        c="black",
+                        s=200,
+                        zorder=9,
+                        visible=False,
+                    )
+                elif name == "a_down":
+                    artists[name] = ax1.scatter(
+                        pts["a_down"]["x"],
+                        pts["a_down"]["y"],
+                        marker="v",
+                        c="black",
+                        s=200,
+                        zorder=9,
+                        visible=False,
+                    )
+            return artists.get(name)
+
+        def toggle(name: str):
+            art = ensure_artist(name)
+            if art:
+                art.set_visible(not art.get_visible())
+                fig.canvas.draw_idle()
 
         def on_pick(event):
             ind = event.ind[0]
@@ -214,7 +263,24 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
             )
             fig.canvas.draw_idle()
 
+        def on_key(event):
+            k = event.key
+            if k == "a":
+                toggle("a_up")
+                toggle("a_down")
+
         fig.canvas.mpl_connect("pick_event", on_pick)
+        fig.canvas.mpl_connect("key_press_event", on_key)
         plt.show()
 
     print(f"[SIM][{timeframe}] buys={len(buy_signals)} sells={len(sell_signals)}")
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--time", default="1m")
+    parser.add_argument("--viz", action="store_true")
+    args = parser.parse_args()
+    run_simulation(timeframe=args.time, viz=args.viz)
