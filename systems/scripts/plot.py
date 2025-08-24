@@ -34,15 +34,25 @@ def _validate(account: str, market: str) -> None:
 # Public plotting API
 # ---------------------------------------------------------------------------
 
-def plot_trades_from_ledger(account: str, market: str, mode: str) -> None:
+def plot_trades_from_ledger(
+    account: str, market: str, mode: str, ledger_path: str | None = None
+) -> None:
     """Plot candles with BUY/SELL/PASS markers from ledger data."""
     _validate(account, market)
 
+    if ledger_path is None:
+        if mode == "sim":
+            ledger_path = Path("data/temp/sim_data.json")
+        elif mode == "live":
+            ledger_path = Path("data/ledgers") / f"{account}_{market}.json"
+        else:
+            raise ValueError("mode must be 'sim' or 'live'")
+    else:
+        ledger_path = Path(ledger_path)
+
     if mode == "sim":
-        ledger_path = Path("data/ledgers/ledger_simulation.json")
         candles_path = Path("data/candles/sim") / f"{market}.csv"
     elif mode == "live":
-        ledger_path = Path("data/ledgers") / f"{account}_{market}.json"
         candles_path = Path("data/candles/live") / f"{market}.csv"
     else:
         raise ValueError("mode must be 'sim' or 'live'")

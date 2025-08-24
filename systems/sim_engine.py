@@ -378,9 +378,12 @@ def _run_single_sim(
     if default_path.exists() and default_path != sim_path:
         sim_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(default_path, sim_path)
+    temp_dir = resolve_path("data/temp")
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
     ledger_save(
         trade_ledger,
-        str(resolve_path("data/ledgers/ledger_simulation.json")),
+        str(temp_dir / "sim_data.json"),
     )
     logs_dir = root / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)

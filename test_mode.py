@@ -56,7 +56,7 @@ def test_simulation_writes_ledger(monkeypatch):
 
     sim_engine.run_simulation(account="Kris", market="DOGEUSD", timeframe="100y", viz=False)
 
-    ledger_path = Path("data/ledgers/ledger_simulation.json")
+    ledger_path = Path("data/temp/sim_data.json")
     assert ledger_path.exists()
     data = json.loads(ledger_path.read_text())
     sides = {e["side"] for e in data.get("entries", [])}

@@ -94,19 +94,19 @@ def main(argv: Optional[list[str]] = None) -> None:
         timeframe=args.timeframe,
         viz=False,
     )
-
-    ledger_name = f"{args.account}_{normalized_market.replace('/', '_')}"
-    source = Path("data/ledgers") / f"{ledger_name}.json"
-    dest = Path("data/ledgers") / "ledger_simulation.json"
-    if not source.exists():
-        print(f"[ERROR] Ledger not found at {source}")
-        sys.exit(1)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(source.read_text())
+    sim_path = Path("data/temp/sim_data.json")
+    if not sim_path.exists():
+        print(f"[ERROR] Simulation did not produce {sim_path}")
+        return
 
     if args.viz:
         try:
-            plot_trades_from_ledger(args.account, args.market, mode="sim")
+            plot_trades_from_ledger(
+                args.account,
+                args.market,
+                mode="sim",
+                ledger_path=str(sim_path),
+            )
         except Exception as exc:  # pragma: no cover - plotting best effort
             print(f"[WARN] Plotting failed: {exc}")
 
