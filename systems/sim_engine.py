@@ -38,11 +38,18 @@ BUY_MULT_TREND_UP   = 1   # strong up-trend multiplier (cap at +1 normalized)
 BUY_MULT_TREND_FLOOR = .25  # keep 0 so flat maps to 0, no forced minimum
 BUY_MULT_TREND_DOWN = 0   # strong down-trend multiplier (cap at -1 normalized)
 
+# Volatility buy scaling
+BUY_MIN_VOL_BUBBLE = 0
+BUY_MAX_VOL_BUBBLE = 500
+BUY_MULT_VOL_MIN   = 0.25
+BUY_MULT_VOL_MAX   = 1.0
+
+VOL_LOOKBACK = 48   # rolling window for volatility
+
 # Angle thresholds (normalized; 0.0..1.0 where 1.0 = 45°)
 ANGLE_UP_MIN   = 0.01   # require at least +0.20 (~+9°) to start scaling up
 ANGLE_DOWN_MIN = 0.50   # require at least -0.20 (~-9°) to start scaling down
 ANGLE_LOOKBACK = 48     # used for slope angle
-VOL_LOOKBACK   = 48     # number of candles for rolling volatility
 
 _INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
 
@@ -135,6 +142,17 @@ def trend_multiplier_lerp(v: float) -> float:
         # interpolate between 0 and +1
         return BUY_MULT_TREND_FLOOR + (BUY_MULT_TREND_UP - BUY_MULT_TREND_FLOOR) * v
 
+
+def vol_multiplier(vol: float) -> float:
+    """
+    Map rolling volatility into buy multiplier.
+    vol → scaled between BUY_MIN_VOL_BUBBLE and BUY_MAX_VOL_BUBBLE.
+    """
+    # clamp to bubble range
+    v = min(max(vol, BUY_MIN_VOL_BUBBLE), BUY_MAX_VOL_BUBBLE)
+    frac = (v - BUY_MIN_VOL_BUBBLE) / max(1e-9, (BUY_MAX_VOL_BUBBLE - BUY_MIN_VOL_BUBBLE))
+    return BUY_MULT_VOL_MIN + frac * (BUY_MULT_VOL_MAX - BUY_MULT_VOL_MIN)
+
 # ===================== Exhaustion Plot + Trades =====================
 def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     file_path = "data/sim/SOLUSD_1h.csv"
@@ -148,7 +166,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     df["candle_index"] = range(len(df))
 
     df["returns"] = df["close"].pct_change()
-    df["volatility"] = df["returns"].rolling(VOL_LOOKBACK).std()
+    df["volatility"] = df["returns"].rolling(VOL_LOOKBACK).std().fillna(0)
 
     # ----- Exhaustion points and rolling angles -----
     pts = {
@@ -229,16 +247,27 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             bubble = pts["exhaustion_down"]["s"][i]
             total_cap = capital + sum(n["units"] * price for n in open_notes)
             trade_usd = scale_buy_size(bubble, total_cap)
+
+            # angle-based multiplier
             v = row["angle"]
             trend_mult = trend_multiplier_lerp(v)
-            trade_usd *= trend_mult
+
+            # volatility-based multiplier
+            vol = row["volatility"]
+            vol_mult = vol_multiplier(vol)
+
+            # combine
+            trade_usd *= max(BUY_MULT_TREND_FLOOR, trend_mult)
+            trade_usd *= vol_mult
             if trade_usd > 0 and capital >= trade_usd:
                 units = trade_usd / price
                 capital -= trade_usd
                 sell_price = sell_target_from_bubble(price, bubble)
                 open_notes.append({"entry_price": price, "units": units, "sell_price": sell_price})
                 trades.append({"idx": idx, "price": price, "side": "BUY", "usd": trade_usd})
-                print(f"BUY @ idx={idx}, price={price:.2f}, target={sell_price:.2f}")
+                print(
+                    f"BUY @ idx={idx}, price={price:.2f}, angle_mult={trend_mult:.2f}, vol_mult={vol_mult:.2f}, target={sell_price:.2f}"
+                )
 
         # ---- Sell check ----
         closed_notes = []
