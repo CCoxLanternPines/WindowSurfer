@@ -95,6 +95,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         viz=False,
     )
     sim_path = Path("data/temp/sim_data.json")
+    print(f"[DEBUG][sim.py] Looking for sim ledger at {sim_path.resolve()}")
     if not sim_path.exists():
         print(f"[ERROR] Simulation did not produce {sim_path}")
         return

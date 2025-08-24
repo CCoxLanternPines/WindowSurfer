@@ -380,10 +380,14 @@ def _run_single_sim(
         shutil.copyfile(default_path, sim_path)
     temp_dir = resolve_path("data/temp")
     temp_dir.mkdir(parents=True, exist_ok=True)
-
+    full_path = temp_dir / "sim_data.json"
+    print(f"[DEBUG][sim_engine] Attempting to write sim ledger → {full_path.resolve()}")
     ledger_save(
         trade_ledger,
-        str(temp_dir / "sim_data.json"),
+        str(full_path),
+    )
+    print(
+        f"[DEBUG][sim_engine] Finished writing ledger, entries={len(trade_ledger.get('entries', []))}"
     )
     logs_dir = root / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
