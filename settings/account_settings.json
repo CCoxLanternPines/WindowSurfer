@@ -11,36 +11,13 @@
       },
       "market settings": {
         "BTC/USD": {
-          "investment_fraction": 0.25,
-          "investment_percent": 0.01
+          "investment_fraction": 0.25
         },
         "DOGE/USD": {
-          "investment_fraction": 0.25,
-          "investment_percent": 0.01
+          "investment_fraction": 0.25
         },
         "ETH/EUR": {
-          "investment_fraction": 0.25,
-          "investment_percent": 0.01
-        }
-      }
-    },
-    "Travis": {
-      "is_live": false,
-      "reporting": {
-        "email": "valleypapers@gmail.com",
-        "daily": true,
-        "weekly": true,
-        "monthly": true,
-        "yearly": true
-      },
-      "market settings": {
-        "DOGE/USD": {
-          "investment_fraction": 0.65,
-          "investment_percent": 0.01
-        },
-        "SOL/USDC": {
-          "investment_fraction": 0.65,
-          "investment_percent": 0.01
+          "investment_fraction": 0.25
         }
       }
     }
