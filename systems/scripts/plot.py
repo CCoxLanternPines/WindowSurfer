@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import List
+from typing import Any
 
 import matplotlib.pyplot as plt  # type: ignore
 import pandas as pd
@@ -15,10 +15,10 @@ from systems.utils.config import load_account_settings
 
 # ---------------------------------------------------------------------------
 # Internal helpers
-
+# ---------------------------------------------------------------------------
 
 def _validate(account: str, market: str) -> None:
-    """Exit if ``account`` or ``market`` is missing from config."""
+    """Exit if account or market is missing from config."""
     accounts = load_account_settings()
     acct_cfg = accounts.get(account)
     if not acct_cfg:
@@ -32,21 +32,10 @@ def _validate(account: str, market: str) -> None:
 
 # ---------------------------------------------------------------------------
 # Public plotting API
-
+# ---------------------------------------------------------------------------
 
 def plot_trades_from_ledger(account: str, market: str, mode: str) -> None:
-    """Plot candles with trade markers from ledger data.
-
-    Parameters
-    ----------
-    account: str
-        Account name from ``account_settings.json``.
-    market: str
-        Market identifier (e.g. ``DOGEUSD``).
-    mode: str
-        ``"sim"`` for simulation or ``"live"`` for live trading.
-    """
-
+    """Plot candles with BUY/SELL/PASS markers from ledger data."""
     _validate(account, market)
 
     if mode == "sim":
@@ -55,7 +44,7 @@ def plot_trades_from_ledger(account: str, market: str, mode: str) -> None:
     elif mode == "live":
         ledger_path = Path("data/ledgers") / f"{account}_{market}.json"
         candles_path = Path("data/candles/live") / f"{market}.csv"
-    else:  # pragma: no cover - defensive
+    else:
         raise ValueError("mode must be 'sim' or 'live'")
 
     if not ledger_path.exists():
@@ -65,29 +54,27 @@ def plot_trades_from_ledger(account: str, market: str, mode: str) -> None:
         print(f"[ERROR] Candles not found at {candles_path}")
         return
 
-    with ledger_path.open("r", encoding="utf-8") as fh:
-        ledger = json.load(fh)
     df = pd.read_csv(candles_path)
-
-    plt.switch_backend("Agg")
+    times = pd.to_datetime(df["timestamp"], unit="s")
     fig, ax = plt.subplots()
-    ax.plot(df["timestamp"], df["close"], label="Close", color="blue")
+    ax.plot(times, df["close"], label="Close", color="blue")
 
-    entries: List[dict] = ledger.get("entries", [])
-    buys_x: List[float] = []
-    buys_y: List[float] = []
-    sells_x: List[float] = []
-    sells_y: List[float] = []
-    passes_x: List[float] = []
-    passes_y: List[float] = []
-    press_times: List[float] = []
-    press_buy: List[float] = []
-    press_sell: List[float] = []
+    try:
+        with ledger_path.open("r", encoding="utf-8") as fh:
+            ledger: dict[str, Any] = json.load(fh)
+    except Exception:
+        ledger = {}
 
-    for e in entries:
-        ts = e.get("timestamp")
-        price = e.get("price")
-        side = e.get("side")
+    buys_x, buys_y = [], []
+    sells_x, sells_y = [], []
+    pass_x, pass_y = [], []
+    press_buy_x, press_buy_y = [], []
+    press_sell_x, press_sell_y = [], []
+
+    for entry in ledger.get("entries", []):
+        ts = entry.get("timestamp")
+        price = entry.get("price")
+        side = entry.get("side")
         if ts is None or price is None or side is None:
             continue
         if side == "BUY":
@@ -96,42 +83,36 @@ def plot_trades_from_ledger(account: str, market: str, mode: str) -> None:
         elif side == "SELL":
             sells_x.append(ts)
             sells_y.append(price)
-        else:
-            passes_x.append(ts)
-            passes_y.append(price)
-        pb = e.get("pressure_buy")
-        ps = e.get("pressure_sell")
-        if pb is not None or ps is not None:
-            press_times.append(ts)
-            press_buy.append(pb)
-            press_sell.append(ps)
+        elif side == "PASS":
+            pass_x.append(ts)
+            pass_y.append(price)
+
+        if "pressure_buy" in entry:
+            press_buy_x.append(ts)
+            press_buy_y.append(entry["pressure_buy"])
+        if "pressure_sell" in entry:
+            press_sell_x.append(ts)
+            press_sell_y.append(entry["pressure_sell"])
 
     if buys_x:
-        ax.scatter(buys_x, buys_y, color="green", marker="^", label="BUY")
+        ax.scatter(pd.to_datetime(buys_x, unit="s"), buys_y, color="green", marker="^", label="BUY")
     if sells_x:
-        ax.scatter(sells_x, sells_y, color="red", marker="v", label="SELL")
-    if passes_x:
-        ax.scatter(passes_x, passes_y, color="gray", marker=".", label="PASS")
+        ax.scatter(pd.to_datetime(sells_x, unit="s"), sells_y, color="red", marker="v", label="SELL")
+    if pass_x:
+        ax.scatter(pd.to_datetime(pass_x, unit="s"), pass_y, color="gray", marker=".", label="PASS")
 
-    ax.set_xlabel("Timestamp")
-    ax.set_ylabel("Price")
-
-    if press_times:
+    if press_buy_x or press_sell_x:
         ax2 = ax.twinx()
-        if any(p is not None for p in press_buy):
-            ax2.plot(press_times, press_buy, color="green", alpha=0.3, label="Buy Pressure")
-        if any(p is not None for p in press_sell):
-            ax2.plot(press_times, press_sell, color="red", alpha=0.3, label="Sell Pressure")
+        if press_buy_x:
+            ax2.plot(pd.to_datetime(press_buy_x, unit="s"), press_buy_y, color="purple", alpha=0.3, label="pressure_buy")
+        if press_sell_x:
+            ax2.plot(pd.to_datetime(press_sell_x, unit="s"), press_sell_y, color="orange", alpha=0.3, label="pressure_sell")
         ax2.set_ylabel("Pressure")
-        lines, labels = ax.get_legend_handles_labels()
-        lines2, labels2 = ax2.get_legend_handles_labels()
-        ax.legend(lines + lines2, labels + labels2)
-    else:
-        ax.legend()
+        ax2.legend(loc="upper right")
 
-    title = f"{account} {market} ({mode})"
-    ax.set_title(title)
-    plt.xticks(rotation=45)
+    ax.legend(loc="upper left")
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Price")
+    fig.autofmt_xdate()
     plt.tight_layout()
     plt.show()
-

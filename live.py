@@ -33,6 +33,17 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--market", required=True, help="Market symbol e.g. DOGEUSD")
     parser.add_argument("--graph", action="store_true", help="Plot ledger after run")
     args = parser.parse_args(argv)
+    from systems.utils.load_config import load_config
+
+    cfg = load_config()
+    accounts = cfg.get("accounts", {})
+    if args.account not in accounts:
+        print(f"[ERROR] Unknown account: {args.account}")
+        raise SystemExit(1)
+    markets = accounts[args.account].get("markets", {})
+    if args.market not in markets:
+        print(f"[ERROR] Unknown market: {args.market} for account {args.account}")
+        raise SystemExit(1)
 
     accounts_cfg = load_account_settings()
     coin_cfg = load_coin_settings()
@@ -54,9 +65,13 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     if args.graph:
         try:
-            plot_trades_from_ledger(args.account, args.market, mode="live")
-        except Exception as exc:  # pragma: no cover - plotting best effort
-            print(f"[WARN] Plotting failed: {exc}")
+    from systems.scripts.plot import plot_trades_from_ledger
+
+    try:
+        plot_trades_from_ledger(args.account, args.market, mode="live")
+    except Exception as exc:  # pragma: no cover - plotting best effort
+        print(f"[WARN] Plotting failed: {exc}")
+
 
 
 if __name__ == "__main__":  # pragma: no cover

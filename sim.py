@@ -35,7 +35,6 @@ def _ensure_candles(account: str, market: str) -> Path:
     If the canonical file is missing, attempt to fetch it using the
     ``systems.scripts.fetch_candles`` helpers.
     """
-    # Default location as per new layout
     candles_dir = Path("data/candles/sim")
     csv_path = candles_dir / f"{market}.csv"
 
@@ -49,7 +48,6 @@ def _ensure_candles(account: str, market: str) -> Path:
 
     from systems.scripts.fetch_candles import fetch_binance_full_history_1h
 
-    # Best effort symbol normalisation for Binance
     symbol = market.upper()
     if symbol.endswith("USD"):
         symbol = symbol + "T"
@@ -67,8 +65,10 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--viz", action="store_true", help="Enable plotting")
     args = parser.parse_args(argv)
 
+    # Load and validate settings
     accounts_cfg = load_account_settings()
     coin_cfg = load_coin_settings()
+
     acct_cfg = accounts_cfg.get(args.account)
     if not acct_cfg:
         print(f"[ERROR] Unknown account {args.account}")
@@ -76,7 +76,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     if args.market not in acct_cfg.get("market settings", {}):
         print(f"[ERROR] Unknown market {args.market} for account {args.account}")
         sys.exit(1)
-    # merge configs to ensure consistency
+
+    # Merge configs to ensure consistency (unused here but placeholder for future)
     _ = {
         **resolve_coin_config(args.market, coin_cfg),
         **resolve_account_market(args.account, args.market, accounts_cfg),
@@ -95,7 +96,7 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     ledger_name = f"{args.account}_{args.market}"
     source = Path("data/ledgers") / f"{ledger_name}.json"
-    dest = Path("data/ledgers/ledger_simulation.json")
+    dest = Path("data/ledgers") / "ledger_simulation.json"
     if source.exists():
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(source.read_text())
