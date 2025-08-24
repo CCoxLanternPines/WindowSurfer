@@ -25,6 +25,12 @@ BUY_MAX_BUBBLE    = 500
 MIN_NOTE_SIZE_PCT = 0.01    # 1% of portfolio
 MAX_NOTE_SIZE_PCT = 0.05    # 5% of portfolio
 
+# Trend multipliers
+BUY_MULT_TREND_UP   = 1.50  # MTU: e.g., boost buys in strong up-trend
+BUY_MULT_TREND_DOWN = 0.00  # MTD: e.g., disable buys in strong down-trend
+# Center (flat) is implicitly 0 via lerp (no buy from angle alone)
+BUY_MULT_TREND_FLOOR = 0.00  # Set >0 to enforce a minimum buy size even when flat
+
 # Sell scaling (baked into note at buy time)
 SELL_MIN_BUBBLE   = 100
 SELL_MAX_BUBBLE   = 800
@@ -116,6 +122,21 @@ def normalized_angle(series: pd.Series, lookback: int) -> float:
     norm = angle / (np.pi / 4)
     return max(-1, min(1, norm))
 
+
+def lerp_trend_multiplier(v: float, mtd: float, mtu: float) -> float:
+    """
+    Piecewise-linear:
+      v in [-1, 0]:  map -1 -> MTD, 0 -> 0
+      v in [ 0, 1]:  map  0 -> 0,   1 -> MTU
+    """
+    v = max(-1.0, min(1.0, float(v)))
+    if v < 0:
+        # v ∈ [-1,0]: multiplier decreases linearly from MTD at -1 to 0 at 0
+        return mtd * (-v)  # because -v ∈ [0,1]
+    else:
+        # v ∈ [0,1]: multiplier increases linearly from 0 at 0 to MTU at +1
+        return mtu * v
+
 # ===================== Exhaustion Plot + Trades =====================
 def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     file_path = "data/sim/SOLUSD_1h.csv"
@@ -134,6 +155,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         "exhaustion_down": {"x": [], "y": [], "s": []},
     }
     angles = {"x": [], "y": [], "v": []}
+    angle_by_idx = {}
 
     for t in range(LOOKBACK, len(df), WINDOW_STEP):
         now_price = float(df["close"].iloc[t])
@@ -144,6 +166,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         angles["x"].append(int(df["candle_index"].iloc[t]))
         angles["y"].append(now_price)
         angles["v"].append(ang)
+        angle_by_idx[int(df["candle_index"].iloc[t])] = ang
 
         if now_price > past_price:
             delta_up = now_price - past_price
@@ -193,6 +216,9 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             bubble = pts["exhaustion_down"]["s"][i]
             total_cap = capital + sum(n["units"] * price for n in open_notes)
             trade_usd = scale_buy_size(bubble, total_cap)
+            v = angle_by_idx.get(idx, 0.0)  # default flat if no sample
+            trend_mult = lerp_trend_multiplier(v, BUY_MULT_TREND_DOWN, BUY_MULT_TREND_UP)
+            trade_usd *= max(BUY_MULT_TREND_FLOOR, trend_mult)
             if trade_usd > 0 and capital >= trade_usd:
                 units = trade_usd / price
                 capital -= trade_usd
@@ -230,12 +256,18 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
 
         # Plot normalized angles
         for x, y, v in zip(angles["x"], angles["y"], angles["v"]):
+            trend_mult = lerp_trend_multiplier(v, BUY_MULT_TREND_DOWN, BUY_MULT_TREND_UP)
+            if trend_mult == 0:
+                continue  # if 0 don’t plot a trend
+
             if v > 0.1:
                 marker, color = "^", "orange"
             elif v < -0.1:
                 marker, color = "v", "purple"
             else:
+                # v is near 0 but trend_mult might be >0 if you change MTD/MTU later
                 marker, color = "o", "gray"
+
             size = 40 * abs(v) + 10
             ax1.scatter(x, y, marker=marker, c=color, s=size, zorder=5)
 
