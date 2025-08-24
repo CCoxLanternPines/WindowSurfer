@@ -17,24 +17,13 @@ from systems.utils.config import (
 from systems.scripts.plot import plot_trades_from_ledger
 
 
-def _normalize_market(market: str) -> str:
-    """Convert markets like ``DOGEUSD`` to ``DOGE/USD``."""
-    if "/" in market:
-        return market
-    market = market.upper()
-    for quote in ("USDT", "USDC", "USD", "EUR", "GBP"):
-        if market.endswith(quote):
-            base = market[: -len(quote)]
-            return f"{base}/{quote}"
-    return market
-
-
 def _ensure_candles(account: str, market: str) -> Path:
     """Ensure candle CSV exists for ``market``.
 
     If the canonical file is missing, attempt to fetch it using the
     ``systems.scripts.fetch_candles`` helpers.
     """
+    market = market.replace("/", "").upper()
     candles_dir = Path("data/candles/sim")
     csv_path = candles_dir / f"{market}.csv"
 
@@ -48,7 +37,7 @@ def _ensure_candles(account: str, market: str) -> Path:
 
     from systems.scripts.fetch_candles import fetch_binance_full_history_1h
 
-    symbol = market.upper()
+    symbol = market
     if symbol.endswith("USD"):
         symbol = symbol + "T"
     df = fetch_binance_full_history_1h(symbol)
@@ -65,6 +54,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--viz", action="store_true", help="Enable plotting")
     args = parser.parse_args(argv)
 
+    market = args.market.replace("/", "").upper()
+
     # Load and validate settings
     accounts_cfg = load_account_settings()
     coin_cfg = load_coin_settings()
@@ -73,24 +64,23 @@ def main(argv: Optional[list[str]] = None) -> None:
     if not acct_cfg:
         print(f"[ERROR] Unknown account {args.account}")
         sys.exit(1)
-    if args.market not in acct_cfg.get("market settings", {}):
-        print(f"[ERROR] Unknown market {args.market} for account {args.account}")
+    if market not in acct_cfg.get("market settings", {}):
+        print(f"[ERROR] Unknown market {market} for account {args.account}")
         sys.exit(1)
 
     # Merge configs to ensure consistency (unused here but placeholder for future)
     _ = {
-        **resolve_coin_config(args.market, coin_cfg),
-        **resolve_account_market(args.account, args.market, accounts_cfg),
+        **resolve_coin_config(market, coin_cfg),
+        **resolve_account_market(args.account, market, accounts_cfg),
     }
 
-    csv_path = _ensure_candles(args.account, args.market)
+    csv_path = _ensure_candles(args.account, market)
 
     from systems.sim_engine import run_simulation
 
-    normalized_market = _normalize_market(args.market)
     run_simulation(
         account=args.account,
-        market=normalized_market,
+        market=market,
         timeframe=args.timeframe,
         viz=False,
     )
@@ -104,7 +94,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         try:
             plot_trades_from_ledger(
                 args.account,
-                args.market,
+                market,
                 mode="sim",
                 ledger_path=str(sim_path),
             )

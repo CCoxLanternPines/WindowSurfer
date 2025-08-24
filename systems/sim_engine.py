@@ -32,17 +32,26 @@ from systems.utils.config import (
     load_general,
     load_coin_settings,
     load_account_settings,
+    resolve_account_market,
 )
 from systems.utils.resolve_symbol import (
     split_tag,
     resolve_symbols,
     to_tag,
-    sim_path_csv,
-    candle_filename,
 )
 from systems.utils.time import parse_cutoff as parse_timeframe
 from systems.utils.trade_logger import init_logger as init_trade_logger, record_event
 from systems.utils.ledger import init_ledger as ledger_init, append_entry as ledger_append, save_ledger as ledger_save
+
+
+def _to_ccxt(market: str) -> str:
+    """Convert a noslash market like ``DOGEUSD`` to ``DOGE/USD``."""
+    market = market.upper()
+    for quote in ("USDT", "USDC", "USD", "EUR", "GBP"):
+        if market.endswith(quote):
+            base = market[: -len(quote)]
+            return f"{base}/{quote}"
+    return market
 
 
 def _run_single_sim(
@@ -65,7 +74,10 @@ def _run_single_sim(
         verbose_state=verbose,
     )
 
-    symbols = resolve_symbols(client, market)
+    market = market.replace("/", "").upper()
+    ccxt_market = _to_ccxt(market)
+
+    symbols = resolve_symbols(client, ccxt_market)
     kraken_name = symbols["kraken_name"]
     kraken_pair = symbols["kraken_pair"]
     binance_name = symbols["binance_name"]
@@ -77,12 +89,12 @@ def _run_single_sim(
     )
 
     tag = to_tag(kraken_name)
-    file_tag = market.replace("/", "_")
+    file_tag = market
     ledger_name = f"{account}_{file_tag}"
     init_trade_logger(ledger_name)
     base, _ = split_tag(tag)
     coin = base.upper()
-    csv_path = candle_filename(account, market)
+    csv_path = Path("data/candles/sim") / f"{market}.csv"
     df, removed = load_candles_df(account, market, verbose=verbose)
     ts_col = "timestamp"
 
@@ -119,10 +131,13 @@ def _run_single_sim(
         coin_settings,
         accounts_cfg,
         account,
-        market,
+        ccxt_market,
         mode="sim",
         client=client,
         prev={"verbose": verbose},
+    )
+    runtime_state["strategy"].update(
+        resolve_account_market(account, market, accounts_cfg)
     )
     runtime_state["mode"] = "sim"
     runtime_state["symbol"] = tag
@@ -490,6 +505,8 @@ def run_simulation(
     coin_settings = load_coin_settings()
     accounts_cfg = load_account_settings()
     accounts = accounts_cfg
+    if market:
+        market = market.replace("/", "").upper()
     targets = accounts.keys() if (all_accounts or not account) else [account]
     for acct_name in targets:
         acct_cfg = accounts.get(acct_name)
@@ -504,10 +521,11 @@ def run_simulation(
         markets_cfg = acct_cfg.get("market settings", {})
         m_targets = [market] if market else list(markets_cfg.keys())
         for m in m_targets:
-            if m not in markets_cfg:
+            m_clean = m.replace("/", "").upper()
+            if m_clean not in markets_cfg:
                 continue
             addlog(
-                f"[RUN][{acct_name}][{m}]",
+                f"[RUN][{acct_name}][{m_clean}]",
                 verbose_int=1,
                 verbose_state=verbose,
             )
@@ -516,7 +534,7 @@ def run_simulation(
                 coin_settings=coin_settings,
                 accounts_cfg=accounts_cfg,
                 account=acct_name,
-                market=m,
+                market=m_clean,
                 client=client,
                 verbose=verbose,
                 timeframe=timeframe,
