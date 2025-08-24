@@ -174,6 +174,8 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         "valley_e":        {"x": [], "y": []},   # Exhaustion+Div (E)
         "valley_r":        {"x": [], "y": []},   # Drawdown Z + Reversion (R / 3)
         "valley_t":        {"x": [], "y": []},   # Confluence (T)
+
+        "pressure_a":     {"x": [], "y": [], "s": []},
     }
 
     last_exhaustion_decision: int | None = None
@@ -183,6 +185,8 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     # For confluence tracking, keep last indices
     last_idx = defaultdict(lambda: -10)
 
+    trend_data = []
+
     # ----- Iterate bars (lightweight, store only coords) -----
     for t in range(WINDOW_SIZE - 1, len(df), WINDOW_STEP):
         candle = df.iloc[t]
@@ -190,6 +194,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         y = float(candle["close"])
 
         decision, confidence, score = multi_window_vote(df, t, window_sizes=[8, 12, 24, 48])
+        trend_data.append((x, y, decision))
 
         # Key 1: Exhaustion (red/green clusters)
         if decision == 1:  # SELL exhaustion
@@ -332,6 +337,28 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         if is_local_min and near_count >= 2:
             pts["valley_t"]["x"].append(x); pts["valley_t"]["y"].append(y)
 
+    current_trend = None
+    pressure_counter = 0
+    for x, y, decision in trend_data:
+        if decision == 1:
+            trend = "up"
+        elif decision == -1:
+            trend = "down"
+        else:
+            continue
+        if current_trend is None:
+            current_trend = trend
+            pressure_counter = 1
+        elif trend == current_trend:
+            pressure_counter += 1
+        else:
+            size = BASE_SIZE * (pressure_counter ** 2)
+            pts["pressure_a"]["x"].append(x)
+            pts["pressure_a"]["y"].append(y)
+            pts["pressure_a"]["s"].append(size)
+            current_trend = trend
+            pressure_counter = 1
+
     # Key 8: Meta-Filter (rev + div overlap) computed post-loop by proximity
     if pts["reversal"]["x"] and pts["top5"]["x"]:
         i, j = 0, 0
@@ -368,6 +395,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         "valley_e":        None,
         "valley_r":        None,
         "valley_t":        None,
+        "pressure_a":      None,
     }
 
     state = {k: False for k in artists.keys()}
@@ -384,6 +412,14 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         elif name == "reversals":
             artists[name] = ax1.scatter(pts["reversal"]["x"], pts["reversal"]["y"],
                                         c="yellow", s=120, edgecolor="black", zorder=7, visible=False)
+        elif name == "pressure_a":
+            scat1 = ax1.scatter(pts["pressure_a"]["x"], pts["pressure_a"]["y"],
+                                s=pts["pressure_a"]["s"], c="gray", alpha=0.5,
+                                zorder=6, visible=False)
+            scat2 = ax1.scatter(pts["pressure_a"]["x"], pts["pressure_a"]["y"],
+                                s=[s*0.5 for s in pts["pressure_a"]["s"]],
+                                c="black", alpha=0.5, zorder=6, visible=False)
+            artists[name] = (scat1, scat2)
         elif name in ("bottom4","top5","top6","top7","top8","valley_w","valley_e","valley_r","valley_t"):
             style = {
                 "bottom4": dict(c="cyan", marker="v", s=100, zorder=6),
@@ -441,6 +477,8 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             toggle("valley_e")
         elif k == "t":
             toggle("valley_t")
+        elif k == "a":
+            toggle("pressure_a")
         # ignore q to avoid closing figure
 
     fig.canvas.mpl_connect("key_press_event", on_key)
