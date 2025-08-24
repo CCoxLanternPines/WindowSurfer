@@ -4,10 +4,14 @@
       "is_live": true,
       "reporting": {
         "email": "christiancox@verizon.net",
-        "daily": true,
-        "weekly": true,
-        "monthly": true,
-        "yearly": true
+        "daily": false,
+        "weekly": false,
+        "monthly": false,
+        "yearly": false
+      },
+      "kraken_api": {
+        "key": "YOUR_API_KEY",
+        "secret": "YOUR_API_SECRET"
       },
       "market settings": {
         "BTC/USD": {
