@@ -57,8 +57,19 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--time", dest="timeframe", default="1m", help="Lookback window")
     parser.add_argument("--viz", action="store_true", help="Enable plotting")
     args = parser.parse_args(argv)
+    from systems.utils.load_config import load_config
 
-    csv_path = _ensure_candles(args.account, args.market)
+    cfg = load_config()
+    accounts = cfg.get("accounts", {})
+    if args.account not in accounts:
+        print(f"[ERROR] Unknown account: {args.account}")
+        raise SystemExit(1)
+    markets = accounts[args.account].get("markets", {})
+    if args.market not in markets:
+        print(f"[ERROR] Unknown market: {args.market} for account {args.account}")
+        raise SystemExit(1)
+
+    _ensure_candles(args.account, args.market)
 
     from systems.sim_engine import run_simulation
 
@@ -71,14 +82,14 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     ledger_name = f"{args.account}_{args.market}"
     source = Path("data/ledgers") / f"{ledger_name}.json"
-    dest = Path("ledger_simulation.json")
+    dest = Path("data/ledgers") / "ledger_simulation.json"
     if source.exists():
         dest.write_text(source.read_text())
 
     if args.viz:
         try:
-            import graph
-            graph.plot(str(dest), str(csv_path))
+            from systems.scripts.plot import plot_trades_from_ledger
+            plot_trades_from_ledger(args.account, args.market, mode="sim")
         except Exception as exc:  # pragma: no cover - plotting best effort
             print(f"[WARN] Plotting failed: {exc}")
 
