@@ -11,7 +11,9 @@ import numpy as np
 
 # ===================== Parameters =====================
 WINDOW_SIZE      = 184
-LOOKBACK         = 184
+# Lookbacks
+EXHAUSTION_LOOKBACK = 92   # used for bubble delta
+ANGLE_LOOKBACK      = 92   # used for slope angle
 SIZE_SCALAR      = 1_000_000
 SIZE_POWER       = 3
 
@@ -159,32 +161,34 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     }
     df["angle"] = 0.0
 
-    for t in range(LOOKBACK, len(df)):
-        start_idx = int(df["candle_index"].iloc[t - LOOKBACK])
-        end_idx = int(df["candle_index"].iloc[t])
-        start_price = float(df["close"].iloc[t - LOOKBACK])
-        end_price = float(df["close"].iloc[t])
-
-        dy = end_price - start_price
-        dx = LOOKBACK
+    # Rolling slope calculation
+    for t in range(ANGLE_LOOKBACK, len(df)):
+        dy = df["close"].iloc[t] - df["close"].iloc[t - ANGLE_LOOKBACK]
+        dx = ANGLE_LOOKBACK
         angle = np.arctan2(dy, dx)
         norm = angle / (np.pi / 4)
         df.at[t, "angle"] = max(-1.0, min(1.0, norm))
 
-        if end_price > start_price:
-            delta_up = end_price - start_price
-            norm_up = delta_up / max(1e-9, start_price)
+    # Exhaustion bubbles
+    for t in range(EXHAUSTION_LOOKBACK, len(df)):
+        now_price = float(df["close"].iloc[t])
+        past_price = float(df["close"].iloc[t - EXHAUSTION_LOOKBACK])
+        end_idx = int(df["candle_index"].iloc[t])
+
+        if now_price > past_price:
+            delta_up = now_price - past_price
+            norm_up = delta_up / max(1e-9, past_price)
             size = SIZE_SCALAR * (norm_up ** SIZE_POWER)
             pts["exhaustion_up"]["x"].append(end_idx)
-            pts["exhaustion_up"]["y"].append(end_price)
+            pts["exhaustion_up"]["y"].append(now_price)
             pts["exhaustion_up"]["s"].append(size)
 
-        elif end_price < start_price:
-            delta_down = start_price - end_price
-            norm_down = delta_down / max(1e-9, start_price)
+        elif now_price < past_price:
+            delta_down = past_price - now_price
+            norm_down = delta_down / max(1e-9, past_price)
             size = SIZE_SCALAR * (norm_down ** SIZE_POWER)
             pts["exhaustion_down"]["x"].append(end_idx)
-            pts["exhaustion_down"]["y"].append(end_price)
+            pts["exhaustion_down"]["y"].append(now_price)
             pts["exhaustion_down"]["s"].append(size)
 
     # ===== Candle-by-candle simulation =====
@@ -256,7 +260,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         # Plot rolling slope arrows
         for i, r in df.iterrows():
             v = r["angle"]
-            if i < LOOKBACK:
+            if i < ANGLE_LOOKBACK:
                 continue
             if v > 0.05:
                 color = "orange"
