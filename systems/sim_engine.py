@@ -17,6 +17,7 @@ SIZE_SCALAR      = 1_000_000
 SIZE_POWER       = 3
 
 START_CAPITAL    = 10_000   # starting cash in USDT
+MONTHLY_TOPUP    = 1_000    # fixed USDT injected each calendar month
 
 # Buy scaling
 BUY_MIN_BUBBLE    = 100
@@ -149,8 +150,26 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     trades = []
     capital = START_CAPITAL
     open_notes = []
+    last_month = None
 
     for idx, row in df.iterrows():
+        dt = None
+        if 'timestamp' in row:
+            ts = float(row['timestamp'])
+            is_ms = ts > 1e12
+            dt = datetime.fromtimestamp(ts / (1000 if is_ms else 1), tz=timezone.utc)
+        elif 'datetime' in row:
+            try:
+                dt = pd.to_datetime(row['datetime'], utc=True).to_pydatetime()
+            except Exception:
+                dt = None
+        if dt is not None:
+            current_month = (dt.year, dt.month)
+            if current_month != last_month:
+                capital += MONTHLY_TOPUP
+                last_month = current_month
+                print(f"Monthly top-up: +{MONTHLY_TOPUP} USDT at {dt.date()} → Capital={capital:.2f}")
+
         price = row["close"]
 
         # ---- Buy check ----
