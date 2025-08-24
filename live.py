@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 from typing import Optional
 
 
@@ -25,17 +24,26 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--market", required=True, help="Market symbol e.g. DOGEUSD")
     parser.add_argument("--graph", action="store_true", help="Plot ledger after run")
     args = parser.parse_args(argv)
+    from systems.utils.load_config import load_config
+
+    cfg = load_config()
+    accounts = cfg.get("accounts", {})
+    if args.account not in accounts:
+        print(f"[ERROR] Unknown account: {args.account}")
+        raise SystemExit(1)
+    markets = accounts[args.account].get("markets", {})
+    if args.market not in markets:
+        print(f"[ERROR] Unknown market: {args.market} for account {args.account}")
+        raise SystemExit(1)
 
     from systems.live_engine import run_live
 
     run_live(account=args.account, market=_normalize_market(args.market))
 
     if args.graph:
-        ledger_path = Path("data/ledgers") / f"{args.account}_{args.market}.json"
-        candles_path = Path("data/live") / f"{args.market}.csv"
         try:
-            import graph
-            graph.plot(str(ledger_path), str(candles_path))
+            from systems.scripts.plot import plot_trades_from_ledger
+            plot_trades_from_ledger(args.account, args.market, mode="live")
         except Exception as exc:  # pragma: no cover - plotting best effort
             print(f"[WARN] Plotting failed: {exc}")
 
