@@ -119,29 +119,20 @@ def sell_target_from_bubble(entry_price: float, s: float) -> float:
     frac = (s_clamped - SELL_MIN_BUBBLE) / (SELL_MAX_BUBBLE - SELL_MIN_BUBBLE)
     maturity = MIN_MATURITY + frac * (MAX_MATURITY - MIN_MATURITY)
     return entry_price * (1 + maturity)
-def trend_multiplier_thresholded(v: float) -> float:
+def trend_multiplier_lerp(v: float) -> float:
     """
-    Thresholded, piecewise-linear mapping with a dead zone around 0:
-      - If |v| < threshold ⇒ 0 (flat always 0)
-      - If v <= -ANGLE_DOWN_MIN ⇒ scale linearly from threshold to -1 up to BUY_MULT_TREND_DOWN
-      - If v >=  ANGLE_UP_MIN   ⇒ scale linearly from threshold to +1 up to BUY_MULT_TREND_UP
+    Linear interpolation of multiplier from angle:
+      v=-1 → BUY_MULT_TREND_DOWN
+      v= 0 → BUY_MULT_TREND_FLOOR
+      v=+1 → BUY_MULT_TREND_UP
     """
-    v = float(max(-1.0, min(1.0, v)))
-
-    # Flat dead zone: always 0
-    if -ANGLE_DOWN_MIN < v < ANGLE_UP_MIN:
-        return 0.0
-
-    if v <= -ANGLE_DOWN_MIN:
-        # Map v∈[-1,-ANGLE_DOWN_MIN] → mult∈[BUY_MULT_TREND_DOWN, 0]
-        span = 1.0 - ANGLE_DOWN_MIN
-        frac = (abs(v) - ANGLE_DOWN_MIN) / span  # 0 at threshold → 1 at -1
-        return BUY_MULT_TREND_DOWN * frac
-
-    # v >= ANGLE_UP_MIN
-    span = 1.0 - ANGLE_UP_MIN
-    frac = (v - ANGLE_UP_MIN) / span            # 0 at threshold → 1 at +1
-    return BUY_MULT_TREND_UP * frac
+    v = max(-1.0, min(1.0, float(v)))
+    if v < 0:
+        # interpolate between -1 and 0
+        return BUY_MULT_TREND_DOWN + (BUY_MULT_TREND_FLOOR - BUY_MULT_TREND_DOWN) * (v + 1)
+    else:
+        # interpolate between 0 and +1
+        return BUY_MULT_TREND_FLOOR + (BUY_MULT_TREND_UP - BUY_MULT_TREND_FLOOR) * v
 
 # ===================== Exhaustion Plot + Trades =====================
 def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
@@ -225,8 +216,8 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             total_cap = capital + sum(n["units"] * price for n in open_notes)
             trade_usd = scale_buy_size(bubble, total_cap)
             v = row["angle"]
-            trend_mult = trend_multiplier_thresholded(v)
-            trade_usd *= max(BUY_MULT_TREND_FLOOR, trend_mult)
+            trend_mult = trend_multiplier_lerp(v)
+            trade_usd *= trend_mult
             if trade_usd > 0 and capital >= trade_usd:
                 units = trade_usd / price
                 capital -= trade_usd
