@@ -175,8 +175,10 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         "valley_r":        {"x": [], "y": []},   # Drawdown Z + Reversion (R / 3)
         "valley_t":        {"x": [], "y": []},   # Confluence (T)
 
+
         "pressure_a_top":    {"x": [], "y": [], "s": []},
         "pressure_a_bottom": {"x": [], "y": [], "s": []},
+
     }
 
     last_exhaustion_decision: int | None = None
@@ -341,8 +343,10 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     current_trend = None
     pressure_counter = 0
     for x, y, decision in trend_data:
+
         trend = "up" if decision == 1 else "down" if decision == -1 else None
         if trend is None:
+
             continue
         if current_trend is None:
             current_trend = trend
@@ -350,6 +354,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         elif trend == current_trend:
             pressure_counter += 1
         else:
+
             size = BASE_SIZE * (pressure_counter ** 2) * 0.5
             if current_trend == "up" and trend == "down":
                 pts["pressure_a_top"]["x"].append(x)
@@ -359,6 +364,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
                 pts["pressure_a_bottom"]["x"].append(x)
                 pts["pressure_a_bottom"]["y"].append(y)
                 pts["pressure_a_bottom"]["s"].append(size)
+
             current_trend = trend
             pressure_counter = 1
 
@@ -416,6 +422,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             artists[name] = ax1.scatter(pts["reversal"]["x"], pts["reversal"]["y"],
                                         c="yellow", s=120, edgecolor="black", zorder=7, visible=False)
         elif name == "pressure_a":
+
             scat_top = ax1.scatter(
                 pts["pressure_a_top"]["x"],
                 pts["pressure_a_top"]["y"],
@@ -437,6 +444,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
                 visible=False,
             )
             artists[name] = (scat_top, scat_bottom)
+
         elif name in ("bottom4","top5","top6","top7","top8","valley_w","valley_e","valley_r","valley_t"):
             style = {
                 "bottom4": dict(c="cyan", marker="v", s=100, zorder=6),
