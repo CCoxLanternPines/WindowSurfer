@@ -32,10 +32,13 @@ MIN_MATURITY      = 0.03    # 0% gain (sell at entry)
 MAX_MATURITY      = .25     # 100% gain (2x entry)
 
 # Trend multipliers
-BUY_MULT_TREND_UP   = 4  # MTU: e.g., boost buys in strong up-trend
-BUY_MULT_TREND_DOWN = 1  # MTD: e.g., disable buys in strong down-trend
-# Center (flat) is implicitly 0 via lerp (no buy from angle alone)
-BUY_MULT_TREND_FLOOR = 0  # Set >0 to enforce a minimum buy size even when flat
+BUY_MULT_TREND_UP   = 4   # strong up-trend multiplier (cap at +1 normalized)
+BUY_MULT_TREND_DOWN = 1   # strong down-trend multiplier (cap at -1 normalized)
+BUY_MULT_TREND_FLOOR = 0  # keep 0 so flat maps to 0, no forced minimum
+
+# Angle thresholds (normalized; 0.0..1.0 where 1.0 = 45°)
+ANGLE_UP_MIN   = 0.20   # require at least +0.20 (~+9°) to start scaling up
+ANGLE_DOWN_MIN = 0.20   # require at least -0.20 (~-9°) to start scaling down
 
 
 _INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
@@ -124,19 +127,29 @@ def normalized_angle(series: pd.Series, lookback: int) -> float:
     return max(-1, min(1, norm))
 
 
-def lerp_trend_multiplier(v: float, mtd: float, mtu: float) -> float:
+def trend_multiplier_thresholded(v: float) -> float:
     """
-    Piecewise-linear:
-      v in [-1, 0]:  map -1 -> MTD, 0 -> 0
-      v in [ 0, 1]:  map  0 -> 0,   1 -> MTU
+    Thresholded, piecewise-linear mapping with a dead zone around 0:
+      - If |v| < threshold ⇒ 0 (flat always 0)
+      - If v <= -ANGLE_DOWN_MIN ⇒ scale linearly from threshold to -1 up to BUY_MULT_TREND_DOWN
+      - If v >=  ANGLE_UP_MIN   ⇒ scale linearly from threshold to +1 up to BUY_MULT_TREND_UP
     """
-    v = max(-1.0, min(1.0, float(v)))
-    if v < 0:
-        # v ∈ [-1,0]: multiplier decreases linearly from MTD at -1 to 0 at 0
-        return mtd * (-v)  # because -v ∈ [0,1]
-    else:
-        # v ∈ [0,1]: multiplier increases linearly from 0 at 0 to MTU at +1
-        return mtu * v
+    v = float(max(-1.0, min(1.0, v)))
+
+    # Flat dead zone: always 0
+    if -ANGLE_DOWN_MIN < v < ANGLE_UP_MIN:
+        return 0.0
+
+    if v <= -ANGLE_DOWN_MIN:
+        # Map v∈[-1,-ANGLE_DOWN_MIN] → mult∈[BUY_MULT_TREND_DOWN, 0]
+        span = 1.0 - ANGLE_DOWN_MIN
+        frac = (abs(v) - ANGLE_DOWN_MIN) / span  # 0 at threshold → 1 at -1
+        return BUY_MULT_TREND_DOWN * frac
+
+    # v >= ANGLE_UP_MIN
+    span = 1.0 - ANGLE_UP_MIN
+    frac = (v - ANGLE_UP_MIN) / span            # 0 at threshold → 1 at +1
+    return BUY_MULT_TREND_UP * frac
 
 # ===================== Exhaustion Plot + Trades =====================
 def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
@@ -217,8 +230,8 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             bubble = pts["exhaustion_down"]["s"][i]
             total_cap = capital + sum(n["units"] * price for n in open_notes)
             trade_usd = scale_buy_size(bubble, total_cap)
-            v = angle_by_idx.get(idx, 0.0)  # default flat if no sample
-            trend_mult = lerp_trend_multiplier(v, BUY_MULT_TREND_DOWN, BUY_MULT_TREND_UP)
+            v = angle_by_idx.get(idx, 0.0)
+            trend_mult = trend_multiplier_thresholded(v)
             trade_usd *= max(BUY_MULT_TREND_FLOOR, trend_mult)
             if trade_usd > 0 and capital >= trade_usd:
                 units = trade_usd / price
@@ -257,19 +270,16 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
 
         # Plot normalized angles
         for x, y, v in zip(angles["x"], angles["y"], angles["v"]):
-            trend_mult = lerp_trend_multiplier(v, BUY_MULT_TREND_DOWN, BUY_MULT_TREND_UP)
-            if trend_mult == 0:
-                continue  # if 0 don’t plot a trend
+            mult = trend_multiplier_thresholded(v)
+            if mult == 0.0:
+                continue  # 0 = flat or below thresholds → no trend plot
 
-            if v > 0.1:
+            if v > 0:
                 marker, color = "^", "orange"
-            elif v < -0.1:
-                marker, color = "v", "purple"
             else:
-                # v is near 0 but trend_mult might be >0 if you change MTD/MTU later
-                marker, color = "o", "gray"
+                marker, color = "v", "purple"
 
-            size = 40 * abs(v) + 10
+            size = 10 + 40 * min(1.0, abs(v))  # visual weight with angle magnitude
             ax1.scatter(x, y, marker=marker, c=color, s=size, zorder=5)
 
         # Plot trades
