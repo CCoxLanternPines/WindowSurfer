@@ -1,14 +1,5 @@
 {
   "general_settings": {
-    "max_note_usdt": 99999.0,
-    "minimum_note_size": 10,
-    "simulation_capital": 1000,
-    "email": {
-      "enabled": true,
-      "daily": true,
-      "weekly": false,
-      "monthly": false,
-      "yearly": true
-    }
+    "simulation_capital": 1000
   }
 }
