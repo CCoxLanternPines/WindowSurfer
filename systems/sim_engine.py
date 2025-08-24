@@ -175,7 +175,10 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         "valley_r":        {"x": [], "y": []},   # Drawdown Z + Reversion (R / 3)
         "valley_t":        {"x": [], "y": []},   # Confluence (T)
 
-        "pressure_a":     {"x": [], "y": [], "s": []},
+
+        "pressure_a_top":    {"x": [], "y": [], "s": []},
+        "pressure_a_bottom": {"x": [], "y": [], "s": []},
+
     }
 
     last_exhaustion_decision: int | None = None
@@ -340,11 +343,10 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     current_trend = None
     pressure_counter = 0
     for x, y, decision in trend_data:
-        if decision == 1:
-            trend = "up"
-        elif decision == -1:
-            trend = "down"
-        else:
+
+        trend = "up" if decision == 1 else "down" if decision == -1 else None
+        if trend is None:
+
             continue
         if current_trend is None:
             current_trend = trend
@@ -352,10 +354,17 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         elif trend == current_trend:
             pressure_counter += 1
         else:
-            size = BASE_SIZE * (pressure_counter ** 2)
-            pts["pressure_a"]["x"].append(x)
-            pts["pressure_a"]["y"].append(y)
-            pts["pressure_a"]["s"].append(size)
+
+            size = BASE_SIZE * (pressure_counter ** 2) * 0.5
+            if current_trend == "up" and trend == "down":
+                pts["pressure_a_top"]["x"].append(x)
+                pts["pressure_a_top"]["y"].append(y)
+                pts["pressure_a_top"]["s"].append(size)
+            elif current_trend == "down" and trend == "up":
+                pts["pressure_a_bottom"]["x"].append(x)
+                pts["pressure_a_bottom"]["y"].append(y)
+                pts["pressure_a_bottom"]["s"].append(size)
+
             current_trend = trend
             pressure_counter = 1
 
@@ -413,13 +422,29 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             artists[name] = ax1.scatter(pts["reversal"]["x"], pts["reversal"]["y"],
                                         c="yellow", s=120, edgecolor="black", zorder=7, visible=False)
         elif name == "pressure_a":
-            scat1 = ax1.scatter(pts["pressure_a"]["x"], pts["pressure_a"]["y"],
-                                s=pts["pressure_a"]["s"], c="gray", alpha=0.5,
-                                zorder=6, visible=False)
-            scat2 = ax1.scatter(pts["pressure_a"]["x"], pts["pressure_a"]["y"],
-                                s=[s*0.5 for s in pts["pressure_a"]["s"]],
-                                c="black", alpha=0.5, zorder=6, visible=False)
-            artists[name] = (scat1, scat2)
+
+            scat_top = ax1.scatter(
+                pts["pressure_a_top"]["x"],
+                pts["pressure_a_top"]["y"],
+                s=pts["pressure_a_top"]["s"],
+                c="gray",
+                alpha=1,
+                marker="o",
+                zorder=6,
+                visible=False,
+            )
+            scat_bottom = ax1.scatter(
+                pts["pressure_a_bottom"]["x"],
+                pts["pressure_a_bottom"]["y"],
+                s=pts["pressure_a_bottom"]["s"],
+                c="black",
+                alpha=1,
+                marker="s",
+                zorder=6,
+                visible=False,
+            )
+            artists[name] = (scat_top, scat_bottom)
+
         elif name in ("bottom4","top5","top6","top7","top8","valley_w","valley_e","valley_r","valley_t"):
             style = {
                 "bottom4": dict(c="cyan", marker="v", s=100, zorder=6),
