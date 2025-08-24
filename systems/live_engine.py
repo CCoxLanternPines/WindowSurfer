@@ -1,9 +1,24 @@
 from __future__ import annotations
 
 import time
+import numpy as np
 import pandas as pd
 
 from .metabrain.engine_utils import cache_all_brains, trade_all_brains
+
+
+WINDOW_SIZE = 24
+WINDOW_STEP = 2
+LOOKBACK = WINDOW_SIZE
+
+
+def normalized_angle(series: pd.Series, lookback: int) -> float:
+    """Return slope angle normalized to [-1,1] over the lookback."""
+    dy = series.iloc[-1] - series.iloc[0]
+    dx = lookback
+    angle = np.arctan2(dy, dx)
+    norm = angle / (np.pi / 4)
+    return max(-1.0, min(1.0, norm))
 
 
 def get_recent_candles(timeframe: str) -> pd.DataFrame:

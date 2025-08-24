@@ -4,6 +4,7 @@ import re
 from datetime import timedelta, datetime, timezone
 import os
 
+import numpy as np
 import pandas as pd
 
 from .metabrain.engine_utils import cache_all_brains, extract_features_at_t
@@ -29,9 +30,19 @@ INTERVAL_SECONDS = {
 
 WINDOW_SIZE = 24
 WINDOW_STEP = 2
+LOOKBACK = WINDOW_SIZE
 CLUSTER_WINDOW = 10
 BASE_SIZE = 10
 SCALE_POWER = 2
+
+
+def normalized_angle(series: pd.Series, lookback: int) -> float:
+    """Return slope angle normalized to [-1,1] over the given lookback."""
+    dy = series.iloc[-1] - series.iloc[0]
+    dx = lookback
+    angle = np.arctan2(dy, dx)
+    norm = angle / (np.pi / 4)
+    return max(-1.0, min(1.0, norm))
 
 def parse_timeframe(tf: str) -> timedelta | None:
     """Parse strings like '12h', '3d', '1m', '6w' into timedelta."""
@@ -117,8 +128,10 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
     state = "flat"
     buy_signals, sell_signals = [], []
     decisions_buy, decisions_sell, decisions_hold = [], [], []
+    angles = {"x": [], "y": [], "v": []}
 
-    for t in range(50, len(df)):
+    start = max(LOOKBACK, 50)
+    for t in range(start, len(df), WINDOW_STEP):
         features = extract_features_at_t(brain_cache, t)
         decision, reasons, score, feat_snapshot = run_arbiter(
             features, state, debug=True, return_score=True
@@ -126,6 +139,11 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
 
         x = int(df["candle_index"].iloc[t])
         y = float(df["close"].iloc[t])
+        angle_val = normalized_angle(df["close"].iloc[t - LOOKBACK : t + 1], LOOKBACK)
+        angles["x"].append(x)
+        angles["y"].append(y)
+        angles["v"].append(angle_val)
+
         payload = (decision, x, y, reasons, score, feat_snapshot)
 
         if decision == "BUY":
@@ -176,6 +194,48 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
             label="HOLD",
             picker=True,
         )
+        angles_up = [
+            (angles["x"][i], angles["y"][i])
+            for i, v in enumerate(angles["v"])
+            if v > 0.5
+        ]
+        angles_down = [
+            (angles["x"][i], angles["y"][i])
+            for i, v in enumerate(angles["v"])
+            if v < -0.5
+        ]
+        angles_flat = [
+            (angles["x"][i], angles["y"][i])
+            for i, v in enumerate(angles["v"])
+            if -0.5 <= v <= 0.5
+        ]
+        if angles_up:
+            ax.scatter(
+                [x for x, _ in angles_up],
+                [y for _, y in angles_up],
+                color="orange",
+                marker="^",
+                s=30,
+                label="angle +1",
+            )
+        if angles_down:
+            ax.scatter(
+                [x for x, _ in angles_down],
+                [y for _, y in angles_down],
+                color="purple",
+                marker="v",
+                s=30,
+                label="angle -1",
+            )
+        if angles_flat:
+            ax.scatter(
+                [x for x, _ in angles_flat],
+                [y for _, y in angles_flat],
+                color="black",
+                marker=".",
+                s=20,
+                label="angle 0",
+            )
         ax.legend()
 
         info_box = ax.text(
@@ -216,5 +276,8 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
 
         fig.canvas.mpl_connect("pick_event", on_pick)
         plt.show()
+
+    else:
+        print("[ANGLES]", angles["v"])
 
     print(f"[SIM][{timeframe}] buys={len(buy_signals)} sells={len(sell_signals)}")
