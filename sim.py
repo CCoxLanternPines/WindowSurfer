@@ -87,19 +87,22 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     from systems.sim_engine import run_simulation
 
+    normalized_market = _normalize_market(args.market)
     run_simulation(
         account=args.account,
-        market=_normalize_market(args.market),
+        market=normalized_market,
         timeframe=args.timeframe,
-        viz=args.viz,
+        viz=False,
     )
 
-    ledger_name = f"{args.account}_{args.market}"
+    ledger_name = f"{args.account}_{normalized_market.replace('/', '_')}"
     source = Path("data/ledgers") / f"{ledger_name}.json"
     dest = Path("data/ledgers") / "ledger_simulation.json"
-    if source.exists():
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(source.read_text())
+    if not source.exists():
+        print(f"[ERROR] Ledger not found at {source}")
+        sys.exit(1)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(source.read_text())
 
     if args.viz:
         try:
