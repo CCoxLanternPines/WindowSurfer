@@ -171,7 +171,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         df.at[t, "angle"] = max(-1.0, min(1.0, norm))
 
     # Exhaustion bubbles
-    for t in range(EXHAUSTION_LOOKBACK, len(df)):
+    for t in range(EXHAUSTION_LOOKBACK, len(df), WINDOW_STEP):
         now_price = float(df["close"].iloc[t])
         past_price = float(df["close"].iloc[t - EXHAUSTION_LOOKBACK])
         end_idx = int(df["candle_index"].iloc[t])
