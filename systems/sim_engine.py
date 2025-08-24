@@ -11,7 +11,6 @@ import numpy as np
 
 # ===================== Parameters =====================
 WINDOW_SIZE      = 184
-WINDOW_STEP      = 24
 LOOKBACK         = 184
 SIZE_SCALAR      = 1_000_000
 SIZE_POWER       = 3
@@ -117,16 +116,6 @@ def sell_target_from_bubble(entry_price: float, s: float) -> float:
     frac = (s_clamped - SELL_MIN_BUBBLE) / (SELL_MAX_BUBBLE - SELL_MIN_BUBBLE)
     maturity = MIN_MATURITY + frac * (MAX_MATURITY - MIN_MATURITY)
     return entry_price * (1 + maturity)
-
-
-def normalized_angle(series: pd.Series, lookback: int) -> float:
-    dy = series.iloc[-1] - series.iloc[0]
-    dx = lookback
-    angle = np.arctan2(dy, dx)
-    norm = angle / (np.pi / 4)
-    return max(-1, min(1, norm))
-
-
 def trend_multiplier_thresholded(v: float) -> float:
     """
     Thresholded, piecewise-linear mapping with a dead zone around 0:
@@ -163,42 +152,37 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     df = df.reset_index(drop=True)
     df["candle_index"] = range(len(df))
 
-    # ----- Exhaustion points and angles -----
+    # ----- Exhaustion points and rolling angles -----
     pts = {
         "exhaustion_up":   {"x": [], "y": [], "s": []},
         "exhaustion_down": {"x": [], "y": [], "s": []},
     }
-    angles = {"x": [], "y": [], "v": []}
-    angle_by_idx = {}
-    angle_lines = []  # (x0, y0, x1, y1, v)
+    df["angle"] = 0.0
 
-    for t in range(LOOKBACK, len(df), WINDOW_STEP):
+    for t in range(LOOKBACK, len(df)):
         start_idx = int(df["candle_index"].iloc[t - LOOKBACK])
         end_idx = int(df["candle_index"].iloc[t])
         start_price = float(df["close"].iloc[t - LOOKBACK])
         end_price = float(df["close"].iloc[t])
 
-        window_series = df["close"].iloc[t - LOOKBACK : t + 1]
-        ang = normalized_angle(window_series, LOOKBACK)
-
-        angle_lines.append((start_idx, start_price, end_idx, end_price, ang))
-        angles["x"].append(end_idx)
-        angles["y"].append(end_price)
-        angles["v"].append(ang)
-        angle_by_idx[end_idx] = ang
+        dy = end_price - start_price
+        dx = LOOKBACK
+        angle = np.arctan2(dy, dx)
+        norm = angle / (np.pi / 4)
+        df.at[t, "angle"] = max(-1.0, min(1.0, norm))
 
         if end_price > start_price:
             delta_up = end_price - start_price
-            norm = delta_up / max(1e-9, start_price)
-            size = SIZE_SCALAR * (norm ** SIZE_POWER)
+            norm_up = delta_up / max(1e-9, start_price)
+            size = SIZE_SCALAR * (norm_up ** SIZE_POWER)
             pts["exhaustion_up"]["x"].append(end_idx)
             pts["exhaustion_up"]["y"].append(end_price)
             pts["exhaustion_up"]["s"].append(size)
 
         elif end_price < start_price:
             delta_down = start_price - end_price
-            norm = delta_down / max(1e-9, start_price)
-            size = SIZE_SCALAR * (norm ** SIZE_POWER)
+            norm_down = delta_down / max(1e-9, start_price)
+            size = SIZE_SCALAR * (norm_down ** SIZE_POWER)
             pts["exhaustion_down"]["x"].append(end_idx)
             pts["exhaustion_down"]["y"].append(end_price)
             pts["exhaustion_down"]["s"].append(size)
@@ -235,7 +219,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             bubble = pts["exhaustion_down"]["s"][i]
             total_cap = capital + sum(n["units"] * price for n in open_notes)
             trade_usd = scale_buy_size(bubble, total_cap)
-            v = angle_by_idx.get(idx, 0.0)
+            v = row["angle"]
             trend_mult = trend_multiplier_thresholded(v)
             trade_usd *= max(BUY_MULT_TREND_FLOOR, trend_mult)
             if trade_usd > 0 and capital >= trade_usd:
@@ -269,33 +253,25 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         ax1.set_ylabel("Price")
         ax1.grid(True)
 
-        # Plot angle direction lines
-        for (x0, y0, x1, y1, v) in angle_lines:
+        # Plot rolling slope arrows
+        for i, r in df.iterrows():
+            v = r["angle"]
+            if i < LOOKBACK:
+                continue
             if v > 0.05:
                 color = "orange"
             elif v < -0.05:
                 color = "purple"
             else:
                 color = "gray"
-            ax1.plot([x0, x1], [y0, y1], color=color, linewidth=2, alpha=0.7)
+            x0, y0 = r["candle_index"], r["close"]
+            x1 = x0 + 5
+            y1 = y0 + v * 5
+            ax1.plot([x0, x1], [y0, y1], color=color, lw=1.5, alpha=0.7)
 
         # Plot exhaustion bubbles
         ax1.scatter(pts["exhaustion_down"]["x"], pts["exhaustion_down"]["y"],
                     s=pts["exhaustion_down"]["s"], c="green", alpha=0.3, edgecolor="black")
-
-        # Plot normalized angles
-        for x, y, v in zip(angles["x"], angles["y"], angles["v"]):
-            mult = trend_multiplier_thresholded(v)
-            if mult == 0.0:
-                continue  # 0 = flat or below thresholds → no trend plot
-
-            if v > 0:
-                marker, color = "^", "orange"
-            else:
-                marker, color = "v", "purple"
-
-            size = 10 + 40 * min(1.0, abs(v))  # visual weight with angle magnitude
-            ax1.scatter(x, y, marker=marker, c=color, s=size, zorder=5)
 
         # Plot trades
         for t in trades:
