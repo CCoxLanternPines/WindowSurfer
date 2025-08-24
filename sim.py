@@ -6,6 +6,15 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 from typing import Optional
+import sys
+
+from systems.utils.config import (
+    load_account_settings,
+    load_coin_settings,
+    resolve_account_market,
+    resolve_coin_config,
+)
+from systems.scripts.plot import plot_trades_from_ledger
 
 
 def _normalize_market(market: str) -> str:
@@ -26,7 +35,6 @@ def _ensure_candles(account: str, market: str) -> Path:
     If the canonical file is missing, attempt to fetch it using the
     ``systems.scripts.fetch_candles`` helpers.
     """
-    # Default location as per new layout
     candles_dir = Path("data/candles/sim")
     csv_path = candles_dir / f"{market}.csv"
 
@@ -40,7 +48,6 @@ def _ensure_candles(account: str, market: str) -> Path:
 
     from systems.scripts.fetch_candles import fetch_binance_full_history_1h
 
-    # Best effort symbol normalisation for Binance
     symbol = market.upper()
     if symbol.endswith("USD"):
         symbol = symbol + "T"
@@ -57,19 +64,26 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--time", dest="timeframe", default="1m", help="Lookback window")
     parser.add_argument("--viz", action="store_true", help="Enable plotting")
     args = parser.parse_args(argv)
-    from systems.utils.load_config import load_config
 
-    cfg = load_config()
-    accounts = cfg.get("accounts", {})
-    if args.account not in accounts:
-        print(f"[ERROR] Unknown account: {args.account}")
-        raise SystemExit(1)
-    markets = accounts[args.account].get("markets", {})
-    if args.market not in markets:
-        print(f"[ERROR] Unknown market: {args.market} for account {args.account}")
-        raise SystemExit(1)
+    # Load and validate settings
+    accounts_cfg = load_account_settings()
+    coin_cfg = load_coin_settings()
 
-    _ensure_candles(args.account, args.market)
+    acct_cfg = accounts_cfg.get(args.account)
+    if not acct_cfg:
+        print(f"[ERROR] Unknown account {args.account}")
+        sys.exit(1)
+    if args.market not in acct_cfg.get("market settings", {}):
+        print(f"[ERROR] Unknown market {args.market} for account {args.account}")
+        sys.exit(1)
+
+    # Merge configs to ensure consistency (unused here but placeholder for future)
+    _ = {
+        **resolve_coin_config(args.market, coin_cfg),
+        **resolve_account_market(args.account, args.market, accounts_cfg),
+    }
+
+    csv_path = _ensure_candles(args.account, args.market)
 
     from systems.sim_engine import run_simulation
 
@@ -84,11 +98,11 @@ def main(argv: Optional[list[str]] = None) -> None:
     source = Path("data/ledgers") / f"{ledger_name}.json"
     dest = Path("data/ledgers") / "ledger_simulation.json"
     if source.exists():
+        dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(source.read_text())
 
     if args.viz:
         try:
-            from systems.scripts.plot import plot_trades_from_ledger
             plot_trades_from_ledger(args.account, args.market, mode="sim")
         except Exception as exc:  # pragma: no cover - plotting best effort
             print(f"[WARN] Plotting failed: {exc}")

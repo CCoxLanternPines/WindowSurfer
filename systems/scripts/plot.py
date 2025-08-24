@@ -1,43 +1,58 @@
 from __future__ import annotations
 
-"""Utility for plotting candles with trade markers from ledger data."""
+"""Plot trades from a ledger alongside candle data."""
 
-from pathlib import Path
 import json
+import sys
+from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt  # type: ignore
 import pandas as pd
 
-from systems.utils.load_config import load_config
+from systems.utils.config import load_account_settings
 
 
-def _validate_account_market(account: str, market: str) -> None:
-    """Raise ``SystemExit`` if account or market are not configured."""
-    cfg = load_config()
-    accounts = cfg.get("accounts", {})
-    if account not in accounts:
-        print(f"[ERROR] Unknown account: {account}")
-        raise SystemExit(1)
-    markets = accounts[account].get("markets", {})
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _validate(account: str, market: str) -> None:
+    """Exit if account or market is missing from config."""
+    accounts = load_account_settings()
+    acct_cfg = accounts.get(account)
+    if not acct_cfg:
+        print(f"[ERROR] Unknown account {account}")
+        sys.exit(1)
+    markets = acct_cfg.get("market settings", {})
     if market not in markets:
-        print(f"[ERROR] Unknown market: {market} for account {account}")
-        raise SystemExit(1)
+        print(f"[ERROR] Unknown market {market} for account {account}")
+        sys.exit(1)
 
+
+# ---------------------------------------------------------------------------
+# Public plotting API
+# ---------------------------------------------------------------------------
 
 def plot_trades_from_ledger(account: str, market: str, mode: str) -> None:
     """Plot candles with BUY/SELL/PASS markers from ledger data."""
-    _validate_account_market(account, market)
+    _validate(account, market)
 
-    market_file = market
     if mode == "sim":
         ledger_path = Path("data/ledgers/ledger_simulation.json")
-        candles_path = Path("data/candles/sim") / f"{market_file}.csv"
+        candles_path = Path("data/candles/sim") / f"{market}.csv"
     elif mode == "live":
-        ledger_path = Path("data/ledgers") / f"{account}_{market_file}.json"
-        candles_path = Path("data/candles/live") / f"{market_file}.csv"
+        ledger_path = Path("data/ledgers") / f"{account}_{market}.json"
+        candles_path = Path("data/candles/live") / f"{market}.csv"
     else:
         raise ValueError("mode must be 'sim' or 'live'")
+
+    if not ledger_path.exists():
+        print(f"[ERROR] Ledger not found at {ledger_path}")
+        return
+    if not candles_path.exists():
+        print(f"[ERROR] Candles not found at {candles_path}")
+        return
 
     df = pd.read_csv(candles_path)
     times = pd.to_datetime(df["timestamp"], unit="s")
@@ -47,19 +62,14 @@ def plot_trades_from_ledger(account: str, market: str, mode: str) -> None:
     try:
         with ledger_path.open("r", encoding="utf-8") as fh:
             ledger: dict[str, Any] = json.load(fh)
-    except FileNotFoundError:
+    except Exception:
         ledger = {}
 
-    buys_x: list[int] = []
-    buys_y: list[float] = []
-    sells_x: list[int] = []
-    sells_y: list[float] = []
-    pass_x: list[int] = []
-    pass_y: list[float] = []
-    press_buy_x: list[int] = []
-    press_buy_y: list[float] = []
-    press_sell_x: list[int] = []
-    press_sell_y: list[float] = []
+    buys_x, buys_y = [], []
+    sells_x, sells_y = [], []
+    pass_x, pass_y = [], []
+    press_buy_x, press_buy_y = [], []
+    press_sell_x, press_sell_y = [], []
 
     for entry in ledger.get("entries", []):
         ts = entry.get("timestamp")
@@ -73,9 +83,10 @@ def plot_trades_from_ledger(account: str, market: str, mode: str) -> None:
         elif side == "SELL":
             sells_x.append(ts)
             sells_y.append(price)
-        else:
+        elif side == "PASS":
             pass_x.append(ts)
             pass_y.append(price)
+
         if "pressure_buy" in entry:
             press_buy_x.append(ts)
             press_buy_y.append(entry["pressure_buy"])
