@@ -39,7 +39,7 @@ from systems.utils.resolve_symbol import (
     resolve_symbols,
     to_tag,
 )
-from systems.utils.time import parse_cutoff as parse_timeframe
+from systems.utils.time import parse_cutoff
 from systems.utils.trade_logger import init_logger as init_trade_logger, record_event
 from systems.utils.ledger import init_ledger as ledger_init, append_entry as ledger_append, save_ledger as ledger_save
 
@@ -103,12 +103,14 @@ def _run_single_sim(
         raise ValueError(f"Candles not sorted by {ts_col}: {csv_path}")
 
     if timeframe:
-        delta = parse_timeframe(timeframe)
+        delta = parse_cutoff(timeframe)
         end_ts = df[ts_col].max()
-        cutoff_ts = end_ts - delta.total_seconds()
-        df = df[df[ts_col] >= cutoff_ts].reset_index(drop=True)
+        start_ts = end_ts - delta.total_seconds()
+        df = df[df[ts_col] >= start_ts].reset_index(drop=True)
+        if df.empty:
+            raise ValueError(f"--time {timeframe} cut dataset to zero rows")
         print(
-            f"[TIMEFILTER] Keeping last {timeframe}, rows={len(df)}, "
+            f"[TIMEFILTER] Using --time {timeframe}, rows={len(df)}, "
             f"first={df[ts_col].min()}, last={df[ts_col].max()}"
         )
 
@@ -184,7 +186,7 @@ def _run_single_sim(
         iso_ts = (
             datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             if ts is not None
-            else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            else "n/a"
         )
         decision = "HOLD"
         trades_log: list[dict[str, Any]] = []
@@ -411,7 +413,7 @@ def _run_single_sim(
     )
     logs_dir = root / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.fromtimestamp(df[ts_col].max(), tz=timezone.utc).strftime("%Y%m%d_%H%M%S")
     csv_path = logs_dir / f"sim_report_{ledger_name}_{ts}.csv"
     json_path = logs_dir / f"sim_report_{ledger_name}_{ts}.json"
     with csv_path.open("w", newline="", encoding="utf-8") as f_csv:
