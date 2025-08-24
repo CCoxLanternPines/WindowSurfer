@@ -350,23 +350,24 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         return
 
     # ===================== Plot & Toggles (lazy create) =====================
-    ax1.set_title("Price with Exhaustion + Predictors (Keys 1–2,3,4–8; Letters W/E/R/T)")
+    ax1.set_title("Price with Exhaustion + Predictors (Keys 1/u,2,3,4–8; Letters W/E/R/T)")
     ax1.set_xlabel("Candles (Index)")
     ax1.set_ylabel("Price")
     ax1.grid(True)
 
     artists = {
-        "exhaustion": None,
-        "reversals":  None,
-        "bottom4":    None,
-        "top5":       None,
-        "top6":       None,
-        "top7":       None,
-        "top8":       None,
-        "valley_w":   None,
-        "valley_e":   None,
-        "valley_r":   None,
-        "valley_t":   None,
+        "exhaustion_up":   None,  # red SELL exhaustion
+        "exhaustion_down": None,  # green BUY exhaustion
+        "reversals":       None,
+        "bottom4":         None,
+        "top5":            None,
+        "top6":            None,
+        "top7":            None,
+        "top8":            None,
+        "valley_w":        None,
+        "valley_e":        None,
+        "valley_r":        None,
+        "valley_t":        None,
     }
 
     state = {k: False for k in artists.keys()}
@@ -374,13 +375,12 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     def ensure_artist(name: str):
         if artists[name] is not None:
             return
-        if name == "exhaustion":
-            # combine red/green
+        if name == "exhaustion_up":
             xr, yr, sr = pts["exhaustion_red"]["x"], pts["exhaustion_red"]["y"], pts["exhaustion_red"]["s"]
+            artists[name] = ax1.scatter(xr, yr, s=sr, c="red", zorder=6, visible=False)
+        elif name == "exhaustion_down":
             xg, yg, sg = pts["exhaustion_green"]["x"], pts["exhaustion_green"]["y"], pts["exhaustion_green"]["s"]
-            h1 = ax1.scatter(xr, yr, s=sr, c="red", zorder=6, visible=False)
-            h2 = ax1.scatter(xg, yg, s=sg, c="green", zorder=6, visible=False)
-            artists[name] = (h1, h2)
+            artists[name] = ax1.scatter(xg, yg, s=sg, c="green", zorder=6, visible=False)
         elif name == "reversals":
             artists[name] = ax1.scatter(pts["reversal"]["x"], pts["reversal"]["y"],
                                         c="yellow", s=120, edgecolor="black", zorder=7, visible=False)
@@ -418,7 +418,9 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     def on_key(event):
         k = (event.key or "").lower()
         if k == "1":
-            toggle("exhaustion")
+            toggle("exhaustion_up")
+        elif k == "u":
+            toggle("exhaustion_down")
         elif k == "2":
             toggle("reversals")
         elif k == "3" or k == "r":
@@ -442,6 +444,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         # ignore q to avoid closing figure
 
     fig.canvas.mpl_connect("key_press_event", on_key)
+    plt.show()
     plt.show()
 
 def main() -> None:
