@@ -42,6 +42,7 @@ BUY_MULT_TREND_DOWN = 0   # strong down-trend multiplier (cap at -1 normalized)
 ANGLE_UP_MIN   = 0.01   # require at least +0.20 (~+9°) to start scaling up
 ANGLE_DOWN_MIN = 0.50   # require at least -0.20 (~-9°) to start scaling down
 ANGLE_LOOKBACK = 48     # used for slope angle
+VOL_LOOKBACK   = 48     # number of candles for rolling volatility
 
 _INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
 
@@ -146,12 +147,16 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     df = df.reset_index(drop=True)
     df["candle_index"] = range(len(df))
 
+    df["returns"] = df["close"].pct_change()
+    df["volatility"] = df["returns"].rolling(VOL_LOOKBACK).std()
+
     # ----- Exhaustion points and rolling angles -----
     pts = {
         "exhaustion_up":   {"x": [], "y": [], "s": []},
         "exhaustion_down": {"x": [], "y": [], "s": []},
     }
     df["angle"] = 0.0
+    vol_pts = {"x": [], "y": [], "s": []}
 
     # Rolling slope calculation
     for t in range(ANGLE_LOOKBACK, len(df)):
@@ -182,6 +187,15 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             pts["exhaustion_down"]["x"].append(end_idx)
             pts["exhaustion_down"]["y"].append(now_price)
             pts["exhaustion_down"]["s"].append(size)
+
+    for t in range(VOL_LOOKBACK, len(df), WINDOW_STEP):
+        vol = df["volatility"].iloc[t]
+        if pd.isna(vol):
+            continue
+        size = SIZE_SCALAR * (vol ** SIZE_POWER)
+        vol_pts["x"].append(int(df["candle_index"].iloc[t]))
+        vol_pts["y"].append(float(df["close"].iloc[t]))
+        vol_pts["s"].append(size)
 
     # ===== Candle-by-candle simulation =====
     trades = []
@@ -268,6 +282,10 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         # Plot exhaustion bubbles
         ax1.scatter(pts["exhaustion_down"]["x"], pts["exhaustion_down"]["y"],
                     s=pts["exhaustion_down"]["s"], c="green", alpha=0.3, edgecolor="black")
+
+        # Plot volatility bubbles (red)
+        ax1.scatter(vol_pts["x"], vol_pts["y"],
+                    s=vol_pts["s"], c="red", alpha=0.3, edgecolor="black")
 
         # Plot trades
         for t in trades:
