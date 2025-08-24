@@ -119,11 +119,14 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
     decisions_buy, decisions_sell, decisions_hold = [], [], []
 
     pts = {
-        "a_up": {"x": [], "y": []},
-        "a_down": {"x": [], "y": []},
+        "a_up": {"x": [], "y": [], "s": []},
+        "a_down": {"x": [], "y": [], "s": []},
     }
 
-    trend_state = "neutral"
+    current_trend = "neutral"
+    pressure_up = 0
+    pressure_down = 0
+
     up_keys = {"1", "5", "6", "7", "8"}
     down_keys = {"w", "e", "r", "t", "y", "3", "4"}
 
@@ -140,18 +143,30 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
         if decision == "BUY":
             decisions_buy.append(payload)
             buy_signals.append((x, y))
-            if trend_state == "down":
+            if current_trend == "down":
+                size = 200 + pressure_down * 50
                 pts["a_up"]["x"].append(x)
                 pts["a_up"]["y"].append(y)
-            trend_state = "up"
+                pts["a_up"]["s"].append(size)
+                pressure_down = 0
+                pressure_up = 1
+            else:
+                pressure_up += 1
+            current_trend = "up"
             state = "long"
         elif decision == "SELL":
             decisions_sell.append(payload)
             sell_signals.append((x, y))
-            if trend_state == "up":
+            if current_trend == "up":
+                size = 200 + pressure_up * 50
                 pts["a_down"]["x"].append(x)
                 pts["a_down"]["y"].append(y)
-            trend_state = "down"
+                pts["a_down"]["s"].append(size)
+                pressure_up = 0
+                pressure_down = 1
+            else:
+                pressure_down += 1
+            current_trend = "down"
             state = "flat"
         else:  # HOLD
             if t % 10 == 0:
@@ -215,8 +230,8 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
                         pts["a_up"]["x"],
                         pts["a_up"]["y"],
                         marker="^",
-                        c="black",
-                        s=200,
+                        c="green",
+                        s=pts["a_up"]["s"],
                         zorder=9,
                         visible=False,
                     )
@@ -225,8 +240,8 @@ def run_simulation(timeframe: str = "1m", viz: bool = True) -> None:
                         pts["a_down"]["x"],
                         pts["a_down"]["y"],
                         marker="v",
-                        c="black",
-                        s=200,
+                        c="red",
+                        s=pts["a_down"]["s"],
                         zorder=9,
                         visible=False,
                     )
