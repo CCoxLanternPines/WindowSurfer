@@ -63,7 +63,7 @@ def _run_single_sim(
     market: str,
     client: ccxt.Exchange,
     verbose: int = 0,
-    timeframe: str = "1m",
+    timeframe: str | None = None,
     viz: bool = True,
 ) -> None:
     os.environ["WS_MODE"] = "sim"
@@ -107,6 +107,10 @@ def _run_single_sim(
         end_ts = df[ts_col].max()
         cutoff_ts = end_ts - delta.total_seconds()
         df = df[df[ts_col] >= cutoff_ts].reset_index(drop=True)
+        print(
+            f"[TIMEFILTER] Keeping last {timeframe}, rows={len(df)}, "
+            f"first={df[ts_col].min()}, last={df[ts_col].max()}"
+        )
 
     # Log one line so we always know what we ran on
     first_ts = int(df[ts_col].iloc[0]) if len(df) else None
@@ -498,7 +502,7 @@ def run_simulation(
     market: str | None = None,
     all_accounts: bool = False,
     verbose: int = 0,
-    timeframe: str = "1m",
+    timeframe: str | None = None,
     viz: bool = True,
 ) -> None:
     """Iterate configured accounts/markets and run simulations."""
