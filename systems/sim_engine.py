@@ -355,7 +355,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             pressure_counter += 1
         else:
 
-            size = BASE_SIZE * (pressure_counter ** 2) * 0.5
+            size = BASE_SIZE * (pressure_counter) * 0.75
             if current_trend == "up" and trend == "down":
                 pts["pressure_a_top"]["x"].append(x)
                 pts["pressure_a_top"]["y"].append(y)
