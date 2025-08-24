@@ -25,31 +25,31 @@ WINDOW_STEP = 12
 BUY_MIN_BUBBLE    = 100
 BUY_MAX_BUBBLE    = 500
 MIN_NOTE_SIZE_PCT = 0.03    # 1% of portfolio
-MAX_NOTE_SIZE_PCT = 0.2    # 5% of portfolio
+MAX_NOTE_SIZE_PCT = 0.25    # 5% of portfolio
 
 # Sell scaling (baked into note at buy time)
-SELL_MIN_BUBBLE   = 100
+SELL_MIN_BUBBLE   = 150
 SELL_MAX_BUBBLE   = 800
-MIN_MATURITY      = 0.03    # 0% gain (sell at entry)
-MAX_MATURITY      = .3     # 100% gain (2x entry)
+MIN_MATURITY      = 0.05    # 0% gain (sell at entry)
+MAX_MATURITY      = .25     # 100% gain (2x entry)
+
+# Volatility buy scaling
+BUY_MIN_VOL_BUBBLE = 0
+BUY_MAX_VOL_BUBBLE = .01
+BUY_MULT_VOL_MIN   = 2.5
+BUY_MULT_VOL_MAX   = 0
+VOL_LOOKBACK = 48   # rolling window for volatility
+
+# Angle thresholds (normalized; 0.0..1.0 where 1.0 = 45°)
+ANGLE_UP_MIN   = 0.1   # require at least +0.20 (~+9°) to start scaling up
+ANGLE_DOWN_MIN = -0.50   # require at least -0.20 (~-9°) to start scaling down
+ANGLE_LOOKBACK = 48     # used for slope angle
 
 # Trend multipliers
 BUY_MULT_TREND_UP   = 1   # strong up-trend multiplier (cap at +1 normalized)
 BUY_MULT_TREND_FLOOR = .25  # keep 0 so flat maps to 0, no forced minimum
 BUY_MULT_TREND_DOWN = 0   # strong down-trend multiplier (cap at -1 normalized)
 
-# Volatility buy scaling
-BUY_MIN_VOL_BUBBLE = 0
-BUY_MAX_VOL_BUBBLE = 500
-BUY_MULT_VOL_MIN   = 0.25
-BUY_MULT_VOL_MAX   = 1.0
-
-VOL_LOOKBACK = 48   # rolling window for volatility
-
-# Angle thresholds (normalized; 0.0..1.0 where 1.0 = 45°)
-ANGLE_UP_MIN   = 0.01   # require at least +0.20 (~+9°) to start scaling up
-ANGLE_DOWN_MIN = 0.50   # require at least -0.20 (~-9°) to start scaling down
-ANGLE_LOOKBACK = 48     # used for slope angle
 
 _INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
 
@@ -106,7 +106,7 @@ def apply_time_filter(df: pd.DataFrame, delta: timedelta, file_path: str) -> pd.
             except Exception:
                 pass
     sec = infer_candle_seconds_from_filename(file_path) or 3600
-    need = int(max(WINDOW_SIZE, delta.total_seconds() // sec))
+    need = int(max(EXHAUSTION_LOOKBACK*2, delta.total_seconds() // sec))
     if need <= 0 or need >= len(df):
         return df
     return df.iloc[-need:]
@@ -150,6 +150,7 @@ def vol_multiplier(vol: float) -> float:
     """
     # clamp to bubble range
     v = min(max(vol, BUY_MIN_VOL_BUBBLE), BUY_MAX_VOL_BUBBLE)
+
     frac = (v - BUY_MIN_VOL_BUBBLE) / max(1e-9, (BUY_MAX_VOL_BUBBLE - BUY_MIN_VOL_BUBBLE))
     return BUY_MULT_VOL_MIN + frac * (BUY_MULT_VOL_MAX - BUY_MULT_VOL_MIN)
 
@@ -210,7 +211,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         vol = df["volatility"].iloc[t]
         if pd.isna(vol):
             continue
-        size = SIZE_SCALAR * (vol ** SIZE_POWER)
+        size = SIZE_SCALAR * (vol * .4 ** SIZE_POWER)
         vol_pts["x"].append(int(df["candle_index"].iloc[t]))
         vol_pts["y"].append(float(df["close"].iloc[t]))
         vol_pts["s"].append(size)
