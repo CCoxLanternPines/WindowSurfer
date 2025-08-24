@@ -19,7 +19,7 @@ START_CAPITAL    = 10_000   # starting cash in USDT
 MONTHLY_TOPUP    = 000    # fixed USDT injected each calendar month
 
 EXHAUSTION_LOOKBACK = 184   # used for bubble delta
-WINDOW_STEP = 100
+WINDOW_STEP = 12
 
 # Buy scaling
 BUY_MIN_BUBBLE    = 100
@@ -39,9 +39,9 @@ BUY_MULT_TREND_FLOOR = .25  # keep 0 so flat maps to 0, no forced minimum
 BUY_MULT_TREND_DOWN = 0   # strong down-trend multiplier (cap at -1 normalized)
 
 # Angle thresholds (normalized; 0.0..1.0 where 1.0 = 45°)
-ANGLE_UP_MIN   = 0.20   # require at least +0.20 (~+9°) to start scaling up
-ANGLE_DOWN_MIN = 0.20   # require at least -0.20 (~-9°) to start scaling down
-ANGLE_LOOKBACK      = 24   # used for slope angle
+ANGLE_UP_MIN   = 0.01   # require at least +0.20 (~+9°) to start scaling up
+ANGLE_DOWN_MIN = 0.50   # require at least -0.20 (~-9°) to start scaling down
+ANGLE_LOOKBACK = 48     # used for slope angle
 
 _INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
 
