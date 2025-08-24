@@ -174,6 +174,10 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         "valley_e":        {"x": [], "y": []},   # Exhaustion+Div (E)
         "valley_r":        {"x": [], "y": []},   # Drawdown Z + Reversion (R / 3)
         "valley_t":        {"x": [], "y": []},   # Confluence (T)
+
+        # Pressure rule markers (a)
+        "a_up":           {"x": [], "y": []},
+        "a_down":         {"x": [], "y": []},
     }
 
     last_exhaustion_decision: int | None = None
@@ -183,11 +187,18 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
     # For confluence tracking, keep last indices
     last_idx = defaultdict(lambda: -10)
 
+    # Trend tracking for pressure rule
+    trend_state = "neutral"
+    up_keys = {"1","5","6","7","8"}
+    down_keys = {"w","e","r","t","y","3","4"}
+
     # ----- Iterate bars (lightweight, store only coords) -----
     for t in range(WINDOW_SIZE - 1, len(df), WINDOW_STEP):
         candle = df.iloc[t]
         x = int(candle["candle_index"])
         y = float(candle["close"])
+
+        signals_this_bar: set[str] = set()
 
         decision, confidence, score = multi_window_vote(df, t, window_sizes=[8, 12, 24, 48])
 
@@ -199,6 +210,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             pts["exhaustion_red"]["x"].append(x)
             pts["exhaustion_red"]["y"].append(y)
             pts["exhaustion_red"]["s"].append(size)
+            signals_this_bar.add("1")
         elif decision == -1:  # BUY exhaustion
             recent_sells.append(t)
             cluster_strength = sum(1 for idx in recent_sells if t - idx <= CLUSTER_WINDOW)
@@ -206,6 +218,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             pts["exhaustion_green"]["x"].append(x)
             pts["exhaustion_green"]["y"].append(y)
             pts["exhaustion_green"]["s"].append(size)
+            signals_this_bar.add("1")
 
         # Key 2: Reversals (yellow) on color flip
         if last_exhaustion_decision is not None and decision != 0 and decision != last_exhaustion_decision:
@@ -230,6 +243,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             if y == float(window.min()) and slope_now > slope_prev:
                 pts["bottom4"]["x"].append(x)
                 pts["bottom4"]["y"].append(y)
+                signals_this_bar.add("4")
 
         # Key 5: Divergence (bearish)
         if t >= 48:
@@ -238,6 +252,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             if price_now > price_prev and slope_now < slope_prev:
                 pts["top5"]["x"].append(x)
                 pts["top5"]["y"].append(y)
+                signals_this_bar.add("5")
 
         # Key 6: Rolling Peak Detection (swing-high)
         if t >= 12:
@@ -246,6 +261,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             if y == float(win.max()):
                 pts["top6"]["x"].append(x)
                 pts["top6"]["y"].append(y)
+                signals_this_bar.add("6")
 
         # Key 7: Compression -> Expansion at highs (predictive)
         if t >= 18:
@@ -256,6 +272,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             if rng < 0.02 * meanv and decision == 1:
                 pts["top7"]["x"].append(x)
                 pts["top7"]["y"].append(y)
+                signals_this_bar.add("7")
 
         # ----- Valley Detectors -----
         # W: Valley A - Capitulation Wick + Snap (tuned; fires a bit more)
@@ -280,6 +297,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
                     mid_body = (o + y)/2.0
                     if (next_close > mid_body) or (next_close > y):
                         pts["valley_w"]["x"].append(x); pts["valley_w"]["y"].append(y); last_idx["valley_w"] = x
+                        signals_this_bar.add("w")
 
         # E: Valley B - Exhaustion Super-Cluster + Positive Divergence (tuned livelier)
         if t >= 36:
@@ -306,6 +324,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
 
             if recent_exh >= 2 and div_ok and guard and extra:
                 pts["valley_e"]["x"].append(x); pts["valley_e"]["y"].append(y); last_idx["valley_e"] = x
+                signals_this_bar.add("e")
 
         # R: Valley D - Drawdown Z-score + Reversion (relaxed)  -- also mapped to numeric key '3'
         if t >= 50:
@@ -319,6 +338,7 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
                 next_ok = (t+1 < len(df)) and (float(df["close"].iloc[t+1]) > y)
                 if slope_ok or next_ok:
                     pts["valley_r"]["x"].append(x); pts["valley_r"]["y"].append(y); last_idx["valley_r"] = x
+                    signals_this_bar.update(["r","3"])
 
         # T: Confluence - >=2 valley signals within 2 bars AND local 7-bar min
         if t >= 6:
@@ -331,6 +351,23 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         near_count = sum(1 for k in ("valley_w","valley_e","valley_r") if abs(x - last_idx[k]) <= 2)
         if is_local_min and near_count >= 2:
             pts["valley_t"]["x"].append(x); pts["valley_t"]["y"].append(y)
+            signals_this_bar.add("t")
+
+        # --- Pressure rule tracking ---
+        up_signal = bool(up_keys & signals_this_bar)
+        down_signal = bool(down_keys & signals_this_bar)
+
+        if trend_state == "down" and up_signal:
+            pts["a_up"]["x"].append(x)
+            pts["a_up"]["y"].append(y)
+        elif trend_state == "up" and down_signal:
+            pts["a_down"]["x"].append(x)
+            pts["a_down"]["y"].append(y)
+
+        if up_signal:
+            trend_state = "up"
+        elif down_signal:
+            trend_state = "down"
 
     # Key 8: Meta-Filter (rev + div overlap) computed post-loop by proximity
     if pts["reversal"]["x"] and pts["top5"]["x"]:
@@ -368,6 +405,8 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         "valley_e":        None,
         "valley_r":        None,
         "valley_t":        None,
+        "a_up":           None,
+        "a_down":         None,
     }
 
     state = {k: False for k in artists.keys()}
@@ -384,6 +423,12 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
         elif name == "reversals":
             artists[name] = ax1.scatter(pts["reversal"]["x"], pts["reversal"]["y"],
                                         c="yellow", s=120, edgecolor="black", zorder=7, visible=False)
+        elif name == "a_up":
+            artists[name] = ax1.scatter(pts["a_up"]["x"], pts["a_up"]["y"],
+                                        marker="^", c="black", s=200, zorder=9, visible=False)
+        elif name == "a_down":
+            artists[name] = ax1.scatter(pts["a_down"]["x"], pts["a_down"]["y"],
+                                        marker="v", c="black", s=200, zorder=9, visible=False)
         elif name in ("bottom4","top5","top6","top7","top8","valley_w","valley_e","valley_r","valley_t"):
             style = {
                 "bottom4": dict(c="cyan", marker="v", s=100, zorder=6),
@@ -441,6 +486,9 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
             toggle("valley_e")
         elif k == "t":
             toggle("valley_t")
+        elif k == "a":
+            toggle("a_up")
+            toggle("a_down")
         # ignore q to avoid closing figure
 
     fig.canvas.mpl_connect("key_press_event", on_key)
