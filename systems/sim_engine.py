@@ -10,32 +10,33 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # ===================== Parameters =====================
-WINDOW_SIZE      = 92
+WINDOW_SIZE      = 184
 WINDOW_STEP      = 24
-LOOKBACK         = 92
+LOOKBACK         = 184
 SIZE_SCALAR      = 1_000_000
 SIZE_POWER       = 3
 
 START_CAPITAL    = 10_000   # starting cash in USDT
-MONTHLY_TOPUP    = 1_000    # fixed USDT injected each calendar month
+MONTHLY_TOPUP    = 000    # fixed USDT injected each calendar month
 
 # Buy scaling
 BUY_MIN_BUBBLE    = 100
 BUY_MAX_BUBBLE    = 500
-MIN_NOTE_SIZE_PCT = 0.01    # 1% of portfolio
-MAX_NOTE_SIZE_PCT = 0.05    # 5% of portfolio
-
-# Trend multipliers
-BUY_MULT_TREND_UP   = 1.50  # MTU: e.g., boost buys in strong up-trend
-BUY_MULT_TREND_DOWN = 0.00  # MTD: e.g., disable buys in strong down-trend
-# Center (flat) is implicitly 0 via lerp (no buy from angle alone)
-BUY_MULT_TREND_FLOOR = 0.00  # Set >0 to enforce a minimum buy size even when flat
+MIN_NOTE_SIZE_PCT = 0.03    # 1% of portfolio
+MAX_NOTE_SIZE_PCT = 0.2    # 5% of portfolio
 
 # Sell scaling (baked into note at buy time)
 SELL_MIN_BUBBLE   = 100
 SELL_MAX_BUBBLE   = 800
 MIN_MATURITY      = 0.03    # 0% gain (sell at entry)
-MAX_MATURITY      = .3     # 100% gain (2x entry)
+MAX_MATURITY      = .25     # 100% gain (2x entry)
+
+# Trend multipliers
+BUY_MULT_TREND_UP   = 4  # MTU: e.g., boost buys in strong up-trend
+BUY_MULT_TREND_DOWN = 1  # MTD: e.g., disable buys in strong down-trend
+# Center (flat) is implicitly 0 via lerp (no buy from angle alone)
+BUY_MULT_TREND_FLOOR = 0  # Set >0 to enforce a minimum buy size even when flat
+
 
 _INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
 
