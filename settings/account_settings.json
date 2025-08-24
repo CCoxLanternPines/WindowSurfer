@@ -14,13 +14,13 @@
         "secret": "YOUR_API_SECRET"
       },
       "market settings": {
-        "BTC/USD": {
+        "BTCUSD": {
           "investment_fraction": 0.25
         },
-        "DOGE/USD": {
+        "DOGEUSD": {
           "investment_fraction": 0.25
         },
-        "ETH/EUR": {
+        "ETHEUR": {
           "investment_fraction": 0.25
         }
       }
