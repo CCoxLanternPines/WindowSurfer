@@ -7,6 +7,9 @@ import argparse
 from pathlib import Path
 from typing import Optional
 import sys
+import json
+
+import pandas as pd  # type: ignore
 
 from systems.scripts.plot import plot_trades_from_ledger
 
@@ -48,7 +51,7 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     coin = args.coin.replace("/", "").upper()
 
-    _ensure_candles(coin)
+    csv_path = _ensure_candles(coin)
 
     from systems.sim_engine import run_simulation
 
@@ -63,14 +66,39 @@ def main(argv: Optional[list[str]] = None) -> None:
         print(f"[ERROR] Simulation did not produce {sim_path}")
         return
 
+    with sim_path.open("r", encoding="utf-8") as fh:
+        ledger = json.load(fh)
+
+    final_val = ledger.get("meta", {}).get("final_value")
+    if final_val is not None:
+        print(f"Final Value (USD): ${float(final_val):.2f}")
+
     if args.viz:
         try:
+            df = pd.read_csv(csv_path)
+            entries = []
+            for t in ledger.get("trades", []):
+                idx = int(t.get("idx", -1))
+                if 0 <= idx < len(df):
+                    ts = float(df.iloc[idx]["timestamp"])
+                else:
+                    ts = None
+                if ts is None:
+                    continue
+                entries.append({
+                    "timestamp": ts,
+                    "price": t.get("price"),
+                    "side": t.get("side"),
+                })
+            plot_path = Path("data/temp/sim_plot.json")
+            with plot_path.open("w", encoding="utf-8") as fh:
+                json.dump({"entries": entries}, fh, indent=2)
             # Use a placeholder account label for plotting since the engine is coin-centric
             plot_trades_from_ledger(
                 "SIM",
                 coin,
                 mode="sim",
-                ledger_path=str(sim_path),
+                ledger_path=str(plot_path),
             )
         except Exception as exc:  # pragma: no cover - plotting best effort
             print(f"[WARN] Plotting failed: {exc}")
