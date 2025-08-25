@@ -1,0 +1,32 @@
+{
+  "coin_settings": {
+    "default": {
+      "exhaustion_lookback": 184,
+      "window_step": 12,
+
+      "buy_min_bubble": 100,
+      "buy_max_bubble": 500,
+      "min_note_size_pct": 0.03,
+      "max_note_size_pct": 0.25,
+
+      "sell_min_bubble": 150,
+      "sell_max_bubble": 800,
+      "min_maturity": 0.05,
+      "max_maturity": 0.25,
+
+      "buy_min_vol_bubble": 0.0,
+      "buy_max_vol_bubble": 0.01,
+      "buy_mult_vol_min": 2.5,
+      "buy_mult_vol_max": 0.0,
+      "vol_lookback": 48,
+
+      "angle_up_min": 0.1,
+      "angle_down_min": -0.5,
+      "angle_lookback": 48,
+
+      "buy_mult_trend_up": 1.0,
+      "buy_mult_trend_floor": 0.25,
+      "buy_mult_trend_down": 0.0
+    }
+  }
+}
