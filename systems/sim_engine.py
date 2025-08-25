@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
-from pathlib import Path
 
-import pandas as pd
 import numpy as np
 
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
-from systems.scripts.chart import plot_trades
 from systems.utils.time import parse_timeframe, apply_time_filter
 from systems.utils import log
 from systems.utils.graph_feed import GraphFeed
@@ -36,9 +33,9 @@ def run_simulation(
     *,
     coin: str,
     timeframe: str = "1m",
-    graph_feed: bool = False,
+    graph_feed: bool = True,
     graph_downsample: int = 1,
-    viz: bool = True,
+    viz: bool = False,
 ) -> None:
     """Run historical simulation for ``coin``.
 
@@ -49,21 +46,15 @@ def run_simulation(
     timeframe:
         Optional timeframe filter. Defaults to "1m".
     viz:
-        Whether to plot the results. Defaults to ``True``.
+        Deprecated. Plotting handled by systems/graph_engine.py.
     """
 
     coin = coin.replace("/", "").upper()
-    primary = Path(f"data/sim/{coin}.csv")
-    file_path = primary
-    if not primary.exists():
-        fallback = Path(f"data/candles/sim/{coin}.csv")
-        if fallback.exists():
-            file_path = fallback
-        else:
-            raise FileNotFoundError(
-                f"No candle data found for {coin} in {primary} or {fallback}"
-            )
-
+    file_path = f"data/sim/{coin}.csv"
+    try_alt = f"data/candles/sim/{coin}.csv"
+    import os, pandas as pd
+    if not os.path.exists(file_path) and os.path.exists(try_alt):
+        file_path = try_alt
     df = pd.read_csv(file_path)
 
     delta = parse_timeframe(timeframe)
@@ -82,13 +73,8 @@ def run_simulation(
         "exhaustion_down": {"x": [], "y": [], "s": []},
     }
     df["angle"] = 0.0
-    vol_pts = {"x": [], "y": [], "s": []}
 
-    feed = (
-        GraphFeed(mode="sim", coin=coin, downsample=graph_downsample, flush=False)
-        if graph_feed
-        else None
-    )
+    feed = GraphFeed(mode="sim", coin=coin, downsample=graph_downsample, flush=False) if graph_feed else None
 
     # Rolling slope calculation
     for t in range(ANGLE_LOOKBACK, len(df)):
@@ -120,15 +106,6 @@ def run_simulation(
             pts["exhaustion_down"]["y"].append(now_price)
             pts["exhaustion_down"]["s"].append(size)
 
-    for t in range(VOL_LOOKBACK, len(df), WINDOW_STEP):
-        vol = df["volatility"].iloc[t]
-        if pd.isna(vol):
-            continue
-        size = SIZE_SCALAR * (vol * .4 ** SIZE_POWER)
-        vol_pts["x"].append(int(df["candle_index"].iloc[t]))
-        vol_pts["y"].append(float(df["close"].iloc[t]))
-        vol_pts["s"].append(size)
-
     # ===== Candle-by-candle simulation =====
     trades = []
     capital = START_CAPITAL
@@ -141,7 +118,7 @@ def run_simulation(
         if "timestamp" in row:
             ts = float(row["timestamp"])
             is_ms = ts > 1e12
-            ts_val = int(ts)
+            ts_val = int(ts / (1000 if is_ms else 1))
             dt = datetime.fromtimestamp(ts / (1000 if is_ms else 1), tz=timezone.utc)
         elif "datetime" in row:
             try:
@@ -161,15 +138,17 @@ def run_simulation(
 
         if feed:
             feed.candle(
-                idx,
+                int(row["candle_index"]),
                 ts_val,
                 float(row.get("open", price)),
                 float(row.get("high", price)),
                 float(row.get("low", price)),
                 float(price),
             )
-            feed.indicator(idx, "angle", float(row.get("angle", 0.0)))
-            feed.indicator(idx, "vol", float(row.get("volatility", 0.0)))
+            if idx >= ANGLE_LOOKBACK and idx % WINDOW_STEP == 0:
+                feed.indicator(int(row["candle_index"]), "angle", float(row.get("angle", 0.0)))
+            if idx >= VOL_LOOKBACK and idx % WINDOW_STEP == 0:
+                feed.indicator(int(row["candle_index"]), "vol", float(row.get("volatility", 0.0)))
 
         prev_len = len(open_notes)
         trade, capital, open_notes = evaluate_buy(idx, row, pts, capital, open_notes)
@@ -199,23 +178,15 @@ def run_simulation(
                     float(n.get("entry_price", 0.0)),
                 )
 
-        if feed:
+        if feed and (idx % 50 == 0):
             equity = capital + sum(n["units"] * price for n in open_notes)
-            feed.capital(idx, float(capital), float(equity))
+            feed.capital(int(row["candle_index"]), float(capital), float(equity))
 
     # Final portfolio value
     final_value = capital + sum(n["units"] * float(df["close"].iloc[-1]) for n in open_notes)
 
     if viz:
-        plot_trades(
-            df,
-            pts,
-            vol_pts,
-            trades,
-            START_CAPITAL,
-            final_value,
-            angle_lookback=ANGLE_LOOKBACK,
-        )
+        pass  # plotting handled by systems/graph_engine.py
 
     if feed:
         feed.close()
@@ -224,11 +195,13 @@ def run_simulation(
         f"Final Capital: {capital:.2f}, Open Notes: {len(open_notes)}, Final Value: {final_value:.2f}"
     )
 
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--coin", required=True)
     p.add_argument("--time", type=str, default="1m")
-    p.add_argument("--viz", action="store_true")
+    p.add_argument("--graph-feed", action="store_true", default=True, help="Emit NDJSON graph feed for graph_engine")
+    p.add_argument("--graph-downsample", type=int, default=1, help="Downsample factor for feed")
     p.add_argument("-v", action="count", default=0, help="Increase verbosity (use -vv for more)")
     p.add_argument("--log", action="store_true", help="Write logs to file")
     args = p.parse_args()
@@ -236,7 +209,14 @@ def main() -> None:
     coin = args.coin.replace("/", "").upper()
     log.init_logger(verbosity=1 + args.v, to_file=args.log, name_hint=f"sim_{coin}")
     log.what(f"Running simulation for {coin} with timeframe {args.time}")
-    run_simulation(coin=coin, timeframe=args.time, viz=args.viz)
+    run_simulation(
+        coin=coin,
+        timeframe=args.time,
+        graph_feed=args.graph_feed,
+        graph_downsample=args.graph_downsample,
+        viz=False,
+    )
+
 
 if __name__ == "__main__":
     main()

@@ -14,9 +14,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Run historical simulation")
     parser.add_argument("--coin", required=True, help="Coin symbol e.g. DOGEUSD")
     parser.add_argument("--time", default="1m", help="Lookback window")
-    parser.add_argument("--viz", action="store_true", help="Enable plotting")
-    parser.add_argument("--graph-feed", action="store_true", help="Write graph feed")
-    parser.add_argument("--graph-downsample", type=int, default=1, help="Feed candle stride")
+    parser.add_argument("--graph-feed", action="store_true", default=True, help="Emit NDJSON graph feed for graph_engine")
+    parser.add_argument("--graph-downsample", type=int, default=1, help="Downsample factor for feed")
     parser.add_argument("-v", action="count", default=0, help="Increase verbosity (use -vv for more)")
     parser.add_argument("--log", action="store_true", help="Write logs to file")
     args = parser.parse_args(argv)
@@ -31,7 +30,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         timeframe=args.time,
         graph_feed=args.graph_feed,
         graph_downsample=args.graph_downsample,
-        viz=args.viz,
+        viz=False,  # plotting moved to graph_engine
     )
 
 
