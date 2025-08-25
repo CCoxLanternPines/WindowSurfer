@@ -10,8 +10,17 @@ def evaluate_sell(
     price: float,
     open_notes: List[Dict[str, float]],
     capital: float,
+    *,
+    angle: float = 0.0,
+    slope_sale: float = 1.0,
 ) -> Tuple[List[Dict[str, Any]], float, List[Dict[str, float]]]:
     """Return closed trade records and updated portfolio state."""
+
+    # Block sells if the current candle is in strong up-slope
+    if angle > slope_sale:
+        # no sells this candle; return unchanged
+        return [], capital, open_notes
+
     trades_closed: List[Dict[str, Any]] = []
     updated_notes: List[Dict[str, float]] = []
     updated_capital = capital
