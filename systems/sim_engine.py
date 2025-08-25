@@ -247,6 +247,23 @@ def run_simulation(
     def ledger_handler(trade, account, coin):
         if not trade:
             return
+        if feed:
+            if trade.get("side") == "BUY":
+                feed.buy(
+                    int(trade.get("idx", 0)),
+                    float(trade.get("price", 0.0)),
+                    float(trade.get("units", 0.0)),
+                    float(trade.get("usd", 0.0)),
+                    float(trade.get("target", 0.0)),
+                )
+            else:
+                feed.sell(
+                    int(trade.get("idx", 0)),
+                    float(trade.get("price", 0.0)),
+                    float(trade.get("units", 0.0)),
+                    float(trade.get("usd", 0.0)),
+                    float(trade.get("entry_price", 0.0)),
+                )
         path = Path("data") / "ledgers" / f"{account}_{coin}.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as f:

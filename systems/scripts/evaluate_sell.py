@@ -29,7 +29,16 @@ def evaluate_sell(
         if price >= note["sell_price"]:
             sell_usd = note["units"] * price
             updated_capital += sell_usd
-            trades_closed.append({"idx": idx, "price": price, "side": "SELL", "usd": sell_usd})
+            trades_closed.append(
+                {
+                    "idx": idx,
+                    "price": price,
+                    "side": "SELL",
+                    "usd": sell_usd,
+                    "units": note["units"],
+                    "entry_price": note["entry_price"],
+                }
+            )
             print(
                 f"SELL @ idx={idx}, entry={note['entry_price']:.2f}, target={note['sell_price']:.2f}, price={price:.2f}"
             )
