@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import re
-from datetime import timedelta, datetime, timezone
-import os
+from datetime import datetime, timezone
 
 import pandas as pd
 import numpy as np
@@ -11,6 +9,7 @@ import numpy as np
 from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.chart import plot_trades
+from systems.utils.time import parse_timeframe, apply_time_filter
 
 # ===================== Parameters =====================
 # Lookbacks
@@ -28,65 +27,6 @@ VOL_LOOKBACK = 48   # rolling window for volatility
 ANGLE_LOOKBACK = 48     # used for slope angle
 
 
-_INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
-
-TIMEFRAME_SECONDS = {
-    's': 1,
-    'm': 30 * 24 * 3600,
-    'h': 3600,
-    'd': 86400,
-    'w': 604800,
-}
-
-INTERVAL_SECONDS = {
-    's': 1,
-    'm': 60,
-    'h': 3600,
-    'd': 86400,
-    'w': 604800,
-}
-
-def parse_timeframe(tf: str):
-    if not tf:
-        return None
-    m = re.match(r'(?i)^\s*(\d+)\s*([smhdw])\s*$', tf)
-    if not m:
-        return None
-    n, u = int(m.group(1)), m.group(2).lower()
-    return timedelta(seconds=n * TIMEFRAME_SECONDS[u])
-
-def infer_candle_seconds_from_filename(path: str) -> int | None:
-    m = _INTERVAL_RE.search(os.path.basename(path))
-    if not m:
-        return None
-    n, u = int(m.group(2)), m.group(3).lower()
-    return n * INTERVAL_SECONDS[u]
-
-def apply_time_filter(df: pd.DataFrame, delta: timedelta, file_path: str) -> pd.DataFrame:
-    if delta is None:
-        return df
-    if 'timestamp' in df.columns:
-        ts = df['timestamp']
-        ts_max = float(ts.iloc[-1])
-        is_ms = ts_max > 1e12
-        to_seconds = (ts / 1000.0) if is_ms else ts
-        cutoff = (datetime.now(timezone.utc).timestamp() - delta.total_seconds())
-        mask = to_seconds >= cutoff
-        return df.loc[mask]
-    for col in ('datetime','date','time'):
-        if col in df.columns:
-            try:
-                dt = pd.to_datetime(df[col], utc=True, errors='coerce')
-                cutoff_dt = pd.Timestamp.utcnow() - delta
-                mask = dt >= cutoff_dt
-                return df.loc[mask]
-            except Exception:
-                pass
-    sec = infer_candle_seconds_from_filename(file_path) or 3600
-    need = int(max(EXHAUSTION_LOOKBACK*2, delta.total_seconds() // sec))
-    if need <= 0 or need >= len(df):
-        return df
-    return df.iloc[-need:]
 
 # ===================== Exhaustion Plot + Trades =====================
 def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
