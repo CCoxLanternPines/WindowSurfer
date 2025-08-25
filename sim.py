@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""CLI entry point for running historical simulations."""
+"""CLI entry point for running historical simulations.
+
+Example:
+    python sim.py --coin DOGEUSD --time 1m --viz
+
+Use ``--help`` to see available options.
+"""
 
 from __future__ import annotations
 
@@ -53,7 +59,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     from systems.sim_engine import run_simulation
 
     run_simulation(
-        coin=coin,
+        market=coin,
         timeframe=args.time,
         viz=False,
     )

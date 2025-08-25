@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""CLI entry point for live trading loop."""
+"""CLI entry point for live trading loop.
+
+Example:
+    python live.py --account Kris --market DOGEUSD --graph
+
+Use ``--help`` to see available options.
+"""
 
 from __future__ import annotations
 
