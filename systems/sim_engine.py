@@ -14,7 +14,9 @@ from systems.utils import log
 from systems.utils.graph_feed import GraphFeed
 from systems.utils.settings_loader import get_coin_setting
 
+
 SETTINGS_PATH = pathlib.Path("settings/settings.json")
+
 if SETTINGS_PATH.exists():
     _settings = json.loads(SETTINGS_PATH.read_text())
     START_CAPITAL = _settings.get("general_settings", {}).get("simulation_capital", 10_000)

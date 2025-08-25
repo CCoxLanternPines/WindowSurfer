@@ -3,8 +3,8 @@
     "simulation_capital": 1000
   },
   "viz_filters": {
-    "volatility_min_size": 0,
-    "pressure_min_size": 0,
-    "angle_skip_n": 1
+    "volatility_min_size": 50,
+    "pressure_min_size": 50,
+    "angle_skip_n": 2
   }
 }
