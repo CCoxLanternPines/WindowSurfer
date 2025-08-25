@@ -1,0 +1,72 @@
+# WindowSurfer Directory Structure Overview
+
+## Root Level
+- **live.py / sim.py / test.py**  
+  Entry-point CLI scripts for running live trading, simulations, and configuration testing.
+
+- **requirements.txt**  
+  Lists Python dependencies required for the system.
+
+- **README.md**  
+  Documentation and quick start guide for the project.
+
+---
+
+## systems/
+This folder contains the *core systems* that drive the decision-making logic.
+
+- **live_engine.py**  
+  Main live trading engine, responsible for executing trades in real-time.
+
+- **sim_engine.py**  
+  Simulation engine for running historical backtests and strategy evaluations.
+
+- **manual.py**  
+  (If present) Allows manual override or testing of specific trading logic.
+
+- **fetch.py**  
+  Fetches historical candle data from exchanges (e.g., Binance, Kraken).
+
+- **scripts/**  
+  Subsystems that the main engines call into for specialized processing (e.g., plotting, ledger management, signal evaluation).  
+  *Think of these as "helpers with trading-specific logic."*
+
+- **utils/**  
+  General-purpose utilities shared across all systems.  
+  Example:  
+  - `settings_loader.py` → Load account/coin/settings JSON files.  
+  - `time.py` → Time utilities like parsing timeframes and windows.
+
+- **regimes/**  
+  Contains logic for regime detection and categorization of market conditions.
+
+---
+
+## settings/
+This folder contains all configuration and parameter files.
+
+- **account_settings.json**  
+  Defines accounts, their Kraken keys, reporting preferences, and per-market rules.
+
+- **coin_settings.json**  
+  Coin-specific parameters like exhaustion lookback, bubble sizes, slope angles.
+
+- **settings.json**  
+  Global defaults (e.g., starting simulation capital).
+
+- **keys.json** (optional, not always present)  
+  Stores API keys/secrets per account for live trading.
+
+---
+
+## _reference/
+Contains reference material or archived configs not actively used in the live system.
+
+---
+
+### Summary
+- **systems/** → Engines, core trading logic, and specialized subsystems.  
+- **scripts/** → Trading-specific helpers called by systems.  
+- **utils/** → Reusable generic helpers for config/time/etc.  
+- **settings/** → All runtime configuration for accounts, coins, and system-wide defaults.  
+- **root scripts** (sim.py, live.py, test.py) → CLI entrypoints for testing, sim, and live trading.
