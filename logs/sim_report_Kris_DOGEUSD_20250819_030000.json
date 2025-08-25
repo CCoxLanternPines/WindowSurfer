@@ -1,0 +1,23 @@
+{
+  "windows": [
+    {
+      "window": "strategy",
+      "window_size": "24",
+      "buys": 0,
+      "sells": 0,
+      "gross_invested": 0.0,
+      "realized_cost": 0.0,
+      "realized_proceeds": 0.0,
+      "realized_pnl": 0.0,
+      "realized_roi": 0.0,
+      "avg_trade_roi": 0.0,
+      "open_value_now": 0,
+      "window_total_at_liq": 0.0
+    }
+  ],
+  "global": {
+    "cash": 1000.0,
+    "open_value_now": 0,
+    "total_at_liq": 1000.0
+  }
+}
