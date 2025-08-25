@@ -12,6 +12,7 @@ from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.chart import plot_trades
 from systems.utils.time import parse_timeframe, apply_time_filter
 from systems.utils import log
+from systems.utils.graph_feed import GraphFeed
 
 # ===================== Parameters =====================
 # Lookbacks
@@ -31,7 +32,14 @@ ANGLE_LOOKBACK = 48     # used for slope angle
 
 
 # ===================== Exhaustion Plot + Trades =====================
-def run_simulation(*, coin: str, timeframe: str = "1m", viz: bool = True) -> None:
+def run_simulation(
+    *,
+    coin: str,
+    timeframe: str = "1m",
+    graph_feed: bool = False,
+    graph_downsample: int = 1,
+    viz: bool = True,
+) -> None:
     """Run historical simulation for ``coin``.
 
     Parameters
@@ -75,6 +83,12 @@ def run_simulation(*, coin: str, timeframe: str = "1m", viz: bool = True) -> Non
     }
     df["angle"] = 0.0
     vol_pts = {"x": [], "y": [], "s": []}
+
+    feed = (
+        GraphFeed(mode="sim", coin=coin, downsample=graph_downsample, flush=False)
+        if graph_feed
+        else None
+    )
 
     # Rolling slope calculation
     for t in range(ANGLE_LOOKBACK, len(df)):
@@ -123,13 +137,15 @@ def run_simulation(*, coin: str, timeframe: str = "1m", viz: bool = True) -> Non
 
     for idx, row in df.iterrows():
         dt = None
-        if 'timestamp' in row:
-            ts = float(row['timestamp'])
+        ts_val = None
+        if "timestamp" in row:
+            ts = float(row["timestamp"])
             is_ms = ts > 1e12
+            ts_val = int(ts)
             dt = datetime.fromtimestamp(ts / (1000 if is_ms else 1), tz=timezone.utc)
-        elif 'datetime' in row:
+        elif "datetime" in row:
             try:
-                dt = pd.to_datetime(row['datetime'], utc=True).to_pydatetime()
+                dt = pd.to_datetime(row["datetime"], utc=True).to_pydatetime()
             except Exception:
                 dt = None
         if dt is not None:
@@ -143,12 +159,49 @@ def run_simulation(*, coin: str, timeframe: str = "1m", viz: bool = True) -> Non
 
         price = row["close"]
 
+        if feed:
+            feed.candle(
+                idx,
+                ts_val,
+                float(row.get("open", price)),
+                float(row.get("high", price)),
+                float(row.get("low", price)),
+                float(price),
+            )
+            feed.indicator(idx, "angle", float(row.get("angle", 0.0)))
+            feed.indicator(idx, "vol", float(row.get("volatility", 0.0)))
+
+        prev_len = len(open_notes)
         trade, capital, open_notes = evaluate_buy(idx, row, pts, capital, open_notes)
         if trade:
             trades.append(trade)
+            if feed and len(open_notes) > prev_len:
+                note = open_notes[-1]
+                feed.buy(
+                    trade["idx"],
+                    trade["price"],
+                    float(note.get("units", 0.0)),
+                    trade["usd"],
+                    float(note.get("sell_price", 0.0)),
+                )
 
+        prev_notes = list(open_notes)
         closed, capital, open_notes = evaluate_sell(idx, price, open_notes, capital)
         trades.extend(closed)
+        if feed and closed:
+            closed_notes = [n for n in prev_notes if n not in open_notes]
+            for tr, n in zip(closed, closed_notes):
+                feed.sell(
+                    tr["idx"],
+                    tr["price"],
+                    float(n.get("units", 0.0)),
+                    tr["usd"],
+                    float(n.get("entry_price", 0.0)),
+                )
+
+        if feed:
+            equity = capital + sum(n["units"] * price for n in open_notes)
+            feed.capital(idx, float(capital), float(equity))
 
     # Final portfolio value
     final_value = capital + sum(n["units"] * float(df["close"].iloc[-1]) for n in open_notes)
@@ -163,6 +216,9 @@ def run_simulation(*, coin: str, timeframe: str = "1m", viz: bool = True) -> Non
             final_value,
             angle_lookback=ANGLE_LOOKBACK,
         )
+
+    if feed:
+        feed.close()
 
     log.what(
         f"Final Capital: {capital:.2f}, Open Notes: {len(open_notes)}, Final Value: {final_value:.2f}"
