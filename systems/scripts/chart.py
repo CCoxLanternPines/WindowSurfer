@@ -71,7 +71,7 @@ def plot_trades(
                 t["idx"],
                 t["price"],
                 marker="^",
-                s=150,
+                s=450,  # triple previous marker size
                 c="lime",
                 edgecolor="black",
                 zorder=10,
@@ -81,7 +81,7 @@ def plot_trades(
                 t["idx"],
                 t["price"],
                 marker="v",
-                s=150,
+                s=450,  # triple previous marker size
                 c="red",
                 edgecolor="black",
                 zorder=10,

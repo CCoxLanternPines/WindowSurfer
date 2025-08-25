@@ -88,11 +88,12 @@ class GraphEngine:
 
         self.buy_trades: List[Dict[str, Any]] = []
         self.sell_trades: List[Dict[str, Any]] = []
+        marker_size = 108  # triple default size for trade markers
         self.buy_art = self.ax_main.scatter(
-            [], [], marker="^", c="green", edgecolor="black", picker=True, pickradius=6
+            [], [], s=marker_size, marker="^", c="green", edgecolor="black", picker=True, pickradius=6
         )
         self.sell_art = self.ax_main.scatter(
-            [], [], marker="v", c="red", edgecolor="black", picker=True, pickradius=6
+            [], [], s=marker_size, marker="v", c="red", edgecolor="black", picker=True, pickradius=6
         )
         self.pb_art = self.ax_main.scatter(
             [], [], s=[], c="green", alpha=0.30, edgecolor="black"
