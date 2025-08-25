@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
-
 import json
 import pathlib
 import numpy as np
@@ -12,26 +10,28 @@ from systems.scripts.evaluate_sell import evaluate_sell
 from systems.utils.time import parse_timeframe, apply_time_filter
 from systems.utils import log
 from systems.utils.graph_feed import GraphFeed
-from systems.utils.config_loader import get_coin_setting
+from systems.utils.config_loader import load_coin_settings
+from systems.scripts.candle_loop import run_candle_loop
 
 
 SETTINGS_PATH = pathlib.Path("settings/settings.json")
 
 if SETTINGS_PATH.exists():
     _settings = json.loads(SETTINGS_PATH.read_text())
-    START_CAPITAL = _settings.get("general_settings", {}).get("simulation_capital", 10_000)
+    _general = _settings.get("general_settings", {})
+    START_CAPITAL = _general.get("simulation_capital", 10_000)
+    MONTHLY_TOPUP = _general.get("monthly_topup", 0)
 else:
     START_CAPITAL = 10_000
+    MONTHLY_TOPUP = 0
 
+# ===================== Parameters =====================
+# Lookbacks and scalars
 # ===================== Parameters =====================
 # Lookbacks and scalars
 
 SIZE_SCALAR      = 1_000_000
 SIZE_POWER       = 3
-
-MONTHLY_TOPUP    = 000    # fixed USDT injected each calendar month
-
-
 
 # ===================== Exhaustion Plot + Trades =====================
 def run_simulation(
@@ -57,35 +57,52 @@ def run_simulation(
     coin = coin.replace("/", "").upper()
 
     # Load per-coin settings with safe fallbacks
-    EXHAUSTION_LOOKBACK = int(get_coin_setting(coin, "exhaustion_lookback", 184))
-    WINDOW_STEP = int(get_coin_setting(coin, "window_step", 12))
+    settings = load_coin_settings(coin)
+    EXHAUSTION_LOOKBACK = int(settings.get("exhaustion_lookback", 184))
+    WINDOW_STEP = int(settings.get("window_step", 12))
 
-    BUY_MIN_BUBBLE = float(get_coin_setting(coin, "buy_min_bubble", 100))
-    BUY_MAX_BUBBLE = float(get_coin_setting(coin, "buy_max_bubble", 500))
-    MIN_NOTE_SIZE_PCT = float(get_coin_setting(coin, "min_note_size_pct", 0.03))
-    MAX_NOTE_SIZE_PCT = float(get_coin_setting(coin, "max_note_size_pct", 0.25))
+    BUY_MIN_BUBBLE = float(settings.get("buy_min_bubble", 100))
+    BUY_MAX_BUBBLE = float(settings.get("buy_max_bubble", 500))
+    MIN_NOTE_SIZE_PCT = float(settings.get("min_note_size_pct", 0.03))
+    MAX_NOTE_SIZE_PCT = float(settings.get("max_note_size_pct", 0.25))
 
-    SELL_MIN_BUBBLE = float(get_coin_setting(coin, "sell_min_bubble", 150))
-    SELL_MAX_BUBBLE = float(get_coin_setting(coin, "sell_max_bubble", 800))
-    MIN_MATURITY = float(get_coin_setting(coin, "min_maturity", 0.05))
-    MAX_MATURITY = float(get_coin_setting(coin, "max_maturity", 0.25))
+    SELL_MIN_BUBBLE = float(settings.get("sell_min_bubble", 150))
+    SELL_MAX_BUBBLE = float(settings.get("sell_max_bubble", 800))
+    MIN_MATURITY = float(settings.get("min_maturity", 0.05))
+    MAX_MATURITY = float(settings.get("max_maturity", 0.25))
 
-    BUY_MIN_VOL_BUBBLE = float(get_coin_setting(coin, "buy_min_vol_bubble", 0.0))
-    BUY_MAX_VOL_BUBBLE = float(get_coin_setting(coin, "buy_max_vol_bubble", 0.01))
-    BUY_MULT_VOL_MIN = float(get_coin_setting(coin, "buy_mult_vol_min", 2.5))
-    BUY_MULT_VOL_MAX = float(get_coin_setting(coin, "buy_mult_vol_max", 0.0))
-    VOL_LOOKBACK = int(get_coin_setting(coin, "vol_lookback", 48))
+    BUY_MIN_VOL_BUBBLE = float(settings.get("buy_min_vol_bubble", 0.0))
+    BUY_MAX_VOL_BUBBLE = float(settings.get("buy_max_vol_bubble", 0.01))
+    BUY_MULT_VOL_MIN = float(settings.get("buy_mult_vol_min", 2.5))
+    BUY_MULT_VOL_MAX = float(settings.get("buy_mult_vol_max", 0.0))
+    VOL_LOOKBACK = int(settings.get("vol_lookback", 48))
 
-    ANGLE_UP_MIN = float(get_coin_setting(coin, "angle_up_min", 0.1))
-    ANGLE_DOWN_MIN = float(get_coin_setting(coin, "angle_down_min", -0.5))
-    ANGLE_LOOKBACK = int(get_coin_setting(coin, "angle_lookback", 48))
+    ANGLE_UP_MIN = float(settings.get("angle_up_min", 0.1))
+    ANGLE_DOWN_MIN = float(settings.get("angle_down_min", -0.5))
+    ANGLE_LOOKBACK = int(settings.get("angle_lookback", 48))
 
-    SLOPE_SALE = float(get_coin_setting(coin, "slope_sale", 1.0))
+    SLOPE_SALE = float(settings.get("slope_sale", 1.0))
     slope_sale = SLOPE_SALE
 
-    BUY_MULT_TREND_UP = float(get_coin_setting(coin, "buy_mult_trend_up", 1.0))
-    BUY_MULT_TREND_FLOOR = float(get_coin_setting(coin, "buy_mult_trend_floor", 0.25))
-    BUY_MULT_TREND_DOWN = float(get_coin_setting(coin, "buy_mult_trend_down", 0.0))
+    BUY_MULT_TREND_UP = float(settings.get("buy_mult_trend_up", 1.0))
+    BUY_MULT_TREND_FLOOR = float(settings.get("buy_mult_trend_floor", 0.25))
+    BUY_MULT_TREND_DOWN = float(settings.get("buy_mult_trend_down", 0.0))
+
+    print(
+        f"[DEBUG] Loaded coin settings for {coin}: angle_up={ANGLE_UP_MIN:.2f}, "
+        f"angle_down={ANGLE_DOWN_MIN:.2f}, vol_lookback={VOL_LOOKBACK}, slope_sale={SLOPE_SALE}"
+    )
+    default_cfg = load_coin_settings("default")
+    for key, val in [
+        ("angle_up_min", ANGLE_UP_MIN),
+        ("angle_down_min", ANGLE_DOWN_MIN),
+        ("angle_lookback", ANGLE_LOOKBACK),
+        ("slope_sale", SLOPE_SALE),
+    ]:
+        if default_cfg.get(key) != val:
+            print(
+                f"[DEBUG] default {key}={default_cfg.get(key)} differs from {val} for {coin}"
+            )
 
     # Inject settings into buy evaluation module
     buy_module.BUY_MIN_BUBBLE = BUY_MIN_BUBBLE
@@ -183,91 +200,80 @@ def run_simulation(
             feed.vol_bubble(int(x), float(y), float(s))
 
     # ===== Candle-by-candle simulation =====
-    trades = []
     capital = START_CAPITAL
-    open_notes = []
-    last_month = None
+    open_notes: list[dict[str, float]] = []
+    last_month: tuple[int, int] | None = None
 
-    for idx, row in df.iterrows():
-        dt = None
-        ts_val = None
-        if "timestamp" in row:
-            ts = float(row["timestamp"])
-            is_ms = ts > 1e12
-            ts_val = int(ts / (1000 if is_ms else 1))
-            dt = datetime.fromtimestamp(ts / (1000 if is_ms else 1), tz=timezone.utc)
-        elif "datetime" in row:
-            try:
-                dt = pd.to_datetime(row["datetime"], utc=True).to_pydatetime()
-            except Exception:
-                dt = None
-        if dt is not None:
-            current_month = (dt.year, dt.month)
-            if current_month != last_month:
-                capital += MONTHLY_TOPUP
-                last_month = current_month
-                log.what(
-                    f"Monthly top-up: +{MONTHLY_TOPUP} USDT at {dt.date()} → Capital={capital:.2f}"
-                )
+    def on_candle(idx, row):
+        if not feed:
+            return
+        price = float(row.get("close", 0.0))
+        ts_val = int(row.get("timestamp", 0))
+        feed.candle(
+            int(row["candle_index"]),
+            ts_val,
+            float(row.get("open", price)),
+            float(row.get("high", price)),
+            float(row.get("low", price)),
+            price,
+        )
+        if idx >= ANGLE_LOOKBACK and idx % WINDOW_STEP == 0:
+            feed.indicator(int(row["candle_index"]), "angle", float(row.get("angle", 0.0)))
+        if idx >= VOL_LOOKBACK and idx % WINDOW_STEP == 0:
+            feed.indicator(int(row["candle_index"]), "vol", float(row.get("volatility", 0.0)))
 
-        price = row["close"]
+    def buy_handler(idx, row, notes, cap):
+        return buy_module.evaluate_buy(idx, row, pts, cap, notes)
 
-        if feed:
-            feed.candle(
-                int(row["candle_index"]),
-                ts_val,
-                float(row.get("open", price)),
-                float(row.get("high", price)),
-                float(row.get("low", price)),
-                float(price),
+    def sell_handler(idx, row, notes, cap):
+        nonlocal last_month
+        ts = int(row.get("timestamp", 0))
+        dt = pd.to_datetime(ts, unit="s", utc=True)
+        current_month = (dt.year, dt.month)
+        if current_month != last_month:
+            cap += MONTHLY_TOPUP
+            last_month = current_month
+            log.what(
+                f"Monthly top-up: +{MONTHLY_TOPUP} USDT at {dt.date()} → Capital={cap:.2f}"
             )
-            if idx >= ANGLE_LOOKBACK and idx % WINDOW_STEP == 0:
-                feed.indicator(int(row["candle_index"]), "angle", float(row.get("angle", 0.0)))
-            if idx >= VOL_LOOKBACK and idx % WINDOW_STEP == 0:
-                feed.indicator(int(row["candle_index"]), "vol", float(row.get("volatility", 0.0)))
-
-        prev_len = len(open_notes)
-        trade, capital, open_notes = buy_module.evaluate_buy(
-            idx, row, pts, capital, open_notes
-        )
-        if trade:
-            trades.append(trade)
-            if feed and len(open_notes) > prev_len:
-                note = open_notes[-1]
-                feed.buy(
-                    trade["idx"],
-                    trade["price"],
-                    float(note.get("units", 0.0)),
-                    trade["usd"],
-                    float(note.get("sell_price", 0.0)),
-                )
-
+            action_handler("TOPUP", idx, row, account="sim", coin=coin)
+        price = float(row["close"])
         angle = float(row.get("angle", 0.0))
-        prev_notes = list(open_notes)
-        closed, capital, open_notes = evaluate_sell(
-            idx, price, open_notes, capital, angle=angle, slope_sale=slope_sale
-        )
-        trades.extend(closed)
-        if feed and closed:
-            closed_notes = [n for n in prev_notes if n not in open_notes]
-            for tr, n in zip(closed, closed_notes):
-                feed.sell(
-                    tr["idx"],
-                    tr["price"],
-                    float(n.get("units", 0.0)),
-                    tr["usd"],
-                    float(n.get("entry_price", 0.0)),
-                )
+        return evaluate_sell(idx, price, notes, cap, angle=angle, slope_sale=slope_sale)
 
-        if feed and (idx % 50 == 0):
-            equity = capital + sum(n["units"] * price for n in open_notes)
-            feed.capital(int(row["candle_index"]), float(capital), float(equity))
+    import json as _json
+    from pathlib import Path
 
-    # Final portfolio value
+    def ledger_handler(trade, account, coin):
+        if not trade:
+            return
+        path = Path("data") / "ledgers" / f"{account}_{coin}.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            _json.dump(trade, f)
+            f.write("\n")
+
+    def action_handler(action, idx, row, account, coin):
+        path = Path("data") / "actions" / f"{account}_{coin}.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        record = {"idx": int(idx), "timestamp": int(row.get("timestamp", 0)), "action": action}
+        with path.open("a", encoding="utf-8") as f:
+            _json.dump(record, f)
+            f.write("\n")
+
+    handlers = {
+        "buy": buy_handler,
+        "sell": sell_handler,
+        "ledger": ledger_handler,
+        "action": action_handler,
+        "on_candle": on_candle,
+        "capital": capital,
+        "open_notes": open_notes,
+    }
+
+    capital, open_notes = run_candle_loop(df, handlers, account="sim", coin=coin)
+
     final_value = capital + sum(n["units"] * float(df["close"].iloc[-1]) for n in open_notes)
-
-    if viz:
-        pass  # plotting handled by systems/graph_engine.py
 
     if feed:
         feed.close()
