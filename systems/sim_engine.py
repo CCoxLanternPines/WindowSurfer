@@ -71,6 +71,8 @@ def _run_single_sim(
     init_trade_logger(ledger_name)
     base, _ = split_tag(tag)
 
+    cfg = coin_settings.get(market, coin_settings.get("default", {}))
+
     if account.upper() == "SIM":
         csv_path = Path("data/candles/sim") / f"{market}.csv"
         if not csv_path.exists():
@@ -101,11 +103,23 @@ def _run_single_sim(
         general, coin_settings, accounts_cfg, account, ccxt_market, "sim", client=client
     )
 
-    for t in tqdm(range(len(df)), desc="📉 Sim Progress", unit="tick"):
+    step_size = cfg.get("window_step", coin_settings.get("default", {}).get("window_step", 1))
+    print(
+        f"[SIM] Using step_size={step_size}, candles={len(df)}, steps={len(range(0, len(df), step_size))}"
+    )
+    entries = []
+    for t in tqdm(range(0, len(df), step_size), desc="📉 Sim Progress", unit="tick"):
         candle = df.iloc[t]
-        buy_signal = evaluate_buy(ctx={}, t=t, series=df, cfg=coin_settings.get("default", {}), runtime_state=runtime_state)
+        price = float(candle["close"])
+        trade_recorded = False
+
+        buy_signal = evaluate_buy(ctx={}, t=t, series=df, cfg=cfg, runtime_state=runtime_state)
         if buy_signal:
-            units = buy_signal.get("units") or (buy_signal["size_usd"] / buy_signal["entry_price"])
+            entry_price = buy_signal.get("entry_price", price)
+            units = buy_signal.get("units")
+            if units is None:
+                units = buy_signal.get("size_usd", 0.0) / entry_price if entry_price else 0.0
+                buy_signal["units"] = units
             apply_buy(
                 ledger=ledger_obj,
                 window_name="default",
@@ -113,22 +127,31 @@ def _run_single_sim(
                 meta=buy_signal,
                 result={
                     "filled_amount": units,
-                    "avg_price": buy_signal["entry_price"],
+                    "avg_price": entry_price,
                     "timestamp": int(candle["timestamp"]),
                 },
                 state=runtime_state,
             )
-            runtime_state["capital"] -= buy_signal["size_usd"]
+            runtime_state["capital"] -= buy_signal.get("size_usd", 0.0)
+            entries.append({
+                "idx": t,
+                "price": entry_price,
+                "side": "BUY",
+                "usd": entry_price * units,
+            })
+            trade_recorded = True
 
         open_notes = ledger_obj.get_open_notes()
         sell_candidates = evaluate_sell(
-            ctx={}, t=t, series=df, cfg=coin_settings.get("default", {}), open_notes=open_notes, runtime_state=runtime_state
+            ctx={}, t=t, series=df, cfg=cfg, open_notes=open_notes, runtime_state=runtime_state
         )
         for sig in sell_candidates:
+            sell_price = sig.get("sell_price", price)
+            units = sig.get("units", sig.get("entry_amount", 0.0))
             result = {
-                "filled_amount": sig["units"],
-                "avg_price": sig["sell_price"],
-                "timestamp": sig["created_ts"],
+                "filled_amount": units,
+                "avg_price": sell_price,
+                "timestamp": sig.get("created_ts"),
             }
             apply_sell(
                 ledger=ledger_obj,
@@ -137,32 +160,32 @@ def _run_single_sim(
                 result=result,
                 state=runtime_state,
             )
+            entries.append({
+                "idx": t,
+                "price": sell_price,
+                "side": "SELL",
+                "usd": sell_price * units,
+            })
+            trade_recorded = True
+
+        if not trade_recorded:
+            entries.append({
+                "idx": t,
+                "price": price,
+                "side": "PASS",
+                "usd": 0.0,
+            })
 
     temp_dir = resolve_path("data/temp")
     temp_dir.mkdir(parents=True, exist_ok=True)
     full_path = temp_dir / "sim_data.json"
-
-    entries = []
-    for note in ledger_obj.get_closed_notes():
-        entries.append({
-            "idx": note.get("created_idx"),
-            "price": note.get("exit_price", note.get("entry_price")),
-            "side": "SELL",
-            "usd": note.get("exit_price", 0.0) * note.get("entry_amount", 0.0),
-        })
-    for note in ledger_obj.get_open_notes():
-        entries.append({
-            "idx": note.get("created_idx"),
-            "price": note.get("entry_price"),
-            "side": "BUY",
-            "usd": note.get("entry_price", 0.0) * note.get("entry_amount", 0.0),
-        })
 
     summary = ledger_obj.get_account_summary(float(df["close"].iloc[-1]))
     simple_ledger = {
         "trades": entries,
         "meta": {
             "coin": market,
+            "settings": cfg,
             "start_capital": start_capital,
             "final_value": summary.get("total_value", 0.0),
         },

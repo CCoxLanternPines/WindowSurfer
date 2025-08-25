@@ -36,6 +36,8 @@ def test_simulation_writes_ledger(monkeypatch):
     from systems.scripts import runtime_state
     monkeypatch.setattr(runtime_state, "resolve_symbols", lambda client, market: {"kraken_name": market, "kraken_pair": market, "binance_name": market})
 
+    monkeypatch.setattr(sim_engine, "load_coin_settings", lambda *args, **kwargs: {"default": {"window_step": 1}})
+
     def fake_state(*args, **kwargs):
         return {
             "strategy": {
