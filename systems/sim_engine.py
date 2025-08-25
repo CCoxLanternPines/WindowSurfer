@@ -353,10 +353,12 @@ def _run_single_sim(
         }
         ledger_entry = {
             "candle_idx": t,
+            "idx": t,
             "timestamp": ts,
             "side": "BUY" if decision == "BUY" else ("SELL" if sell_notes else "PASS"),
             "price": price,
             "size_usd": size_usd,
+            "usd": size_usd,
             "entry_price": entry_price_val,
             "roi": roi_val,
             "pressure_buy": pressures.get("buy", {}).get("strategy", 0.0),
@@ -619,52 +621,33 @@ def _run_single_sim(
         plt.show()
 
 
-def run_simulation(
-    *,
-    account: str | None = None,
-    market: str | None = None,
-    all_accounts: bool = False,
-    verbose: int = 0,
-    timeframe: str = "1m",
-    viz: bool = True,
-) -> None:
-    """Iterate configured accounts/markets and run simulations."""
+def run_simulation(*, coin: str, timeframe: str = "1m", viz: bool = True) -> None:
+    """Run a simulation for the given ``coin`` over ``timeframe``."""
     general = load_general()
     coin_settings = load_coin_settings()
     accounts_cfg = load_account_settings()
-    accounts = accounts_cfg
-    if market:
-        market = market.replace("/", "").upper()
-    targets = accounts.keys() if (all_accounts or not account) else [account]
-    for acct_name in targets:
-        acct_cfg = accounts.get(acct_name)
-        if not acct_cfg:
-            addlog(
-                f"[ERROR] Unknown account {acct_name}",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-            continue
-        client = ccxt.kraken({"enableRateLimit": True})
-        markets_cfg = acct_cfg.get("market settings", {})
-        m_targets = [market] if market else list(markets_cfg.keys())
-        for m in m_targets:
-            m_clean = m.replace("/", "").upper()
-            if m_clean not in markets_cfg:
-                continue
-            addlog(
-                f"[RUN][{acct_name}][{m_clean}]",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-            _run_single_sim(
-                general=general,
-                coin_settings=coin_settings,
-                accounts_cfg=accounts_cfg,
-                account=acct_name,
-                market=m_clean,
-                client=client,
-                verbose=verbose,
-                timeframe=timeframe,
-                viz=viz,
-            )
+
+    if not accounts_cfg:
+        raise ValueError("No account configuration available")
+
+    # Use the first configured account for simulation purposes
+    account = next(iter(accounts_cfg.keys()))
+    client = ccxt.kraken({"enableRateLimit": True})
+    market = coin.replace("/", "").upper()
+
+    addlog(
+        f"[RUN][{account}][{market}]",
+        verbose_int=1,
+        verbose_state=0,
+    )
+    _run_single_sim(
+        general=general,
+        coin_settings=coin_settings,
+        accounts_cfg=accounts_cfg,
+        account=account,
+        market=market,
+        client=client,
+        verbose=0,
+        timeframe=timeframe,
+        viz=viz,
+    )

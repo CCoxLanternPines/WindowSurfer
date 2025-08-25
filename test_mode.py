@@ -54,7 +54,7 @@ def test_simulation_writes_ledger(monkeypatch):
 
     monkeypatch.setattr(sim_engine, "build_runtime_state", fake_state)
 
-    sim_engine.run_simulation(account="Kris", market="DOGEUSD", timeframe="100y", viz=False)
+    sim_engine.run_simulation(coin="DOGEUSD", timeframe="100y", viz=False)
 
     ledger_path = Path("data/temp/sim_data.json")
     assert ledger_path.exists()
