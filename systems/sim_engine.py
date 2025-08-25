@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 
+import json
+import pathlib
 import numpy as np
 
 from systems.scripts.evaluate_buy import evaluate_buy
@@ -12,13 +14,19 @@ from systems.utils import log
 from systems.utils.graph_feed import GraphFeed
 from systems.utils.settings_loader import get_coin_setting
 
+SETTINGS_PATH = pathlib.Path("settings.json")
+if SETTINGS_PATH.exists():
+    _settings = json.loads(SETTINGS_PATH.read_text())
+    START_CAPITAL = _settings.get("general_settings", {}).get("simulation_capital", 10_000)
+else:
+    START_CAPITAL = 10_000
+
 # ===================== Parameters =====================
 # Lookbacks
 
 SIZE_SCALAR      = 1_000_000
 SIZE_POWER       = 3
 
-START_CAPITAL    = 10_000   # starting cash in USDT
 MONTHLY_TOPUP    = 000    # fixed USDT injected each calendar month
 
 EXHAUSTION_LOOKBACK = 184   # used for bubble delta
