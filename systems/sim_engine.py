@@ -1,482 +1,341 @@
 from __future__ import annotations
 
-"""Historical simulation engine for position-based strategy."""
-
-import shutil
-from datetime import datetime, timezone
-import csv
-import json
+import argparse
+import re
+from datetime import timedelta, datetime, timezone
 import os
 
-import ccxt
 import pandas as pd
-from tqdm import tqdm
-from typing import Any, Dict
+import matplotlib.pyplot as plt
+import numpy as np
 
-from systems.scripts.ledger import Ledger, save_ledger
-from systems.scripts.candle_loader import load_candles_df
-from systems.scripts.evaluate_buy import evaluate_buy
-from systems.scripts.evaluate_sell import evaluate_sell
-from systems.scripts.runtime_state import build_runtime_state
-from systems.scripts.trade_apply import (
-    apply_buy,
-    apply_sell,
-    paper_execute_buy,
-    paper_execute_sell,
-)
-from systems.utils.addlog import addlog
-from pathlib import Path
+# ===================== Parameters =====================
+# Lookbacks
 
-from systems.utils.config import (
-    resolve_path,
-    load_general,
-    load_coin_settings,
-    load_account_settings,
-)
-from systems.utils.resolve_symbol import (
-    split_tag,
-    resolve_symbols,
-    to_tag,
-    sim_path_csv,
-    candle_filename,
-)
-from systems.utils.time import parse_cutoff as parse_timeframe
-from systems.utils.trade_logger import init_logger as init_trade_logger, record_event
+SIZE_SCALAR      = 1_000_000
+SIZE_POWER       = 3
 
+START_CAPITAL    = 10_000   # starting cash in USDT
+MONTHLY_TOPUP    = 000    # fixed USDT injected each calendar month
 
-def _run_single_sim(
-    *,
-    general,
-    coin_settings,
-    accounts_cfg,
-    account: str,
-    market: str,
-    client: ccxt.Exchange,
-    verbose: int = 0,
-    timeframe: str = "1m",
-    viz: bool = True,
-) -> None:
-    os.environ["WS_MODE"] = "sim"
-    os.environ["WS_ACCOUNT"] = account
-    addlog(
-        "[PARITY] Running in sim mode — strategy knobs identical, only execution differs",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
+EXHAUSTION_LOOKBACK = 184   # used for bubble delta
+WINDOW_STEP = 12
 
-    symbols = resolve_symbols(client, market)
-    kraken_name = symbols["kraken_name"]
-    kraken_pair = symbols["kraken_pair"]
-    binance_name = symbols["binance_name"]
+# Buy scaling
+BUY_MIN_BUBBLE    = 100
+BUY_MAX_BUBBLE    = 500
+MIN_NOTE_SIZE_PCT = 0.03    # 1% of portfolio
+MAX_NOTE_SIZE_PCT = 0.25    # 5% of portfolio
 
-    addlog(
-        f"[RESOLVE][{account}][{market}] KrakenName={kraken_name} KrakenPair={kraken_pair} BinanceName={binance_name}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
+# Sell scaling (baked into note at buy time)
+SELL_MIN_BUBBLE   = 150
+SELL_MAX_BUBBLE   = 800
+MIN_MATURITY      = 0.05    # 0% gain (sell at entry)
+MAX_MATURITY      = .25     # 100% gain (2x entry)
 
-    tag = to_tag(kraken_name)
-    file_tag = market.replace("/", "_")
-    ledger_name = f"{account}_{file_tag}"
-    init_trade_logger(ledger_name)
-    base, _ = split_tag(tag)
-    coin = base.upper()
-    csv_path = candle_filename(account, market)
-    df, removed = load_candles_df(account, market, verbose=verbose)
-    ts_col = "timestamp"
+# Volatility buy scaling
+BUY_MIN_VOL_BUBBLE = 0
+BUY_MAX_VOL_BUBBLE = .01
+BUY_MULT_VOL_MIN   = 2.5
+BUY_MULT_VOL_MAX   = 0
+VOL_LOOKBACK = 48   # rolling window for volatility
 
-    # Optional hard check
-    if not df[ts_col].is_monotonic_increasing:
-        raise ValueError(f"Candles not sorted by {ts_col}: {csv_path}")
+# Angle thresholds (normalized; 0.0..1.0 where 1.0 = 45°)
+ANGLE_UP_MIN   = 0.1   # require at least +0.20 (~+9°) to start scaling up
+ANGLE_DOWN_MIN = -0.50   # require at least -0.20 (~-9°) to start scaling down
+ANGLE_LOOKBACK = 48     # used for slope angle
 
-    if timeframe:
-        delta = parse_timeframe(timeframe)
-        cutoff_ts = (datetime.now(tz=timezone.utc) - delta).timestamp()
-        df = df[df[ts_col] >= cutoff_ts].reset_index(drop=True)
-
-    # Log one line so we always know what we ran on
-    first_ts = int(df[ts_col].iloc[0]) if len(df) else None
-    last_ts = int(df[ts_col].iloc[-1]) if len(df) else None
-    first_iso = (
-        datetime.fromtimestamp(first_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        if first_ts is not None
-        else "n/a"
-    )
-    last_iso = (
-        datetime.fromtimestamp(last_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        if last_ts is not None
-        else "n/a"
-    )
-    print(
-        f"[DATA][SIM] file={csv_path} rows={len(df)} first={first_iso} last={last_iso} dups_removed={removed}"
-    )
-
-    total = len(df)
-
-    runtime_state = build_runtime_state(
-        general,
-        coin_settings,
-        accounts_cfg,
-        account,
-        market,
-        mode="sim",
-        client=client,
-        prev={"verbose": verbose},
-    )
-    runtime_state["mode"] = "sim"
-    runtime_state["symbol"] = tag
-    runtime_state["buy_unlock_p"] = {}
-    strategy_cfg = runtime_state.get("strategy", {})
+# Trend multipliers
+BUY_MULT_TREND_UP   = 1   # strong up-trend multiplier (cap at +1 normalized)
+BUY_MULT_TREND_FLOOR = .25  # keep 0 so flat maps to 0, no forced minimum
+BUY_MULT_TREND_DOWN = 0   # strong down-trend multiplier (cap at -1 normalized)
 
 
-    ledger_obj = Ledger()
-    ledger_obj.set_metadata({"capital": runtime_state.get("capital", 0.0)})
-    buy_points: list[tuple[float, float]] = []
-    sell_points: list[tuple[float, float]] = []
-    win_metrics = {
-        "strategy": {
-            "window_size": str(strategy_cfg.get("window_size", "")),
-            "buys": 0,
-            "sells": 0,
-            "gross_invested": 0.0,
-            "realized_cost": 0.0,
-            "realized_proceeds": 0.0,
-            "realized_trades": 0,
-            "realized_roi_accum": 0.0,
-        }
+_INTERVAL_RE = re.compile(r'[_\-]((\d+)([smhdw]))(?=\.|_|$)', re.I)
+
+TIMEFRAME_SECONDS = {
+    's': 1,
+    'm': 30 * 24 * 3600,
+    'h': 3600,
+    'd': 86400,
+    'w': 604800,
+}
+
+INTERVAL_SECONDS = {
+    's': 1,
+    'm': 60,
+    'h': 3600,
+    'd': 86400,
+    'w': 604800,
+}
+
+def parse_timeframe(tf: str):
+    if not tf:
+        return None
+    m = re.match(r'(?i)^\s*(\d+)\s*([smhdw])\s*$', tf)
+    if not m:
+        return None
+    n, u = int(m.group(1)), m.group(2).lower()
+    return timedelta(seconds=n * TIMEFRAME_SECONDS[u])
+
+def infer_candle_seconds_from_filename(path: str) -> int | None:
+    m = _INTERVAL_RE.search(os.path.basename(path))
+    if not m:
+        return None
+    n, u = int(m.group(2)), m.group(3).lower()
+    return n * INTERVAL_SECONDS[u]
+
+def apply_time_filter(df: pd.DataFrame, delta: timedelta, file_path: str) -> pd.DataFrame:
+    if delta is None:
+        return df
+    if 'timestamp' in df.columns:
+        ts = df['timestamp']
+        ts_max = float(ts.iloc[-1])
+        is_ms = ts_max > 1e12
+        to_seconds = (ts / 1000.0) if is_ms else ts
+        cutoff = (datetime.now(timezone.utc).timestamp() - delta.total_seconds())
+        mask = to_seconds >= cutoff
+        return df.loc[mask]
+    for col in ('datetime','date','time'):
+        if col in df.columns:
+            try:
+                dt = pd.to_datetime(df[col], utc=True, errors='coerce')
+                cutoff_dt = pd.Timestamp.utcnow() - delta
+                mask = dt >= cutoff_dt
+                return df.loc[mask]
+            except Exception:
+                pass
+    sec = infer_candle_seconds_from_filename(file_path) or 3600
+    need = int(max(EXHAUSTION_LOOKBACK*2, delta.total_seconds() // sec))
+    if need <= 0 or need >= len(df):
+        return df
+    return df.iloc[-need:]
+
+# ===================== Trade sizing =====================
+def scale_buy_size(s: float, total_cap: float) -> float:
+    if s < BUY_MIN_BUBBLE:
+        return 0.0
+    s_clamped = min(max(s, BUY_MIN_BUBBLE), BUY_MAX_BUBBLE)
+    frac = (s_clamped - BUY_MIN_BUBBLE) / (BUY_MAX_BUBBLE - BUY_MIN_BUBBLE)
+    pct = MIN_NOTE_SIZE_PCT + frac * (MAX_NOTE_SIZE_PCT - MIN_NOTE_SIZE_PCT)
+    return total_cap * pct
+
+def sell_target_from_bubble(entry_price: float, s: float) -> float:
+    if s < SELL_MIN_BUBBLE:
+        return float("inf")  # effectively never sell
+    s_clamped = min(max(s, SELL_MIN_BUBBLE), SELL_MAX_BUBBLE)
+    frac = (s_clamped - SELL_MIN_BUBBLE) / (SELL_MAX_BUBBLE - SELL_MIN_BUBBLE)
+    maturity = MIN_MATURITY + frac * (MAX_MATURITY - MIN_MATURITY)
+    return entry_price * (1 + maturity)
+def trend_multiplier_lerp(v: float) -> float:
+    """
+    Linear interpolation of multiplier from angle:
+      v=-1 → BUY_MULT_TREND_DOWN
+      v= 0 → BUY_MULT_TREND_FLOOR
+      v=+1 → BUY_MULT_TREND_UP
+    """
+    v = max(-1.0, min(1.0, float(v)))
+    if v < 0:
+        # interpolate between -1 and 0
+        return BUY_MULT_TREND_DOWN + (BUY_MULT_TREND_FLOOR - BUY_MULT_TREND_DOWN) * (v + 1)
+    else:
+        # interpolate between 0 and +1
+        return BUY_MULT_TREND_FLOOR + (BUY_MULT_TREND_UP - BUY_MULT_TREND_FLOOR) * v
+
+
+def vol_multiplier(vol: float) -> float:
+    """
+    Map rolling volatility into buy multiplier.
+    vol → scaled between BUY_MIN_VOL_BUBBLE and BUY_MAX_VOL_BUBBLE.
+    """
+    # clamp to bubble range
+    v = min(max(vol, BUY_MIN_VOL_BUBBLE), BUY_MAX_VOL_BUBBLE)
+
+    frac = (v - BUY_MIN_VOL_BUBBLE) / max(1e-9, (BUY_MAX_VOL_BUBBLE - BUY_MIN_VOL_BUBBLE))
+    return BUY_MULT_VOL_MIN + frac * (BUY_MULT_VOL_MAX - BUY_MULT_VOL_MIN)
+
+# ===================== Exhaustion Plot + Trades =====================
+def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
+    file_path = "data/sim/SOLUSD_1h.csv"
+    df = pd.read_csv(file_path)
+
+    delta = parse_timeframe(timeframe)
+    if delta is not None:
+        df = apply_time_filter(df, delta, file_path)
+
+    df = df.reset_index(drop=True)
+    df["candle_index"] = range(len(df))
+
+    df["returns"] = df["close"].pct_change()
+    df["volatility"] = df["returns"].rolling(VOL_LOOKBACK).std().fillna(0)
+
+    # ----- Exhaustion points and rolling angles -----
+    pts = {
+        "exhaustion_up":   {"x": [], "y": [], "s": []},
+        "exhaustion_down": {"x": [], "y": [], "s": []},
     }
-    addlog(f"[SIM] Starting simulation for {coin}", verbose_int=1, verbose_state=verbose)
+    df["angle"] = 0.0
+    vol_pts = {"x": [], "y": [], "s": []}
 
-    step = int(strategy_cfg.get("window_step", 1))
-    window_size = int(strategy_cfg.get("window_size", 0))
-    for start in tqdm(
-        range(0, total - window_size, step),
-        desc="📉 Sim Progress",
-        dynamic_ncols=True,
-    ):
-        t = start  # anchor candle for this window
-        price = float(df.iloc[t]["close"])
-        ts = int(df.iloc[t]["timestamp"]) if "timestamp" in df.columns else None
-        iso_ts = (
-            datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            if ts is not None
-            else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        )
-        decision = "HOLD"
-        trades_log: list[dict[str, Any]] = []
-        ctx = {"ledger": ledger_obj}
-        buy_res = evaluate_buy(
-            ctx,
-            t,
-            df,
-            cfg=strategy_cfg,
-            runtime_state=runtime_state,
-        )
-        if buy_res:
-            result = paper_execute_buy(price, buy_res["size_usd"], timestamp=ts)
+    # Rolling slope calculation
+    for t in range(ANGLE_LOOKBACK, len(df)):
+        dy = df["close"].iloc[t] - df["close"].iloc[t - ANGLE_LOOKBACK]
+        dx = ANGLE_LOOKBACK
+        angle = np.arctan2(dy, dx)
+        norm = angle / (np.pi / 4)
+        df.at[t, "angle"] = max(-1.0, min(1.0, norm))
 
-            note = apply_buy(
-                ledger=ledger_obj,
-                window_name="strategy",
-                t=t,
-                meta=buy_res,
-                result=result,
-                state=runtime_state,
-            )
+    # Exhaustion bubbles
+    for t in range(EXHAUSTION_LOOKBACK, len(df), WINDOW_STEP):
+        now_price = float(df["close"].iloc[t])
+        past_price = float(df["close"].iloc[t - EXHAUSTION_LOOKBACK])
+        end_idx = int(df["candle_index"].iloc[t])
 
-            runtime_state.setdefault("buy_unlock_p", {})["strategy"] = buy_res.get("unlock_p")
+        if now_price > past_price:
+            delta_up = now_price - past_price
+            norm_up = delta_up / max(1e-9, past_price)
+            size = SIZE_SCALAR * (norm_up ** SIZE_POWER)
+            pts["exhaustion_up"]["x"].append(end_idx)
+            pts["exhaustion_up"]["y"].append(now_price)
+            pts["exhaustion_up"]["s"].append(size)
 
-            m_buy = win_metrics.get("strategy")
-            if m_buy is not None:
-                cost = result["filled_amount"] * result["avg_price"]
-                m_buy["buys"] += 1
-                m_buy["gross_invested"] += cost
+        elif now_price < past_price:
+            delta_down = past_price - now_price
+            norm_down = delta_down / max(1e-9, past_price)
+            size = SIZE_SCALAR * (norm_down ** SIZE_POWER)
+            pts["exhaustion_down"]["x"].append(end_idx)
+            pts["exhaustion_down"]["y"].append(now_price)
+            pts["exhaustion_down"]["s"].append(size)
 
-            trades_log.append(
-                {
-                    "action": "BUY",
-                    "amount": result["filled_amount"] * result["avg_price"],
-                    "price": result["avg_price"],
-                    "note_id": note.get("id"),
-                }
-            )
-            decision = "BUY"
+    for t in range(VOL_LOOKBACK, len(df), WINDOW_STEP):
+        vol = df["volatility"].iloc[t]
+        if pd.isna(vol):
+            continue
+        size = SIZE_SCALAR * (vol * .4 ** SIZE_POWER)
+        vol_pts["x"].append(int(df["candle_index"].iloc[t]))
+        vol_pts["y"].append(float(df["close"].iloc[t]))
+        vol_pts["s"].append(size)
 
-            if viz:
-                buy_points.append((float(df.iloc[t][ts_col]), price))
+    # ===== Candle-by-candle simulation =====
+    trades = []
+    capital = START_CAPITAL
+    open_notes = []
+    last_month = None
 
-        open_notes = ledger_obj.get_open_notes()
-        sell_notes = evaluate_sell(
-            ctx,
-            t,
-            df,
-            cfg=strategy_cfg,
-            open_notes=open_notes,
-            runtime_state=runtime_state,
-        )
-        if sell_notes:
-            decision = (
-                "FLAT"
-                if any(n.get("sell_mode") == "flat" for n in sell_notes)
-                else "SELL"
-            )
+    for idx, row in df.iterrows():
+        dt = None
+        if 'timestamp' in row:
+            ts = float(row['timestamp'])
+            is_ms = ts > 1e12
+            dt = datetime.fromtimestamp(ts / (1000 if is_ms else 1), tz=timezone.utc)
+        elif 'datetime' in row:
+            try:
+                dt = pd.to_datetime(row['datetime'], utc=True).to_pydatetime()
+            except Exception:
+                dt = None
+        if dt is not None:
+            current_month = (dt.year, dt.month)
+            if current_month != last_month:
+                capital += MONTHLY_TOPUP
+                last_month = current_month
+                print(f"Monthly top-up: +{MONTHLY_TOPUP} USDT at {dt.date()} → Capital={capital:.2f}")
 
-        for note in sell_notes:
-            result = paper_execute_sell(
-                price, note.get("entry_amount", 0.0), timestamp=ts
-            )
-            if viz:
-                mode = note.get("sell_mode", "normal")
-                sell_points.append((float(df.iloc[t][ts_col]), price, mode))
-            closed = apply_sell(
-                ledger=ledger_obj,
-                note=note,
-                t=t,
-                result=result,
-                state=runtime_state,
-            )
-            trades_log.append(
-                {
-                    "action": "SELL",
-                    "amount": result["filled_amount"] * result["avg_price"],
-                    "price": result["avg_price"],
-                    "note_id": closed.get("id"),
-                }
-            )
+        price = row["close"]
 
-            qty = closed.get("entry_amount", 0.0)
-            buy_price = closed.get("entry_price", 0.0)
-            exit_price = closed.get("exit_price", 0.0)
-            cost = buy_price * qty
-            proceeds = exit_price * qty
-            roi_trade = (proceeds - cost) / cost if cost > 0 else 0.0
-            m_sell = win_metrics.get("strategy")
-            if m_sell is not None:
-                m_sell["sells"] += 1
-                m_sell["realized_cost"] += cost
-                m_sell["realized_proceeds"] += proceeds
-                m_sell["realized_trades"] += 1
-                m_sell["realized_roi_accum"] += roi_trade
-        features = runtime_state.get("last_features", {}).get("strategy", {})
-        pressures = runtime_state.get("pressures", {})
-        event = {
-            "timestamp": iso_ts,
-            "ledger": ledger_name,
-            "pair": tag,
-            "window": f"{strategy_cfg.get('window_size', 0)}h",
-            "decision": decision,
-            "features": {
-                "close": price,
-                "slope": features.get("slope"),
-                "volatility": features.get("volatility"),
-                "buy_pressure": pressures.get("buy", {}).get("strategy", 0.0),
-                "sell_pressure": pressures.get("sell", {}).get("strategy", 0.0),
-                "buy_trigger": strategy_cfg.get("buy_trigger", 0.0),
-                "sell_trigger": strategy_cfg.get("sell_trigger", 0.0),
-            },
-            "trades": trades_log,
-        }
-        record_event(event)
+        # ---- Buy check ----
+        if idx in pts["exhaustion_down"]["x"]:
+            i = pts["exhaustion_down"]["x"].index(idx)
+            bubble = pts["exhaustion_down"]["s"][i]
+            total_cap = capital + sum(n["units"] * price for n in open_notes)
+            trade_usd = scale_buy_size(bubble, total_cap)
 
-    final_price = float(df.iloc[-1]["close"]) if total else 0.0
-    summary = ledger_obj.get_account_summary(final_price)
+            # angle-based multiplier
+            v = row["angle"]
+            trend_mult = trend_multiplier_lerp(v)
 
-    open_value = sum(
-        n.get("entry_amount", 0.0) * final_price for n in ledger_obj.get_open_notes()
-    )
+            # volatility-based multiplier
+            vol = row["volatility"]
+            vol_mult = vol_multiplier(vol)
 
-    wallet_cash = runtime_state["capital"]
-    m = win_metrics.get("strategy", {})
-    realized_roi = (
-        (m.get("realized_proceeds", 0.0) / m.get("realized_cost", 1.0) - 1.0)
-        if m.get("realized_cost", 0.0) > 0
-        else 0.0
-    )
-    avg_trade_roi = (
-        m.get("realized_roi_accum", 0.0) / m.get("realized_trades", 1)
-        if m.get("realized_trades", 0) > 0
-        else 0.0
-    )
-    total_value_at_liq = m.get("realized_proceeds", 0.0) + open_value
-    realized_pnl = m.get("realized_proceeds", 0.0) - m.get("realized_cost", 0.0)
-    addlog(
-        f"[REPORT][strategy] buys={m.get('buys',0)} sells={m.get('sells',0)} realized_pnl=${realized_pnl:.2f} realized_roi={(realized_roi*100):.2f}% avg_trade_roi={(avg_trade_roi*100):.2f}% open_notes_value=${open_value:.2f} strategy_total_at_liq=${total_value_at_liq:.2f}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
-    rows = [
-        {
-            "window": "strategy",
-            "window_size": m.get("window_size", ""),
-            "buys": m.get("buys", 0),
-            "sells": m.get("sells", 0),
-            "gross_invested": m.get("gross_invested", 0.0),
-            "realized_cost": m.get("realized_cost", 0.0),
-            "realized_proceeds": m.get("realized_proceeds", 0.0),
-            "realized_pnl": realized_pnl,
-            "realized_roi": realized_roi,
-            "avg_trade_roi": avg_trade_roi,
-            "open_value_now": open_value,
-            "window_total_at_liq": total_value_at_liq,
-        }
-    ]
+            # combine
+            trade_usd *= max(BUY_MULT_TREND_FLOOR, trend_mult)
+            trade_usd *= vol_mult
+            if trade_usd > 0 and capital >= trade_usd:
+                units = trade_usd / price
+                capital -= trade_usd
+                sell_price = sell_target_from_bubble(price, bubble)
+                open_notes.append({"entry_price": price, "units": units, "sell_price": sell_price})
+                trades.append({"idx": idx, "price": price, "side": "BUY", "usd": trade_usd})
+                print(
+                    f"BUY @ idx={idx}, price={price:.2f}, angle_mult={trend_mult:.2f}, vol_mult={vol_mult:.2f}, target={sell_price:.2f}"
+                )
 
-    global_total_at_liq = wallet_cash + open_value
-    addlog(
-        f"[REPORT][GLOBAL] cash=${wallet_cash:.2f} open_value=${open_value:.2f} total_at_liq=${global_total_at_liq:.2f}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
-    addlog(
-        f"Final Value (USD): ${summary['total_value']:.2f}",
-        verbose_int=1,
-        verbose_state=verbose,
-    )
-    ledger_obj.set_metadata({"capital": runtime_state.get("capital", 0.0)})
-    save_ledger(
-        ledger_name,
-        ledger_obj,
-        sim=True,
-        final_tick=total - 1,
-        summary=summary,
-        tag=file_tag,
-    )
-    root = resolve_path("")
-    default_path = root / "data" / "tmp" / "simulation" / f"{ledger_name}.json"
-    sim_path = root / "data" / "tmp" / f"simulation_{ledger_name}.json"
-    if default_path.exists() and default_path != sim_path:
-        sim_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(default_path, sim_path)
-    logs_dir = root / "logs"
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_path = logs_dir / f"sim_report_{ledger_name}_{ts}.csv"
-    json_path = logs_dir / f"sim_report_{ledger_name}_{ts}.json"
-    with csv_path.open("w", newline="", encoding="utf-8") as f_csv:
-        writer = csv.DictWriter(
-            f_csv,
-            fieldnames=[
-                "window",
-                "window_size",
-                "buys",
-                "sells",
-                "gross_invested",
-                "realized_cost",
-                "realized_proceeds",
-                "realized_pnl",
-                "realized_roi",
-                "avg_trade_roi",
-                "open_value_now",
-                "window_total_at_liq",
-            ],
-        )
-        writer.writeheader()
-        writer.writerows(rows)
-    json_data = {
-        "windows": rows,
-        "global": {
-            "cash": wallet_cash,
-            "open_value_now": open_value,
-            "total_at_liq": global_total_at_liq,
-        },
-    }
-    with json_path.open("w", encoding="utf-8") as f_json:
-        json.dump(json_data, f_json, indent=2)
+        # ---- Sell check ----
+        closed_notes = []
+        for note in open_notes:
+            if price >= note["sell_price"]:
+                sell_usd = note["units"] * price
+                capital += sell_usd
+                trades.append({"idx": idx, "price": price, "side": "SELL", "usd": sell_usd})
+                closed_notes.append(note)
+                print(f"SELL @ idx={idx}, entry={note['entry_price']:.2f}, target={note['sell_price']:.2f}, price={price:.2f}")
+        for n in closed_notes:
+            open_notes.remove(n)
+
+    # Final portfolio value
+    final_value = capital + sum(n["units"] * float(df["close"].iloc[-1]) for n in open_notes)
+
     if viz:
-        import matplotlib.pyplot as plt
+        fig, ax1 = plt.subplots(figsize=(12, 6))
+        ax1.plot(df["candle_index"], df["close"], lw=1, label="Close Price", color="blue")
+        ax1.set_title(f"Exhaustion Trades\nStart {START_CAPITAL}, End {final_value:.2f}")
+        ax1.set_xlabel("Candles (Index)")
+        ax1.set_ylabel("Price")
+        ax1.grid(True)
 
-        times = pd.to_datetime(df[ts_col], unit="s")
-        plt.figure()
-        plt.plot(times, df["close"], label="Close", color="gray", zorder=1)
-        # --- Plot buys (single block, no duplication) ---
-        if buy_points:
-            b_t, b_p = zip(*buy_points)
-            plt.scatter(
-                pd.to_datetime(b_t, unit="s"),
-                b_p,
-                marker="o", color="g", label="Buy", zorder=2,
-            )
+        # Plot rolling slope arrows
+        for i, r in df.iterrows():
+            v = r["angle"]
+            if i < ANGLE_LOOKBACK:
+                continue
+            if v > 0.05:
+                color = "orange"
+            elif v < -0.05:
+                color = "purple"
+            else:
+                color = "gray"
+            x0, y0 = r["candle_index"], r["close"]
+            x1 = x0 + 5
+            y1 = y0 + v * 5
+            ax1.plot([x0, x1], [y0, y1], color=color, lw=1.5, alpha=0.7)
 
+        # Plot exhaustion bubbles
+        ax1.scatter(pts["exhaustion_down"]["x"], pts["exhaustion_down"]["y"],
+                    s=pts["exhaustion_down"]["s"], c="green", alpha=0.3, edgecolor="black")
 
-        # --- Plot sells (normal vs flat) ---
-        if sell_points:
-            times_normal = [t for t, p, m in sell_points if m == "normal"]
-            prices_normal = [p for t, p, m in sell_points if m == "normal"]
-            times_flat   = [t for t, p, m in sell_points if m == "flat"]
-            prices_flat  = [p for t, p, m in sell_points if m == "flat"]
-            times_all   = [t for t, p, m in sell_points if m == "all"]
-            prices_all  = [p for t, p, m in sell_points if m == "all"]
+        # Plot volatility bubbles (red)
+        ax1.scatter(vol_pts["x"], vol_pts["y"],
+                    s=vol_pts["s"], c="red", alpha=0.3, edgecolor="black")
 
-            if times_normal:
-                plt.scatter(
-                    pd.to_datetime(times_normal, unit="s"),
-                    prices_normal,
-                    marker="o", color="r", label="Sell", zorder=2,
-                )
-            if times_flat:
-                plt.scatter(
-                    pd.to_datetime(times_flat, unit="s"),
-                    prices_flat,
-                    marker="o", color="orange", label="Flat Sell", zorder=2,
-                )
-            if times_all:
-                plt.scatter(
-                    pd.to_datetime(times_all, unit="s"),
-                    prices_all,
-                    marker="x", color="red", label="All Sell", zorder=3,
-                )
+        # Plot trades
+        for t in trades:
+            if t["side"] == "BUY":
+                ax1.scatter(t["idx"], t["price"], marker="^", s=150,
+                            c="lime", edgecolor="black", zorder=10)
+            elif t["side"] == "SELL":
+                ax1.scatter(t["idx"], t["price"], marker="v", s=150,
+                            c="red", edgecolor="black", zorder=10)
 
-
-        plt.xlabel("Time")
-        plt.ylabel("Price")
-        plt.legend()
-        plt.tight_layout()
         plt.show()
 
+    print(f"Final Capital: {capital:.2f}, Open Notes: {len(open_notes)}, Final Value: {final_value:.2f}")
 
-def run_simulation(
-    *,
-    account: str | None = None,
-    market: str | None = None,
-    all_accounts: bool = False,
-    verbose: int = 0,
-    timeframe: str = "1m",
-    viz: bool = True,
-) -> None:
-    """Iterate configured accounts/markets and run simulations."""
-    general = load_general()
-    coin_settings = load_coin_settings()
-    accounts_cfg = load_account_settings()
-    accounts = accounts_cfg
-    targets = accounts.keys() if (all_accounts or not account) else [account]
-    for acct_name in targets:
-        acct_cfg = accounts.get(acct_name)
-        if not acct_cfg:
-            addlog(
-                f"[ERROR] Unknown account {acct_name}",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-            continue
-        client = ccxt.kraken({"enableRateLimit": True})
-        markets_cfg = acct_cfg.get("market settings", {})
-        m_targets = [market] if market else list(markets_cfg.keys())
-        for m in m_targets:
-            if m not in markets_cfg:
-                continue
-            addlog(
-                f"[RUN][{acct_name}][{m}]",
-                verbose_int=1,
-                verbose_state=verbose,
-            )
-            _run_single_sim(
-                general=general,
-                coin_settings=coin_settings,
-                accounts_cfg=accounts_cfg,
-                account=acct_name,
-                market=m,
-                client=client,
-                verbose=verbose,
-                timeframe=timeframe,
-                viz=viz,
-            )
+def main() -> None:
+    p = argparse.ArgumentParser()
+    p.add_argument("--time", type=str, default="1m")
+    p.add_argument("--viz", action="store_true")
+    args = p.parse_args()
+    run_simulation(timeframe=args.time, viz=args.viz)
+
+if __name__ == "__main__":
+    main()

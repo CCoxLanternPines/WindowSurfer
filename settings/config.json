@@ -1,0 +1,6 @@
+{
+  "flat_band_deg": 10,
+  "buy_threshold": 1.0,
+  "sell_threshold": 1.0,
+  "pressure_decay": 0.1
+}
