@@ -75,3 +75,5 @@ data/cache/
 
 # Settings secrets
 settings/keys.json
+
+settings/account_settings.json
