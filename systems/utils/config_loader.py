@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 _SETTINGS_CACHE: Dict[str, Any] | None = None
+_COIN_SETTINGS_CACHE: Dict[str, Dict[str, Any]] = {}
 
 
 def load_settings(*, reload: bool = False) -> Dict[str, Any]:
@@ -40,3 +41,24 @@ def get_viz_filters() -> Dict[str, Any]:
         "pressure_min_size": max(0.0, pres),
         "angle_skip_n": max(1, ang),
     }
+
+
+def load_coin_settings(market: str, *, reload: bool = False) -> Dict[str, Any]:
+    """Return merged coin settings for ``market``."""
+    global _COIN_SETTINGS_CACHE
+    if market not in _COIN_SETTINGS_CACHE or reload:
+        path = Path(__file__).resolve().parents[2] / "settings" / "coin_settings.json"
+        with path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh).get("coin_settings", {})
+        cfg = dict(data.get("default", {}))
+        overrides = data.get(market)
+        if overrides:
+            cfg.update(overrides)
+        _COIN_SETTINGS_CACHE[market] = cfg
+    return _COIN_SETTINGS_CACHE[market]
+
+
+def get_coin_setting(coin: str, key: str, default: Any = None) -> Any:
+    """Retrieve a coin-specific setting with ``default`` fallback."""
+    cfg = load_coin_settings(coin)
+    return cfg.get(key, default)
