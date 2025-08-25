@@ -12221,5 +12221,70 @@
       "sell_trigger": 10.0
     },
     "trades": []
+  },
+  {
+    "timestamp": "1970-01-01T00:00:01Z",
+    "ledger": "Kris_DOGEUSD",
+    "pair": "DOGEUSD",
+    "window": "1h",
+    "decision": "BUY",
+    "features": {
+      "close": 1.0,
+      "slope": null,
+      "volatility": null,
+      "buy_pressure": 0.0,
+      "sell_pressure": 0.0,
+      "buy_trigger": 1,
+      "sell_trigger": 0.0
+    },
+    "trades": [
+      {
+        "action": "BUY",
+        "amount": 10.0,
+        "price": 1.0,
+        "note_id": "strategy-0"
+      }
+    ]
+  },
+  {
+    "timestamp": "1970-01-01T00:00:02Z",
+    "ledger": "Kris_DOGEUSD",
+    "pair": "DOGEUSD",
+    "window": "1h",
+    "decision": "SELL",
+    "features": {
+      "close": 2.0,
+      "slope": null,
+      "volatility": null,
+      "buy_pressure": 0.0,
+      "sell_pressure": 0.0,
+      "buy_trigger": 1,
+      "sell_trigger": 0.0
+    },
+    "trades": [
+      {
+        "action": "SELL",
+        "amount": 20.0,
+        "price": 2.0,
+        "note_id": "strategy-0"
+      }
+    ]
+  },
+  {
+    "timestamp": "1970-01-01T00:00:03Z",
+    "ledger": "Kris_DOGEUSD",
+    "pair": "DOGEUSD",
+    "window": "1h",
+    "decision": "HOLD",
+    "features": {
+      "close": 3.0,
+      "slope": null,
+      "volatility": null,
+      "buy_pressure": 0.0,
+      "sell_pressure": 0.0,
+      "buy_trigger": 1,
+      "sell_trigger": 0.0
+    },
+    "trades": []
   }
 ]
