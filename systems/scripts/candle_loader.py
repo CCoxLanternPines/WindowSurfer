@@ -8,6 +8,12 @@ from typing import Tuple
 import pandas as pd
 
 from systems.utils.addlog import addlog
+from systems.utils.resolve_symbol import (
+    candle_filename,
+    sim_path_csv,
+    live_path_csv,
+    to_tag,
+)
 
 
 def load_candles_df(
@@ -24,9 +30,9 @@ def load_candles_df(
     account: str
         Account name used for the candle filename.
     market: str
-        Market pair without slash, e.g. ``"SOLUSD"``.
+        Market pair in CCXT format, e.g. ``"DOGEUSD"``.
     live: bool, optional
-        If ``True``, load from ``data/candles/live`` else ``data/candles/sim``.
+        If ``True``, load from ``data/live`` else ``data/sim``.
     verbose: int, optional
         Verbosity level forwarded to ``addlog``.
 
@@ -36,24 +42,30 @@ def load_candles_df(
         Normalised dataframe and number of duplicate rows removed.
     """
 
-    market = market.replace("/", "").upper()
-    base_dir = Path("data/candles/live" if live else "data/candles/sim")
-    csv_path = base_dir / f"{market}.csv"
-    if not csv_path.exists():
-        legacy_dir = Path("data/live" if live else "data/sim")
-        legacy = legacy_dir / f"{market}.csv"
-        if legacy.exists():
-            addlog(
-                f"[DEPRECATED] Found legacy file {legacy}, use {csv_path}",
-                verbose_int=1,
-                verbose_state=verbose,
+    # --- Coin-centric sim mode ---
+    if account.upper() == "SIM" or account == "":
+        csv_path = Path("data/candles/sim") / f"{market.upper()}.csv"
+        if not csv_path.exists():
+            raise FileNotFoundError(
+                f"Missing data file: {csv_path}. Run: python bot.py --mode fetch --market {market}"
             )
-            csv_path = legacy
-        else:
+    else:
+        # --- Normal account-based mode (unchanged) ---
+        csv_path = candle_filename(account, market, live=live)
+        if not Path(csv_path).exists():
+            tag = to_tag(market)
+            legacy = live_path_csv(tag) if live else sim_path_csv(tag)
+            if Path(legacy).exists():
+                addlog(
+                    f"[DEPRECATED] Found legacy file {legacy}, use {csv_path}",
+                    verbose_int=1,
+                    verbose_state=verbose,
+                )
             raise FileNotFoundError(
                 f"Missing data file: {csv_path}. Run: python bot.py --mode fetch --account {account} --market {market}"
             )
 
+    # --- Load and normalize ---
     df = pd.read_csv(csv_path)
 
     ts_col = next(
@@ -66,11 +78,14 @@ def load_candles_df(
     df[ts_col] = pd.to_numeric(df[ts_col], errors="coerce")
     df = df.dropna(subset=[ts_col])
     before = len(df)
-    df = df.sort_values(ts_col).drop_duplicates(subset=[ts_col], keep="last").reset_index(drop=True)
+    df = (
+        df.sort_values(ts_col)
+        .drop_duplicates(subset=[ts_col], keep="last")
+        .reset_index(drop=True)
+    )
     removed = before - len(df)
 
     if ts_col != "timestamp":
         df = df.rename(columns={ts_col: "timestamp"})
 
     return df, removed
-
