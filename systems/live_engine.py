@@ -17,6 +17,7 @@ from systems.scripts.candle_loop import run_candle_loop
 from systems.utils.config_loader import load_coin_settings
 from systems.scripts.ledger import write_trade
 from systems.scripts.action_writer import write_action
+from systems.utils.graph_feed import GraphFeed
 
 
 SETTINGS_PATH = pathlib.Path("settings/settings.json")
@@ -98,6 +99,61 @@ def run_live(
     monthly_topup_applied = False
     ledger_path = pathlib.Path("data") / "ledgers" / f"{account}_{coin}.jsonl"
     action_path = pathlib.Path("data") / "actions" / f"{account}_{coin}.jsonl"
+
+    feed = (
+        GraphFeed(
+            mode="live",
+            coin=coin,
+            account=account,
+            downsample=graph_downsample,
+            flush=False,
+        )
+        if graph_feed
+        else None
+    )
+
+    def on_candle(idx, row):
+        if not feed:
+            return
+        price = float(row.get("close", 0.0))
+        ts_val = int(row.get("timestamp", 0))
+        feed.candle(
+            int(row["candle_index"]),
+            ts_val,
+            float(row.get("open", price)),
+            float(row.get("high", price)),
+            float(row.get("low", price)),
+            price,
+        )
+        if idx >= ANGLE_LOOKBACK and idx % WINDOW_STEP == 0:
+            feed.indicator(
+                int(row["candle_index"]), "angle", float(row.get("angle", 0.0))
+            )
+        if idx >= VOL_LOOKBACK and idx % WINDOW_STEP == 0:
+            feed.indicator(
+                int(row["candle_index"]), "vol", float(row.get("volatility", 0.0))
+            )
+
+    def ledger_handler(trade, account, coin):
+        write_trade(trade, account, coin)
+        if not feed or not trade:
+            return
+        if trade.get("side") == "BUY":
+            feed.buy(
+                int(trade.get("idx", 0)),
+                float(trade.get("price", 0.0)),
+                float(trade.get("units", 0.0)),
+                float(trade.get("usd", 0.0)),
+                float(trade.get("target", 0.0)),
+            )
+        else:
+            feed.sell(
+                int(trade.get("idx", 0)),
+                float(trade.get("price", 0.0)),
+                float(trade.get("units", 0.0)),
+                float(trade.get("usd", 0.0)),
+                float(trade.get("entry_price", 0.0)),
+            )
 
     while True:
         ohlcv = exchange.fetch_ohlcv(market, timeframe="1h", limit=720) or []
@@ -200,8 +256,9 @@ def run_live(
             handlers = {
                 "buy": buy_handler,
                 "sell": sell_handler,
-                "ledger": write_trade,
+                "ledger": ledger_handler,
                 "action": lambda *args, **kwargs: None,
+                "on_candle": on_candle,
                 "capital": capital,
                 "open_notes": open_notes,
             }
@@ -240,3 +297,6 @@ def run_live(
 
         now = int(time.time())
         time.sleep(max(0, 3600 - (now % 3600)))
+
+    if feed:
+        feed.close()

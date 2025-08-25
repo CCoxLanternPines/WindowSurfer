@@ -99,7 +99,14 @@ def evaluate_buy(
             updated_capital -= trade_usd
             sell_price = sell_target_from_bubble(price, bubble)
             updated_notes.append({"entry_price": price, "units": units, "sell_price": sell_price})
-            maybe_trade = {"idx": idx, "price": price, "side": "BUY", "usd": trade_usd}
+            maybe_trade = {
+                "idx": idx,
+                "price": price,
+                "side": "BUY",
+                "usd": trade_usd,
+                "units": units,
+                "target": sell_price,
+            }
             print(
                 f"BUY @ idx={idx}, price={price:.2f}, angle_mult={trend_mult:.2f}, vol_mult={vol_mult:.2f}, target={sell_price:.2f}"
             )
