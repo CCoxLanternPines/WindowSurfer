@@ -120,11 +120,12 @@ class GraphEngine:
         txt = _json.dumps(trade, indent=2, sort_keys=True)
         self.info_text.set_text(txt)
 
-        x = trade.get("i")
+        x = float(trade.get("i", 0))
         if self.cursor_line is None:
             self.cursor_line = self.ax_main.axvline(x, color="gray", lw=0.8, ls="--")
         else:
-            self.cursor_line.set_xdata(x)
+            # set_xdata expects a sequence for a vertical line
+            self.cursor_line.set_xdata([x, x])
 
         self.fig.canvas.draw_idle()
 
