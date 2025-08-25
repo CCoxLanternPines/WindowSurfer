@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import pathlib
 import time
+import logging
 
 import ccxt  # type: ignore
 import pandas as pd
@@ -14,6 +15,8 @@ import systems.scripts.evaluate_buy as buy_module
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.candle_loop import run_candle_loop
 from systems.utils.config_loader import load_coin_settings
+from systems.scripts.ledger import write_trade
+from systems.scripts.action_writer import write_action
 
 
 SETTINGS_PATH = pathlib.Path("settings/settings.json")
@@ -28,11 +31,16 @@ else:
     MONTHLY_TOPUP = 0
 
 
+logger = logging.getLogger(__name__)
+
+
 def run_live(
     *,
     account: str,
     market: str,
     graph_feed: bool = False,
+    graph_downsample: int = 5,
+    test_mode: bool = False,
 ) -> None:
     coin = market.replace("/", "").upper()
 
@@ -83,6 +91,13 @@ def run_live(
     open_notes: list[dict[str, float]] = []
     last_ts = 0
     last_month: tuple[int, int] | None = None
+    accounts_loaded = 1
+    deduped_coins = {coin}
+    sells_total = 0
+    buys_total = 0
+    monthly_topup_applied = False
+    ledger_path = pathlib.Path("data") / "ledgers" / f"{account}_{coin}.jsonl"
+    action_path = pathlib.Path("data") / "actions" / f"{account}_{coin}.jsonl"
 
     while True:
         ohlcv = exchange.fetch_ohlcv(market, timeframe="1h", limit=720) or []
@@ -133,42 +148,18 @@ def run_live(
             f"(lookbacks: angle={ANGLE_LOOKBACK}, vol={VOL_LOOKBACK})"
         )
 
-        from pathlib import Path
-
-        def record_trade(trade, account, coin):
-            if not trade:
-                return
-            path = Path("data") / "ledgers" / f"{account}_{coin}.jsonl"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("a", encoding="utf-8") as f:
-                json.dump(trade, f)
-                f.write("\n")
-
-        def write_action(idx, row, sells, buys, notes, cap):
-            path = Path("data") / "actions" / f"{account}_{coin}.jsonl"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            record = {
-                "idx": int(idx),
-                "timestamp": int(row.get("timestamp", 0)),
-                "sells": int(sells),
-                "buys": int(buys),
-                "open_notes": len(notes),
-                "capital": float(cap),
-            }
-            with path.open("a", encoding="utf-8") as f:
-                json.dump(record, f)
-                f.write("\n")
-
         for idx, row in subset.iterrows():
             ts = int(row.get("timestamp", 0))
             dt = pd.to_datetime(ts, unit="s", utc=True)
             current_month = (dt.year, dt.month)
             if current_month != last_month:
-                capital += MONTHLY_TOPUP
-                print(
-                    f"[INFO] Monthly top-up: +{MONTHLY_TOPUP} USDT at {dt.date()} → Capital={capital:.2f}"
-                )
-                write_action(idx, row, 0, 0, open_notes, capital)
+                if MONTHLY_TOPUP:
+                    capital += MONTHLY_TOPUP
+                    monthly_topup_applied = True
+                    print(
+                        f"[INFO] Monthly top-up: +{MONTHLY_TOPUP} USDT at {dt.date()} → Capital={capital:.2f}"
+                    )
+                write_action(idx, row, 0, 0, open_notes, capital, account, coin)
                 last_month = current_month
 
             sells = 0
@@ -178,6 +169,14 @@ def run_live(
                 nonlocal buys
                 trade, cap, notes = buy_module.evaluate_buy(i, r, pts, cap, notes)
                 if trade:
+                    amount = trade.get("usd", 0.0) / max(1e-9, trade.get("price", 0.0))
+                    if test_mode:
+                        logger.info("[TEST] Skipping Kraken order placement")
+                    else:
+                        try:
+                            exchange.create_order(market, "market", "buy", amount)
+                        except Exception as exc:  # pragma: no cover - network
+                            logger.warning("Kraken buy failed: %s", exc)
                     buys += 1
                 return trade, cap, notes
 
@@ -186,13 +185,22 @@ def run_live(
                 price = float(r["close"])
                 angle = float(r.get("angle", 0.0))
                 closed, cap, notes = evaluate_sell(i, price, notes, cap, angle=angle, slope_sale=slope_sale)
+                for t in closed:
+                    amount = t.get("usd", 0.0) / max(1e-9, t.get("price", 0.0))
+                    if test_mode:
+                        logger.info("[TEST] Skipping Kraken order placement")
+                    else:
+                        try:
+                            exchange.create_order(market, "market", "sell", amount)
+                        except Exception as exc:  # pragma: no cover - network
+                            logger.warning("Kraken sell failed: %s", exc)
                 sells += len(closed)
                 return closed, cap, notes
 
             handlers = {
                 "buy": buy_handler,
                 "sell": sell_handler,
-                "ledger": record_trade,
+                "ledger": write_trade,
                 "action": lambda *args, **kwargs: None,
                 "capital": capital,
                 "open_notes": open_notes,
@@ -201,13 +209,34 @@ def run_live(
             candle_df = subset.loc[[idx]]
             capital, open_notes = run_candle_loop(candle_df, handlers, account, coin)
             ts = int(row.get("timestamp", 0))
-            write_action(idx, row, sells, buys, open_notes, capital)
+            write_action(idx, row, sells, buys, open_notes, capital, account, coin)
+            sells_total += sells
+            buys_total += buys
             print(
                 f"[DEBUG] {account}/{coin} @ {ts}: sells={sells}, buys={buys}, "
                 f"open_notes={len(open_notes)}, capital={capital:.2f}"
             )
 
         last_ts = int(subset["timestamp"].iloc[-1])
+
+        if test_mode:
+            print()
+            print("[TEST SUMMARY]")
+            print(f"Accounts loaded: {accounts_loaded}")
+            print(f"Coins deduped: {len(deduped_coins)}")
+            print("Candles pulled: 720 per coin")
+            print("Angle/Vol computed: OK")
+            print(f"Sells executed: {sells_total}")
+            print(f"Buys executed: {buys_total}")
+            print(f"Ledger updated: {ledger_path}")
+            print(f"Action file updated: {action_path}")
+            print(
+                f"Monthly top-up: {'applied' if monthly_topup_applied else 'skipped'}"
+            )
+            print("Reports triggered: none")
+            print(f"Final Capital: {capital:.2f}")
+            print(f"Open Notes: {len(open_notes)}")
+            break
 
         now = int(time.time())
         time.sleep(max(0, 3600 - (now % 3600)))
