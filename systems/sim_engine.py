@@ -2,7 +2,6 @@ from __future__ import annotations
 
 """Historical simulation engine for position-based strategy."""
 
-import shutil
 from datetime import datetime, timezone, timedelta
 import csv
 import json
@@ -186,12 +185,15 @@ def _run_single_sim(
     runtime_state["buy_unlock_p"] = {}
     strategy_cfg = runtime_state.get("strategy", {})
 
+    # Capture starting capital for ledger meta
+    start_capital = float(runtime_state.get("capital", 0.0))
+
     # simple ledger for reporting/graphing
     trade_ledger = ledger_init(account, market, "sim")
 
 
     ledger_obj = Ledger()
-    ledger_obj.set_metadata({"capital": runtime_state.get("capital", 0.0)})
+    ledger_obj.set_metadata({"capital": start_capital})
     buy_points: list[tuple[float, float]] = []
     sell_points: list[tuple[float, float]] = []
     win_metrics = {
@@ -432,21 +434,32 @@ def _run_single_sim(
         tag=file_tag,
     )
     root = resolve_path("")
-    default_path = root / "data" / "tmp" / "simulation" / f"{ledger_name}.json"
-    sim_path = root / "data" / "tmp" / f"simulation_{ledger_name}.json"
-    if default_path.exists() and default_path != sim_path:
-        sim_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(default_path, sim_path)
+
+    # Always write simplified JSON ledger for external visualization
     temp_dir = resolve_path("data/temp")
     temp_dir.mkdir(parents=True, exist_ok=True)
     full_path = temp_dir / "sim_data.json"
     print(f"[DEBUG][sim_engine] Attempting to write sim ledger → {full_path.resolve()}")
-    ledger_save(
-        trade_ledger,
-        str(full_path),
-    )
+    simple_ledger = {
+        "trades": [
+            {
+                "idx": e.get("idx"),
+                "price": e.get("price"),
+                "side": e.get("side"),
+                "usd": e.get("usd", e.get("size_usd")),
+            }
+            for e in trade_ledger.get("entries", [])
+        ],
+        "meta": {
+            "coin": market,
+            "start_capital": start_capital,
+            "final_value": summary.get("total_value", 0.0),
+        },
+    }
+    with full_path.open("w", encoding="utf-8") as fh:
+        json.dump(simple_ledger, fh, indent=2)
     print(
-        f"[DEBUG][sim_engine] Finished writing ledger, entries={len(trade_ledger.get('entries', []))}"
+        f"[DEBUG][sim_engine] Finished writing ledger, entries={len(simple_ledger['trades'])}"
     )
     logs_dir = root / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)

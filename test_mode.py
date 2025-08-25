@@ -59,7 +59,7 @@ def test_simulation_writes_ledger(monkeypatch):
     ledger_path = Path("data/temp/sim_data.json")
     assert ledger_path.exists()
     data = json.loads(ledger_path.read_text())
-    sides = {e["side"] for e in data.get("entries", [])}
+    sides = {e["side"] for e in data.get("trades", [])}
     assert {"BUY", "SELL", "PASS"}.issubset(sides)
 
 
