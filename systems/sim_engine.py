@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
 import numpy as np
@@ -29,8 +30,31 @@ ANGLE_LOOKBACK = 48     # used for slope angle
 
 
 # ===================== Exhaustion Plot + Trades =====================
-def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
-    file_path = "data/sim/SOLUSD_1h.csv"
+def run_simulation(*, coin: str, timeframe: str = "1m", viz: bool = True) -> None:
+    """Run historical simulation for ``coin``.
+
+    Parameters
+    ----------
+    coin:
+        Market symbol (e.g. ``DOGEUSD``).
+    timeframe:
+        Optional timeframe filter. Defaults to "1m".
+    viz:
+        Whether to plot the results. Defaults to ``True``.
+    """
+
+    coin = coin.replace("/", "").upper()
+    primary = Path(f"data/sim/{coin}.csv")
+    file_path = primary
+    if not primary.exists():
+        fallback = Path(f"data/candles/sim/{coin}.csv")
+        if fallback.exists():
+            file_path = fallback
+        else:
+            raise FileNotFoundError(
+                f"No candle data found for {coin} in {primary} or {fallback}"
+            )
+
     df = pd.read_csv(file_path)
 
     delta = parse_timeframe(timeframe)
@@ -141,10 +165,11 @@ def run_simulation(*, timeframe: str = "1m", viz: bool = True) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
+    p.add_argument("--coin", required=True)
     p.add_argument("--time", type=str, default="1m")
     p.add_argument("--viz", action="store_true")
     args = p.parse_args()
-    run_simulation(timeframe=args.time, viz=args.viz)
+    run_simulation(coin=args.coin, timeframe=args.time, viz=args.viz)
 
 if __name__ == "__main__":
     main()
