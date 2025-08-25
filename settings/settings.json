@@ -1,6 +1,7 @@
 {
   "general_settings": {
-    "simulation_capital": 1000
+    "simulation_capital": 1000,
+    "monthly_topup": 0
   },
   "viz_filters": {
     "volatility_min_size": 50,
