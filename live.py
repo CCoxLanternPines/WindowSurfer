@@ -21,17 +21,10 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--account", required=True, help="Account name")
     parser.add_argument("--market", required=True, help="Market symbol e.g. DOGEUSD")
     parser.add_argument("--graph", action="store_true", help="Plot ledger after run")
-    parser.add_argument("--graph-feed", action="store_true", help="Write graph feed")
     parser.add_argument(
-        "--graph-downsample",
-        type=int,
-        default=5,
-        help="Feed candle stride",
-    )
-    parser.add_argument(
-        "--test",
+        "--live-orders",
         action="store_true",
-        help="Run a single test cycle without placing orders",
+        help="PLACE REAL ORDERS on the exchange (default: dry run)",
     )
     args = parser.parse_args(argv)
     from systems.utils.load_config import load_config
@@ -64,13 +57,7 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     from systems.live_engine import run_live
 
-    run_live(
-        account=args.account,
-        market=market,
-        graph_feed=args.graph_feed,
-        graph_downsample=args.graph_downsample,
-        test_mode=args.test,
-    )
+    run_live(account=args.account, market=market, place_orders=args.live_orders)
 
     if args.graph:
         try:

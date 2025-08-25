@@ -33,25 +33,115 @@ else:
 
 
 logger = logging.getLogger(__name__)
+def run_live(*, account: str, market: str, place_orders: bool = False) -> None:
+    """Run the live trading loop.
 
-
-def run_live(
-    *,
-    account: str,
-    market: str,
-    graph_feed: bool = False,
-    graph_downsample: int = 5,
-    test_mode: bool = False,
-) -> None:
+    Parameters
+    ----------
+    account:
+        Account name.
+    market:
+        Market symbol e.g. ``DOGEUSD``.
+    place_orders:
+        When ``True`` orders are actually sent to Kraken.
+    """
     coin = market.replace("/", "").upper()
+    feed = GraphFeed(mode="live", coin=coin, account=account, flush=True)
 
+    # ------------------------------------------------------------ dry run
+    if not place_orders:
+        path = pathlib.Path("data") / "sim" / f"{coin}.csv"
+        if path.exists():
+            df = pd.read_csv(path).tail(200)
+        else:
+            now = int(time.time())
+            ts = [now + i * 60 for i in range(200)]
+            price = 1.0
+            df = pd.DataFrame(
+                {
+                    "timestamp": ts,
+                    "open": price,
+                    "high": price,
+                    "low": price,
+                    "close": price,
+                }
+            )
+        df["candle_index"] = range(len(df))
+
+        capital = START_CAPITAL
+        open_notes: list[dict[str, float]] = []
+        usd = 5.0
+        entry_price = 0.0
+        units = 0.0
+        buy_idx: int | None = None
+
+        for i, row in df.iterrows():
+            ts_val = int(row.get("timestamp", 0))
+            price = float(row.get("close", 0.0))
+            feed.candle(
+                int(row["candle_index"]),
+                ts_val,
+                float(row.get("open", price)),
+                float(row.get("high", price)),
+                float(row.get("low", price)),
+                price,
+            )
+
+            sells = buys = 0
+            if buy_idx is None:
+                entry_price = price
+                units = usd / price
+                target = price * 1.01
+                feed.buy(int(i), price, units, usd, target)
+                write_trade(
+                    {
+                        "idx": int(i),
+                        "price": price,
+                        "side": "BUY",
+                        "usd": usd,
+                        "units": units,
+                        "target": target,
+                    },
+                    account,
+                    coin,
+                )
+                open_notes.append(
+                    {"entry_price": entry_price, "units": units, "sell_price": target}
+                )
+                capital -= usd
+                buys = 1
+                buy_idx = int(i)
+            elif buy_idx is not None and i >= buy_idx + 3 and open_notes:
+                proceeds = usd * (price / entry_price)
+                feed.sell(int(i), price, units, proceeds, entry_price)
+                write_trade(
+                    {
+                        "idx": int(i),
+                        "price": price,
+                        "side": "SELL",
+                        "usd": proceeds,
+                        "units": units,
+                        "entry_price": entry_price,
+                    },
+                    account,
+                    coin,
+                )
+                open_notes.clear()
+                capital += proceeds
+                sells = 1
+
+            write_action(i, row, sells, buys, open_notes, capital, account, coin)
+            time.sleep(0.1)
+
+        feed.close()
+        return
+
+    # ------------------------------------------------------------ real mode
     settings = load_coin_settings(coin)
     EXHAUSTION_LOOKBACK = int(settings.get("exhaustion_lookback", 184))
     WINDOW_STEP = int(settings.get("window_step", 12))
     VOL_LOOKBACK = int(settings.get("vol_lookback", 48))
     ANGLE_LOOKBACK = int(settings.get("angle_lookback", 48))
-    ANGLE_UP_MIN = float(settings.get("angle_up_min", 0.1))
-    ANGLE_DOWN_MIN = float(settings.get("angle_down_min", -0.5))
     SLOPE_SALE = float(settings.get("slope_sale", 1.0))
     slope_sale = SLOPE_SALE
 
@@ -72,49 +162,17 @@ def run_live(
     buy_module.BUY_MULT_TREND_DOWN = float(settings.get("buy_mult_trend_down", 0.0))
 
     print(
-        f"[DEBUG] Loaded coin settings for {coin}: angle_up={ANGLE_UP_MIN:.2f}, "
-        f"angle_down={ANGLE_DOWN_MIN:.2f}, vol_lookback={VOL_LOOKBACK}, slope_sale={SLOPE_SALE}"
+        f"[DEBUG] Loaded coin settings for {coin}: angle_lookback={ANGLE_LOOKBACK}, "
+        f"vol_lookback={VOL_LOOKBACK}, slope_sale={SLOPE_SALE}"
     )
-    default_cfg = load_coin_settings("default")
-    for key, val in [
-        ("angle_up_min", ANGLE_UP_MIN),
-        ("angle_down_min", ANGLE_DOWN_MIN),
-        ("angle_lookback", ANGLE_LOOKBACK),
-        ("slope_sale", SLOPE_SALE),
-    ]:
-        if default_cfg.get(key) != val:
-            print(
-                f"[DEBUG] default {key}={default_cfg.get(key)} differs from {val} for {coin}"
-            )
 
     exchange = ccxt.kraken({"enableRateLimit": True})
     capital = START_CAPITAL
     open_notes: list[dict[str, float]] = []
     last_ts = 0
     last_month: tuple[int, int] | None = None
-    accounts_loaded = 1
-    deduped_coins = {coin}
-    sells_total = 0
-    buys_total = 0
-    monthly_topup_applied = False
-    ledger_path = pathlib.Path("data") / "ledgers" / f"{account}_{coin}.jsonl"
-    action_path = pathlib.Path("data") / "actions" / f"{account}_{coin}.jsonl"
 
-    feed = (
-        GraphFeed(
-            mode="live",
-            coin=coin,
-            account=account,
-            downsample=graph_downsample,
-            flush=False,
-        )
-        if graph_feed
-        else None
-    )
-
-    def on_candle(idx, row):
-        if not feed:
-            return
+    def on_candle(idx: int, row: pd.Series) -> None:
         price = float(row.get("close", 0.0))
         ts_val = int(row.get("timestamp", 0))
         feed.candle(
@@ -126,9 +184,7 @@ def run_live(
             price,
         )
         if idx >= ANGLE_LOOKBACK and idx % WINDOW_STEP == 0:
-            feed.indicator(
-                int(row["candle_index"]), "angle", float(row.get("angle", 0.0))
-            )
+            feed.indicator(int(row["candle_index"]), "angle", float(row.get("angle", 0.0)))
         if idx >= VOL_LOOKBACK and idx % WINDOW_STEP == 0:
             feed.indicator(
                 int(row["candle_index"]), "vol", float(row.get("volatility", 0.0))
@@ -136,7 +192,7 @@ def run_live(
 
     def ledger_handler(trade, account, coin):
         write_trade(trade, account, coin)
-        if not feed or not trade:
+        if not trade:
             return
         if trade.get("side") == "BUY":
             feed.buy(
@@ -160,9 +216,12 @@ def run_live(
         if not ohlcv:
             time.sleep(60)
             continue
-        df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
+        df = pd.DataFrame(
+            ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"]
+        )
         df["timestamp"] = (
-            pd.to_datetime(df["timestamp"], unit="ms", utc=True).astype("int64") // 1_000_000_000
+            pd.to_datetime(df["timestamp"], unit="ms", utc=True).astype("int64")
+            // 1_000_000_000
         )
         df = df.sort_values("timestamp").reset_index(drop=True)
         df["candle_index"] = range(len(df))
@@ -198,20 +257,13 @@ def run_live(
             time.sleep(max(0, 3600 - (now % 3600)))
             continue
 
-        latest = subset.iloc[-1]
-        print(
-            f"[DEBUG] angle={float(latest['angle']):.3f}, volatility={float(latest['volatility']):.5f} "
-            f"(lookbacks: angle={ANGLE_LOOKBACK}, vol={VOL_LOOKBACK})"
-        )
-
         for idx, row in subset.iterrows():
-            ts = int(row.get("timestamp", 0))
-            dt = pd.to_datetime(ts, unit="s", utc=True)
+            ts_val = int(row.get("timestamp", 0))
+            dt = pd.to_datetime(ts_val, unit="s", utc=True)
             current_month = (dt.year, dt.month)
             if current_month != last_month:
                 if MONTHLY_TOPUP:
                     capital += MONTHLY_TOPUP
-                    monthly_topup_applied = True
                     print(
                         f"[INFO] Monthly top-up: +{MONTHLY_TOPUP} USDT at {dt.date()} → Capital={capital:.2f}"
                     )
@@ -226,13 +278,10 @@ def run_live(
                 trade, cap, notes = buy_module.evaluate_buy(i, r, pts, cap, notes)
                 if trade:
                     amount = trade.get("usd", 0.0) / max(1e-9, trade.get("price", 0.0))
-                    if test_mode:
-                        logger.info("[TEST] Skipping Kraken order placement")
-                    else:
-                        try:
-                            exchange.create_order(market, "market", "buy", amount)
-                        except Exception as exc:  # pragma: no cover - network
-                            logger.warning("Kraken buy failed: %s", exc)
+                    try:
+                        exchange.create_order(market, "market", "buy", amount)
+                    except Exception as exc:  # pragma: no cover - network
+                        logger.warning("Kraken buy failed: %s", exc)
                     buys += 1
                 return trade, cap, notes
 
@@ -240,16 +289,15 @@ def run_live(
                 nonlocal sells
                 price = float(r["close"])
                 angle = float(r.get("angle", 0.0))
-                closed, cap, notes = evaluate_sell(i, price, notes, cap, angle=angle, slope_sale=slope_sale)
+                closed, cap, notes = evaluate_sell(
+                    i, price, notes, cap, angle=angle, slope_sale=slope_sale
+                )
                 for t in closed:
                     amount = t.get("usd", 0.0) / max(1e-9, t.get("price", 0.0))
-                    if test_mode:
-                        logger.info("[TEST] Skipping Kraken order placement")
-                    else:
-                        try:
-                            exchange.create_order(market, "market", "sell", amount)
-                        except Exception as exc:  # pragma: no cover - network
-                            logger.warning("Kraken sell failed: %s", exc)
+                    try:
+                        exchange.create_order(market, "market", "sell", amount)
+                    except Exception as exc:  # pragma: no cover - network
+                        logger.warning("Kraken sell failed: %s", exc)
                 sells += len(closed)
                 return closed, cap, notes
 
@@ -265,38 +313,14 @@ def run_live(
 
             candle_df = subset.loc[[idx]]
             capital, open_notes = run_candle_loop(candle_df, handlers, account, coin)
-            ts = int(row.get("timestamp", 0))
             write_action(idx, row, sells, buys, open_notes, capital, account, coin)
-            sells_total += sells
-            buys_total += buys
             print(
-                f"[DEBUG] {account}/{coin} @ {ts}: sells={sells}, buys={buys}, "
+                f"[DEBUG] {account}/{coin} @ {ts_val}: sells={sells}, buys={buys}, "
                 f"open_notes={len(open_notes)}, capital={capital:.2f}"
             )
 
         last_ts = int(subset["timestamp"].iloc[-1])
-
-        if test_mode:
-            print()
-            print("[TEST SUMMARY]")
-            print(f"Accounts loaded: {accounts_loaded}")
-            print(f"Coins deduped: {len(deduped_coins)}")
-            print("Candles pulled: 720 per coin")
-            print("Angle/Vol computed: OK")
-            print(f"Sells executed: {sells_total}")
-            print(f"Buys executed: {buys_total}")
-            print(f"Ledger updated: {ledger_path}")
-            print(f"Action file updated: {action_path}")
-            print(
-                f"Monthly top-up: {'applied' if monthly_topup_applied else 'skipped'}"
-            )
-            print("Reports triggered: none")
-            print(f"Final Capital: {capital:.2f}")
-            print(f"Open Notes: {len(open_notes)}")
-            break
-
         now = int(time.time())
         time.sleep(max(0, 3600 - (now % 3600)))
 
-    if feed:
-        feed.close()
+    feed.close()
