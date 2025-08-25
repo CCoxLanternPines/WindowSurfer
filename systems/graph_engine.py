@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 
+from systems.scripts.viz_filters import VizFilters
+
 
 def discover_feed(
     *,
@@ -81,6 +83,8 @@ class GraphEngine:
         # main plot elements
         (self.price_line,) = self.ax_main.plot([], [], lw=1, label="Close")
         self.ax_main.grid(True)
+        self.filters = VizFilters.from_settings()
+        self._angle_idx = 0
 
         self.buy_trades: List[Dict[str, Any]] = []
         self.sell_trades: List[Dict[str, Any]] = []
@@ -139,6 +143,10 @@ class GraphEngine:
         elif t == "sell":
             self._add_trade(obj, is_buy=False)
         elif t == "ind" and obj.get("k") == "angle":
+            if not self.filters.allow_angle(self._angle_idx):
+                self._angle_idx += 1
+                return
+            self._angle_idx += 1
             i = obj["i"]
             v = obj["v"]
             y0 = self._price_at.get(i)
@@ -149,9 +157,11 @@ class GraphEngine:
                 self.ax_main.plot([x0, x1], [y0, y1], color=color, lw=1.5, alpha=0.7)
                 self.fig.canvas.draw_idle()
         elif t == "pb":
-            self._append_bubble(self.pb_art, obj)
+            if self.filters.allow_pressure(obj.get("s")):
+                self._append_bubble(self.pb_art, obj)
         elif t == "vb":
-            self._append_bubble(self.vb_art, obj)
+            if self.filters.allow_volatility(obj.get("s")):
+                self._append_bubble(self.vb_art, obj)
 
     # ------------------------------------------------------------------
     def _add_candle(self, candle: Dict[str, Any]) -> None:
