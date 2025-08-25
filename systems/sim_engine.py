@@ -117,6 +117,12 @@ def _run_single_sim(
     df, removed = load_candles_df(account, market, verbose=verbose)
     ts_col = "timestamp"
 
+    # --- Timestamp unit detection ---
+    last_ts_raw = float(df[ts_col].iloc[-1]) if len(df) else 0.0
+    is_ms = last_ts_raw > 1e12  # > ~2001-09-09 in ms
+    TUNIT = "ms" if is_ms else "s"
+    TFACTOR = 1000.0 if is_ms else 1.0  # seconds→ts units
+
     # Optional hard check
     if not df[ts_col].is_monotonic_increasing:
         raise ValueError(f"Candles not sorted by {ts_col}: {csv_path}")
@@ -126,33 +132,32 @@ def _run_single_sim(
         delta = parse_timeframe(timeframe)
         if delta:
             end_ts = float(df[ts_col].iloc[-1])
-            start_ts = end_ts - delta.total_seconds()
+            start_ts = end_ts - delta.total_seconds() * TFACTOR
             df = df[df[ts_col] >= start_ts].reset_index(drop=True)
+            # Recompute last_ts_raw after slice
+            last_ts_raw = float(df[ts_col].iloc[-1]) if len(df) else 0.0
 
     # --- Time-slice diagnostics (anchored to dataset end) ---
-    if timeframe and delta:
-        # candle spacing (median in seconds)
-        diffs = df[ts_col].diff().dropna()
-        med_step = float(diffs.median()) if not diffs.empty else 0.0
-        approx_rows = int((delta.total_seconds() / med_step)) if med_step else 0
+    if timeframe and delta and len(df) >= 2:
+        diffs_raw = df[ts_col].diff().dropna()
+        med_step_raw = float(diffs_raw.median()) if not diffs_raw.empty else 0.0
+        med_step_sec = med_step_raw / TFACTOR if med_step_raw else 0.0
+        approx_rows = int(delta.total_seconds() / med_step_sec) if med_step_sec else 0
         print(
-            f"[TIMEFILTER][CHECK] delta={delta} med_step={med_step:.0f}s "
-            f"approx_rows~{approx_rows} actual_rows={len(df)}"
+            f"[TIMEFILTER][CHECK] delta={delta} med_step={med_step_sec:.0f}s approx_rows~{approx_rows} actual_rows={len(df)}"
         )
 
     # Log one line so we always know what we ran on
-    first_ts = int(df[ts_col].iloc[0]) if len(df) else None
-    last_ts = int(df[ts_col].iloc[-1]) if len(df) else None
-    first_iso = (
-        datetime.fromtimestamp(first_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        if first_ts is not None
-        else "n/a"
-    )
-    last_iso = (
-        datetime.fromtimestamp(last_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        if last_ts is not None
-        else "n/a"
-    )
+    def _iso(ts_raw: float) -> str:
+        try:
+            return datetime.fromtimestamp(ts_raw / TFACTOR, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        except Exception:
+            return "n/a"
+
+    first_raw = float(df[ts_col].iloc[0]) if len(df) else None
+    last_raw = float(df[ts_col].iloc[-1]) if len(df) else None
+    first_iso = _iso(first_raw) if first_raw is not None else "n/a"
+    last_iso = _iso(last_raw) if last_raw is not None else "n/a"
     print(
         f"[DATA][SIM] file={csv_path} rows={len(df)} first={first_iso} last={last_iso} dups_removed={removed}"
     )
@@ -212,9 +217,9 @@ def _run_single_sim(
     ):
         t = start  # anchor candle for this window
         price = float(df.iloc[t]["close"])
-        ts = int(df.iloc[t]["timestamp"]) if "timestamp" in df.columns else None
+        ts = float(df.iloc[t][ts_col]) if ts_col in df.columns else None
         iso_ts = (
-            datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            datetime.fromtimestamp(ts / TFACTOR, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             if ts is not None
             else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         )
@@ -480,7 +485,7 @@ def _run_single_sim(
         import matplotlib.pyplot as plt
         import numpy as np
 
-        times = pd.to_datetime(df[ts_col], unit="s")
+        times = pd.to_datetime(df[ts_col], unit=TUNIT)
         plt.figure()
         plt.plot(times, df["close"], label="Close", color="gray", zorder=1)
 
@@ -574,7 +579,7 @@ def _run_single_sim(
         if buy_points:
             b_t, b_p = zip(*buy_points)
             plt.scatter(
-                pd.to_datetime(b_t, unit="s"),
+                pd.to_datetime(b_t, unit=TUNIT),
                 b_p,
                 marker="o", color="g", label="Buy", zorder=5,
             )
@@ -590,19 +595,19 @@ def _run_single_sim(
 
             if times_normal:
                 plt.scatter(
-                    pd.to_datetime(times_normal, unit="s"),
+                    pd.to_datetime(times_normal, unit=TUNIT),
                     prices_normal,
                     marker="o", color="r", label="Sell", zorder=5,
                 )
             if times_flat:
                 plt.scatter(
-                    pd.to_datetime(times_flat, unit="s"),
+                    pd.to_datetime(times_flat, unit=TUNIT),
                     prices_flat,
                     marker="o", color="orange", label="Flat Sell", zorder=5,
                 )
             if times_all:
                 plt.scatter(
-                    pd.to_datetime(times_all, unit="s"),
+                    pd.to_datetime(times_all, unit=TUNIT),
                     prices_all,
                     marker="x", color="red", label="All Sell", zorder=6,
                 )
