@@ -11,6 +11,7 @@ from systems.scripts.evaluate_buy import evaluate_buy
 from systems.scripts.evaluate_sell import evaluate_sell
 from systems.scripts.chart import plot_trades
 from systems.utils.time import parse_timeframe, apply_time_filter
+from systems.utils import log
 
 # ===================== Parameters =====================
 # Lookbacks
@@ -136,7 +137,9 @@ def run_simulation(*, coin: str, timeframe: str = "1m", viz: bool = True) -> Non
             if current_month != last_month:
                 capital += MONTHLY_TOPUP
                 last_month = current_month
-                print(f"Monthly top-up: +{MONTHLY_TOPUP} USDT at {dt.date()} → Capital={capital:.2f}")
+                log.what(
+                    f"Monthly top-up: +{MONTHLY_TOPUP} USDT at {dt.date()} → Capital={capital:.2f}"
+                )
 
         price = row["close"]
 
@@ -161,15 +164,23 @@ def run_simulation(*, coin: str, timeframe: str = "1m", viz: bool = True) -> Non
             angle_lookback=ANGLE_LOOKBACK,
         )
 
-    print(f"Final Capital: {capital:.2f}, Open Notes: {len(open_notes)}, Final Value: {final_value:.2f}")
+    log.what(
+        f"Final Capital: {capital:.2f}, Open Notes: {len(open_notes)}, Final Value: {final_value:.2f}"
+    )
 
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--coin", required=True)
     p.add_argument("--time", type=str, default="1m")
     p.add_argument("--viz", action="store_true")
+    p.add_argument("-v", action="count", default=0, help="Increase verbosity (use -vv for more)")
+    p.add_argument("--log", action="store_true", help="Write logs to file")
     args = p.parse_args()
-    run_simulation(coin=args.coin, timeframe=args.time, viz=args.viz)
+
+    coin = args.coin.replace("/", "").upper()
+    log.init_logger(verbosity=1 + args.v, to_file=args.log, name_hint=f"sim_{coin}")
+    log.what(f"Running simulation for {coin} with timeframe {args.time}")
+    run_simulation(coin=coin, timeframe=args.time, viz=args.viz)
 
 if __name__ == "__main__":
     main()
