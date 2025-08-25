@@ -275,3 +275,79 @@ def plot_trades_from_ledger(
     fig.autofmt_xdate()
     plt.tight_layout()
     plt.show()
+
+
+def plot_from_json(ledger_path: str) -> None:
+    """Plot simulation trades from a ledger JSON file."""
+    path = Path(ledger_path)
+    if not path.exists():
+        print(f"[ERROR] Ledger not found at {path}")
+        return
+
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            ledger: dict[str, Any] = json.load(fh)
+    except Exception:
+        ledger = {}
+
+    market = ledger.get("meta", {}).get("coin")
+    if not market:
+        print("[ERROR] Ledger missing coin metadata")
+        return
+
+    candles_path = Path("data/candles/sim") / f"{market}.csv"
+    if not candles_path.exists():
+        print(f"[ERROR] Candles not found at {candles_path}")
+        return
+
+    df = pd.read_csv(candles_path)
+    times = pd.to_datetime(df["timestamp"], unit="s")
+    fig, ax = plt.subplots()
+    ax.plot(times, df["close"], label="Close", color="blue")
+
+    coin_settings = load_coin_settings()
+    coin_symbol, _ = split_tag(market)
+    coin_cfg = coin_settings.get(coin_symbol.upper(), {})
+    over = _truth_overlays(df, coin_cfg)
+
+    ex_dn_x, ex_dn_y, ex_dn_s = over["ex_down"]
+    if ex_dn_x:
+        ax.scatter(pd.to_datetime(ex_dn_x, unit="s"), ex_dn_y, s=ex_dn_s, c="green", alpha=0.30, edgecolor="black", linewidths=0.5)
+    ex_up_x, ex_up_y, ex_up_s = over["ex_up"]
+    if ex_up_x:
+        ax.scatter(pd.to_datetime(ex_up_x, unit="s"), ex_up_y, s=ex_up_s, c="red", alpha=0.30, edgecolor="black", linewidths=0.5)
+
+    vol_x, vol_y, vol_s = over["vol"]
+    if vol_x:
+        ax.scatter(pd.to_datetime(vol_x, unit="s"), vol_y, s=vol_s, c="crimson", alpha=0.20, edgecolor="black", linewidths=0.3)
+
+    for (x0, y0, x1, y1, color) in over["arrows"]:
+        ax.plot([pd.to_datetime(x0, unit="s"), pd.to_datetime(x1, unit="s")], [y0, y1], color=color, lw=1.3, alpha=0.7, zorder=2)
+
+    buys_x, buys_y, sells_x, sells_y = [], [], [], []
+    for entry in ledger.get("trades", []):
+        idx = int(entry.get("idx", -1))
+        if idx < 0 or idx >= len(df):
+            continue
+        ts = float(df.iloc[idx]["timestamp"])
+        price = entry.get("price")
+        side = entry.get("side")
+        if price is None or side is None:
+            continue
+        if side == "BUY":
+            buys_x.append(ts); buys_y.append(price)
+        elif side == "SELL":
+            sells_x.append(ts); sells_y.append(price)
+
+    if buys_x:
+        ax.scatter(pd.to_datetime(buys_x, unit="s"), buys_y, color="green", marker="^", label="BUY")
+    if sells_x:
+        ax.scatter(pd.to_datetime(sells_x, unit="s"), sells_y, color="red", marker="v", label="SELL")
+
+    ax.legend(loc="upper left")
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Price")
+    fig.autofmt_xdate()
+    plt.tight_layout()
+    plt.show(block=False)
+    plt.close(fig)
