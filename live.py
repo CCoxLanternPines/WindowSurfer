@@ -28,6 +28,11 @@ def main(argv: Optional[list[str]] = None) -> None:
         default=5,
         help="Feed candle stride",
     )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Run a single test cycle without placing orders",
+    )
     args = parser.parse_args(argv)
     from systems.utils.load_config import load_config
 
@@ -64,6 +69,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         market=market,
         graph_feed=args.graph_feed,
         graph_downsample=args.graph_downsample,
+        test_mode=args.test,
     )
 
     if args.graph:
