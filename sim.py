@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Optional
 import json
 
-from systems.scripts.plot import plot_from_json
 
 
 def _ensure_candles(coin: str) -> Path:
@@ -72,7 +71,9 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     if args.viz:
         try:
-            plot_from_json(str(sim_path))
+            from systems.graph_engine import render_simulation
+
+            render_simulation(str(sim_path))
         except Exception as exc:  # pragma: no cover - plotting best effort
             print(f"[WARN] Plotting failed: {exc}")
 
