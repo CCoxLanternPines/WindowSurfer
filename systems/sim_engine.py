@@ -10,6 +10,7 @@ from systems.scripts.evaluate_sell import evaluate_sell
 from systems.utils.time import parse_timeframe, apply_time_filter
 from systems.utils import log
 from systems.utils.graph_feed import GraphFeed
+from systems.utils.settings_loader import get_coin_setting
 
 # ===================== Parameters =====================
 # Lookbacks
@@ -128,6 +129,8 @@ def run_simulation(
         for x, y, s in zip(vol_pts["x"], vol_pts["y"], vol_pts["s"]):
             feed.vol_bubble(int(x), float(y), float(s))
 
+    slope_sale = float(get_coin_setting(coin, "slope_sale", 1.0))
+
     # ===== Candle-by-candle simulation =====
     trades = []
     capital = START_CAPITAL
@@ -186,8 +189,11 @@ def run_simulation(
                     float(note.get("sell_price", 0.0)),
                 )
 
+        angle = float(row.get("angle", 0.0))
         prev_notes = list(open_notes)
-        closed, capital, open_notes = evaluate_sell(idx, price, open_notes, capital)
+        closed, capital, open_notes = evaluate_sell(
+            idx, price, open_notes, capital, angle=angle, slope_sale=slope_sale
+        )
         trades.extend(closed)
         if feed and closed:
             closed_notes = [n for n in prev_notes if n not in open_notes]

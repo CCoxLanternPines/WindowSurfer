@@ -22,3 +22,9 @@ def load_coin_settings(market: str) -> Dict[str, Any]:
     if overrides:
         cfg.update(overrides)
     return cfg
+
+
+def get_coin_setting(coin: str, key: str, default: Any = None) -> Any:
+    """Retrieve a single setting for ``coin`` with optional ``default``."""
+    cfg = load_coin_settings(coin)
+    return cfg.get(key, default)
