@@ -66,8 +66,12 @@ def _run_single_sim(
     market = market.replace("/", "").upper()
     ccxt_market = _to_ccxt(market)
 
-    symbols = resolve_symbols(client, ccxt_market)
-    kraken_name = symbols["kraken_name"]
+    try:
+        symbols = resolve_symbols(client, ccxt_market)
+        kraken_name = symbols["kraken_name"]
+    except Exception:
+        symbols = {"kraken_name": ccxt_market}
+        kraken_name = ccxt_market
     tag = to_tag(kraken_name)
     ledger_name = f"{account}_{market}"
     init_trade_logger(ledger_name)

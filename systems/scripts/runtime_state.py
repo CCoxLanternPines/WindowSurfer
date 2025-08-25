@@ -53,7 +53,10 @@ def build_runtime_state(
     buy_unlock_p = prev.get("buy_unlock_p", {})
     verbose = prev.get("verbose", 0)
 
-    symbols = resolve_symbols(client, symbol)
+    try:
+        symbols = resolve_symbols(client, symbol)
+    except Exception:
+        symbols = {"kraken_name": symbol}
     if mode == "sim":
         capital = float(general.get("simulation_capital", 0.0))
     elif mode == "live":

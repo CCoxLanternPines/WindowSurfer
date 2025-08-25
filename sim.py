@@ -6,12 +6,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 from typing import Optional
-import sys
 import json
 
-import pandas as pd  # type: ignore
-
-from systems.scripts.plot import plot_trades_from_ledger
+from systems.scripts.plot import plot_from_json
 
 
 def _ensure_candles(coin: str) -> Path:
@@ -45,19 +42,19 @@ def _ensure_candles(coin: str) -> Path:
 def main(argv: Optional[list[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Run historical simulation")
     parser.add_argument("--coin", required=True, help="Coin symbol e.g. DOGEUSD")
-    parser.add_argument("--time", dest="timeframe", default="1m", help="Lookback window")
+    parser.add_argument("--time", default="1m", help="Lookback window")
     parser.add_argument("--viz", action="store_true", help="Enable plotting")
     args = parser.parse_args(argv)
 
     coin = args.coin.replace("/", "").upper()
 
-    csv_path = _ensure_candles(coin)
+    _ensure_candles(coin)
 
     from systems.sim_engine import run_simulation
 
     run_simulation(
         coin=coin,
-        timeframe=args.timeframe,
+        timeframe=args.time,
         viz=False,
     )
     sim_path = Path("data/temp/sim_data.json")
@@ -75,31 +72,7 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     if args.viz:
         try:
-            df = pd.read_csv(csv_path)
-            entries = []
-            for t in ledger.get("trades", []):
-                idx = int(t.get("idx", -1))
-                if 0 <= idx < len(df):
-                    ts = float(df.iloc[idx]["timestamp"])
-                else:
-                    ts = None
-                if ts is None:
-                    continue
-                entries.append({
-                    "timestamp": ts,
-                    "price": t.get("price"),
-                    "side": t.get("side"),
-                })
-            plot_path = Path("data/temp/sim_plot.json")
-            with plot_path.open("w", encoding="utf-8") as fh:
-                json.dump({"entries": entries}, fh, indent=2)
-            # Use a placeholder account label for plotting since the engine is coin-centric
-            plot_trades_from_ledger(
-                "SIM",
-                coin,
-                mode="sim",
-                ledger_path=str(plot_path),
-            )
+            plot_from_json(str(sim_path))
         except Exception as exc:  # pragma: no cover - plotting best effort
             print(f"[WARN] Plotting failed: {exc}")
 
