@@ -70,3 +70,10 @@ Contains reference material or archived configs not actively used in the live sy
 - **utils/** → Reusable generic helpers for config/time/etc.  
 - **settings/** → All runtime configuration for accounts, coins, and system-wide defaults.  
 - **root scripts** (sim.py, live.py, test.py) → CLI entrypoints for testing, sim, and live trading.
+
+##Notes
+no -v specified = standard messages "What i am doing"
+-v Why I am doing it
+--vv the logic i am taking to make these decisions
+
+never use print use log() helper

@@ -1,0 +1,77 @@
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Temporary run state
+*.pid
+
+# Project-specific data noise
+data/results/
+data/sim_*
+data/*_backup.json
+
+# Secrets
+apikeys.yaml
+kraken.yaml
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Python caches / builds ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Virtual envs & tooling ---
+venv/
+.venv/
+env/
+.env
+.env.*
+poetry.lock
+Pipfile.lock
+
+# --- Editors/IDE ---
+.idea/
+.vscode/
+*.code-workspace
+
+# --- Project artifacts (do NOT version) ---
+data/temp/
+data/tmp/
+data/tmp/**
+data/brains/
+data/tuned/
+data/regimes/
+data/cache/
+*.tmp
+
+# Common large artifacts
+*.parquet
+
+*.feather
+
+# Secrets / creds (optional telegram file, keys)
+*.key
+*.pem
+*.crt
+*.der
+*.p12
+
+# OS-specific alt streams (Windows)
+*.Zone.Identifier
+
+
+# Settings secrets
+settings/keys.json
