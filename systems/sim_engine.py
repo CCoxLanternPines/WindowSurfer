@@ -66,6 +66,10 @@ def _run_single_sim(
     market = market.replace("/", "").upper()
     ccxt_market = _to_ccxt(market)
 
+    # Resolve coin-specific configuration, falling back to default settings
+    cfg = dict(coin_settings.get("default", {}))
+    cfg.update(coin_settings.get(market, {}))
+
     try:
         symbols = resolve_symbols(client, ccxt_market)
         kraken_name = symbols["kraken_name"]
@@ -110,30 +114,41 @@ def _run_single_sim(
         general, coin_settings, accounts_cfg, account, ccxt_market, "sim", client=client
     )
 
+    # --- Precompute volatility and returns ---
+    vol_lb = cfg.get("vol_lookback", 48)
+    df["returns"] = df["close"].pct_change()
+    df["volatility"] = df["returns"].rolling(vol_lb).std().fillna(0)
+
     # --- Sim loop ---
-    for t in tqdm(range(len(df)), desc="📉 Sim Progress", unit="tick"):
+    step_size = cfg.get("window_step", 1)
+    for t in tqdm(range(0, len(df), step_size), desc="📉 Sim Progress", unit="tick"):
         candle = df.iloc[t]
 
         # BUY
-        buy_signal = evaluate_buy(ctx={}, t=t, series=df, cfg=coin_settings.get("default", {}), runtime_state=runtime_state)
+        buy_signal = evaluate_buy(ctx={}, t=t, series=df, cfg=cfg, runtime_state=runtime_state)
         if buy_signal:
+            filled_amount = buy_signal.get("units")
+            if filled_amount is None:
+                price = float(candle["close"])
+                filled_amount = buy_signal.get("size_usd", 0.0) / price
+                buy_signal["units"] = filled_amount
             note = apply_buy(
                 ledger=ledger_obj,
                 window_name="default",
                 t=t,
                 meta=buy_signal,
                 result={
-                    "filled_amount": buy_signal["units"],
-                    "avg_price": buy_signal["entry_price"],
+                    "filled_amount": filled_amount,
+                    "avg_price": buy_signal.get("entry_price", float(candle["close"])),
                     "timestamp": int(candle["timestamp"]),
                 },
                 state=runtime_state,
             )
-            runtime_state["capital"] -= buy_signal["size_usd"]
+            runtime_state["capital"] -= buy_signal.get("size_usd", 0.0)
 
         # SELL
         open_notes = ledger_obj.get_open_notes()
-        sell_signals = evaluate_sell(ctx={}, t=t, series=df, cfg=coin_settings.get("default", {}), open_notes=open_notes, runtime_state=runtime_state)
+        sell_signals = evaluate_sell(ctx={}, t=t, series=df, cfg=cfg, open_notes=open_notes, runtime_state=runtime_state)
         for sig in sell_signals:
             result = {
                 "filled_amount": sig["units"],
@@ -175,6 +190,7 @@ def _run_single_sim(
         "trades": entries,
         "meta": {
             "coin": market,
+            "settings": cfg,
             "start_capital": start_capital,
             "final_value": summary.get("total_value", 0.0),
         },
