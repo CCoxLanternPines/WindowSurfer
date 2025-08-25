@@ -15,9 +15,10 @@ def plot_trades(
     trades: List[Dict[str, float]],
     start_capital: float,
     final_value: float,
-    angle_lookback: int = 48,
+    cfg: Dict[str, float],
 ) -> None:
     """Plot price, exhaustion points, volatility, and trade markers."""
+    angle_lookback = int(cfg.get("angle_lookback", 48))
     fig, ax1 = plt.subplots(figsize=(12, 6))
     ax1.plot(df["candle_index"], df["close"], lw=1, label="Close Price", color="blue")
     ax1.set_title(f"Exhaustion Trades\nStart {start_capital}, End {final_value:.2f}")

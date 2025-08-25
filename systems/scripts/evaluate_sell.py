@@ -10,6 +10,7 @@ def evaluate_sell(
     price: float,
     open_notes: List[Dict[str, float]],
     capital: float,
+    cfg: Dict[str, Any] | None = None,
 ) -> Tuple[List[Dict[str, Any]], float, List[Dict[str, float]]]:
     """Return closed trade records and updated portfolio state."""
     trades_closed: List[Dict[str, Any]] = []
