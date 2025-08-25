@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Connectivity and configuration checks."""
+"""Connectivity and configuration checks.
+
+Example:
+    python test.py --account Kris --market DOGEUSD --smoketest
+
+Use ``--help`` to see available options.
+"""
 
 from __future__ import annotations
 
