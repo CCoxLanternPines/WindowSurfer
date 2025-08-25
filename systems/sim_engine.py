@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-"""Historical simulation engine for position-based strategy."""
-
 from datetime import datetime, timezone, timedelta
 import json
 import os
@@ -25,10 +23,10 @@ from systems.utils.trade_logger import init_logger as init_trade_logger
 
 TIMEFRAME_SECONDS = {
     "s": 1,
-    "m": 30 * 24 * 3600,  # 1m = one month
-    "w": 7 * 24 * 3600,   # 1w = one week
-    "d": 24 * 3600,       # 1d = one day
-    "h": 3600,            # 1h = one hour
+    "m": 30 * 24 * 3600,
+    "w": 7 * 24 * 3600,
+    "d": 24 * 3600,
+    "h": 3600,
 }
 
 def parse_timeframe(tf: str):
@@ -66,22 +64,13 @@ def _run_single_sim(
     market = market.replace("/", "").upper()
     ccxt_market = _to_ccxt(market)
 
-    # Resolve coin-specific configuration, falling back to default settings
-    cfg = dict(coin_settings.get("default", {}))
-    cfg.update(coin_settings.get(market, {}))
-
-    try:
-        symbols = resolve_symbols(client, ccxt_market)
-        kraken_name = symbols["kraken_name"]
-    except Exception:
-        symbols = {"kraken_name": ccxt_market}
-        kraken_name = ccxt_market
+    symbols = resolve_symbols(client, ccxt_market)
+    kraken_name = symbols["kraken_name"]
     tag = to_tag(kraken_name)
     ledger_name = f"{account}_{market}"
     init_trade_logger(ledger_name)
     base, _ = split_tag(tag)
 
-    # --- CSV handling ---
     if account.upper() == "SIM":
         csv_path = Path("data/candles/sim") / f"{market}.csv"
         if not csv_path.exists():
@@ -93,7 +82,6 @@ def _run_single_sim(
         df, _ = load_candles_df(account, market, verbose=verbose)
         ts_col = "timestamp"
 
-    # --- Time filter ---
     last_ts_raw = float(df[ts_col].iloc[-1]) if len(df) else 0.0
     is_ms = last_ts_raw > 1e12
     TFACTOR = 1000.0 if is_ms else 1.0
@@ -105,7 +93,6 @@ def _run_single_sim(
             start_ts = end_ts - delta.total_seconds() * TFACTOR
             df = df[df[ts_col] >= start_ts].reset_index(drop=True)
 
-        # --- Ledger init ---
     ledger_obj = Ledger()
     start_capital = float(general.get("simulation_capital", 0.0))
     ledger_obj.set_metadata({"capital": start_capital})
@@ -114,42 +101,30 @@ def _run_single_sim(
         general, coin_settings, accounts_cfg, account, ccxt_market, "sim", client=client
     )
 
-    # --- Precompute volatility and returns ---
-    vol_lb = cfg.get("vol_lookback", 48)
-    df["returns"] = df["close"].pct_change()
-    df["volatility"] = df["returns"].rolling(vol_lb).std().fillna(0)
-
-    # --- Sim loop ---
-    step_size = cfg.get("window_step", 1)
-    for t in tqdm(range(0, len(df), step_size), desc="📉 Sim Progress", unit="tick"):
+    for t in tqdm(range(len(df)), desc="📉 Sim Progress", unit="tick"):
         candle = df.iloc[t]
-
-        # BUY
-        buy_signal = evaluate_buy(ctx={}, t=t, series=df, cfg=cfg, runtime_state=runtime_state)
+        buy_signal = evaluate_buy(ctx={}, t=t, series=df, cfg=coin_settings.get("default", {}), runtime_state=runtime_state)
         if buy_signal:
-            filled_amount = buy_signal.get("units")
-            if filled_amount is None:
-                price = float(candle["close"])
-                filled_amount = buy_signal.get("size_usd", 0.0) / price
-                buy_signal["units"] = filled_amount
-            note = apply_buy(
+            units = buy_signal.get("units") or (buy_signal["size_usd"] / buy_signal["entry_price"])
+            apply_buy(
                 ledger=ledger_obj,
                 window_name="default",
                 t=t,
                 meta=buy_signal,
                 result={
-                    "filled_amount": filled_amount,
-                    "avg_price": buy_signal.get("entry_price", float(candle["close"])),
+                    "filled_amount": units,
+                    "avg_price": buy_signal["entry_price"],
                     "timestamp": int(candle["timestamp"]),
                 },
                 state=runtime_state,
             )
-            runtime_state["capital"] -= buy_signal.get("size_usd", 0.0)
+            runtime_state["capital"] -= buy_signal["size_usd"]
 
-        # SELL
         open_notes = ledger_obj.get_open_notes()
-        sell_signals = evaluate_sell(ctx={}, t=t, series=df, cfg=cfg, open_notes=open_notes, runtime_state=runtime_state)
-        for sig in sell_signals:
+        sell_candidates = evaluate_sell(
+            ctx={}, t=t, series=df, cfg=coin_settings.get("default", {}), open_notes=open_notes, runtime_state=runtime_state
+        )
+        for sig in sell_candidates:
             result = {
                 "filled_amount": sig["units"],
                 "avg_price": sig["sell_price"],
@@ -163,8 +138,6 @@ def _run_single_sim(
                 state=runtime_state,
             )
 
-
-    # --- JSON output ---
     temp_dir = resolve_path("data/temp")
     temp_dir.mkdir(parents=True, exist_ok=True)
     full_path = temp_dir / "sim_data.json"
@@ -190,14 +163,16 @@ def _run_single_sim(
         "trades": entries,
         "meta": {
             "coin": market,
-            "settings": cfg,
             "start_capital": start_capital,
             "final_value": summary.get("total_value", 0.0),
+        },
+        "series": {
+            "timestamps": df["timestamp"].tolist(),
+            "close": df["close"].tolist(),
         },
     }
     with full_path.open("w", encoding="utf-8") as fh:
         json.dump(simple_ledger, fh, indent=2)
-
 
 def run_simulation(*, coin: str, timeframe: str = "1m", viz: bool = True) -> None:
     general = load_general()
