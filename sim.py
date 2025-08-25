@@ -14,8 +14,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Run historical simulation")
     parser.add_argument("--coin", required=True, help="Coin symbol e.g. DOGEUSD")
     parser.add_argument("--time", default="1m", help="Lookback window")
-    parser.add_argument("--graph-feed", action="store_true", default=True, help="Emit NDJSON graph feed for graph_engine")
-    parser.add_argument("--graph-downsample", type=int, default=1, help="Downsample factor for feed")
+    parser.add_argument("--viz", action="store_true", help="Run graph_engine after simulation")
     parser.add_argument("-v", action="count", default=0, help="Increase verbosity (use -vv for more)")
     parser.add_argument("--log", action="store_true", help="Write logs to file")
     args = parser.parse_args(argv)
@@ -28,10 +27,14 @@ def main(argv: Optional[list[str]] = None) -> None:
     run_simulation(
         coin=coin,
         timeframe=args.time,
-        graph_feed=args.graph_feed,
-        graph_downsample=args.graph_downsample,
         viz=False,  # plotting moved to graph_engine
     )
+
+    if args.viz:
+        from systems.graph_engine import discover_feed, render_feed
+
+        path = discover_feed(mode="sim", coin=coin)
+        render_feed(path)
 
 
 if __name__ == "__main__":  # pragma: no cover
