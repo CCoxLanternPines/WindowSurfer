@@ -129,6 +129,17 @@ def _run_single_sim(
             start_ts = end_ts - delta.total_seconds()
             df = df[df[ts_col] >= start_ts].reset_index(drop=True)
 
+    # --- Time-slice diagnostics (anchored to dataset end) ---
+    if timeframe and delta:
+        # candle spacing (median in seconds)
+        diffs = df[ts_col].diff().dropna()
+        med_step = float(diffs.median()) if not diffs.empty else 0.0
+        approx_rows = int((delta.total_seconds() / med_step)) if med_step else 0
+        print(
+            f"[TIMEFILTER][CHECK] delta={delta} med_step={med_step:.0f}s "
+            f"approx_rows~{approx_rows} actual_rows={len(df)}"
+        )
+
     # Log one line so we always know what we ran on
     first_ts = int(df[ts_col].iloc[0]) if len(df) else None
     last_ts = int(df[ts_col].iloc[-1]) if len(df) else None
