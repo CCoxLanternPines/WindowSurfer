@@ -90,6 +90,12 @@ class GraphEngine:
         self.sell_art = self.ax_main.scatter(
             [], [], marker="v", c="red", edgecolor="black", picker=True, pickradius=6
         )
+        self.pb_art = self.ax_main.scatter(
+            [], [], s=[], c="green", alpha=0.30, edgecolor="black"
+        )
+        self.vb_art = self.ax_main.scatter(
+            [], [], s=[], c="red", alpha=0.30, edgecolor="black"
+        )
 
         self.cursor_line = None
 
@@ -98,6 +104,7 @@ class GraphEngine:
 
         self.candle_x: List[float] = []
         self.candle_y: List[float] = []
+        self._price_at: Dict[int, float] = {}
 
     # ------------------------------------------------------------------
     def _on_pick(self, event) -> None:  # pragma: no cover - UI callback
@@ -130,11 +137,28 @@ class GraphEngine:
             self._add_trade(obj, is_buy=True)
         elif t == "sell":
             self._add_trade(obj, is_buy=False)
+        elif t == "ind" and obj.get("k") == "angle":
+            i = obj["i"]
+            v = obj["v"]
+            y0 = self._price_at.get(i)
+            if y0 is not None:
+                x0, x1 = i, i + 5
+                y1 = y0 + v * 5
+                color = "orange" if v > 0.05 else "purple" if v < -0.05 else "gray"
+                self.ax_main.plot([x0, x1], [y0, y1], color=color, lw=1.5, alpha=0.7)
+                self.fig.canvas.draw_idle()
+        elif t == "pb":
+            self._append_bubble(self.pb_art, obj)
+        elif t == "vb":
+            self._append_bubble(self.vb_art, obj)
 
     # ------------------------------------------------------------------
     def _add_candle(self, candle: Dict[str, Any]) -> None:
-        self.candle_x.append(candle.get("i"))
-        self.candle_y.append(candle.get("c"))
+        idx = candle.get("i")
+        price = candle.get("c")
+        self.candle_x.append(idx)
+        self.candle_y.append(price)
+        self._price_at[idx] = price
         self.price_line.set_data(self.candle_x, self.candle_y)
         self.ax_main.relim()
         self.ax_main.autoscale_view()
@@ -154,6 +178,23 @@ class GraphEngine:
         else:
             new_offsets = np.array([[x, y]])
         artist.set_offsets(new_offsets)
+        self.fig.canvas.draw_idle()
+
+    # ------------------------------------------------------------------
+    def _append_bubble(self, artist, obj: Dict[str, Any]) -> None:
+        x, y, s = obj["i"], obj["p"], obj["s"]
+        offsets = artist.get_offsets()
+        sizes = artist.get_sizes()
+        if offsets.size:
+            new_offsets = np.vstack([offsets, [x, y]])
+        else:
+            new_offsets = np.array([[x, y]])
+        if sizes.size:
+            new_sizes = np.append(sizes, s)
+        else:
+            new_sizes = np.array([s])
+        artist.set_offsets(new_offsets)
+        artist.set_sizes(new_sizes)
         self.fig.canvas.draw_idle()
 
 

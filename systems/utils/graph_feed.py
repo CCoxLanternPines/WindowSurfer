@@ -48,6 +48,14 @@ class GraphFeed:
             return
         self._write({"t":"ind","i":int(i),"k":str(k),"v":float(v)})
 
+    def pressure_bubble(self, i: int, p: float, s: float) -> None:
+        """Write a green pressure bubble at candle ``i``."""
+        self._write({"t": "pb", "i": int(i), "p": float(p), "s": float(s)})
+
+    def vol_bubble(self, i: int, p: float, s: float) -> None:
+        """Write a red volatility bubble at candle ``i``."""
+        self._write({"t": "vb", "i": int(i), "p": float(p), "s": float(s)})
+
     def buy(self, i: int, p: float, u: float, usd: float, target: float) -> None:
         self._write({"t":"buy","i":int(i),"p":float(p),"u":float(u),"$":float(usd),"target":float(target)})
 

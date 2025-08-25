@@ -72,6 +72,7 @@ def run_simulation(
         "exhaustion_up":   {"x": [], "y": [], "s": []},
         "exhaustion_down": {"x": [], "y": [], "s": []},
     }
+    vol_pts = {"x": [], "y": [], "s": []}
     df["angle"] = 0.0
 
     feed = GraphFeed(mode="sim", coin=coin, downsample=graph_downsample, flush=False) if graph_feed else None
@@ -105,6 +106,27 @@ def run_simulation(
             pts["exhaustion_down"]["x"].append(end_idx)
             pts["exhaustion_down"]["y"].append(now_price)
             pts["exhaustion_down"]["s"].append(size)
+    # Volatility bubbles
+    for t in range(VOL_LOOKBACK, len(df), WINDOW_STEP):
+        price = float(df["close"].iloc[t])
+        vol = float(df["volatility"].iloc[t])
+        end_idx = int(df["candle_index"].iloc[t])
+        size = SIZE_SCALAR * (vol ** SIZE_POWER)
+        vol_pts["x"].append(end_idx)
+        vol_pts["y"].append(price)
+        vol_pts["s"].append(size)
+
+    if feed:
+        # pressure/green bubbles
+        for x, y, s in zip(
+            pts["exhaustion_down"]["x"],
+            pts["exhaustion_down"]["y"],
+            pts["exhaustion_down"]["s"],
+        ):
+            feed.pressure_bubble(int(x), float(y), float(s))
+        # volatility/red bubbles
+        for x, y, s in zip(vol_pts["x"], vol_pts["y"], vol_pts["s"]):
+            feed.vol_bubble(int(x), float(y), float(s))
 
     # ===== Candle-by-candle simulation =====
     trades = []
