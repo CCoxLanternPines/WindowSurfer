@@ -3,10 +3,11 @@ from __future__ import annotations
 """Historical simulation engine for position-based strategy."""
 
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import csv
 import json
 import os
+import re
 
 import ccxt
 import pandas as pd
@@ -39,9 +40,27 @@ from systems.utils.resolve_symbol import (
     resolve_symbols,
     to_tag,
 )
-from systems.utils.time import parse_cutoff as parse_timeframe
 from systems.utils.trade_logger import init_logger as init_trade_logger, record_event
 from systems.utils.ledger import init_ledger as ledger_init, append_entry as ledger_append, save_ledger as ledger_save
+
+
+TIMEFRAME_SECONDS = {
+    "s": 1,
+    "m": 30 * 24 * 3600,  # 1m = one month
+    "w": 7 * 24 * 3600,   # 1w = one week
+    "d": 24 * 3600,       # 1d = one day
+    "h": 3600,            # 1h = one hour
+}
+
+
+def parse_timeframe(tf: str) -> timedelta | None:
+    if not tf:
+        return None
+    m = re.match(r"(?i)^\s*(\d+)\s*([smhdw])\s*$", tf)
+    if not m:
+        return None
+    n, u = int(m.group(1)), m.group(2).lower()
+    return timedelta(seconds=n * TIMEFRAME_SECONDS[u])
 
 
 def _to_ccxt(market: str) -> str:
@@ -102,10 +121,13 @@ def _run_single_sim(
     if not df[ts_col].is_monotonic_increasing:
         raise ValueError(f"Candles not sorted by {ts_col}: {csv_path}")
 
+    delta = None
     if timeframe:
         delta = parse_timeframe(timeframe)
-        cutoff_ts = (datetime.now(tz=timezone.utc) - delta).timestamp()
-        df = df[df[ts_col] >= cutoff_ts].reset_index(drop=True)
+        if delta:
+            end_ts = float(df[ts_col].iloc[-1])
+            start_ts = end_ts - delta.total_seconds()
+            df = df[df[ts_col] >= start_ts].reset_index(drop=True)
 
     # Log one line so we always know what we ran on
     first_ts = int(df[ts_col].iloc[0]) if len(df) else None
@@ -123,6 +145,10 @@ def _run_single_sim(
     print(
         f"[DATA][SIM] file={csv_path} rows={len(df)} first={first_iso} last={last_iso} dups_removed={removed}"
     )
+    if timeframe and delta:
+        print(
+            f"[TIMEFILTER] Using --time {timeframe} rows={len(df)} first={first_iso} last={last_iso}"
+        )
 
     total = len(df)
 
@@ -441,21 +467,108 @@ def _run_single_sim(
         json.dump(json_data, f_json, indent=2)
     if viz:
         import matplotlib.pyplot as plt
+        import numpy as np
 
         times = pd.to_datetime(df[ts_col], unit="s")
         plt.figure()
         plt.plot(times, df["close"], label="Close", color="gray", zorder=1)
-        # --- Plot buys (single block, no duplication) ---
+
+        # ----- Feature calculations for visualization -----
+        ex_lookback = int(strategy_cfg.get("exhaustion_lookback", 184))
+        window_step = int(strategy_cfg.get("window_step", 12))
+        vol_lookback = int(strategy_cfg.get("vol_lookback", 48))
+        angle_lookback = int(strategy_cfg.get("angle_lookback", 48))
+        angle_up_min = float(strategy_cfg.get("angle_up_min", 0.05))
+        angle_down_min = float(strategy_cfg.get("angle_down_min", -0.05))
+
+        returns = df["close"].pct_change()
+        df["volatility"] = returns.rolling(vol_lookback).std().fillna(0.0)
+        df["angle"] = 0.0
+
+        SIZE_SCALAR = 1_000_000
+        SIZE_POWER = 3
+
+        ex_up = {"x": [], "y": [], "s": []}
+        ex_down = {"x": [], "y": [], "s": []}
+        vol_pts = {"x": [], "y": [], "s": []}
+
+        for t in range(angle_lookback, len(df)):
+            dy = df["close"].iloc[t] - df["close"].iloc[t - angle_lookback]
+            dx = angle_lookback
+            angle = np.arctan2(dy, dx)
+            norm = angle / (np.pi / 4)
+            df.at[t, "angle"] = max(-1.0, min(1.0, norm))
+
+        for t in range(ex_lookback, len(df), window_step):
+            now_price = float(df["close"].iloc[t])
+            past_price = float(df["close"].iloc[t - ex_lookback])
+            if now_price > past_price:
+                delta_up = now_price - past_price
+                norm_up = delta_up / max(1e-9, past_price)
+                size = SIZE_SCALAR * (norm_up ** SIZE_POWER)
+                ex_up["x"].append(times.iloc[t])
+                ex_up["y"].append(now_price)
+                ex_up["s"].append(size)
+            elif now_price < past_price:
+                delta_down = past_price - now_price
+                norm_down = delta_down / max(1e-9, past_price)
+                size = SIZE_SCALAR * (norm_down ** SIZE_POWER)
+                ex_down["x"].append(times.iloc[t])
+                ex_down["y"].append(now_price)
+                ex_down["s"].append(size)
+
+        for t in range(vol_lookback, len(df), window_step):
+            vol = df["volatility"].iloc[t]
+            size = SIZE_SCALAR * (vol * (0.4 ** SIZE_POWER))
+            vol_pts["x"].append(times.iloc[t])
+            vol_pts["y"].append(float(df["close"].iloc[t]))
+            vol_pts["s"].append(size)
+
+        arrow_span = 5
+        for i in range(angle_lookback, len(df), window_step):
+            v = df["angle"].iloc[i]
+            if v > angle_up_min:
+                color = "orange"
+            elif v < angle_down_min:
+                color = "purple"
+            else:
+                color = "gray"
+            x0 = times.iloc[i]
+            y0 = df["close"].iloc[i]
+            j = min(i + arrow_span, len(df) - 1)
+            x1 = times.iloc[j]
+            y1 = y0 + v * arrow_span
+            plt.plot([x0, x1], [y0, y1], color=color, lw=1.5, alpha=0.7)
+
+        if ex_up["x"]:
+            plt.scatter(
+                ex_up["x"], ex_up["y"], s=ex_up["s"],
+                color="green", alpha=0.3, edgecolors="black",
+                label="Exhaust Up", zorder=2,
+            )
+        if ex_down["x"]:
+            plt.scatter(
+                ex_down["x"], ex_down["y"], s=ex_down["s"],
+                color="red", alpha=0.3, edgecolors="black",
+                label="Exhaust Down", zorder=2,
+            )
+        if vol_pts["x"]:
+            plt.scatter(
+                vol_pts["x"], vol_pts["y"], s=vol_pts["s"],
+                facecolors="none", edgecolors="red", alpha=0.3,
+                label="Volatility", zorder=2,
+            )
+
+        # --- Plot buys ---
         if buy_points:
             b_t, b_p = zip(*buy_points)
             plt.scatter(
                 pd.to_datetime(b_t, unit="s"),
                 b_p,
-                marker="o", color="g", label="Buy", zorder=2,
+                marker="o", color="g", label="Buy", zorder=5,
             )
 
-
-        # --- Plot sells (normal vs flat) ---
+        # --- Plot sells ---
         if sell_points:
             times_normal = [t for t, p, m in sell_points if m == "normal"]
             prices_normal = [p for t, p, m in sell_points if m == "normal"]
@@ -468,21 +581,20 @@ def _run_single_sim(
                 plt.scatter(
                     pd.to_datetime(times_normal, unit="s"),
                     prices_normal,
-                    marker="o", color="r", label="Sell", zorder=2,
+                    marker="o", color="r", label="Sell", zorder=5,
                 )
             if times_flat:
                 plt.scatter(
                     pd.to_datetime(times_flat, unit="s"),
                     prices_flat,
-                    marker="o", color="orange", label="Flat Sell", zorder=2,
+                    marker="o", color="orange", label="Flat Sell", zorder=5,
                 )
             if times_all:
                 plt.scatter(
                     pd.to_datetime(times_all, unit="s"),
                     prices_all,
-                    marker="x", color="red", label="All Sell", zorder=3,
+                    marker="x", color="red", label="All Sell", zorder=6,
                 )
-
 
         plt.xlabel("Time")
         plt.ylabel("Price")
