@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
+"""Thin CLI wrapper for simulation visualization."""
+
 from __future__ import annotations
 
-"""Minimal plotting utilities for ledgers and candles."""
+import argparse
+from typing import Optional
 
-import json
-from pathlib import Path
-
-import matplotlib.pyplot as plt  # type: ignore
-import pandas as pd
+from systems.graph_engine import render_simulation
 
 
-def plot(ledger_path: str, candles_path: str) -> None:
-    """Plot candle close prices with optional trade markers."""
-    df = pd.read_csv(candles_path)
-    plt.plot(df["timestamp"], df["close"], label="Close", color="blue")
-    try:
-        with open(ledger_path, "r", encoding="utf-8") as f:
-            ledger = json.load(f)
-        for note in ledger.get("closed_notes", []):
-            if "created_ts" in note and "entry_price" in note:
-                plt.scatter(note["created_ts"], note["entry_price"], color="green", marker="^")
-            if "exit_ts" in note and "exit_price" in note:
-                plt.scatter(note["exit_ts"], note["exit_price"], color="red", marker="v")
-    except FileNotFoundError:
-        pass
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+def main(argv: Optional[list[str]] = None) -> None:
+    parser = argparse.ArgumentParser(description="Render simulation ledger")
+    parser.add_argument(
+        "--ledger",
+        default="data/temp/sim_data.json",
+        help="Path to simulation ledger JSON",
+    )
+    parser.add_argument(
+        "--viz", action="store_true", help="Render visualization"
+    )
+    args = parser.parse_args(argv)
+
+    if args.viz:
+        render_simulation(args.ledger)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()
+
